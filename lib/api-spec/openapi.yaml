@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: receipts
+    description: Receipt storage, search, and retrieval
+  - name: Storage
+    description: Object storage upload and serving endpoints.
 paths:
   /healthz:
     get:
@@ -24,6 +28,280 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /receipts:
+    get:
+      operationId: listReceipts
+      tags: [receipts]
+      summary: List receipts (most recent first)
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Natural-language search query across merchant, products, OCR text, and AI metadata.
+      responses:
+        "200":
+          description: List of receipts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Receipt"
+    post:
+      operationId: createReceipt
+      tags: [receipts]
+      summary: Create a receipt from an uploaded file and trigger AI extraction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptInput"
+      responses:
+        "201":
+          description: Created receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Receipt"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /receipts/stats:
+    get:
+      operationId: getReceiptStats
+      tags: [receipts]
+      summary: Aggregate stats for the current user's receipts
+      responses:
+        "200":
+          description: Receipt statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptStats"
+  /receipts/recent:
+    get:
+      operationId: getRecentReceipts
+      tags: [receipts]
+      summary: A small set of the most recent receipts
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+          description: Number of recent receipts to return (default 5).
+      responses:
+        "200":
+          description: Recent receipts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Receipt"
+  /receipts/merchant-breakdown:
+    get:
+      operationId: getMerchantBreakdown
+      tags: [receipts]
+      summary: Spend grouped by merchant
+      responses:
+        "200":
+          description: Merchant spend breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MerchantSpend"
+  /receipts/{id}:
+    get:
+      operationId: getReceipt
+      tags: [receipts]
+      summary: Get a single receipt with full details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Receipt detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Receipt"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    patch:
+      operationId: updateReceipt
+      tags: [receipts]
+      summary: Update editable receipt fields
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptUpdate"
+      responses:
+        "200":
+          description: Updated receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Receipt"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    delete:
+      operationId: deleteReceipt
+      tags: [receipts]
+      summary: Delete a receipt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      description: |
+        Returns a presigned GCS URL for direct upload. The client sends JSON
+        metadata here, then uploads the file directly to the returned URL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadUrlRequest'
+      responses:
+        '200':
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadUrlResponse'
+        '400':
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Failed to generate upload URL.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /storage/public-objects/{filePath}:
+    get:
+      tags: [Storage]
+      operationId: getPublicObject
+      summary: Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+      description: |
+        Unconditionally public — no authentication or ACL checks.
+        Searches PUBLIC_OBJECT_SEARCH_PATHS for the given file path.
+      parameters:
+        - name: filePath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Relative file path within the public search paths.
+      responses:
+        '200':
+          description: Object content streamed with correct Content-Type.
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Failed to serve public object.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Serve an object entity from PRIVATE_OBJECT_DIR
+      description: |
+        Serves object entities uploaded via presigned URLs. These can optionally
+        be protected with authentication or ACL checks based on the use case.
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Object path within the private object dir (e.g. `uploads/some-uuid`).
+      responses:
+        '200':
+          description: Object content streamed with correct Content-Type.
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Object not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Failed to serve object.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
     HealthStatus:
@@ -33,4 +311,158 @@ components:
           type: string
       required:
         - status
-
+    Receipt:
+      type: object
+      required:
+        - id
+        - objectPath
+        - originalFileName
+        - contentType
+        - status
+        - createdAt
+      properties:
+        id:
+          type: integer
+        objectPath:
+          type: string
+          description: Storage path of the original uploaded file (e.g. /objects/uploads/uuid).
+        originalFileName:
+          type: string
+        contentType:
+          type: string
+          description: MIME type of the uploaded original.
+        status:
+          type: string
+          enum: [processing, completed, failed]
+          description: AI extraction status.
+        merchant:
+          type: ["string", "null"]
+        purchaseDate:
+          type: ["string", "null"]
+          description: Purchase date in ISO format (YYYY-MM-DD).
+        total:
+          type: ["number", "null"]
+        currency:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        summary:
+          type: ["string", "null"]
+          description: AI-generated natural-language summary of the receipt.
+        ocrText:
+          type: ["string", "null"]
+          description: Full extracted text from the receipt.
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceiptProduct"
+        createdAt:
+          type: string
+          format: date-time
+    ReceiptProduct:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        quantity:
+          type: ["number", "null"]
+        price:
+          type: ["number", "null"]
+    ReceiptInput:
+      type: object
+      required:
+        - objectPath
+        - originalFileName
+        - contentType
+      properties:
+        objectPath:
+          type: string
+          minLength: 1
+          description: Storage path returned by the upload endpoint.
+        originalFileName:
+          type: string
+          minLength: 1
+        contentType:
+          type: string
+          minLength: 1
+    ReceiptUpdate:
+      type: object
+      properties:
+        merchant:
+          type: string
+        purchaseDate:
+          type: string
+        total:
+          type: number
+        currency:
+          type: string
+        category:
+          type: string
+    ReceiptStats:
+      type: object
+      required:
+        - totalReceipts
+        - totalSpend
+        - merchantCount
+        - thisMonthSpend
+      properties:
+        totalReceipts:
+          type: integer
+        totalSpend:
+          type: number
+        merchantCount:
+          type: integer
+        thisMonthSpend:
+          type: number
+        topCategory:
+          type: ["string", "null"]
+    MerchantSpend:
+      type: object
+      required:
+        - merchant
+        - total
+        - count
+      properties:
+        merchant:
+          type: string
+        total:
+          type: number
+        count:
+          type: integer
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Original file name.
+        size:
+          type: integer
+          minimum: 1
+          description: File size in bytes.
+        contentType:
+          type: string
+          minLength: 1
+          description: MIME type of the file (e.g. `image/jpeg`).
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+          description: Presigned GCS URL for PUT upload.
+        objectPath:
+          type: string
+          description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.
+        metadata:
+          $ref: '#/components/schemas/UploadUrlRequest'
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Receiptr"
+version = "1.0.0"
+id = "artifacts/receiptr"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 5000
+
+[services.development]
+run = "pnpm --filter @workspace/receiptr run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/receiptr", "run", "build" ]
+publicDir = "artifacts/receiptr/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "5000"
+BASE_PATH = "/"
