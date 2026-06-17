@@ -2,7 +2,8 @@ import { useState, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { format } from "date-fns";
-import { Search, Plus, FileText, ArrowRight, Loader2, Filter, LogOut, CheckCircle2 } from "lucide-react";
+import { Search, Plus, FileText, ArrowRight, Loader2, Filter, LogOut, CheckCircle2, User } from "lucide-react";
+import { useGuestMode } from "@/components/GuestProvider";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ export default function Library() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const [, setLocation] = useLocation();
+  const { isGuest, guestUser, exitGuestMode } = useGuestMode();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -136,16 +138,32 @@ export default function Library() {
         
         <div className="p-4 border-t mt-auto">
           <div className="flex items-center gap-3">
-            <Avatar className="w-9 h-9 border">
-              <AvatarImage src={user?.imageUrl} />
-              <AvatarFallback>{user?.firstName?.charAt(0) || "U"}</AvatarFallback>
-            </Avatar>
-            <div className="flex-col flex flex-1 min-w-0">
-              <span className="text-sm font-medium truncate">{user?.fullName || user?.primaryEmailAddress?.emailAddress}</span>
-            </div>
-            <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" onClick={() => signOut({ redirectUrl: "/" })}>
-              <LogOut className="w-4 h-4" />
-            </Button>
+            {isGuest ? (
+              <>
+                <div className="w-9 h-9 rounded-full border bg-secondary flex items-center justify-center">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div className="flex-col flex flex-1 min-w-0">
+                  <span className="text-sm font-medium truncate">{guestUser?.name}</span>
+                </div>
+                <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" onClick={() => { exitGuestMode(); setLocation("/"); }}>
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Avatar className="w-9 h-9 border">
+                  <AvatarImage src={user?.imageUrl} />
+                  <AvatarFallback>{user?.firstName?.charAt(0) || "U"}</AvatarFallback>
+                </Avatar>
+                <div className="flex-col flex flex-1 min-w-0">
+                  <span className="text-sm font-medium truncate">{user?.fullName || user?.primaryEmailAddress?.emailAddress}</span>
+                </div>
+                <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" onClick={() => signOut({ redirectUrl: "/" })}>
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </aside>

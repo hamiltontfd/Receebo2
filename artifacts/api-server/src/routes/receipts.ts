@@ -15,7 +15,7 @@ import {
   UpdateReceiptResponse,
   DeleteReceiptParams,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { extractReceiptData } from "../lib/receiptExtraction";
 import { logger } from "../lib/logger";
 
@@ -52,7 +52,7 @@ async function runExtraction(
   }
 }
 
-router.get("/receipts", requireAuth, async (req, res): Promise<void> => {
+router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
 
   const conditions = [eq(receiptsTable.userId, req.userId!)];
@@ -79,7 +79,7 @@ router.get("/receipts", requireAuth, async (req, res): Promise<void> => {
   res.json(ListReceiptsResponse.parse(rows));
 });
 
-router.post("/receipts", requireAuth, async (req, res): Promise<void> => {
+router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   const parsed = CreateReceiptBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -107,7 +107,7 @@ router.post("/receipts", requireAuth, async (req, res): Promise<void> => {
   res.status(201).json(GetReceiptResponse.parse(receipt));
 });
 
-router.get("/receipts/stats", requireAuth, async (req, res): Promise<void> => {
+router.get("/receipts/stats", requireAuthOrGuest, async (req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(receiptsTable)
@@ -156,7 +156,7 @@ router.get("/receipts/stats", requireAuth, async (req, res): Promise<void> => {
   );
 });
 
-router.get("/receipts/recent", requireAuth, async (req, res): Promise<void> => {
+router.get("/receipts/recent", requireAuthOrGuest, async (req, res): Promise<void> => {
   const parsed = GetRecentReceiptsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -176,7 +176,7 @@ router.get("/receipts/recent", requireAuth, async (req, res): Promise<void> => {
 
 router.get(
   "/receipts/merchant-breakdown",
-  requireAuth,
+  requireAuthOrGuest,
   async (req, res): Promise<void> => {
     const rows = await db
       .select()
@@ -204,7 +204,7 @@ router.get(
   },
 );
 
-router.get("/receipts/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void> => {
   const params = GetReceiptParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -229,7 +229,7 @@ router.get("/receipts/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(GetReceiptResponse.parse(receipt));
 });
 
-router.patch("/receipts/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void> => {
   const params = UpdateReceiptParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -261,7 +261,7 @@ router.patch("/receipts/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(UpdateReceiptResponse.parse(receipt));
 });
 
-router.delete("/receipts/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void> => {
   const params = DeleteReceiptParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

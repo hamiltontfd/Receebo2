@@ -1,7 +1,9 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { useGuestMode } from "@/components/GuestProvider";
 
 export default function Landing() {
+  const { enterGuestMode } = useGuestMode();
   return (
     <div className="min-h-dvh flex flex-col bg-background text-foreground selection:bg-primary/20">
       <header className="px-6 py-4 flex items-center justify-between z-10 sticky top-0 bg-background/80 backdrop-blur-md border-b">
@@ -39,6 +41,14 @@ export default function Landing() {
                 Start Organizing Free
               </Button>
             </Link>
+            <Button
+              variant="outline"
+              size="lg"
+              className="rounded-full h-14 px-8 text-base font-medium"
+              onClick={enterGuestMode}
+            >
+              Try Without Account
+            </Button>
           </div>
         </section>
       </main>

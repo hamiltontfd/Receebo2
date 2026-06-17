@@ -11,6 +11,8 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Library from "@/pages/library";
 import ReceiptDetail from "@/pages/receipt-detail";
+import { useGuestMode } from "@/components/GuestProvider";
+import { setGuestId } from "@workspace/api-client-react";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -112,42 +114,53 @@ function SignUpPage() {
 }
 
 function HomeRedirect() {
+  const { isGuest } = useGuestMode();
   return (
     <>
       <Show when="signed-in">
         <Redirect to="/library" />
       </Show>
       <Show when="signed-out">
-        <Landing />
+        {isGuest ? <Redirect to="/library" /> : <Landing />}
       </Show>
     </>
   );
 }
 
 function LibraryRoute() {
+  const { isGuest } = useGuestMode();
   return (
     <>
       <Show when="signed-in">
         <Library />
       </Show>
       <Show when="signed-out">
-        <Redirect to="/" />
+        {isGuest ? <Library /> : <Redirect to="/" />}
       </Show>
     </>
   );
 }
 
 function ReceiptDetailRoute() {
+  const { isGuest } = useGuestMode();
   return (
     <>
       <Show when="signed-in">
         <ReceiptDetail />
       </Show>
       <Show when="signed-out">
-        <Redirect to="/" />
+        {isGuest ? <ReceiptDetail /> : <Redirect to="/" />}
       </Show>
     </>
   );
+}
+
+function GuestIdSync() {
+  const { isGuest, guestUser } = useGuestMode();
+  useEffect(() => {
+    setGuestId(isGuest ? guestUser?.id ?? null : null);
+  }, [isGuest, guestUser]);
+  return null;
 }
 
 function ClerkQueryClientCacheInvalidator() {
@@ -191,6 +204,7 @@ function ClerkProviderWithRoutes() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <ClerkQueryClientCacheInvalidator />
+          <GuestIdSync />
           <Switch>
             <Route path="/" component={HomeRedirect} />
             <Route path="/sign-in/*?" component={SignInPage} />
