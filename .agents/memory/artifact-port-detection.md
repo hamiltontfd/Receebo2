@@ -1,41 +1,35 @@
 ---
-name: Artifact port detection vs serving
-description: Why a web artifact's dev workflow can report "failed" / DIDNT_OPEN_A_PORT yet the app still serves fine through the api-server router.
+name: Don't create duplicate dev workflows for an artifact
+description: A web artifact already has a system-managed dev workflow; adding your own console workflow for the same dev command causes a port conflict and a "failed" artifact workflow.
 ---
 
-# Artifact dev-workflow port detection is separate from actual serving
+# Each artifact already has a managed dev workflow — do not add a second one
 
-In this pnpm monorepo, web artifacts are path-routed: the `api` artifact (api-server)
-is the application router on the single external port (e.g. 8080 -> external 80) and
-dispatches incoming paths to each web artifact's `localPort` based on its
-`artifact.toml` (`previewPath` -> `localPort`). The browser/preview never hits the
-web artifact's port directly.
+In this pnpm monorepo, every artifact gets a system-managed workflow named
+`artifacts/<slug>: <service>` (e.g. `artifacts/receiptr: web`). It is generated
+from the artifact's real config at `artifacts/<slug>/.replit-artifact/artifact.toml`
+(NOT `artifacts/<slug>/artifact.toml`, which is empty/unused). That config sets the
+service `localPort` and a `[services.env]` block (e.g. `PORT=5000`, `BASE_PATH=/`),
+and the matching `.replit` `[[ports]]` entry. Path routing: the api-server is the
+router on the single external port and proxies `previewPath` -> the service's
+`localPort`; the browser/preview hits `localhost:80/<previewPath>`, never the
+artifact port directly.
 
-Two independent systems are easy to confuse:
-- **Serving** works whenever the web artifact's vite dev server is alive on its
-  `localPort`. The api-server proxy routes `previewPath` -> that localPort. No
-  `.replit` `[[ports]]` entry is required for this.
-- **Workflow port DETECTION** (what marks a workflow running vs failed) reads the
-  external ports declared in `.replit`. If the artifact has no `.replit` `[[ports]]`
-  entry, the detector reports `openPorts=null` -> `DIDNT_OPEN_A_PORT` no matter which
-  port the app actually binds, and the artifact-managed workflow gets killed at the
-  port-wait timeout.
+**The trap:** if a "... : web" workflow shows "failed", do NOT work around it by
+creating your own console workflow that runs the same dev command on the same port.
+That second workflow squats the artifact's `localPort`, so the managed workflow then
+fails with "Port <N> is already in use" — a self-inflicted conflict that persists
+across restarts and confuses the user ("the artifact failed to run").
 
-**Why this happened here:** the `receiptr` artifact was bootstrapped with an invalid
-localPort, so no `.replit` `[[ports]]` entry was ever written for it. There is no
-agent tool to edit `.replit` directly (blocked), and `verifyAndReplaceArtifactToml` /
-`configureWorkflow` do NOT add `.replit` port entries. The artifact registration also
-can't be removed, so cleanly recreating the artifact is not possible.
+**How to apply:**
+1. First screenshot `localhost:80/<previewPath>` — if it renders, serving is fine.
+2. Inspect the REAL config at `.replit-artifact/artifact.toml`. If it has the right
+   `localPort` and `[services.env]` (PORT/BASE_PATH), the managed workflow is correct.
+3. If a "failed" managed workflow is caused by a duplicate workflow you (or a past
+   session) added, `removeWorkflow({name})` the duplicate, then restart the managed
+   `artifacts/<slug>: web` workflow. It will bind the freed port and serve.
+4. To change an artifact's port/env/command, edit `.replit-artifact/artifact.toml`
+   via `verifyAndReplaceArtifactToml` — never hand-roll a parallel workflow.
 
-**Workaround that works:** create a plain console workflow (e.g. `receiptr-run`) with
-NO `waitForPort` running the artifact's dev command (`PORT=<localPort> BASE_PATH=/ pnpm
---filter @workspace/<artifact> run dev`). With no port wait it is never killed, vite
-stays alive, and the api-server proxy serves the preview at `localhost:80/`. The
-artifact-managed `... : web` workflow will keep showing "failed" — that label is
-cosmetic here. **Production is unaffected**: prod serves a static build through
-api-server, not the dev workflow.
-
-**How to apply:** Don't chase a "failed" web-artifact workflow / DIDNT_OPEN_A_PORT as
-if the app is down — first screenshot `localhost:80/<previewPath>` through the proxy.
-If it renders, serving is fine and the failure is just detection. Keep vite alive via
-a no-waitForPort console workflow rather than fighting `.replit`.
+**Why:** the managed workflow and the artifact config are the single source of truth.
+A parallel console workflow is redundant and races for the same port.

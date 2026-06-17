@@ -1,2 +1,2 @@
-- [Artifact port detection vs serving](artifact-port-detection.md) — a web artifact's dev workflow can show "failed"/DIDNT_OPEN_A_PORT yet still serve via the api-server proxy; keep vite alive with a no-waitForPort console workflow.
+- [Don't create duplicate dev workflows for an artifact](artifact-port-detection.md) — each artifact has a managed `... : web` workflow from `.replit-artifact/artifact.toml`; never add a parallel console workflow on the same port (causes "Port in use" failure). Remove the duplicate instead.
 - [object-storage-web lib composite build](object-storage-web-composite.md) — the lib ships unbuilt without composite:true; add composite opts + run `tsc -b` on it so a consuming artifact's `tsc -p` typecheck resolves its .d.ts.
