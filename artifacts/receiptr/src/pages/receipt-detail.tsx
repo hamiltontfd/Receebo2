@@ -21,6 +21,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
+import { currencySymbol } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -49,12 +50,6 @@ const editFormSchema = z.object({
 
 type EditFormValues = z.infer<typeof editFormSchema>;
 
-function currencySymbol(currency?: string | null): string {
-  if (!currency || currency === "USD") return "$";
-  if (currency === "EUR") return "\u20AC";
-  if (currency === "GBP") return "\u00A3";
-  return `${currency} `;
-}
 
 export default function ReceiptDetail() {
   const [match, params] = useRoute("/receipts/:id");
@@ -365,7 +360,7 @@ export default function ReceiptDetail() {
                   {product.quantity && product.quantity > 1 ? ` × ${product.quantity}` : ""}
                 </span>
                 {product.price != null && (
-                  <span className="font-mono font-medium">${product.price.toFixed(2)}</span>
+                  <span className="font-mono font-medium">{symbol}{product.price.toFixed(2)}</span>
                 )}
               </li>
             ))}

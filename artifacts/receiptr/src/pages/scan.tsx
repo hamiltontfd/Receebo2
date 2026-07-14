@@ -17,6 +17,7 @@ import {
   customFetch,
 } from "@workspace/api-client-react";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
+import { currencySymbol } from "@/lib/currency";
 
 type Phase = "capture" | "reading" | "review";
 
@@ -477,9 +478,12 @@ export default function Scan() {
                 <ul className="space-y-2">
                   {receipt.products.map((p, i) => (
                     <li key={i} className="flex justify-between text-sm">
-                      <span>{p.name}</span>
+                      <span>
+                        {p.name}
+                        {p.quantity && p.quantity > 1 ? ` × ${p.quantity}` : ""}
+                      </span>
                       {p.price != null && (
-                        <span className="font-mono">${p.price.toFixed(2)}</span>
+                        <span className="font-mono">{currencySymbol(receipt.currency)}{p.price.toFixed(2)}</span>
                       )}
                     </li>
                   ))}
