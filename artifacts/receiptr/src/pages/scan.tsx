@@ -486,8 +486,7 @@ export default function Scan() {
                   {receipt.products.map((p, i) => (
                     <li key={i} className="flex justify-between text-sm">
                       <span>
-                        {p.name}
-                        {p.quantity && p.quantity > 1 ? ` × ${p.quantity}` : ""}
+                        {p.quantity && p.quantity > 1 ? `×${p.quantity} ` : ""}{p.name}
                       </span>
                       {p.price != null && (
                         <span className="font-mono">{currencySymbol(receipt.currency)}{p.price.toFixed(2)}</span>

@@ -357,8 +357,7 @@ export default function ReceiptDetail() {
             {receipt.products.map((product, i) => (
               <li key={i} className="flex justify-between text-sm">
                 <span>
-                  {product.name}
-                  {product.quantity && product.quantity > 1 ? ` × ${product.quantity}` : ""}
+                  {product.quantity && product.quantity > 1 ? `×${product.quantity} ` : ""}{product.name}
                 </span>
                 {product.price != null && (
                   <span className="font-mono font-medium">{symbol}{product.price.toFixed(2)}</span>
