@@ -167,16 +167,25 @@ function GuestIdSync() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ guestToken }),
         })
-          .catch(() => {
-            // Silent failure — the user loses their guest receipts in a worst-case
-            // scenario, but we never block the sign-in flow
+          .then((res) => {
+            if (res.ok) {
+              // Success (204): clear token only now so a failed attempt stays retryable
+              clearGuestToken();
+              if (isGuest) exitGuestMode();
+              // Refetch all active queries so the library immediately shows
+              // the migrated receipts under the signed-in user's account
+              void queryClient.refetchQueries();
+            } else {
+              // Server error — keep token in localStorage so the next sign-in
+              // cycle can retry; reset guard so retry fires next time
+              claimAttemptedRef.current = false;
+              if (isGuest) exitGuestMode();
+            }
           })
-          .finally(() => {
-            clearGuestToken();
+          .catch(() => {
+            // Network error — keep token for retry on next sign-in; reset guard
+            claimAttemptedRef.current = false;
             if (isGuest) exitGuestMode();
-            // Refetch all active queries so the library immediately shows
-            // the migrated receipts under the signed-in user's account
-            void queryClient.refetchQueries();
           });
       } else {
         if (isGuest) exitGuestMode();
