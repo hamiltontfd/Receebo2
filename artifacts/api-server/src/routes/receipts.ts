@@ -17,6 +17,10 @@ import {
 } from "@workspace/api-zod";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { enqueueExtraction } from "../lib/extractionQueue";
+import { logger } from "../lib/logger";
+import { ObjectStorageService } from "../lib/objectStorage";
+
+const objectStorageService = new ObjectStorageService();
 
 const CANONICAL_CATEGORIES = ["Electronics", "Home", "Clothing & Apparel", "Groceries", "Other"] as const;
 function normalizeCategory(value: string | null | undefined): string | undefined {
@@ -267,20 +271,33 @@ router.delete("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<voi
     return;
   }
 
-  const [receipt] = await db
-    .delete(receiptsTable)
+  const [existing] = await db
+    .select()
+    .from(receiptsTable)
     .where(
       and(
         eq(receiptsTable.id, params.data.id),
         eq(receiptsTable.userId, req.userId!),
       ),
-    )
-    .returning();
+    );
 
-  if (!receipt) {
+  if (!existing) {
     res.status(404).json({ error: "Receipt not found" });
     return;
   }
+
+  try {
+    await objectStorageService.deleteObject(existing.objectPath);
+  } catch (err) {
+    logger.warn(
+      { err, receiptId: existing.id, objectPath: existing.objectPath },
+      "Failed to delete storage object for receipt; proceeding with DB delete",
+    );
+  }
+
+  await db
+    .delete(receiptsTable)
+    .where(eq(receiptsTable.id, existing.id));
 
   res.sendStatus(204);
 });
