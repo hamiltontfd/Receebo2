@@ -8,16 +8,16 @@ export function requireAuthOrGuest(
   res: Response,
   next: NextFunction,
 ): void {
-  const userId = req.headers["x-guest-id"];
-  if (typeof userId === "string" && userId.startsWith(GUEST_ID_PREFIX)) {
-    (req as any).userId = userId;
-    return next();
-  }
-
   const auth = getAuth(req);
   const clerkUserId = (auth?.sessionClaims?.userId as string | undefined) || auth?.userId;
   if (clerkUserId) {
     (req as any).userId = clerkUserId;
+    return next();
+  }
+
+  const guestId = req.headers["x-guest-id"];
+  if (typeof guestId === "string" && guestId.startsWith(GUEST_ID_PREFIX)) {
+    (req as any).userId = guestId;
     return next();
   }
 

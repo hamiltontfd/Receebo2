@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk } from "@clerk/react";
+import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from "wouter";
@@ -11,6 +11,9 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Library from "@/pages/library";
 import ReceiptDetail from "@/pages/receipt-detail";
+import Scan from "@/pages/scan";
+import SearchPage from "@/pages/search";
+import AppShell from "@/components/AppShell";
 import { useGuestMode } from "@/components/GuestProvider";
 import { setGuestId } from "@workspace/api-client-react";
 
@@ -42,41 +45,41 @@ const clerkAppearance = {
     logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
   },
   variables: {
-    colorPrimary: "hsl(148 27% 24%)",
-    colorForeground: "hsl(154 28% 14%)",
-    colorMutedForeground: "hsl(82 8% 41%)",
+    colorPrimary: "hsl(0 0% 7%)",
+    colorForeground: "hsl(0 0% 7%)",
+    colorMutedForeground: "hsl(0 0% 45%)",
     colorDanger: "hsl(0 84% 60%)",
     colorBackground: "hsl(0 0% 100%)",
-    colorInput: "hsl(48 15% 88%)",
-    colorInputForeground: "hsl(154 28% 14%)",
-    colorNeutral: "hsl(48 15% 88%)",
+    colorInput: "hsl(0 0% 90%)",
+    colorInputForeground: "hsl(0 0% 7%)",
+    colorNeutral: "hsl(0 0% 90%)",
     fontFamily: "'Plus Jakarta Sans', sans-serif",
-    borderRadius: "0.5rem",
+    borderRadius: "0.75rem",
   },
   elements: {
     rootBox: "w-full flex justify-center",
     cardBox: "bg-white rounded-2xl w-[440px] max-w-full overflow-hidden",
     card: "!shadow-none !border-0 !bg-transparent !rounded-none",
     footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    headerTitle: "text-2xl font-bold tracking-tight text-[#1a2e25]",
-    headerSubtitle: "text-sm text-[#616e68]",
+    headerTitle: "text-2xl font-bold tracking-tight text-[#121212]",
+    headerSubtitle: "text-sm text-[#737373]",
     socialButtonsBlockButtonText: "text-sm font-medium",
-    formFieldLabel: "text-sm font-medium text-[#1a2e25]",
-    footerActionLink: "text-[#2c4c3b] hover:text-[#1a2e25] font-medium",
-    footerActionText: "text-sm text-[#616e68]",
-    dividerText: "text-xs text-[#616e68]",
-    identityPreviewEditButton: "text-[#2c4c3b] hover:text-[#1a2e25]",
-    formFieldSuccessText: "text-sm text-[#2c4c3b]",
+    formFieldLabel: "text-sm font-medium text-[#121212]",
+    footerActionLink: "text-[#121212] hover:text-black font-medium",
+    footerActionText: "text-sm text-[#737373]",
+    dividerText: "text-xs text-[#737373]",
+    identityPreviewEditButton: "text-[#121212] hover:text-black",
+    formFieldSuccessText: "text-sm text-[#121212]",
     alertText: "text-sm",
     logoBox: "mb-6 flex justify-center",
     logoImage: "h-8",
-    socialButtonsBlockButton: "border-[#e0dfd9] hover:bg-[#f0efea]",
-    formButtonPrimary: "bg-[#2c4c3b] hover:bg-[#1a2e25] text-white",
-    formFieldInput: "bg-[#f0efea] border-[#e0dfd9] focus:ring-[#2c4c3b]",
+    socialButtonsBlockButton: "border-[#e5e5e5] hover:bg-[#f5f5f5]",
+    formButtonPrimary: "bg-[#121212] hover:bg-black text-white",
+    formFieldInput: "bg-[#f5f5f5] border-[#e5e5e5] focus:ring-[#121212]",
     footerAction: "flex gap-2 justify-center mt-6",
-    dividerLine: "bg-[#e0dfd9]",
-    alert: "bg-[#f0efea] text-[#1a2e25]",
-    otpCodeFieldInput: "border-[#e0dfd9] focus:ring-[#2c4c3b]",
+    dividerLine: "bg-[#e5e5e5]",
+    alert: "bg-[#f5f5f5] text-[#121212]",
+    otpCodeFieldInput: "border-[#e5e5e5] focus:ring-[#121212]",
     formFieldRow: "gap-4",
     main: "flex flex-col gap-4",
   },
@@ -127,39 +130,32 @@ function HomeRedirect() {
   );
 }
 
-function LibraryRoute() {
+function ProtectedShell({ children }: { children: React.ReactNode }) {
   const { isGuest } = useGuestMode();
   return (
     <>
       <Show when="signed-in">
-        <Library />
+        <AppShell>{children}</AppShell>
       </Show>
       <Show when="signed-out">
-        {isGuest ? <Library /> : <Redirect to="/" />}
-      </Show>
-    </>
-  );
-}
-
-function ReceiptDetailRoute() {
-  const { isGuest } = useGuestMode();
-  return (
-    <>
-      <Show when="signed-in">
-        <ReceiptDetail />
-      </Show>
-      <Show when="signed-out">
-        {isGuest ? <ReceiptDetail /> : <Redirect to="/" />}
+        {isGuest ? <AppShell>{children}</AppShell> : <Redirect to="/" />}
       </Show>
     </>
   );
 }
 
 function GuestIdSync() {
-  const { isGuest, guestUser } = useGuestMode();
+  const { isGuest, guestUser, exitGuestMode } = useGuestMode();
+  const { isSignedIn } = useAuth();
   useEffect(() => {
+    if (isSignedIn) {
+      // Signed-in users must never send the guest header
+      setGuestId(null);
+      if (isGuest) exitGuestMode();
+      return;
+    }
     setGuestId(isGuest ? guestUser?.id ?? null : null);
-  }, [isGuest, guestUser]);
+  }, [isSignedIn, isGuest, guestUser, exitGuestMode]);
   return null;
 }
 
@@ -209,8 +205,18 @@ function ClerkProviderWithRoutes() {
             <Route path="/" component={HomeRedirect} />
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
-            <Route path="/library" component={LibraryRoute} />
-            <Route path="/receipts/:id" component={ReceiptDetailRoute} />
+            <Route path="/library">
+              <ProtectedShell><Library /></ProtectedShell>
+            </Route>
+            <Route path="/search">
+              <ProtectedShell><SearchPage /></ProtectedShell>
+            </Route>
+            <Route path="/scan">
+              <ProtectedShell><Scan /></ProtectedShell>
+            </Route>
+            <Route path="/receipts/:id">
+              <ProtectedShell><ReceiptDetail /></ProtectedShell>
+            </Route>
             <Route component={NotFound} />
           </Switch>
           <Toaster />
