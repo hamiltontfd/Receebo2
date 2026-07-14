@@ -47,6 +47,7 @@ async function runExtraction(
         summary: data.summary,
         ocrText: data.ocrText,
         warranty: data.warranty,
+        transactionNumber: data.transactionNumber,
         products: data.products,
         notableItems: data.notableItems,
       })

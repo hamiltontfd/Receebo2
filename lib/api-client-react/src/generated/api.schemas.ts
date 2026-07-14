@@ -78,6 +78,11 @@ export interface Receipt {
      * @nullable
      */
   ocrText?: string | null;
+  /**
+     * Transaction/receipt number printed on the receipt.
+     * @nullable
+     */
+  transactionNumber?: string | null;
   products?: ReceiptProduct[];
   /** Items flagged as notable (expensive or warranty-relevant). */
   notableItems?: NotableItem[];

@@ -39,6 +39,7 @@ export const ListReceiptsResponseItem = zod.object({
   "category": zod.string().nullish(),
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
+  "transactionNumber": zod.string().nullish().describe('Transaction/receipt number printed on the receipt.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -108,6 +109,7 @@ export const GetRecentReceiptsResponseItem = zod.object({
   "category": zod.string().nullish(),
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
+  "transactionNumber": zod.string().nullish().describe('Transaction/receipt number printed on the receipt.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -157,6 +159,7 @@ export const GetReceiptResponse = zod.object({
   "category": zod.string().nullish(),
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
+  "transactionNumber": zod.string().nullish().describe('Transaction/receipt number printed on the receipt.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -210,6 +213,7 @@ export const UpdateReceiptResponse = zod.object({
   "category": zod.string().nullish(),
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
+  "transactionNumber": zod.string().nullish().describe('Transaction/receipt number printed on the receipt.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),

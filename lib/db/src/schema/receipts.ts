@@ -40,6 +40,7 @@ export const receiptsTable = pgTable("receipts", {
   category: text("category"),
   summary: text("summary"),
   ocrText: text("ocr_text"),
+  transactionNumber: text("transaction_number"),
   products: jsonb("products").$type<ReceiptProductItem[]>().notNull().default([]),
   notableItems: jsonb("notable_items").$type<ReceiptNotableItem[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true })

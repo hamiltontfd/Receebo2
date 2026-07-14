@@ -26,6 +26,7 @@ export type ExtractedReceipt = {
   summary: string | null;
   ocrText: string | null;
   warranty: string | null;
+  transactionNumber: string | null;
   products: ExtractedProduct[];
   notableItems: ExtractedNotableItem[];
 };
@@ -49,6 +50,7 @@ Respond ONLY with a JSON object matching this exact shape:
   "summary": string | null,         // one or two natural sentences summarizing what was bought and the context
   "ocrText": string | null,         // the full raw text content transcribed from the receipt, preserving line breaks
   "warranty": string | null,        // warranty or return-policy information printed on the receipt (e.g. "2-year manufacturer warranty", "30-day returns"), or null if none is mentioned
+  "transactionNumber": string | null, // the transaction/receipt/confirmation number printed on the receipt (e.g. "TXN-4821039", "#00123456", "Order #123"), or null if not present
   "products": [                      // individual line items; empty array if none are legible
     { "name": string, "quantity": number | null, "price": number | null }
   ],
@@ -174,6 +176,7 @@ export async function extractReceiptData(
     summary: toStringOrNull(parsed.summary),
     ocrText: toStringOrNull(parsed.ocrText),
     warranty: toStringOrNull(parsed.warranty),
+    transactionNumber: toStringOrNull((parsed as ExtractedReceipt).transactionNumber),
     products,
     notableItems,
   };
