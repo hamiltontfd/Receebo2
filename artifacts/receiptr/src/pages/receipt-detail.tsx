@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  ArrowLeft, Loader2, Trash2, Edit2, Share2, AlertTriangle, FileText,
+  ArrowLeft, Loader2, Trash2, Edit2, Share2, AlertTriangle,
 } from "lucide-react";
 
 import {
@@ -19,6 +19,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -376,21 +377,12 @@ export default function ReceiptDetail() {
         </div>
       )}
 
-      {/* Original receipt */}
-      <a
-        href={fileUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-2xl border p-4 flex items-center gap-3 hover:bg-secondary/50 transition-colors"
-      >
-        <span className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-          <FileText className="w-4 h-4 text-muted-foreground" />
-        </span>
-        <div className="min-w-0">
-          <p className="font-semibold text-sm truncate">Original receipt</p>
-          <p className="text-xs text-muted-foreground truncate">{receipt.originalFileName}</p>
-        </div>
-      </a>
+      {/* Original receipt — inline preview with collapsible wrapper on mobile */}
+      <ReceiptPreview
+        fileUrl={fileUrl}
+        contentType={receipt.contentType}
+        fileName={receipt.originalFileName}
+      />
 
       {/* Actions */}
       {!isEditing && (
