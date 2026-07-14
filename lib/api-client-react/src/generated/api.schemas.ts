@@ -136,6 +136,14 @@ export interface UploadUrlResponse {
   metadata?: UploadUrlRequest;
 }
 
+export interface GuestClaimBody {
+  /**
+     * The guest session token to claim and migrate.
+     * @minLength 1
+     */
+  guestToken: string;
+}
+
 export interface ErrorEnvelope {
   error: string;
 }

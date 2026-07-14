@@ -22,6 +22,7 @@ import type {
 import type {
   ErrorEnvelope,
   GetRecentReceiptsParams,
+  GuestClaimBody,
   HealthStatus,
   ListReceiptsParams,
   MerchantSpend,
@@ -733,6 +734,81 @@ export const useDeleteReceipt = <TError = ErrorType<ErrorEnvelope>,
         TContext
       > => {
       return useMutation(getDeleteReceiptMutationOptions(options));
+    }
+
+export const getClaimGuestSessionUrl = () => {
+
+
+
+
+  return `/api/guest-session/claim`
+}
+
+/**
+ * Re-assigns all receipts owned by the given guest token to the currently
+authenticated Clerk user, then deletes the guest session. Safe to call
+unconditionally — returns 204 whether or not a guest token was found.
+
+ * @summary Migrate guest receipts to an authenticated user
+ */
+export const claimGuestSession = async (guestClaimBody: GuestClaimBody, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getClaimGuestSessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      guestClaimBody,)
+  }
+);}
+
+
+
+
+export const getClaimGuestSessionMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimGuestSession>>, TError,{data: BodyType<GuestClaimBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimGuestSession>>, TError,{data: BodyType<GuestClaimBody>}, TContext> => {
+
+const mutationKey = ['claimGuestSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimGuestSession>>, {data: BodyType<GuestClaimBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  claimGuestSession(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimGuestSessionMutationResult = NonNullable<Awaited<ReturnType<typeof claimGuestSession>>>
+    export type ClaimGuestSessionMutationBody = BodyType<GuestClaimBody>
+    export type ClaimGuestSessionMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Migrate guest receipts to an authenticated user
+ */
+export const useClaimGuestSession = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimGuestSession>>, TError,{data: BodyType<GuestClaimBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimGuestSession>>,
+        TError,
+        {data: BodyType<GuestClaimBody>},
+        TContext
+      > => {
+      return useMutation(getClaimGuestSessionMutationOptions(options));
     }
 
 export const getRequestUploadUrlUrl = () => {

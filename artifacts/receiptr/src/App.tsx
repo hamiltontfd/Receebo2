@@ -14,8 +14,11 @@ import ReceiptDetail from "@/pages/receipt-detail";
 import Scan from "@/pages/scan";
 import SearchPage from "@/pages/search";
 import AppShell from "@/components/AppShell";
-import { useGuestMode } from "@/components/GuestProvider";
+import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
 import { setGuestId } from "@workspace/api-client-react";
+
+const GUEST_TOKEN_KEY = "receiptr:guestToken";
+const apiBase = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -147,15 +150,45 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
 function GuestIdSync() {
   const { isGuest, guestUser, exitGuestMode } = useGuestMode();
   const { isSignedIn } = useAuth();
+  const queryClient = useQueryClient();
+  const claimAttemptedRef = useRef(false);
+
   useEffect(() => {
     if (isSignedIn) {
       // Signed-in users must never send the guest header
       setGuestId(null);
-      if (isGuest) exitGuestMode();
+
+      // Migrate guest receipts exactly once per sign-in event
+      const guestToken = localStorage.getItem(GUEST_TOKEN_KEY);
+      if (guestToken && !claimAttemptedRef.current) {
+        claimAttemptedRef.current = true;
+        fetch(`${apiBase}/api/guest-session/claim`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ guestToken }),
+        })
+          .catch(() => {
+            // Silent failure — the user loses their guest receipts in a worst-case
+            // scenario, but we never block the sign-in flow
+          })
+          .finally(() => {
+            clearGuestToken();
+            if (isGuest) exitGuestMode();
+            // Refetch all active queries so the library immediately shows
+            // the migrated receipts under the signed-in user's account
+            void queryClient.refetchQueries();
+          });
+      } else {
+        if (isGuest) exitGuestMode();
+      }
       return;
     }
+
+    // Signed-out: reset claim guard so a subsequent guest → sign-in round-trip works
+    claimAttemptedRef.current = false;
     setGuestId(isGuest ? guestUser?.id ?? null : null);
-  }, [isSignedIn, isGuest, guestUser, exitGuestMode]);
+  }, [isSignedIn, isGuest, guestUser, exitGuestMode, queryClient]);
+
   return null;
 }
 

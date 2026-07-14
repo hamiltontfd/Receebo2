@@ -204,6 +204,21 @@ export const DeleteReceiptParams = zod.object({
 
 
 /**
+ * Re-assigns all receipts owned by the given guest token to the currently
+authenticated Clerk user, then deletes the guest session. Safe to call
+unconditionally — returns 204 whether or not a guest token was found.
+
+ * @summary Migrate guest receipts to an authenticated user
+ */
+
+
+
+export const ClaimGuestSessionBody = zod.object({
+  "guestToken": zod.string().min(1).describe('The guest session token to claim and migrate.')
+})
+
+
+/**
  * Returns a presigned GCS URL for direct upload. The client sends JSON
 metadata here, then uploads the file directly to the returned URL.
 

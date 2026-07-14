@@ -199,6 +199,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /guest-session/claim:
+    post:
+      operationId: claimGuestSession
+      tags: [receipts]
+      summary: Migrate guest receipts to an authenticated user
+      description: |
+        Re-assigns all receipts owned by the given guest token to the currently
+        authenticated Clerk user, then deletes the guest session. Safe to call
+        unconditionally — returns 204 whether or not a guest token was found.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuestClaimBody"
+      responses:
+        "204":
+          description: Migration complete (or no-op if token was absent/already claimed)
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /storage/uploads/request-url:
     post:
       tags: [Storage]
@@ -471,6 +495,15 @@ components:
           description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.
         metadata:
           $ref: '#/components/schemas/UploadUrlRequest'
+    GuestClaimBody:
+      type: object
+      required:
+        - guestToken
+      properties:
+        guestToken:
+          type: string
+          minLength: 1
+          description: The guest session token to claim and migrate.
     ErrorEnvelope:
       type: object
       required: [error]

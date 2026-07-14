@@ -8,6 +8,7 @@
 
 export * from './errorEnvelope';
 export * from './getRecentReceiptsParams';
+export * from './guestClaimBody';
 export * from './healthStatus';
 export * from './listReceiptsParams';
 export * from './merchantSpend';
