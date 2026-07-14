@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Search, Camera, LayoutGrid, LogOut } from "lucide-react";
+import { Search, Camera, LogOut } from "lucide-react";
 import { useUser, useClerk } from "@clerk/react";
 import { useGuestMode } from "@/components/GuestProvider";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 const tabs = [
   { href: "/search", label: "Search", icon: Search },
   { href: "/scan", label: "Scan", icon: Camera },
-  { href: "/library", label: "Library", icon: LayoutGrid },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -29,7 +28,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
       {/* Desktop top nav */}
       <header className="hidden md:flex h-14 border-b px-6 items-center justify-between sticky top-0 z-20 bg-background/90 backdrop-blur">
-        <Link href="/library" className="font-extrabold tracking-tight text-lg">
+        <Link href="/search" className="font-extrabold tracking-tight text-lg">
           Receiptr
         </Link>
         <nav className="flex items-center gap-1">

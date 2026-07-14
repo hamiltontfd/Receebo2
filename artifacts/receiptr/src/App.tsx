@@ -9,7 +9,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
-import Library from "@/pages/library";
 import ReceiptDetail from "@/pages/receipt-detail";
 import Scan from "@/pages/scan";
 import SearchPage from "@/pages/search";
@@ -124,10 +123,10 @@ function HomeRedirect() {
   return (
     <>
       <Show when="signed-in">
-        <Redirect to="/library" />
+        <Redirect to="/search" />
       </Show>
       <Show when="signed-out">
-        {isGuest ? <Redirect to="/library" /> : <Landing />}
+        {isGuest ? <Redirect to="/search" /> : <Landing />}
       </Show>
     </>
   );
@@ -248,7 +247,7 @@ function ClerkProviderWithRoutes() {
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
             <Route path="/library">
-              <ProtectedShell><Library /></ProtectedShell>
+              <Redirect to="/search" />
             </Route>
             <Route path="/search">
               <ProtectedShell><SearchPage /></ProtectedShell>
