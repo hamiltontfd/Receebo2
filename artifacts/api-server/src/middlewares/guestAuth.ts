@@ -1,6 +1,6 @@
 import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
-import { db, guestSessionsTable } from "@workspace/db";
+import { db, guestSessionsTable, receiptsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 export async function requireAuthOrGuest(
@@ -17,9 +17,8 @@ export async function requireAuthOrGuest(
 
   const guestToken = req.headers["x-guest-id"];
   if (typeof guestToken === "string" && guestToken.length > 0) {
-    // All guest tokens — both legacy guest-* IDs and new UUIDs — must exist in
-    // guest_sessions. Legacy IDs were seeded at deploy time; new IDs are issued
-    // by POST /api/guest-session. Unknown tokens always get 401.
+    // Fast path: token already registered in guest_sessions (covers both server-issued
+    // UUIDs and previously migrated legacy IDs)
     const [session] = await db
       .select()
       .from(guestSessionsTable)
@@ -29,6 +28,27 @@ export async function requireAuthOrGuest(
     if (session) {
       (req as any).userId = guestToken;
       return next();
+    }
+
+    // Lazy-migration path: legacy client-generated guest-* IDs that pre-date server-issued
+    // tokens. If this ID owns at least one receipt it is a real returning guest — register
+    // it in guest_sessions so all future requests hit the fast path. Unknown legacy IDs
+    // (no owned receipts, or a spoofed value) fall through to 401.
+    if (guestToken.startsWith("guest-")) {
+      const [ownerReceipt] = await db
+        .select({ id: receiptsTable.id })
+        .from(receiptsTable)
+        .where(eq(receiptsTable.userId, guestToken))
+        .limit(1);
+
+      if (ownerReceipt) {
+        await db
+          .insert(guestSessionsTable)
+          .values({ token: guestToken })
+          .onConflictDoNothing();
+        (req as any).userId = guestToken;
+        return next();
+      }
     }
   }
 
