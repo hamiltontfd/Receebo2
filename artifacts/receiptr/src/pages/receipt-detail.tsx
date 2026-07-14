@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CATEGORIES, categoryStyle } from "@/lib/categories";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -256,9 +258,20 @@ export default function ReceiptDetail() {
                   render={({ field }) => (
                     <FormItem className="p-4 space-y-1">
                       <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="e.g. Electronics" className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger className="border-0 px-0 h-auto py-0 font-medium shadow-none focus:ring-0 [&>svg]:ml-1">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {CATEGORIES.map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{cat}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -321,7 +334,13 @@ export default function ReceiptDetail() {
         <div className="rounded-2xl border divide-y">
           <div className="p-4 flex items-center justify-between text-sm">
             <span className="text-muted-foreground font-medium">Category</span>
-            <span className="font-semibold capitalize">{receipt.category || "None"}</span>
+            {receipt.category ? (
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${categoryStyle(receipt.category)}`}>
+                {receipt.category}
+              </span>
+            ) : (
+              <span className="font-semibold text-muted-foreground">None</span>
+            )}
           </div>
           <div className="p-4 flex items-center justify-between text-sm">
             <span className="text-muted-foreground font-medium">Date</span>

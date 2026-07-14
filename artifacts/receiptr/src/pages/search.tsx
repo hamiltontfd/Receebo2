@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListReceipts } from "@workspace/api-client-react";
 import { currencySymbol } from "@/lib/currency";
-
-const QUICK_FILTERS = ["Electronics", "Groceries", "Clothing", "Travel"];
+import { CATEGORIES, categoryStyle } from "@/lib/categories";
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
@@ -38,16 +37,18 @@ export default function SearchPage() {
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        {QUICK_FILTERS.map((f) => (
-          <Button
-            key={f}
-            variant={query === f ? "default" : "outline"}
-            size="sm"
-            className="rounded-full"
-            onClick={() => setQuery(query === f ? "" : f)}
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setQuery(query === cat ? "" : cat)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+              query === cat
+                ? categoryStyle(cat) + " border-transparent"
+                : "bg-background text-muted-foreground border-border hover:border-foreground/30"
+            }`}
           >
-            {f}
-          </Button>
+            {cat}
+          </button>
         ))}
       </div>
 
@@ -79,10 +80,16 @@ export default function SearchPage() {
                     <p className="font-semibold truncate group-hover:underline">
                       {r.merchant || r.originalFileName}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(r.purchaseDate || r.createdAt), "MMM d, yyyy")}
-                      {r.category ? ` · ${r.category}` : ""}
-                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(r.purchaseDate || r.createdAt), "MMM d, yyyy")}
+                      </span>
+                      {r.category && (
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
+                          {r.category}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 {r.total != null && (

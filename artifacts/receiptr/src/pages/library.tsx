@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useListReceipts, useGetReceiptStats } from "@workspace/api-client-react";
 import type { Receipt as ReceiptItem } from "@workspace/api-client-react";
 import { currencySymbol } from "@/lib/currency";
+import { categoryStyle } from "@/lib/categories";
 
 function monthKey(r: ReceiptItem): string {
   const d = new Date(r.purchaseDate || r.createdAt);
@@ -125,10 +126,16 @@ export default function Library() {
                         <p className="font-semibold truncate group-hover:underline">
                           {r.merchant || r.originalFileName}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(r.purchaseDate || r.createdAt), "MMM d")}
-                          {r.category ? ` · ${r.category}` : ""}
-                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(r.purchaseDate || r.createdAt), "MMM d")}
+                          </span>
+                          {r.category && (
+                            <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
+                              {r.category}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     {r.total != null && (

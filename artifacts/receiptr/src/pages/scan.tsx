@@ -19,6 +19,8 @@ import {
 } from "@workspace/api-client-react";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { currencySymbol } from "@/lib/currency";
+import { CATEGORIES, categoryStyle } from "@/lib/categories";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Phase = "capture" | "reading" | "review";
 
@@ -460,12 +462,21 @@ export default function Scan() {
 
             <div className="rounded-xl border p-4 space-y-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</p>
-              <Input
-                value={form.category}
-                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                placeholder="e.g. Electronics"
-                className="border-0 px-0 font-medium focus-visible:ring-0 shadow-none"
-              />
+              <Select
+                value={form.category || undefined}
+                onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
+              >
+                <SelectTrigger className="border-0 px-0 h-auto py-0 font-medium shadow-none focus:ring-0 [&>svg]:ml-1">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{cat}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="rounded-xl border p-4 space-y-1">
