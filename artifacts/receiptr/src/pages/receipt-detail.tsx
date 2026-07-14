@@ -353,9 +353,14 @@ export default function ReceiptDetail() {
 
       {receipt.products && receipt.products.length > 0 && !isEditing && (
         <div className="rounded-2xl border p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-            Purchased
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Purchased
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {receipt.products.reduce((sum, p) => sum + (p.quantity && p.quantity > 1 ? p.quantity : 1), 0)} items total
+            </p>
+          </div>
           <ul className="space-y-2">
             {receipt.products.map((product, i) => (
               <li key={i} className="flex justify-between text-sm">
