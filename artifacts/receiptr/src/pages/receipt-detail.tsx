@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRoute, Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
@@ -21,6 +22,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
+import { PageTransition, listVariants, itemVariants } from "@/components/PageTransition";
 import { currencySymbol } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,17 +78,25 @@ function StoreFullscreen({ fileUrl, onClose }: { fileUrl: string; onClose: () =>
   }, []);
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
       className="fixed inset-0 z-[9999] bg-black flex items-center justify-center cursor-pointer"
       onClick={onClose}
       role="button"
       aria-label="Dismiss full-screen receipt view"
     >
-      <img
+      <motion.img
         src={fileUrl}
         alt="Receipt"
         className="max-w-full max-h-full object-contain select-none"
         draggable={false}
+        initial={{ scale: 0.94, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.94, opacity: 0 }}
+        transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
       />
       <button
         className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-colors"
@@ -98,7 +108,7 @@ function StoreFullscreen({ fileUrl, onClose }: { fileUrl: string; onClose: () =>
       <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-xs select-none">
         Tap anywhere to dismiss
       </p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -212,11 +222,16 @@ export default function ReceiptDetail() {
 
   if (isLoading) {
     return (
-      <div className="w-full max-w-lg mx-auto px-5 py-6 space-y-4">
+      <motion.div
+        className="w-full max-w-lg mx-auto px-5 py-6 space-y-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2 }}
+      >
         <Skeleton className="h-8 w-24" />
         <Skeleton className="h-48 rounded-2xl" />
         <Skeleton className="h-64 rounded-2xl" />
-      </div>
+      </motion.div>
     );
   }
 
@@ -244,11 +259,13 @@ export default function ReceiptDetail() {
 
   return (
     <>
-      {showStore && isImage && (
-        <StoreFullscreen fileUrl={fileUrl} onClose={() => setShowStore(false)} />
-      )}
+      <AnimatePresence>
+        {showStore && isImage && (
+          <StoreFullscreen fileUrl={fileUrl} onClose={() => setShowStore(false)} />
+        )}
+      </AnimatePresence>
 
-      <div className="w-full max-w-lg mx-auto px-5 py-6 flex flex-col gap-5">
+      <PageTransition className="w-full max-w-lg mx-auto px-5 py-6 flex flex-col gap-5">
         <div>
           <Link href="/library" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-4 h-4" />
@@ -450,18 +467,23 @@ export default function ReceiptDetail() {
                 {receipt.products.reduce((sum, p) => sum + (p.quantity && p.quantity > 1 ? p.quantity : 1), 0)} items total
               </p>
             </div>
-            <ul className="space-y-2">
+            <motion.ul
+              className="space-y-2"
+              variants={listVariants}
+              initial="hidden"
+              animate="visible"
+            >
               {receipt.products.map((product, i) => (
-                <li key={i} className="flex justify-between text-sm">
+                <motion.li key={i} variants={itemVariants} className="flex justify-between text-sm">
                   <span>
                     {product.quantity && product.quantity > 1 ? `×${product.quantity} ` : ""}{product.name}
                   </span>
                   {product.price != null && (
                     <span className="font-mono font-medium">{symbol}{product.price.toFixed(2)}</span>
                   )}
-                </li>
+                </motion.li>
               ))}
-            </ul>
+            </motion.ul>
           </div>
         )}
 
@@ -532,7 +554,7 @@ export default function ReceiptDetail() {
             </div>
           </div>
         )}
-      </div>
+      </PageTransition>
     </>
   );
 }
