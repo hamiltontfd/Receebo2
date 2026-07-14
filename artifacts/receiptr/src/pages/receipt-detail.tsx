@@ -338,7 +338,10 @@ export default function ReceiptDetail() {
           <div className="p-4 flex items-center justify-between text-sm">
             <span className="text-muted-foreground font-medium">Items</span>
             <span className="font-semibold">
-              {receipt.products?.length || 0} item{(receipt.products?.length || 0) === 1 ? "" : "s"}
+              {(() => {
+                const count = receipt.products?.reduce((s, p) => s + (p.quantity || 1), 0) ?? 0;
+                return `${count} item${count === 1 ? "" : "s"}`;
+              })()}
             </span>
           </div>
         </div>
