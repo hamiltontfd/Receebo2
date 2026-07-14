@@ -30,6 +30,13 @@ export type ExtractedReceipt = {
   notableItems: ExtractedNotableItem[];
 };
 
+const CANONICAL_CATEGORIES = ["Electronics", "Home", "Clothing & Apparel", "Groceries", "Other"] as const;
+
+function normalizeCategory(value: string | null): string {
+  if (value && (CANONICAL_CATEGORIES as readonly string[]).includes(value)) return value;
+  return "Other";
+}
+
 const SYSTEM_PROMPT = `You are an expert receipt and invoice analyst. You are given an image or PDF of a purchase receipt or invoice. Read it carefully and extract structured information.
 
 Respond ONLY with a JSON object matching this exact shape:
@@ -163,7 +170,7 @@ export async function extractReceiptData(
     purchaseDate,
     total: toNumberOrNull(parsed.total),
     currency: toStringOrNull(parsed.currency),
-    category: toStringOrNull(parsed.category),
+    category: normalizeCategory(toStringOrNull(parsed.category)),
     summary: toStringOrNull(parsed.summary),
     ocrText: toStringOrNull(parsed.ocrText),
     warranty: toStringOrNull(parsed.warranty),

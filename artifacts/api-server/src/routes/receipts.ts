@@ -19,6 +19,13 @@ import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { extractReceiptData } from "../lib/receiptExtraction";
 import { logger } from "../lib/logger";
 
+const CANONICAL_CATEGORIES = ["Electronics", "Home", "Clothing & Apparel", "Groceries", "Other"] as const;
+function normalizeCategory(value: string | null | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (value && (CANONICAL_CATEGORIES as readonly string[]).includes(value)) return value;
+  return "Other";
+}
+
 const router: IRouter = Router();
 
 async function runExtraction(
@@ -265,7 +272,12 @@ router.patch("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void
 
   const [receipt] = await db
     .update(receiptsTable)
-    .set(parsed.data)
+    .set({
+      ...parsed.data,
+      ...(parsed.data.category !== undefined
+        ? { category: normalizeCategory(parsed.data.category) }
+        : {}),
+    })
     .where(
       and(
         eq(receiptsTable.id, params.data.id),

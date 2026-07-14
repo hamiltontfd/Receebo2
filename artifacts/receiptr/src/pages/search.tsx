@@ -41,10 +41,8 @@ export default function SearchPage() {
           <button
             key={cat}
             onClick={() => setQuery(query === cat ? "" : cat)}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
-              query === cat
-                ? categoryStyle(cat) + " border-transparent"
-                : "bg-background text-muted-foreground border-border hover:border-foreground/30"
+            className={`text-xs font-semibold px-3 py-1.5 rounded-full border-2 transition-all ${categoryStyle(cat)} ${
+              query === cat ? "border-current shadow-sm scale-105" : "border-transparent opacity-70 hover:opacity-100"
             }`}
           >
             {cat}
