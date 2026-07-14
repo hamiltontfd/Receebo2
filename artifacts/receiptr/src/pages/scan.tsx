@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Camera, Upload, Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -465,12 +465,12 @@ export default function Scan() {
 
             <div className="rounded-xl border p-4 space-y-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Warranty</p>
-              <Textarea
+              <AutosizeTextarea
                 value={form.warranty}
                 onChange={(e) => setForm((f) => ({ ...f, warranty: e.target.value }))}
                 placeholder="e.g. 2-year manufacturer warranty"
-                rows={4}
-                className="border-0 px-0 font-medium focus-visible:ring-0 shadow-none min-h-0"
+                minRows={3}
+                className="border-0 px-0 font-medium focus-visible:ring-0 shadow-none"
               />
             </div>
 
