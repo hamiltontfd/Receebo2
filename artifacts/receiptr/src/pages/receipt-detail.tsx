@@ -344,7 +344,7 @@ export default function ReceiptDetail() {
       )}
 
       {receipt.notableItems && receipt.notableItems.length > 0 && !isEditing && (
-        <NotableItemsBanner items={receipt.notableItems} />
+        <NotableItemsBanner items={receipt.notableItems} currency={receipt.currency} />
       )}
 
       {receipt.products && receipt.products.length > 0 && !isEditing && (

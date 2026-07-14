@@ -493,7 +493,7 @@ export default function Scan() {
           </div>
 
           {receipt?.notableItems && receipt.notableItems.length > 0 && (
-            <NotableItemsBanner items={receipt.notableItems} />
+            <NotableItemsBanner items={receipt.notableItems} currency={receipt.currency} />
           )}
 
           <div className="mt-auto space-y-3 pt-4">

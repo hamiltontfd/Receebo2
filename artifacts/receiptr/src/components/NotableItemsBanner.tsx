@@ -1,10 +1,12 @@
 import type { NotableItem } from "@workspace/api-client-react";
+import { currencySymbol } from "@/lib/currency";
 
 interface NotableItemsBannerProps {
   items: NotableItem[];
+  currency?: string | null;
 }
 
-export function NotableItemsBanner({ items }: NotableItemsBannerProps) {
+export function NotableItemsBanner({ items, currency }: NotableItemsBannerProps) {
   if (!items || items.length === 0) return null;
 
   return (
@@ -19,7 +21,7 @@ export function NotableItemsBanner({ items }: NotableItemsBannerProps) {
               <span className="text-sm font-semibold leading-tight">{item.name}</span>
               {item.price != null && (
                 <span className="text-sm font-mono font-medium shrink-0">
-                  ${item.price.toFixed(2)}
+                  {currencySymbol(currency)}{item.price.toFixed(2)}
                 </span>
               )}
             </div>
