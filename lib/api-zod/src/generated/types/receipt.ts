@@ -17,6 +17,13 @@ export interface Receipt {
   contentType: string;
   /** AI extraction status. */
   status: ReceiptStatus;
+  /** Draft receipts are pending user confirmation and excluded from the library. */
+  isDraft?: boolean;
+  /**
+     * Warranty or return-policy information extracted from the receipt.
+     * @nullable
+     */
+  warranty?: string | null;
   /** @nullable */
   merchant?: string | null;
   /**

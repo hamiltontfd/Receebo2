@@ -42,6 +42,7 @@ const editFormSchema = z.object({
   total: z.coerce.number().optional(),
   currency: z.string().optional(),
   category: z.string().optional(),
+  warranty: z.string().optional(),
 });
 
 type EditFormValues = z.infer<typeof editFormSchema>;
@@ -82,6 +83,7 @@ export default function ReceiptDetail() {
       total: undefined,
       currency: "USD",
       category: "",
+      warranty: "",
     },
   });
 
@@ -93,6 +95,7 @@ export default function ReceiptDetail() {
         total: receipt.total || undefined,
         currency: receipt.currency || "USD",
         category: receipt.category || "",
+        warranty: receipt.warranty || "",
       });
     }
   }, [receipt, isEditing, form]);
@@ -107,6 +110,7 @@ export default function ReceiptDetail() {
           total: data.total,
           currency: data.currency,
           category: data.category,
+          warranty: data.warranty,
         },
       });
       setIsEditing(false);
@@ -290,6 +294,19 @@ export default function ReceiptDetail() {
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="warranty"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Warranty</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g. 2-year manufacturer warranty" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="flex items-center gap-2 pt-2">
                 <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
                   {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -315,6 +332,10 @@ export default function ReceiptDetail() {
                 ? format(new Date(receipt.purchaseDate), "MMMM d, yyyy")
                 : "Unknown"}
             </span>
+          </div>
+          <div className="p-4 flex items-center justify-between gap-4 text-sm">
+            <span className="text-muted-foreground font-medium">Warranty</span>
+            <span className="font-semibold text-right">{receipt.warranty || "None"}</span>
           </div>
           <div className="p-4 flex items-center justify-between text-sm">
             <span className="text-muted-foreground font-medium">Items</span>

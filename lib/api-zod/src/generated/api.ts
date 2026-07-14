@@ -30,6 +30,8 @@ export const ListReceiptsResponseItem = zod.object({
   "originalFileName": zod.string(),
   "contentType": zod.string().describe('MIME type of the uploaded original.'),
   "status": zod.enum(['processing', 'completed', 'failed']).describe('AI extraction status.'),
+  "isDraft": zod.boolean().optional().describe('Draft receipts are pending user confirmation and excluded from the library.'),
+  "warranty": zod.string().nullish().describe('Warranty or return-policy information extracted from the receipt.'),
   "merchant": zod.string().nullish(),
   "purchaseDate": zod.string().nullish().describe('Purchase date in ISO format (YYYY-MM-DD).'),
   "total": zod.number().nullish(),
@@ -91,6 +93,8 @@ export const GetRecentReceiptsResponseItem = zod.object({
   "originalFileName": zod.string(),
   "contentType": zod.string().describe('MIME type of the uploaded original.'),
   "status": zod.enum(['processing', 'completed', 'failed']).describe('AI extraction status.'),
+  "isDraft": zod.boolean().optional().describe('Draft receipts are pending user confirmation and excluded from the library.'),
+  "warranty": zod.string().nullish().describe('Warranty or return-policy information extracted from the receipt.'),
   "merchant": zod.string().nullish(),
   "purchaseDate": zod.string().nullish().describe('Purchase date in ISO format (YYYY-MM-DD).'),
   "total": zod.number().nullish(),
@@ -132,6 +136,8 @@ export const GetReceiptResponse = zod.object({
   "originalFileName": zod.string(),
   "contentType": zod.string().describe('MIME type of the uploaded original.'),
   "status": zod.enum(['processing', 'completed', 'failed']).describe('AI extraction status.'),
+  "isDraft": zod.boolean().optional().describe('Draft receipts are pending user confirmation and excluded from the library.'),
+  "warranty": zod.string().nullish().describe('Warranty or return-policy information extracted from the receipt.'),
   "merchant": zod.string().nullish(),
   "purchaseDate": zod.string().nullish().describe('Purchase date in ISO format (YYYY-MM-DD).'),
   "total": zod.number().nullish(),
@@ -160,7 +166,9 @@ export const UpdateReceiptBody = zod.object({
   "purchaseDate": zod.string().optional(),
   "total": zod.number().optional(),
   "currency": zod.string().optional(),
-  "category": zod.string().optional()
+  "category": zod.string().optional(),
+  "warranty": zod.string().optional(),
+  "isDraft": zod.boolean().optional().describe('Set to false to confirm a draft receipt into the library.')
 })
 
 export const UpdateReceiptResponse = zod.object({
@@ -169,6 +177,8 @@ export const UpdateReceiptResponse = zod.object({
   "originalFileName": zod.string(),
   "contentType": zod.string().describe('MIME type of the uploaded original.'),
   "status": zod.enum(['processing', 'completed', 'failed']).describe('AI extraction status.'),
+  "isDraft": zod.boolean().optional().describe('Draft receipts are pending user confirmation and excluded from the library.'),
+  "warranty": zod.string().nullish().describe('Warranty or return-policy information extracted from the receipt.'),
   "merchant": zod.string().nullish(),
   "purchaseDate": zod.string().nullish().describe('Purchase date in ISO format (YYYY-MM-DD).'),
   "total": zod.number().nullish(),

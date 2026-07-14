@@ -39,6 +39,7 @@ async function runExtraction(
         category: data.category,
         summary: data.summary,
         ocrText: data.ocrText,
+        warranty: data.warranty,
         products: data.products,
       })
       .where(eq(receiptsTable.id, receiptId));
@@ -55,7 +56,10 @@ async function runExtraction(
 router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
 
-  const conditions = [eq(receiptsTable.userId, req.userId!)];
+  const conditions = [
+    eq(receiptsTable.userId, req.userId!),
+    eq(receiptsTable.isDraft, false),
+  ];
   if (q.length > 0) {
     const term = `%${q}%`;
     const search = or(
@@ -94,6 +98,7 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
       originalFileName: parsed.data.originalFileName,
       contentType: parsed.data.contentType,
       status: "processing",
+      isDraft: true,
       products: [],
     })
     .returning();
@@ -111,7 +116,12 @@ router.get("/receipts/stats", requireAuthOrGuest, async (req, res): Promise<void
   const rows = await db
     .select()
     .from(receiptsTable)
-    .where(eq(receiptsTable.userId, req.userId!));
+    .where(
+      and(
+        eq(receiptsTable.userId, req.userId!),
+        eq(receiptsTable.isDraft, false),
+      ),
+    );
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -167,7 +177,12 @@ router.get("/receipts/recent", requireAuthOrGuest, async (req, res): Promise<voi
   const rows = await db
     .select()
     .from(receiptsTable)
-    .where(eq(receiptsTable.userId, req.userId!))
+    .where(
+      and(
+        eq(receiptsTable.userId, req.userId!),
+        eq(receiptsTable.isDraft, false),
+      ),
+    )
     .orderBy(desc(receiptsTable.createdAt))
     .limit(limit);
 
@@ -181,7 +196,12 @@ router.get(
     const rows = await db
       .select()
       .from(receiptsTable)
-      .where(eq(receiptsTable.userId, req.userId!));
+      .where(
+        and(
+          eq(receiptsTable.userId, req.userId!),
+          eq(receiptsTable.isDraft, false),
+        ),
+      );
 
     const map = new Map<string, { total: number; count: number }>();
     for (const r of rows) {

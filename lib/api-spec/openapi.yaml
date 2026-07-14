@@ -335,6 +335,12 @@ components:
           type: string
           enum: [processing, completed, failed]
           description: AI extraction status.
+        isDraft:
+          type: boolean
+          description: Draft receipts are pending user confirmation and excluded from the library.
+        warranty:
+          type: ["string", "null"]
+          description: Warranty or return-policy information extracted from the receipt.
         merchant:
           type: ["string", "null"]
         purchaseDate:
@@ -400,6 +406,11 @@ components:
           type: string
         category:
           type: string
+        warranty:
+          type: string
+        isDraft:
+          type: boolean
+          description: Set to false to confirm a draft receipt into the library.
     ReceiptStats:
       type: object
       required:

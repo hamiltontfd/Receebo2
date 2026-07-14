@@ -12,4 +12,7 @@ export interface ReceiptUpdate {
   total?: number;
   currency?: string;
   category?: string;
+  warranty?: string;
+  /** Set to false to confirm a draft receipt into the library. */
+  isDraft?: boolean;
 }

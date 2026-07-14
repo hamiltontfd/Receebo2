@@ -6,6 +6,7 @@ import {
   doublePrecision,
   timestamp,
   jsonb,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -23,6 +24,8 @@ export const receiptsTable = pgTable("receipts", {
   originalFileName: text("original_file_name").notNull(),
   contentType: text("content_type").notNull(),
   status: text("status").notNull().default("processing"),
+  isDraft: boolean("is_draft").notNull().default(false),
+  warranty: text("warranty"),
   merchant: text("merchant"),
   purchaseDate: date("purchase_date", { mode: "string" }),
   total: doublePrecision("total"),

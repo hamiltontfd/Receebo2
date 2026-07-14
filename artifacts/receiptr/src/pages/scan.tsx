@@ -24,7 +24,7 @@ const READING_STEPS = [
   "Date detected",
   "Products extracted",
   "Total identified",
-  "Summary generated",
+  "Warranty detected",
 ];
 
 function useCameraStream(enabled: boolean) {
@@ -76,7 +76,16 @@ export default function Scan() {
   const [stepsDone, setStepsDone] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { videoRef, cameraReady, cameraError } = useCameraStream(phase === "capture");
+  // On desktop, upload is the primary path; the camera is opt-in.
+  const [isDesktop] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 768px)").matches,
+  );
+  const [cameraRequested, setCameraRequested] = useState(false);
+  const cameraActive = phase === "capture" && (!isDesktop || cameraRequested);
+
+  const { videoRef, cameraReady, cameraError } = useCameraStream(cameraActive);
 
   const createReceipt = useCreateReceipt();
   const updateReceipt = useUpdateReceipt();
@@ -117,6 +126,7 @@ export default function Scan() {
     purchaseDate: "",
     total: "",
     category: "",
+    warranty: "",
   });
 
   useEffect(() => {
@@ -126,6 +136,7 @@ export default function Scan() {
         purchaseDate: receipt.purchaseDate ?? "",
         total: receipt.total != null ? String(receipt.total) : "",
         category: receipt.category ?? "",
+        warranty: receipt.warranty ?? "",
       });
     }
   }, [phase, receipt]);
@@ -208,6 +219,8 @@ export default function Scan() {
           purchaseDate: form.purchaseDate || undefined,
           total: form.total !== "" ? Number(form.total) : undefined,
           category: form.category || undefined,
+          warranty: form.warranty || undefined,
+          isDraft: false,
         },
       });
       invalidateLists();
@@ -255,6 +268,40 @@ export default function Scan() {
             </p>
           </div>
 
+          {isDesktop && !cameraRequested ? (
+            <div className="flex-1 min-h-[340px] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-4 p-8 text-center">
+              <span className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center">
+                <Upload className="w-6 h-6 text-muted-foreground" />
+              </span>
+              <div className="space-y-1 max-w-xs">
+                <p className="font-semibold">Upload a receipt</p>
+                <p className="text-sm text-muted-foreground">
+                  JPG, PNG, or PDF. We'll read the details for you.
+                </p>
+              </div>
+              <Button
+                className="rounded-full h-12 px-8 font-semibold"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4 mr-2" />
+                )}
+                Upload receipt
+              </Button>
+              <Button
+                variant="ghost"
+                className="rounded-full text-muted-foreground"
+                onClick={() => setCameraRequested(true)}
+                disabled={uploading}
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Use camera instead
+              </Button>
+            </div>
+          ) : (
           <div className="relative flex-1 min-h-[340px] rounded-2xl overflow-hidden bg-foreground">
             {cameraError ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-background p-8 text-center">
@@ -299,7 +346,9 @@ export default function Scan() {
             )}
           </div>
 
-          {!cameraError && (
+          )}
+
+          {(!isDesktop || cameraRequested) && !cameraError && (
             <Button
               variant="outline"
               className="rounded-full h-12"
@@ -407,6 +456,16 @@ export default function Scan() {
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
                 placeholder="e.g. Electronics"
+                className="border-0 px-0 font-medium focus-visible:ring-0 shadow-none"
+              />
+            </div>
+
+            <div className="rounded-xl border p-4 space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Warranty</p>
+              <Input
+                value={form.warranty}
+                onChange={(e) => setForm((f) => ({ ...f, warranty: e.target.value }))}
+                placeholder="e.g. 2-year manufacturer warranty"
                 className="border-0 px-0 font-medium focus-visible:ring-0 shadow-none"
               />
             </div>
