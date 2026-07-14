@@ -442,14 +442,19 @@ export default function Scan() {
               </div>
               <div className="rounded-xl border p-4 space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={form.total}
-                  onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))}
-                  placeholder="0.00"
-                  className="border-0 px-0 font-mono font-semibold focus-visible:ring-0 shadow-none"
-                />
+                <div className="flex items-center gap-1">
+                  <span className="font-mono font-semibold text-muted-foreground select-none">
+                    {currencySymbol(receipt?.currency)}
+                  </span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.total}
+                    onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))}
+                    placeholder="0.00"
+                    className="border-0 px-0 font-mono font-semibold focus-visible:ring-0 shadow-none"
+                  />
+                </div>
               </div>
             </div>
 
