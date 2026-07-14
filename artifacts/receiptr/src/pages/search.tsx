@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { Search as SearchIcon, Loader2, FileText } from "lucide-react";
+import { Search as SearchIcon, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListReceipts, useGetRecentReceipts } from "@workspace/api-client-react";
 import type { Receipt } from "@workspace/api-client-react";
 import { currencySymbol } from "@/lib/currency";
-import { CATEGORIES, categoryStyle } from "@/lib/categories";
+import { CATEGORIES, categoryStyle, categoryIcon } from "@/lib/categories";
 import {
   PageTransition,
   listVariants,
@@ -19,6 +19,7 @@ import {
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
 function ReceiptRow({ r, index }: { r: Receipt; index: number }) {
+  const Icon = categoryIcon(r.category);
   return (
     <motion.li
       variants={itemVariants}
@@ -29,11 +30,11 @@ function ReceiptRow({ r, index }: { r: Receipt; index: number }) {
         className="flex items-center justify-between gap-4 py-4 group"
       >
         <div className="min-w-0 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+          <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(r.category)}`}>
             {r.status === "processing" ? (
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <FileText className="w-4 h-4 text-muted-foreground" />
+              <Icon className="w-4 h-4" />
             )}
           </span>
           <div className="min-w-0">
@@ -220,27 +221,30 @@ export default function SearchPage() {
                     >
                       {notableItems.map((item, i) => (
                         <motion.div key={i} variants={cardVariants}>
-                          <Link
-                            href={`/receipts/${item.receiptId}`}
-                            className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start hover:bg-secondary/50 transition-colors"
-                          >
-                            <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
-                            {item.price != null && (
-                              <p className="font-mono font-bold text-base">
-                                {currencySymbol(item.currency)}{item.price.toFixed(2)}
-                              </p>
-                            )}
-                            <div className="mt-auto flex flex-col gap-1">
-                              {item.category && (
-                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full w-fit ${categoryStyle(item.category)}`}>
-                                  {item.category}
+                          {(() => {
+                            const CardIcon = categoryIcon(item.category);
+                            return (
+                              <Link
+                                href={`/receipts/${item.receiptId}`}
+                                className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start hover:bg-secondary/50 transition-colors"
+                              >
+                                <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
+                                  <CardIcon className="w-4 h-4" />
                                 </span>
-                              )}
-                              {item.merchant && (
-                                <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
-                              )}
-                            </div>
-                          </Link>
+                                <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
+                                {item.price != null && (
+                                  <p className="font-mono font-bold text-base">
+                                    {currencySymbol(item.currency)}{item.price.toFixed(2)}
+                                  </p>
+                                )}
+                                <div className="mt-auto flex flex-col gap-1">
+                                  {item.merchant && (
+                                    <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
+                                  )}
+                                </div>
+                              </Link>
+                            );
+                          })()}
                         </motion.div>
                       ))}
                     </motion.div>

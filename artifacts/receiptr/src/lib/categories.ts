@@ -1,3 +1,6 @@
+import { Cpu, Home, Shirt, ShoppingBasket, Package } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
 export const CATEGORIES = [
   "Electronics",
   "Home",
@@ -16,7 +19,20 @@ const STYLES: Record<string, string> = {
   Other: "bg-gray-100 text-gray-600",
 };
 
+const ICONS: Record<string, LucideIcon> = {
+  Electronics: Cpu,
+  Home: Home,
+  "Clothing & Apparel": Shirt,
+  Groceries: ShoppingBasket,
+  Other: Package,
+};
+
 export function categoryStyle(category?: string | null): string {
   if (!category) return STYLES["Other"];
   return STYLES[category] ?? STYLES["Other"];
+}
+
+export function categoryIcon(category?: string | null): LucideIcon {
+  if (!category) return ICONS["Other"];
+  return ICONS[category] ?? ICONS["Other"];
 }

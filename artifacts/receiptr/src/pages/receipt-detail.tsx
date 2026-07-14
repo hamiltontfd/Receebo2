@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CATEGORIES, categoryStyle } from "@/lib/categories";
+import { CATEGORIES, categoryStyle, categoryIcon } from "@/lib/categories";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -276,6 +276,15 @@ export default function ReceiptDetail() {
         {/* Hero card */}
         <div className="rounded-2xl bg-foreground text-background p-6 space-y-4">
           <div>
+            {(() => {
+              const HeroIcon = categoryIcon(receipt.category);
+              return (
+                <div className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-2 py-1 mb-3">
+                  <HeroIcon className="w-3.5 h-3.5" />
+                  <span className="text-xs font-semibold">{receipt.category || "Other"}</span>
+                </div>
+              );
+            })()}
             <h1 className="text-2xl font-extrabold tracking-tight">
               {receipt.merchant || receipt.originalFileName}
             </h1>
