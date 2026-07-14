@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { NotableItem } from './notableItem';
 import type { ReceiptProduct } from './receiptProduct';
 import type { ReceiptStatus } from './receiptStatus';
 
@@ -48,5 +49,7 @@ export interface Receipt {
      */
   ocrText?: string | null;
   products?: ReceiptProduct[];
+  /** Items flagged as notable (expensive or warranty-relevant). */
+  notableItems?: NotableItem[];
   createdAt: Date;
 }

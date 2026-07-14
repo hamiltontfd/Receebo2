@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { NotableItem } from './notableItem';
 
 export interface ReceiptUpdate {
   merchant?: string;
@@ -15,4 +16,5 @@ export interface ReceiptUpdate {
   warranty?: string;
   /** Set to false to confirm a draft receipt into the library. */
   isDraft?: boolean;
+  notableItems?: NotableItem[];
 }

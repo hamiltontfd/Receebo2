@@ -386,6 +386,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReceiptProduct"
+        notableItems:
+          type: array
+          description: Items flagged as notable (expensive or warranty-relevant).
+          items:
+            $ref: "#/components/schemas/NotableItem"
         createdAt:
           type: string
           format: date-time
@@ -417,6 +422,21 @@ components:
         contentType:
           type: string
           minLength: 1
+    NotableItem:
+      type: object
+      required:
+        - name
+        - reason
+      properties:
+        name:
+          type: string
+        price:
+          type: ["number", "null"]
+        category:
+          type: ["string", "null"]
+        reason:
+          type: string
+          description: One-line explanation of why this item is worth keeping the receipt for.
     ReceiptUpdate:
       type: object
       properties:
@@ -435,6 +455,10 @@ components:
         isDraft:
           type: boolean
           description: Set to false to confirm a draft receipt into the library.
+        notableItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotableItem"
     ReceiptStats:
       type: object
       required:

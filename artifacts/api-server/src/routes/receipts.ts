@@ -41,6 +41,7 @@ async function runExtraction(
         ocrText: data.ocrText,
         warranty: data.warranty,
         products: data.products,
+        notableItems: data.notableItems,
       })
       .where(eq(receiptsTable.id, receiptId));
     logger.info({ receiptId }, "Receipt extraction completed");

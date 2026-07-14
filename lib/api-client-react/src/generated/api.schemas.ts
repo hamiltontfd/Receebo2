@@ -29,6 +29,16 @@ export interface ReceiptProduct {
   price?: number | null;
 }
 
+export interface NotableItem {
+  name: string;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  category?: string | null;
+  /** One-line explanation of why this item is worth keeping the receipt for. */
+  reason: string;
+}
+
 export interface Receipt {
   id: number;
   /** Storage path of the original uploaded file (e.g. /objects/uploads/uuid). */
@@ -69,6 +79,8 @@ export interface Receipt {
      */
   ocrText?: string | null;
   products?: ReceiptProduct[];
+  /** Items flagged as notable (expensive or warranty-relevant). */
+  notableItems?: NotableItem[];
   createdAt: string;
 }
 
@@ -93,6 +105,7 @@ export interface ReceiptUpdate {
   warranty?: string;
   /** Set to false to confirm a draft receipt into the library. */
   isDraft?: boolean;
+  notableItems?: NotableItem[];
 }
 
 export interface ReceiptStats {

@@ -12,6 +12,7 @@ export * from './guestClaimBody';
 export * from './healthStatus';
 export * from './listReceiptsParams';
 export * from './merchantSpend';
+export * from './notableItem';
 export * from './receipt';
 export * from './receiptInput';
 export * from './receiptProduct';

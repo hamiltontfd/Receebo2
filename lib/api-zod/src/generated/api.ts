@@ -44,6 +44,12 @@ export const ListReceiptsResponseItem = zod.object({
   "quantity": zod.number().nullish(),
   "price": zod.number().nullish()
 })).optional(),
+  "notableItems": zod.array(zod.object({
+  "name": zod.string(),
+  "price": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "reason": zod.string().describe('One-line explanation of why this item is worth keeping the receipt for.')
+})).optional().describe('Items flagged as notable (expensive or warranty-relevant).'),
   "createdAt": zod.coerce.date()
 })
 export const ListReceiptsResponse = zod.array(ListReceiptsResponseItem)
@@ -107,6 +113,12 @@ export const GetRecentReceiptsResponseItem = zod.object({
   "quantity": zod.number().nullish(),
   "price": zod.number().nullish()
 })).optional(),
+  "notableItems": zod.array(zod.object({
+  "name": zod.string(),
+  "price": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "reason": zod.string().describe('One-line explanation of why this item is worth keeping the receipt for.')
+})).optional().describe('Items flagged as notable (expensive or warranty-relevant).'),
   "createdAt": zod.coerce.date()
 })
 export const GetRecentReceiptsResponse = zod.array(GetRecentReceiptsResponseItem)
@@ -150,6 +162,12 @@ export const GetReceiptResponse = zod.object({
   "quantity": zod.number().nullish(),
   "price": zod.number().nullish()
 })).optional(),
+  "notableItems": zod.array(zod.object({
+  "name": zod.string(),
+  "price": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "reason": zod.string().describe('One-line explanation of why this item is worth keeping the receipt for.')
+})).optional().describe('Items flagged as notable (expensive or warranty-relevant).'),
   "createdAt": zod.coerce.date()
 })
 
@@ -168,7 +186,13 @@ export const UpdateReceiptBody = zod.object({
   "currency": zod.string().optional(),
   "category": zod.string().optional(),
   "warranty": zod.string().optional(),
-  "isDraft": zod.boolean().optional().describe('Set to false to confirm a draft receipt into the library.')
+  "isDraft": zod.boolean().optional().describe('Set to false to confirm a draft receipt into the library.'),
+  "notableItems": zod.array(zod.object({
+  "name": zod.string(),
+  "price": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "reason": zod.string().describe('One-line explanation of why this item is worth keeping the receipt for.')
+})).optional()
 })
 
 export const UpdateReceiptResponse = zod.object({
@@ -191,6 +215,12 @@ export const UpdateReceiptResponse = zod.object({
   "quantity": zod.number().nullish(),
   "price": zod.number().nullish()
 })).optional(),
+  "notableItems": zod.array(zod.object({
+  "name": zod.string(),
+  "price": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "reason": zod.string().describe('One-line explanation of why this item is worth keeping the receipt for.')
+})).optional().describe('Items flagged as notable (expensive or warranty-relevant).'),
   "createdAt": zod.coerce.date()
 })
 

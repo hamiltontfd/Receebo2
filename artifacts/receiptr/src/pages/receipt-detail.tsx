@@ -20,6 +20,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 
 import { ReceiptPreview } from "@/components/ReceiptPreview";
+import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -345,6 +346,10 @@ export default function ReceiptDetail() {
             </span>
           </div>
         </div>
+      )}
+
+      {receipt.notableItems && receipt.notableItems.length > 0 && !isEditing && (
+        <NotableItemsBanner items={receipt.notableItems} />
       )}
 
       {receipt.products && receipt.products.length > 0 && !isEditing && (

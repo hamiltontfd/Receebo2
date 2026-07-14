@@ -17,6 +17,13 @@ export type ReceiptProductItem = {
   price: number | null;
 };
 
+export type ReceiptNotableItem = {
+  name: string;
+  price?: number | null;
+  category?: string | null;
+  reason: string;
+};
+
 export const receiptsTable = pgTable("receipts", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull(),
@@ -34,6 +41,7 @@ export const receiptsTable = pgTable("receipts", {
   summary: text("summary"),
   ocrText: text("ocr_text"),
   products: jsonb("products").$type<ReceiptProductItem[]>().notNull().default([]),
+  notableItems: jsonb("notable_items").$type<ReceiptNotableItem[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -16,6 +16,7 @@ import {
   getGetRecentReceiptsQueryKey,
   customFetch,
 } from "@workspace/api-client-react";
+import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 
 type Phase = "capture" | "reading" | "review";
 
@@ -486,6 +487,10 @@ export default function Scan() {
               </div>
             )}
           </div>
+
+          {receipt?.notableItems && receipt.notableItems.length > 0 && (
+            <NotableItemsBanner items={receipt.notableItems} />
+          )}
 
           <div className="mt-auto space-y-3 pt-4">
             <Button

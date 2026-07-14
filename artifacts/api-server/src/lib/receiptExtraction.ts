@@ -10,6 +10,13 @@ export type ExtractedProduct = {
   price: number | null;
 };
 
+export type ExtractedNotableItem = {
+  name: string;
+  price: number | null;
+  category: string | null;
+  reason: string;
+};
+
 export type ExtractedReceipt = {
   merchant: string | null;
   purchaseDate: string | null;
@@ -20,6 +27,7 @@ export type ExtractedReceipt = {
   ocrText: string | null;
   warranty: string | null;
   products: ExtractedProduct[];
+  notableItems: ExtractedNotableItem[];
 };
 
 const SYSTEM_PROMPT = `You are an expert receipt and invoice analyst. You are given an image or PDF of a purchase receipt or invoice. Read it carefully and extract structured information.
@@ -36,6 +44,14 @@ Respond ONLY with a JSON object matching this exact shape:
   "warranty": string | null,        // warranty or return-policy information printed on the receipt (e.g. "2-year manufacturer warranty", "30-day returns"), or null if none is mentioned
   "products": [                      // individual line items; empty array if none are legible
     { "name": string, "quantity": number | null, "price": number | null }
+  ],
+  "notableItems": [                  // items worth keeping the receipt for; empty array if none qualify
+    {
+      "name": string,                // product name as it appears on the receipt
+      "price": number | null,        // item price as a plain number, or null if not visible
+      "category": string | null,     // inferred category, e.g. "Electronics", "Appliances", "Tools", "Furniture"
+      "reason": string               // one-line reason, e.g. "likely has manufacturer warranty", "eligible for return", "high-value purchase"
+    }
   ]
 }
 
@@ -43,7 +59,8 @@ Rules:
 - Use null for any field you genuinely cannot determine. Do not invent values.
 - "total" and "price" must be numbers (e.g. 12.99), never strings, and must not include currency symbols.
 - Transcribe ocrText faithfully, including item lines, taxes, and totals.
-- Do not include any commentary outside the JSON.`;
+- Do not include any commentary outside the JSON.
+- For notableItems: include any line item priced above ~$50 that falls into a durable-goods category such as electronics, appliances, tools, furniture, sporting equipment, or similar. These are purchases where a receipt may be needed for warranty claims, returns, or insurance. Exclude consumables (food, drinks, toiletries), services, and low-value items regardless of category.`;
 
 function buildContentPart(base64: string, contentType: string) {
   if (contentType === "application/pdf") {
@@ -120,6 +137,19 @@ export async function extractReceiptData(
         }))
     : [];
 
+  const notableItems: ExtractedNotableItem[] = Array.isArray(
+    (parsed as Partial<ExtractedReceipt>).notableItems,
+  )
+    ? ((parsed as Partial<ExtractedReceipt>).notableItems as ExtractedNotableItem[])
+        .filter((n) => n && typeof n === "object")
+        .map((n) => ({
+          name: toStringOrNull(n.name) ?? "Item",
+          price: toNumberOrNull(n.price),
+          category: toStringOrNull(n.category),
+          reason: toStringOrNull(n.reason) ?? "worth keeping",
+        }))
+    : [];
+
   let purchaseDate = toStringOrNull(parsed.purchaseDate);
   if (purchaseDate && !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) {
     const d = new Date(purchaseDate);
@@ -138,5 +168,6 @@ export async function extractReceiptData(
     ocrText: toStringOrNull(parsed.ocrText),
     warranty: toStringOrNull(parsed.warranty),
     products,
+    notableItems,
   };
 }
