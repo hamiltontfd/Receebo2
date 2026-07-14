@@ -24,6 +24,7 @@ import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { currencySymbol } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -298,7 +299,7 @@ export default function ReceiptDetail() {
                   <FormItem>
                     <FormLabel>Warranty</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g. 2-year manufacturer warranty" />
+                      <Textarea {...field} placeholder="e.g. 2-year manufacturer warranty" rows={4} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
