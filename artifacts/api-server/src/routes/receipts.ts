@@ -16,8 +16,7 @@ import {
   DeleteReceiptParams,
 } from "@workspace/api-zod";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
-import { extractReceiptData } from "../lib/receiptExtraction";
-import { logger } from "../lib/logger";
+import { enqueueExtraction } from "../lib/extractionQueue";
 
 const CANONICAL_CATEGORIES = ["Electronics", "Home", "Clothing & Apparel", "Groceries", "Other"] as const;
 function normalizeCategory(value: string | null | undefined): string | undefined {
@@ -27,40 +26,6 @@ function normalizeCategory(value: string | null | undefined): string | undefined
 }
 
 const router: IRouter = Router();
-
-async function runExtraction(
-  receiptId: number,
-  objectPath: string,
-  contentType: string,
-): Promise<void> {
-  try {
-    const data = await extractReceiptData(objectPath, contentType);
-    await db
-      .update(receiptsTable)
-      .set({
-        status: "completed",
-        merchant: data.merchant,
-        purchaseDate: data.purchaseDate,
-        total: data.total,
-        currency: data.currency,
-        category: data.category,
-        summary: data.summary,
-        ocrText: data.ocrText,
-        warranty: data.warranty,
-        transactionNumber: data.transactionNumber,
-        products: data.products,
-        notableItems: data.notableItems,
-      })
-      .where(eq(receiptsTable.id, receiptId));
-    logger.info({ receiptId }, "Receipt extraction completed");
-  } catch (error) {
-    logger.error({ error, receiptId }, "Receipt extraction failed");
-    await db
-      .update(receiptsTable)
-      .set({ status: "failed" })
-      .where(eq(receiptsTable.id, receiptId));
-  }
-}
 
 router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
@@ -112,11 +77,11 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
     })
     .returning();
 
-  void runExtraction(
-    receipt.id,
-    receipt.objectPath,
-    receipt.contentType,
-  );
+  enqueueExtraction({
+    receiptId: receipt.id,
+    objectPath: receipt.objectPath,
+    contentType: receipt.contentType,
+  });
 
   res.status(201).json(GetReceiptResponse.parse(receipt));
 });
