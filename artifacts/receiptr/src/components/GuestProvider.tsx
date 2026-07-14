@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 
 const GUEST_TOKEN_KEY = "receiptr:guestToken";
 
@@ -19,7 +19,18 @@ const GuestContext = createContext<GuestContextValue | null>(null);
 
 async function issueGuestToken(): Promise<string> {
   const existing = localStorage.getItem(GUEST_TOKEN_KEY);
-  if (existing) return existing;
+  if (existing) {
+    // Re-confirm the token still exists on the server (idempotent endpoint)
+    const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
+    const res = await fetch(`${base}/api/guest-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: existing }),
+    });
+    if (res.ok) return existing;
+    // Token no longer valid — clear it and issue a fresh one
+    localStorage.removeItem(GUEST_TOKEN_KEY);
+  }
 
   const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
   const res = await fetch(`${base}/api/guest-session`, { method: "POST" });
@@ -36,6 +47,14 @@ export function clearGuestToken(): void {
 export function GuestProvider({ children }: { children: React.ReactNode }) {
   const [guestUser, setGuestUser] = useState<GuestUser | null>(null);
   const isGuest = guestUser !== null;
+
+  // Auto-restore guest mode from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(GUEST_TOKEN_KEY);
+    if (stored) {
+      setGuestUser({ id: stored, name: "Guest", email: "guest@receiptr.local" });
+    }
+  }, []);
 
   const enterGuestMode = useCallback(async () => {
     const token = await issueGuestToken();
