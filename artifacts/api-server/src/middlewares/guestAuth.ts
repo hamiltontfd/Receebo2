@@ -1,13 +1,13 @@
 import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
+import { db, guestSessionsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
-const GUEST_ID_PREFIX = "guest-";
-
-export function requireAuthOrGuest(
+export async function requireAuthOrGuest(
   req: Request,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   const auth = getAuth(req);
   const clerkUserId = (auth?.sessionClaims?.userId as string | undefined) || auth?.userId;
   if (clerkUserId) {
@@ -15,10 +15,18 @@ export function requireAuthOrGuest(
     return next();
   }
 
-  const guestId = req.headers["x-guest-id"];
-  if (typeof guestId === "string" && guestId.startsWith(GUEST_ID_PREFIX)) {
-    (req as any).userId = guestId;
-    return next();
+  const guestToken = req.headers["x-guest-id"];
+  if (typeof guestToken === "string" && guestToken.length > 0) {
+    const [session] = await db
+      .select()
+      .from(guestSessionsTable)
+      .where(eq(guestSessionsTable.token, guestToken))
+      .limit(1);
+
+    if (session) {
+      (req as any).userId = guestToken;
+      return next();
+    }
   }
 
   res.status(401).json({ error: "Unauthorized" });

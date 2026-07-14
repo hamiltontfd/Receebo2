@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useCallback } from "react";
 
+const GUEST_TOKEN_KEY = "receiptr:guestToken";
+
 export interface GuestUser {
   id: string;
   name: string;
@@ -9,19 +11,35 @@ export interface GuestUser {
 export interface GuestContextValue {
   isGuest: boolean;
   guestUser: GuestUser | null;
-  enterGuestMode: () => void;
+  enterGuestMode: () => Promise<void>;
   exitGuestMode: () => void;
 }
 
 const GuestContext = createContext<GuestContextValue | null>(null);
 
+async function issueGuestToken(): Promise<string> {
+  const existing = localStorage.getItem(GUEST_TOKEN_KEY);
+  if (existing) return existing;
+
+  const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
+  const res = await fetch(`${base}/api/guest-session`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to create guest session");
+  const { guestToken } = (await res.json()) as { guestToken: string };
+  localStorage.setItem(GUEST_TOKEN_KEY, guestToken);
+  return guestToken;
+}
+
+export function clearGuestToken(): void {
+  localStorage.removeItem(GUEST_TOKEN_KEY);
+}
+
 export function GuestProvider({ children }: { children: React.ReactNode }) {
   const [guestUser, setGuestUser] = useState<GuestUser | null>(null);
   const isGuest = guestUser !== null;
 
-  const enterGuestMode = useCallback(() => {
-    const id = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setGuestUser({ id, name: "Guest", email: "guest@receiptr.local" });
+  const enterGuestMode = useCallback(async () => {
+    const token = await issueGuestToken();
+    setGuestUser({ id: token, name: "Guest", email: "guest@receiptr.local" });
   }, []);
 
   const exitGuestMode = useCallback(() => {

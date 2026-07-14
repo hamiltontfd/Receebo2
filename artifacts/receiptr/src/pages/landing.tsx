@@ -59,8 +59,8 @@ export default function Landing() {
   const { enterGuestMode } = useGuestMode();
   const [, setLocation] = useLocation();
 
-  const startScanning = () => {
-    enterGuestMode();
+  const startScanning = async () => {
+    await enterGuestMode();
     setLocation("/scan");
   };
 
