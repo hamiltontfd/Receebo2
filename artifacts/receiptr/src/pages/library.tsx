@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListReceipts, useGetReceiptStats } from "@workspace/api-client-react";
 import type { Receipt as ReceiptItem } from "@workspace/api-client-react";
+import { currencySymbol } from "@/lib/currency";
 
 function monthKey(r: ReceiptItem): string {
   const d = new Date(r.purchaseDate || r.createdAt);
@@ -132,7 +133,7 @@ export default function Library() {
                     </div>
                     {r.total != null && (
                       <span className="font-mono font-semibold shrink-0">
-                        ${r.total.toFixed(2)}
+                        {currencySymbol(r.currency)}{r.total.toFixed(2)}
                       </span>
                     )}
                   </Link>
@@ -140,7 +141,7 @@ export default function Library() {
               ))}
             </ul>
             <p className="text-right text-xs text-muted-foreground mt-2 font-mono">
-              ${group.total.toFixed(2)}
+              {currencySymbol(group.items[0]?.currency)}{group.total.toFixed(2)}
             </p>
           </section>
         ))}

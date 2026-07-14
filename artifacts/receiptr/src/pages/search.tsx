@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListReceipts } from "@workspace/api-client-react";
+import { currencySymbol } from "@/lib/currency";
 
 const QUICK_FILTERS = ["Electronics", "Groceries", "Clothing", "Travel"];
 
@@ -86,7 +87,7 @@ export default function SearchPage() {
                 </div>
                 {r.total != null && (
                   <span className="font-mono font-semibold shrink-0">
-                    ${r.total.toFixed(2)}
+                    {currencySymbol(r.currency)}{r.total.toFixed(2)}
                   </span>
                 )}
               </Link>
