@@ -220,31 +220,31 @@ export default function ReceiptDetail() {
       </div>
 
       {isEditing ? (
-        <div className="rounded-2xl border p-5">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="rounded-2xl border divide-y">
               <FormField
                 control={form.control}
                 name="merchant"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Merchant</FormLabel>
+                  <FormItem className="p-4 space-y-1">
+                    <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Merchant</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g. Apple Store" />
+                      <Input {...field} placeholder="e.g. Apple Store" className="border-0 px-0 h-auto py-0 font-semibold focus-visible:ring-0 shadow-none" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 divide-x">
                 <FormField
                   control={form.control}
                   name="purchaseDate"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date</FormLabel>
+                    <FormItem className="p-4 space-y-1">
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" {...field} className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -254,25 +254,25 @@ export default function ReceiptDetail() {
                   control={form.control}
                   name="category"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
+                    <FormItem className="p-4 space-y-1">
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="e.g. Electronics" />
+                        <Input {...field} placeholder="e.g. Electronics" className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 divide-x">
                 <FormField
                   control={form.control}
                   name="total"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total</FormLabel>
+                    <FormItem className="p-4 space-y-1">
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} />
+                        <Input type="number" step="0.01" {...field} value={field.value ?? ""} className="border-0 px-0 h-auto py-0 font-mono font-semibold focus-visible:ring-0 shadow-none" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -282,10 +282,10 @@ export default function ReceiptDetail() {
                   control={form.control}
                   name="currency"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Currency</FormLabel>
+                    <FormItem className="p-4 space-y-1">
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Currency</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="USD" />
+                        <Input {...field} placeholder="USD" className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -296,27 +296,27 @@ export default function ReceiptDetail() {
                 control={form.control}
                 name="warranty"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Warranty</FormLabel>
+                  <FormItem className="p-4 space-y-1">
+                    <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Warranty</FormLabel>
                     <FormControl>
-                      <AutosizeTextarea {...field} placeholder="e.g. 2-year manufacturer warranty" minRows={3} />
+                      <AutosizeTextarea {...field} placeholder="e.g. 2-year manufacturer warranty" minRows={3} className="border-0 px-0 shadow-none focus-visible:ring-0 resize-none" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="flex items-center gap-2 pt-2">
-                <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
-                  {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Save Changes
-                </Button>
-                <Button type="button" variant="outline" className="rounded-full" onClick={() => setIsEditing(false)} disabled={updateReceipt.isPending}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </div>
+            </div>
+            <div className="flex items-center gap-2 mt-4">
+              <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
+                {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Save Changes
+              </Button>
+              <Button type="button" variant="outline" className="rounded-full" onClick={() => setIsEditing(false)} disabled={updateReceipt.isPending}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Form>
       ) : (
         <div className="rounded-2xl border divide-y">
           <div className="p-4 flex items-center justify-between text-sm">
