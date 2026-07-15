@@ -2,6 +2,7 @@ import { db, receiptsTable } from "@workspace/db";
 import { eq, and, lt } from "drizzle-orm";
 import { extractReceiptData } from "./receiptExtraction";
 import { logger } from "./logger";
+import { sendReceiptReadyEmail } from "./emailService";
 
 const MAX_ATTEMPTS = 3;
 const STUCK_THRESHOLD_MS = 5 * 60 * 1000;
@@ -48,6 +49,29 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
       .where(eq(receiptsTable.id, receiptId));
 
     logger.info({ receiptId, attempt }, "Extraction job completed");
+
+    // Send "receipt ready" notification — fire and forget, never throws
+    try {
+      const rows = await db
+        .select({ userId: receiptsTable.userId, originalFileName: receiptsTable.originalFileName })
+        .from(receiptsTable)
+        .where(eq(receiptsTable.id, receiptId))
+        .limit(1);
+      const userId = rows[0]?.userId;
+      if (userId) {
+        void sendReceiptReadyEmail(userId, {
+          id: receiptId,
+          merchant: data.merchant,
+          total: data.total,
+          currency: data.currency,
+          purchaseDate: data.purchaseDate,
+          originalFileName: rows[0]?.originalFileName ?? "",
+        });
+      }
+    } catch (notifyErr) {
+      logger.warn({ notifyErr, receiptId }, "Could not dispatch receipt ready notification");
+    }
+
     activeJobs.delete(receiptId);
   } catch (error) {
     logger.error({ error, receiptId, attempt }, "Extraction job attempt failed");

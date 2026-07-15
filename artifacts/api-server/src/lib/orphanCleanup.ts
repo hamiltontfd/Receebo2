@@ -1,7 +1,9 @@
 import type { File as GCSFile } from "@google-cloud/storage";
 import { db, receiptsTable } from "@workspace/db";
+import { eq, isNotNull } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
 import { logger } from "./logger";
+import { sendWarrantyReminderEmail } from "./emailService";
 
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const ORPHAN_AGE_THRESHOLD_DAYS = 7;
@@ -101,6 +103,57 @@ async function runOrphanCleanup(): Promise<void> {
     },
     "Orphan cleanup complete",
   );
+
+  // Warranty expiry reminders — send once when expiry is 28-30 days away
+  try {
+    const warrantyReceipts = await db
+      .select({
+        id: receiptsTable.id,
+        userId: receiptsTable.userId,
+        merchant: receiptsTable.merchant,
+        warranty: receiptsTable.warranty,
+        originalFileName: receiptsTable.originalFileName,
+      })
+      .from(receiptsTable)
+      .where(isNotNull(receiptsTable.warranty));
+
+    const withWarranty = warrantyReceipts.filter(
+      (r) => r.warranty && r.warranty.trim().length > 0,
+    );
+
+    const ISO_DATE_RE = /(\d{4}-\d{2}-\d{2})/g;
+    const now = Date.now();
+    const MS_PER_DAY = 86_400_000;
+    let remindersSent = 0;
+
+    for (const r of withWarranty) {
+      if (!r.warranty) continue;
+      const matches = r.warranty.match(ISO_DATE_RE);
+      if (!matches) continue;
+
+      for (const dateStr of matches) {
+        const expiryMs = new Date(dateStr).getTime();
+        const daysUntil = (expiryMs - now) / MS_PER_DAY;
+        // Send reminder when between 28 and 30 days away (daily run window)
+        if (daysUntil >= 28 && daysUntil <= 30) {
+          void sendWarrantyReminderEmail(r.userId, {
+            id: r.id,
+            merchant: r.merchant,
+            warranty: r.warranty,
+            originalFileName: r.originalFileName,
+          });
+          remindersSent++;
+          break;
+        }
+      }
+    }
+
+    if (remindersSent > 0) {
+      logger.info({ remindersSent }, "Warranty reminder emails dispatched");
+    }
+  } catch (err) {
+    logger.error({ err }, "Warranty reminder sweep failed");
+  }
 }
 
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;
