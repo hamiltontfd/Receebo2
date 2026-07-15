@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, gte, sql } from "drizzle-orm";
 import { db, receiptsTable, receiptAttachmentsTable } from "@workspace/db";
 import { CreateAttachmentBody, CreateAttachmentParams, DeleteAttachmentParams } from "@workspace/api-zod";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
@@ -8,6 +8,13 @@ import { logger } from "../lib/logger";
 
 const objectStorageService = new ObjectStorageService();
 const router: IRouter = Router();
+
+const DAILY_UPLOAD_LIMIT = 5;
+
+function todayMidnightUTC(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
 
 /** POST /receipts/:id/attachments */
 router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): Promise<void> => {
@@ -25,30 +32,75 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
 
   const userId = req.userId!;
   const receiptId = params.data.id;
+  const midnight = todayMidnightUTC();
 
-  const [receipt] = await db
-    .select({ id: receiptsTable.id })
-    .from(receiptsTable)
-    .where(and(eq(receiptsTable.id, receiptId), eq(receiptsTable.userId, userId)))
-    .limit(1);
+  let attachment: (typeof receiptAttachmentsTable.$inferSelect) | undefined;
+  let limitReached = false;
+  let receiptNotFound = false;
 
-  if (!receipt) {
+  // Same advisory-lock + transaction pattern as receipt creation so that
+  // primary uploads and attachment uploads share the daily cap atomically.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
+
+    const [receipt] = await tx
+      .select({ id: receiptsTable.id })
+      .from(receiptsTable)
+      .where(and(eq(receiptsTable.id, receiptId), eq(receiptsTable.userId, userId)))
+      .limit(1);
+
+    if (!receipt) {
+      receiptNotFound = true;
+      return;
+    }
+
+    // Count receipt uploads today
+    const [receiptCountRow] = await tx
+      .select({ used: count() })
+      .from(receiptsTable)
+      .where(and(eq(receiptsTable.userId, userId), gte(receiptsTable.createdAt, midnight)));
+
+    // Count attachment uploads today (join to get only this user's attachments)
+    const [attCountRow] = await tx
+      .select({ used: count() })
+      .from(receiptAttachmentsTable)
+      .innerJoin(receiptsTable, eq(receiptAttachmentsTable.receiptId, receiptsTable.id))
+      .where(and(eq(receiptsTable.userId, userId), gte(receiptAttachmentsTable.createdAt, midnight)));
+
+    const totalToday = Number(receiptCountRow?.used ?? 0) + Number(attCountRow?.used ?? 0);
+    if (totalToday >= DAILY_UPLOAD_LIMIT) {
+      limitReached = true;
+      return;
+    }
+
+    const [inserted] = await tx
+      .insert(receiptAttachmentsTable)
+      .values({
+        receiptId,
+        objectPath: parsed.data.objectPath,
+        originalFileName: parsed.data.originalFileName,
+        contentType: parsed.data.contentType,
+      })
+      .returning();
+
+    attachment = inserted;
+  });
+
+  if (receiptNotFound) {
     res.status(404).json({ error: "Receipt not found" });
     return;
   }
 
-  const [attachment] = await db
-    .insert(receiptAttachmentsTable)
-    .values({
-      receiptId,
-      objectPath: parsed.data.objectPath,
-      originalFileName: parsed.data.originalFileName,
-      contentType: parsed.data.contentType,
-    })
-    .returning();
+  if (limitReached) {
+    res.status(429).json({
+      error: "daily_limit_reached",
+      message: "You've reached your 5 upload limit for today. Come back tomorrow.",
+    });
+    return;
+  }
 
-  logger.info({ receiptId, attachmentId: attachment.id }, "Attachment created");
-  res.status(201).json(attachment);
+  logger.info({ receiptId, attachmentId: attachment!.id }, "Attachment created");
+  res.status(201).json(attachment!);
 });
 
 /** DELETE /receipts/:id/attachments/:attachmentId */

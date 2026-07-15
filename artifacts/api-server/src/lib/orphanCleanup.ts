@@ -40,9 +40,15 @@ async function runOrphanCleanup(): Promise<void> {
   let knownPaths: Set<string>;
   try {
     const receiptRows = await db.select({ objectPath: receiptsTable.objectPath }).from(receiptsTable);
+    // Only include attachment paths where the parent receipt still exists (INNER JOIN).
+    // The FK + ON DELETE CASCADE means orphan attachment rows can't exist under normal
+    // operation, but using a JOIN makes the intent explicit and handles any edge cases
+    // (e.g., FK temporarily disabled, manual DML). Any attachment whose receipt is missing
+    // will not appear here and its storage object will be swept as an orphan.
     const attachmentRows = await db
       .select({ objectPath: receiptAttachmentsTable.objectPath })
-      .from(receiptAttachmentsTable);
+      .from(receiptAttachmentsTable)
+      .innerJoin(receiptsTable, eq(receiptAttachmentsTable.receiptId, receiptsTable.id));
     knownPaths = new Set([
       ...receiptRows.map((r) => r.objectPath),
       ...attachmentRows.map((a) => a.objectPath),
