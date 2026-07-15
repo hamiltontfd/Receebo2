@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
 import { db, receiptsTable } from "@workspace/db";
 import {
   CreateReceiptBody,
@@ -61,6 +61,29 @@ router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   res.json(ListReceiptsResponse.parse(rows));
 });
 
+const DAILY_UPLOAD_LIMIT = 5;
+
+function todayMidnightUTC(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+router.get("/receipts/daily-count", requireAuthOrGuest, async (req, res): Promise<void> => {
+  const midnight = todayMidnightUTC();
+  const [row] = await db
+    .select({ used: count() })
+    .from(receiptsTable)
+    .where(
+      and(
+        eq(receiptsTable.userId, req.userId!),
+        gte(receiptsTable.createdAt, midnight),
+      ),
+    );
+
+  const used = Number(row?.used ?? 0);
+  res.json({ used, remaining: Math.max(0, DAILY_UPLOAD_LIMIT - used), limit: DAILY_UPLOAD_LIMIT });
+});
+
 router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   const parsed = CreateReceiptBody.safeParse(req.body);
   if (!parsed.success) {
@@ -68,26 +91,66 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
     return;
   }
 
-  const [receipt] = await db
-    .insert(receiptsTable)
-    .values({
-      userId: req.userId!,
-      objectPath: parsed.data.objectPath,
-      originalFileName: parsed.data.originalFileName,
-      contentType: parsed.data.contentType,
-      status: "processing",
-      isDraft: true,
-      products: [],
-    })
-    .returning();
+  const userId = req.userId!;
+  const midnight = todayMidnightUTC();
 
-  enqueueExtraction({
-    receiptId: receipt.id,
-    objectPath: receipt.objectPath,
-    contentType: receipt.contentType,
+  // Atomically check the daily cap and insert within a single transaction.
+  // pg_advisory_xact_lock serialises concurrent uploads for the same user so
+  // two simultaneous requests cannot both observe used < 5 and both insert.
+  // The lock key is derived from the user ID string via hashtext() and is
+  // automatically released when the transaction commits or rolls back.
+  let receipt: (typeof receiptsTable.$inferSelect) | undefined;
+  let limitReached = false;
+
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
+
+    const [countRow] = await tx
+      .select({ used: count() })
+      .from(receiptsTable)
+      .where(
+        and(
+          eq(receiptsTable.userId, userId),
+          gte(receiptsTable.createdAt, midnight),
+        ),
+      );
+
+    if (Number(countRow?.used ?? 0) >= DAILY_UPLOAD_LIMIT) {
+      limitReached = true;
+      return;
+    }
+
+    const [inserted] = await tx
+      .insert(receiptsTable)
+      .values({
+        userId,
+        objectPath: parsed.data.objectPath,
+        originalFileName: parsed.data.originalFileName,
+        contentType: parsed.data.contentType,
+        status: "processing",
+        isDraft: true,
+        products: [],
+      })
+      .returning();
+
+    receipt = inserted;
   });
 
-  res.status(201).json(GetReceiptResponse.parse(receipt));
+  if (limitReached) {
+    res.status(429).json({
+      error: "daily_limit_reached",
+      message: "You've reached your 5 receipt limit for today. Come back tomorrow.",
+    });
+    return;
+  }
+
+  enqueueExtraction({
+    receiptId: receipt!.id,
+    objectPath: receipt!.objectPath,
+    contentType: receipt!.contentType,
+  });
+
+  res.status(201).json(GetReceiptResponse.parse(receipt!));
 });
 
 router.get("/receipts/stats", requireAuthOrGuest, async (req, res): Promise<void> => {

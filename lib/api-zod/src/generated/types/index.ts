@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './dailyUploadCount';
 export * from './errorEnvelope';
 export * from './getRecentReceiptsParams';
 export * from './guestClaimBody';

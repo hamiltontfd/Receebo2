@@ -39,7 +39,7 @@ export const ListReceiptsResponseItem = zod.object({
   "category": zod.string().nullish(),
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
-  "transactionNumber": zod.string().nullish().describe('Transaction/receipt number printed on the receipt.'),
+  "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -68,6 +68,16 @@ export const CreateReceiptBody = zod.object({
   "objectPath": zod.string().min(1).describe('Storage path returned by the upload endpoint.'),
   "originalFileName": zod.string().min(1),
   "contentType": zod.string().min(1)
+})
+
+
+/**
+ * @summary Get the number of receipts uploaded today (resets at midnight UTC)
+ */
+export const GetDailyUploadCountResponse = zod.object({
+  "used": zod.number().describe('Number of receipts uploaded today (since midnight UTC).'),
+  "remaining": zod.number().describe('Number of uploads remaining for today.'),
+  "limit": zod.number().describe('Total daily upload limit.')
 })
 
 
@@ -109,7 +119,7 @@ export const GetRecentReceiptsResponseItem = zod.object({
   "category": zod.string().nullish(),
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
-  "transactionNumber": zod.string().nullish().describe('Transaction/receipt number printed on the receipt.'),
+  "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -159,7 +169,7 @@ export const GetReceiptResponse = zod.object({
   "category": zod.string().nullish(),
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
-  "transactionNumber": zod.string().nullish().describe('Transaction/receipt number printed on the receipt.'),
+  "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -213,7 +223,7 @@ export const UpdateReceiptResponse = zod.object({
   "category": zod.string().nullish(),
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
-  "transactionNumber": zod.string().nullish().describe('Transaction/receipt number printed on the receipt.'),
+  "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),

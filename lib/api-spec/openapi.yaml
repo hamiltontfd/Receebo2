@@ -78,6 +78,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Daily upload limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /receipts/daily-count:
+    get:
+      operationId: getDailyUploadCount
+      tags: [receipts]
+      summary: Get the number of receipts uploaded today (resets at midnight UTC)
+      responses:
+        "200":
+          description: Daily upload count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyUploadCount"
   /receipts/stats:
     get:
       operationId: getReceiptStats
@@ -382,6 +400,9 @@ components:
         ocrText:
           type: ["string", "null"]
           description: Full extracted text from the receipt.
+        transactionNumber:
+          type: ["string", "null"]
+          description: Transaction or reference number from the receipt.
         products:
           type: array
           items:
@@ -528,6 +549,19 @@ components:
           type: string
           minLength: 1
           description: The guest session token to claim and migrate.
+    DailyUploadCount:
+      type: object
+      required: [used, remaining, limit]
+      properties:
+        used:
+          type: integer
+          description: Number of receipts uploaded today (since midnight UTC).
+        remaining:
+          type: integer
+          description: Number of uploads remaining for today.
+        limit:
+          type: integer
+          description: Total daily upload limit.
     ErrorEnvelope:
       type: object
       required: [error]

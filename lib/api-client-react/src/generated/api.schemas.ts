@@ -79,7 +79,7 @@ export interface Receipt {
      */
   ocrText?: string | null;
   /**
-     * Transaction/receipt number printed on the receipt.
+     * Transaction or reference number from the receipt.
      * @nullable
      */
   transactionNumber?: string | null;
@@ -160,6 +160,15 @@ export interface GuestClaimBody {
      * @minLength 1
      */
   guestToken: string;
+}
+
+export interface DailyUploadCount {
+  /** Number of receipts uploaded today (since midnight UTC). */
+  used: number;
+  /** Number of uploads remaining for today. */
+  remaining: number;
+  /** Total daily upload limit. */
+  limit: number;
 }
 
 export interface ErrorEnvelope {
