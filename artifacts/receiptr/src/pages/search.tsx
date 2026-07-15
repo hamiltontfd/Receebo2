@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
-import { Search as SearchIcon, Loader2, ScanLine } from "lucide-react";
+import { Search as SearchIcon, Loader2, ScanLine, Camera } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -109,7 +109,10 @@ export default function SearchPage() {
     return items;
   }, [recent]);
 
+  const showFab = !!(recent && recent.length > 0);
+
   return (
+    <>
     <PageTransition className="flex-1 w-full max-w-lg md:max-w-3xl mx-auto px-5 py-6 flex flex-col gap-5">
       {/* Search input */}
       <div className="relative">
@@ -305,5 +308,26 @@ export default function SearchPage() {
         )}
       </AnimatePresence>
     </PageTransition>
+
+    {/* Floating scan button — mobile only, visible when there are receipts */}
+    <AnimatePresence>
+      {showFab && (
+        <motion.button
+          key="fab"
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          whileTap={{ scale: 0.88 }}
+          transition={{ type: "spring", stiffness: 400, damping: 22 }}
+          onClick={() => setLocation("/scan")}
+          aria-label="Scan receipt"
+          className="md:hidden fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-foreground text-background flex items-center justify-center shadow-xl"
+          style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+        >
+          <Camera className="w-6 h-6" />
+        </motion.button>
+      )}
+    </AnimatePresence>
+    </>
   );
 }

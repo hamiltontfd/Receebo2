@@ -1,6 +1,5 @@
 import { Link, useLocation } from "wouter";
 import { Search, Camera, LogOut } from "lucide-react";
-import { motion } from "framer-motion";
 import { useUser, useClerk } from "@clerk/react";
 import { useGuestMode } from "@/components/GuestProvider";
 import { Button } from "@/components/ui/button";
@@ -56,52 +55,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col pb-20 md:pb-0">{children}</main>
-
-      {/* Mobile bottom tab bar */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 border-t bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-        <div className="flex items-stretch justify-around h-16">
-          {tabs.map(({ href, label, icon: Icon }) => {
-            const active = location.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex flex-col items-center justify-center gap-1 flex-1 text-xs font-medium transition-colors ${
-                  active ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                <motion.span
-                  whileTap={{ scale: 0.88 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                  className="flex flex-col items-center justify-center gap-1"
-                >
-                  {href === "/scan" ? (
-                    <motion.span
-                      animate={{ scale: active ? 1.05 : 1, backgroundColor: active ? "hsl(var(--foreground))" : "hsl(var(--secondary))" }}
-                      transition={{ type: "spring", stiffness: 350, damping: 22 }}
-                      className={`flex items-center justify-center w-10 h-10 rounded-xl ${active ? "text-background" : "text-foreground"}`}
-                    >
-                      <Icon className="w-5 h-5" />
-                    </motion.span>
-                  ) : (
-                    <>
-                      <motion.span
-                        animate={{ scale: active ? 1.15 : 1 }}
-                        transition={{ type: "spring", stiffness: 380, damping: 22 }}
-                        className="flex items-center justify-center"
-                      >
-                        <Icon className="w-5 h-5" />
-                      </motion.span>
-                      <span>{label}</span>
-                    </>
-                  )}
-                </motion.span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      <main className="flex-1 flex flex-col">{children}</main>
     </div>
   );
 }
