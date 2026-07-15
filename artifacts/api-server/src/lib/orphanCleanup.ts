@@ -1,6 +1,6 @@
 import type { File as GCSFile } from "@google-cloud/storage";
 import { db, receiptsTable } from "@workspace/db";
-import { eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
 import { logger } from "./logger";
 import { sendWarrantyReminderEmail } from "./emailService";
@@ -115,27 +115,34 @@ async function runOrphanCleanup(): Promise<void> {
         originalFileName: receiptsTable.originalFileName,
       })
       .from(receiptsTable)
-      .where(isNotNull(receiptsTable.warranty));
+      .where(
+        and(
+          eq(receiptsTable.status, "completed"),
+          isNotNull(receiptsTable.warranty),
+        ),
+      );
 
-    const withWarranty = warrantyReceipts.filter(
-      (r) => r.warranty && r.warranty.trim().length > 0,
-    );
+    // Anchor to today's UTC midnight so the comparison is calendar-day exact.
+    // A receipt qualifies only when today + 30 days == the expiry date at UTC midnight.
+    // Running the job multiple times on the same day won't re-send because the
+    // target date doesn't change within a calendar day.
+    const MS_PER_DAY = 86_400_000;
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
+    const targetMs = todayUtc.getTime() + 30 * MS_PER_DAY;
 
     const ISO_DATE_RE = /(\d{4}-\d{2}-\d{2})/g;
-    const now = Date.now();
-    const MS_PER_DAY = 86_400_000;
     let remindersSent = 0;
 
-    for (const r of withWarranty) {
+    for (const r of warrantyReceipts) {
       if (!r.warranty) continue;
       const matches = r.warranty.match(ISO_DATE_RE);
       if (!matches) continue;
 
       for (const dateStr of matches) {
-        const expiryMs = new Date(dateStr).getTime();
-        const daysUntil = (expiryMs - now) / MS_PER_DAY;
-        // Send reminder when between 28 and 30 days away (daily run window)
-        if (daysUntil >= 28 && daysUntil <= 30) {
+        // Parse as UTC midnight to avoid timezone offset in getTime()
+        const expiryMs = new Date(`${dateStr}T00:00:00Z`).getTime();
+        if (expiryMs === targetMs) {
           void sendWarrantyReminderEmail(r.userId, {
             id: r.id,
             merchant: r.merchant,
@@ -143,7 +150,7 @@ async function runOrphanCleanup(): Promise<void> {
             originalFileName: r.originalFileName,
           });
           remindersSent++;
-          break;
+          break; // one reminder per receipt per run
         }
       }
     }
