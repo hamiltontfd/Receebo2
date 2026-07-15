@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
-import { Search as SearchIcon, Loader2 } from "lucide-react";
+import { Search as SearchIcon, Loader2, ScanLine } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListReceipts, useGetRecentReceipts } from "@workspace/api-client-react";
 import type { Receipt } from "@workspace/api-client-react";
@@ -66,6 +67,7 @@ function ReceiptRow({ r, index }: { r: Receipt; index: number }) {
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 400);
@@ -276,9 +278,25 @@ export default function SearchPage() {
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-center py-16 text-muted-foreground text-sm"
+                    className="flex flex-col items-center justify-center px-8 py-16 text-center gap-5"
                   >
-                    Scan your first receipt to get started.
+                    <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center">
+                      <ScanLine className="w-9 h-9 text-muted-foreground" />
+                    </div>
+                    <div className="space-y-2 max-w-xs">
+                      <h2 className="text-xl font-extrabold tracking-tight">
+                        No receipts yet.
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        Scan your first receipt to build your searchable purchase history.
+                      </p>
+                    </div>
+                    <Button
+                      className="rounded-full h-12 px-8 font-semibold"
+                      onClick={() => setLocation("/scan")}
+                    >
+                      Scan Receipt
+                    </Button>
                   </motion.div>
                 ) : null}
               </>
