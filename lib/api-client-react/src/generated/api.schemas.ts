@@ -39,6 +39,15 @@ export interface NotableItem {
   reason: string;
 }
 
+export interface ReceiptAttachment {
+  id: number;
+  receiptId: number;
+  objectPath: string;
+  originalFileName: string;
+  contentType: string;
+  createdAt: string;
+}
+
 export interface Receipt {
   id: number;
   /** Storage path of the original uploaded file (e.g. /objects/uploads/uuid). */
@@ -86,6 +95,8 @@ export interface Receipt {
   products?: ReceiptProduct[];
   /** Items flagged as notable (expensive or warranty-relevant). */
   notableItems?: NotableItem[];
+  /** Additional files attached to this receipt. */
+  attachments?: ReceiptAttachment[];
   createdAt: string;
 }
 

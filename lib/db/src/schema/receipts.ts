@@ -1,6 +1,7 @@
 import {
   pgTable,
   serial,
+  integer,
   text,
   date,
   doublePrecision,
@@ -59,3 +60,21 @@ export const insertReceiptSchema = createInsertSchema(receiptsTable).omit({
 });
 export type InsertReceipt = z.infer<typeof insertReceiptSchema>;
 export type Receipt = typeof receiptsTable.$inferSelect;
+
+export const receiptAttachmentsTable = pgTable("receipt_attachments", {
+  id: serial("id").primaryKey(),
+  receiptId: integer("receipt_id")
+    .notNull()
+    .references(() => receiptsTable.id, { onDelete: "cascade" }),
+  objectPath: text("object_path").notNull(),
+  originalFileName: text("original_file_name").notNull(),
+  contentType: text("content_type").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertReceiptAttachmentSchema = createInsertSchema(receiptAttachmentsTable).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertReceiptAttachment = z.infer<typeof insertReceiptAttachmentSchema>;
+export type ReceiptAttachmentRow = typeof receiptAttachmentsTable.$inferSelect;

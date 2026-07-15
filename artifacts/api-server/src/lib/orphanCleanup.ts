@@ -1,5 +1,5 @@
 import type { File as GCSFile } from "@google-cloud/storage";
-import { db, receiptsTable } from "@workspace/db";
+import { db, receiptsTable, receiptAttachmentsTable } from "@workspace/db";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
 import { logger } from "./logger";
@@ -39,8 +39,14 @@ async function runOrphanCleanup(): Promise<void> {
 
   let knownPaths: Set<string>;
   try {
-    const rows = await db.select({ objectPath: receiptsTable.objectPath }).from(receiptsTable);
-    knownPaths = new Set(rows.map((r) => r.objectPath));
+    const receiptRows = await db.select({ objectPath: receiptsTable.objectPath }).from(receiptsTable);
+    const attachmentRows = await db
+      .select({ objectPath: receiptAttachmentsTable.objectPath })
+      .from(receiptAttachmentsTable);
+    knownPaths = new Set([
+      ...receiptRows.map((r) => r.objectPath),
+      ...attachmentRows.map((a) => a.objectPath),
+    ]);
     logger.info({ count: knownPaths.size }, "Loaded known object paths from DB");
   } catch (err) {
     logger.error({ err }, "Orphan cleanup: failed to query DB, aborting");

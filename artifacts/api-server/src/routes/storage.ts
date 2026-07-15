@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { and, eq } from "drizzle-orm";
-import { db, receiptsTable } from "@workspace/db";
+import { db, receiptsTable, receiptAttachmentsTable } from "@workspace/db";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -93,9 +93,8 @@ router.get("/storage/objects/*path", requireAuthOrGuest, async (req: Request, re
     const objectPath = `/objects/${wildcardPath}`;
 
     // Ownership check: only serve the object if it belongs to a receipt
-    // owned by the requesting user. This scopes private files per-user and
-    // prevents IDOR access to other users' receipts.
-    const [owned] = await db
+    // (primary file or attachment) owned by the requesting user.
+    const [ownedByReceipt] = await db
       .select({ id: receiptsTable.id })
       .from(receiptsTable)
       .where(
@@ -106,9 +105,23 @@ router.get("/storage/objects/*path", requireAuthOrGuest, async (req: Request, re
       )
       .limit(1);
 
-    if (!owned) {
-      res.status(404).json({ error: "Object not found" });
-      return;
+    if (!ownedByReceipt) {
+      const [ownedByAttachment] = await db
+        .select({ id: receiptAttachmentsTable.id })
+        .from(receiptAttachmentsTable)
+        .innerJoin(receiptsTable, eq(receiptAttachmentsTable.receiptId, receiptsTable.id))
+        .where(
+          and(
+            eq(receiptAttachmentsTable.objectPath, objectPath),
+            eq(receiptsTable.userId, req.userId!),
+          ),
+        )
+        .limit(1);
+
+      if (!ownedByAttachment) {
+        res.status(404).json({ error: "Object not found" });
+        return;
+      }
     }
 
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);

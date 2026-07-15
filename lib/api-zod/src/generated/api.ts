@@ -154,6 +154,15 @@ export const GetReceiptParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const ReceiptAttachmentSchema = zod.object({
+  "id": zod.number(),
+  "receiptId": zod.number(),
+  "objectPath": zod.string(),
+  "originalFileName": zod.string(),
+  "contentType": zod.string(),
+  "createdAt": zod.coerce.date(),
+})
+
 export const GetReceiptResponse = zod.object({
   "id": zod.number(),
   "objectPath": zod.string().describe('Storage path of the original uploaded file (e.g. \/objects\/uploads\/uuid).'),
@@ -181,7 +190,23 @@ export const GetReceiptResponse = zod.object({
   "category": zod.string().nullish(),
   "reason": zod.string().describe('One-line explanation of why this item is worth keeping the receipt for.')
 })).optional().describe('Items flagged as notable (expensive or warranty-relevant).'),
+  "attachments": zod.array(ReceiptAttachmentSchema).optional().describe('Additional files attached to this receipt.'),
   "createdAt": zod.coerce.date()
+})
+
+export const CreateAttachmentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateAttachmentBody = zod.object({
+  "objectPath": zod.string().min(1),
+  "originalFileName": zod.string().min(1),
+  "contentType": zod.string().min(1),
+})
+
+export const DeleteAttachmentParams = zod.object({
+  "id": zod.coerce.number(),
+  "attachmentId": zod.coerce.number(),
 })
 
 

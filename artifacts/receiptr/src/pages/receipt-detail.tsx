@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRoute, Link, useLocation } from "wouter";
 import { format } from "date-fns";
@@ -7,6 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft, Loader2, Trash2, Edit2, Share2, AlertTriangle, ScanLine, X,
+  Paperclip, FileText,
 } from "lucide-react";
 
 import {
@@ -17,6 +18,9 @@ import {
   getListReceiptsQueryKey,
   getGetReceiptStatsQueryKey,
   getGetRecentReceiptsQueryKey,
+  useCreateAttachment,
+  useDeleteAttachment,
+  customFetch,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -122,6 +126,12 @@ export default function ReceiptDetail() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [showStore, setShowStore] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const createAttachment = useCreateAttachment();
+  const deleteAttachmentMutation = useDeleteAttachment();
 
   const { data: receipt, isLoading, isError } = useGetReceipt(receiptId, {
     query: {
@@ -219,6 +229,53 @@ export default function ReceiptDetail() {
   const handleShowStore = useCallback(() => {
     setShowStore(true);
   }, []);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const uploadInfo = await customFetch<{ uploadURL: string; objectPath: string }>(
+        "/api/storage/uploads/request-url",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+        },
+      );
+      await fetch(uploadInfo.uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      await createAttachment.mutateAsync({
+        receiptId,
+        data: {
+          objectPath: uploadInfo.objectPath,
+          originalFileName: file.name,
+          contentType: file.type || "application/octet-stream",
+        },
+      });
+      toast({ title: "File attached", description: `${file.name} added to this receipt.` });
+    } catch {
+      toast({ title: "Upload failed", description: "Could not attach the file.", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    setDeletingAttachmentId(attachmentId);
+    try {
+      await deleteAttachmentMutation.mutateAsync({ receiptId, attachmentId });
+      toast({ title: "File removed", description: "Attachment deleted." });
+    } catch {
+      toast({ title: "Error", description: "Could not remove attachment.", variant: "destructive" });
+    } finally {
+      setDeletingAttachmentId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -511,6 +568,102 @@ export default function ReceiptDetail() {
           contentType={receipt.contentType}
           fileName={receipt.originalFileName}
         />
+
+        {/* Files section — primary scan + attachments */}
+        {!isEditing && (
+          <div className="rounded-2xl border divide-y">
+            <div className="p-4 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Files
+              </p>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                {isUploading
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Paperclip className="w-3.5 h-3.5" />
+                }
+                {isUploading ? "Uploading..." : "Attach file"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+            </div>
+
+            {/* Primary scan */}
+            <div className="px-4 py-3 flex items-center gap-3">
+              <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-sm truncate">{receipt.originalFileName}</span>
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                download={receipt.originalFileName}
+              >
+                View
+              </a>
+            </div>
+
+            {/* Attachments */}
+            {receipt.attachments && receipt.attachments.map((att) => {
+              const attUrl = `${import.meta.env.BASE_URL}api/storage${att.objectPath}`;
+              const isDeleting = deletingAttachmentId === att.id;
+              return (
+                <div key={att.id} className="px-4 py-3 flex items-center gap-3">
+                  <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
+                  <span className="flex-1 text-sm truncate">{att.originalFileName}</span>
+                  <a
+                    href={attUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    download={att.originalFileName}
+                  >
+                    View
+                  </a>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        disabled={isDeleting}
+                        className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50 shrink-0"
+                        aria-label="Remove attachment"
+                      >
+                        {isDeleting
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Trash2 className="w-3.5 h-3.5" />
+                        }
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove this file?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently delete <span className="font-medium">{att.originalFileName}</span> from this receipt.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteAttachment(att.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Actions */}
         {!isEditing && (

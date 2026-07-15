@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, count, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
-import { db, receiptsTable } from "@workspace/db";
+import { db, receiptsTable, receiptAttachmentsTable } from "@workspace/db";
 import {
   CreateReceiptBody,
   ListReceiptsResponse,
@@ -287,7 +287,12 @@ router.get("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void> 
     return;
   }
 
-  res.json(GetReceiptResponse.parse(receipt));
+  const attachments = await db
+    .select()
+    .from(receiptAttachmentsTable)
+    .where(eq(receiptAttachmentsTable.receiptId, receipt.id));
+
+  res.json(GetReceiptResponse.parse({ ...receipt, attachments }));
 });
 
 router.patch("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void> => {
@@ -347,6 +352,23 @@ router.delete("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<voi
   if (!existing) {
     res.status(404).json({ error: "Receipt not found" });
     return;
+  }
+
+  // Delete all attachment storage objects first (DB rows cascade via FK)
+  const attachments = await db
+    .select({ objectPath: receiptAttachmentsTable.objectPath, id: receiptAttachmentsTable.id })
+    .from(receiptAttachmentsTable)
+    .where(eq(receiptAttachmentsTable.receiptId, existing.id));
+
+  for (const att of attachments) {
+    try {
+      await objectStorageService.deleteObject(att.objectPath);
+    } catch (err) {
+      logger.warn(
+        { err, attachmentId: att.id, objectPath: att.objectPath },
+        "Failed to delete attachment storage object; proceeding",
+      );
+    }
   }
 
   try {
