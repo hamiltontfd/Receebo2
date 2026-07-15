@@ -70,17 +70,20 @@ function todayMidnightUTC(): Date {
 
 router.get("/receipts/daily-count", requireAuthOrGuest, async (req, res): Promise<void> => {
   const midnight = todayMidnightUTC();
-  const [row] = await db
+  const userId = req.userId!;
+
+  const [receiptRow] = await db
     .select({ used: count() })
     .from(receiptsTable)
-    .where(
-      and(
-        eq(receiptsTable.userId, req.userId!),
-        gte(receiptsTable.createdAt, midnight),
-      ),
-    );
+    .where(and(eq(receiptsTable.userId, userId), gte(receiptsTable.createdAt, midnight)));
 
-  const used = Number(row?.used ?? 0);
+  const [attRow] = await db
+    .select({ used: count() })
+    .from(receiptAttachmentsTable)
+    .innerJoin(receiptsTable, eq(receiptAttachmentsTable.receiptId, receiptsTable.id))
+    .where(and(eq(receiptsTable.userId, userId), gte(receiptAttachmentsTable.createdAt, midnight)));
+
+  const used = Number(receiptRow?.used ?? 0) + Number(attRow?.used ?? 0);
   res.json({ used, remaining: Math.max(0, DAILY_UPLOAD_LIMIT - used), limit: DAILY_UPLOAD_LIMIT });
 });
 
@@ -108,14 +111,17 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
     const [countRow] = await tx
       .select({ used: count() })
       .from(receiptsTable)
-      .where(
-        and(
-          eq(receiptsTable.userId, userId),
-          gte(receiptsTable.createdAt, midnight),
-        ),
-      );
+      .where(and(eq(receiptsTable.userId, userId), gte(receiptsTable.createdAt, midnight)));
 
-    if (Number(countRow?.used ?? 0) >= DAILY_UPLOAD_LIMIT) {
+    const [attCountRow] = await tx
+      .select({ used: count() })
+      .from(receiptAttachmentsTable)
+      .innerJoin(receiptsTable, eq(receiptAttachmentsTable.receiptId, receiptsTable.id))
+      .where(and(eq(receiptsTable.userId, userId), gte(receiptAttachmentsTable.createdAt, midnight)));
+
+    const totalToday = Number(countRow?.used ?? 0) + Number(attCountRow?.used ?? 0);
+
+    if (totalToday >= DAILY_UPLOAD_LIMIT) {
       limitReached = true;
       return;
     }

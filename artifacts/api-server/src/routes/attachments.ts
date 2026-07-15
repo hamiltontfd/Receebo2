@@ -34,6 +34,16 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
   const receiptId = params.data.id;
   const midnight = todayMidnightUTC();
 
+  // Validate that the objectPath was issued by this server (i.e. it lives under
+  // the expected private uploads directory). This prevents a malicious client
+  // from associating an arbitrary GCS path — potentially belonging to another
+  // user — with a receipt and then reading it via the /storage/objects/* proxy.
+  const expectedPrefix = `${objectStorageService.getPrivateObjectDir()}/uploads/`;
+  if (!parsed.data.objectPath.startsWith(expectedPrefix)) {
+    res.status(400).json({ error: "Invalid objectPath" });
+    return;
+  }
+
   let attachment: (typeof receiptAttachmentsTable.$inferSelect) | undefined;
   let limitReached = false;
   let receiptNotFound = false;
