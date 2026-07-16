@@ -14,6 +14,8 @@ import {
   UpdateReceiptBody,
   UpdateReceiptResponse,
   DeleteReceiptParams,
+  CheckSimilarReceiptQueryParams,
+  CheckSimilarReceiptResponseItem,
 } from "@workspace/api-zod";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { enqueueExtraction } from "../lib/extractionQueue";
@@ -270,6 +272,44 @@ router.get(
     res.json(GetMerchantBreakdownResponse.parse(breakdown));
   },
 );
+
+router.get("/receipts/check-similar", requireAuthOrGuest, async (req, res): Promise<void> => {
+  const parsed = CheckSimilarReceiptQueryParams.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const { merchant, purchaseDate, total } = parsed.data;
+
+  // All three fields must be present for a meaningful exact-match duplicate check.
+  // If any is missing, there is nothing useful to match against.
+  if (merchant == null || purchaseDate == null || total == null) {
+    res.json([]);
+    return;
+  }
+
+  const rows = await db
+    .select({
+      id: receiptsTable.id,
+      merchant: receiptsTable.merchant,
+      purchaseDate: receiptsTable.purchaseDate,
+      total: receiptsTable.total,
+    })
+    .from(receiptsTable)
+    .where(
+      and(
+        eq(receiptsTable.userId, req.userId!),
+        eq(receiptsTable.isDraft, false),
+        eq(receiptsTable.status, "completed"),
+        eq(receiptsTable.merchant, merchant),
+        eq(receiptsTable.purchaseDate, purchaseDate),
+        eq(receiptsTable.total, total),
+      ),
+    );
+
+  res.json(rows.map((r) => CheckSimilarReceiptResponseItem.parse(r)));
+});
 
 router.get("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void> => {
   const params = GetReceiptParams.safeParse(req.params);

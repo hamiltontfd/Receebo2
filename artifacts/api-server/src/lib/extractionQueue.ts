@@ -1,8 +1,30 @@
 import { db, receiptsTable } from "@workspace/db";
 import { eq, and, lt } from "drizzle-orm";
-import { extractReceiptData } from "./receiptExtraction";
+import { extractReceiptData, type ExtractedProduct } from "./receiptExtraction";
 import { logger } from "./logger";
 import { sendReceiptReadyEmail } from "./emailService";
+
+function deduplicateProducts(products: ExtractedProduct[]): ExtractedProduct[] {
+  const seen = new Map<string, ExtractedProduct>();
+  for (const product of products) {
+    const normalizedName = product.name.trim().toLowerCase();
+    const key = `${normalizedName}::${product.price ?? "null"}`;
+    if (!seen.has(key)) {
+      seen.set(key, product);
+    } else {
+      const existing = seen.get(key)!;
+      if (
+        product.quantity != null &&
+        product.quantity > 1 &&
+        existing.quantity != null &&
+        existing.quantity > 1
+      ) {
+        seen.set(key, { ...existing, quantity: existing.quantity + product.quantity });
+      }
+    }
+  }
+  return Array.from(seen.values());
+}
 
 const MAX_ATTEMPTS = 3;
 const STUCK_THRESHOLD_MS = 5 * 60 * 1000;
@@ -30,6 +52,15 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
 
   try {
     const data = await extractReceiptData(objectPath, contentType);
+    const deduplicatedProducts = deduplicateProducts(data.products);
+
+    if (deduplicatedProducts.length < data.products.length) {
+      logger.info(
+        { receiptId, original: data.products.length, deduped: deduplicatedProducts.length },
+        "Deduplicated products from extraction result",
+      );
+    }
+
     await db
       .update(receiptsTable)
       .set({
@@ -43,7 +74,7 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
         ocrText: data.ocrText,
         warranty: data.warranty,
         transactionNumber: data.transactionNumber,
-        products: data.products,
+        products: deduplicatedProducts,
         notableItems: data.notableItems,
       })
       .where(eq(receiptsTable.id, receiptId));

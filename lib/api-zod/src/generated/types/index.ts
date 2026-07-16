@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './checkSimilarReceiptParams';
 export * from './dailyUploadCount';
 export * from './errorEnvelope';
 export * from './getRecentReceiptsParams';
@@ -20,5 +21,6 @@ export * from './receiptProduct';
 export * from './receiptStats';
 export * from './receiptStatus';
 export * from './receiptUpdate';
+export * from './similarReceiptMatch';
 export * from './uploadUrlRequest';
 export * from './uploadUrlResponse';

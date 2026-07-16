@@ -182,6 +182,19 @@ export interface DailyUploadCount {
   limit: number;
 }
 
+export interface SimilarReceiptMatch {
+  id: number;
+  /** @nullable */
+  merchant?: string | null;
+  /**
+     * Purchase date in ISO format (YYYY-MM-DD).
+     * @nullable
+     */
+  purchaseDate?: string | null;
+  /** @nullable */
+  total?: number | null;
+}
+
 export interface ErrorEnvelope {
   error: string;
 }
@@ -200,5 +213,20 @@ export type GetRecentReceiptsParams = {
  * @maximum 20
  */
 limit?: number;
+};
+
+export type CheckSimilarReceiptParams = {
+/**
+ * Merchant name to match exactly.
+ */
+merchant?: string;
+/**
+ * Purchase date in YYYY-MM-DD format.
+ */
+purchaseDate?: string;
+/**
+ * Total amount to match exactly.
+ */
+total?: number;
 };
 

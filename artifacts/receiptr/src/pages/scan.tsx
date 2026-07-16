@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Camera, Upload, Check, Loader2, X, ScanLine } from "lucide-react";
+import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
@@ -12,6 +12,7 @@ import {
   useDeleteReceipt,
   useGetReceipt,
   useGetDailyUploadCount,
+  checkSimilarReceipt,
   getGetReceiptQueryKey,
   getListReceiptsQueryKey,
   getGetReceiptStatsQueryKey,
@@ -19,6 +20,7 @@ import {
   getGetDailyUploadCountQueryKey,
   customFetch,
   ApiError,
+  type SimilarReceiptMatch,
 } from "@workspace/api-client-react";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { currencySymbol } from "@/lib/currency";
@@ -96,6 +98,8 @@ export default function Scan() {
   const { videoRef, cameraReady, cameraError } = useCameraStream(cameraActive);
 
   const [limitError, setLimitError] = useState<string | null>(null);
+  const [similarMatches, setSimilarMatches] = useState<SimilarReceiptMatch[] | null>(null);
+  const [dismissedDuplicate, setDismissedDuplicate] = useState(false);
 
   const createReceipt = useCreateReceipt();
   const updateReceipt = useUpdateReceipt();
@@ -132,6 +136,23 @@ export default function Scan() {
     }
     return undefined;
   }, [phase, receipt]);
+
+  // Check for duplicate receipts when entering review with a completed receipt.
+  // Only fires when all three fields (merchant, date, total) are present —
+  // matching on a partial set would produce false positives.
+  useEffect(() => {
+    if (phase !== "review" || !receipt || receipt.status !== "completed") return;
+    const { merchant, purchaseDate, total } = receipt;
+    if (merchant == null || purchaseDate == null || total == null) return;
+    setSimilarMatches(null);
+    setDismissedDuplicate(false);
+    checkSimilarReceipt({ merchant, purchaseDate, total }).then((matches) => {
+      setSimilarMatches(matches);
+    }).catch(() => {
+      setSimilarMatches([]);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, receipt?.id]);
 
   const [form, setForm] = useState({
     merchant: "",
@@ -266,6 +287,18 @@ export default function Scan() {
     }
     setReceiptId(null);
     setPhase("capture");
+  };
+
+  const handleDiscard = async () => {
+    if (receiptId != null) {
+      try {
+        await deleteReceipt.mutateAsync({ id: receiptId });
+        invalidateLists();
+      } catch {
+        // Receipt may already be gone; navigate regardless
+      }
+    }
+    setLocation("/");
   };
 
   return (
@@ -454,6 +487,44 @@ export default function Scan() {
               </p>
             )}
           </div>
+
+          {similarMatches && similarMatches.length > 0 && !dismissedDuplicate && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                    This looks like a receipt you've already saved
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                    {similarMatches[0].merchant && similarMatches[0].purchaseDate
+                      ? `${similarMatches[0].merchant} on ${similarMatches[0].purchaseDate}`
+                      : similarMatches[0].merchant ?? similarMatches[0].purchaseDate ?? "Matching receipt found"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-full text-xs border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                  onClick={() => setDismissedDuplicate(true)}
+                >
+                  Save anyway
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-full text-xs text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                  onClick={handleDiscard}
+                  disabled={deleteReceipt.isPending}
+                >
+                  {deleteReceipt.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                  Discard
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-5">
             <div className="rounded-xl border p-4 space-y-1">

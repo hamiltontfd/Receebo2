@@ -69,7 +69,8 @@ Rules:
 - "total" and "price" must be numbers (e.g. 12.99), never strings, and must not include currency symbols.
 - Transcribe ocrText faithfully, including item lines, taxes, and totals.
 - Do not include any commentary outside the JSON.
-- For notableItems: include any line item priced above ~$50 that falls into a durable-goods category such as electronics, appliances, tools, furniture, sporting equipment, or similar. These are purchases where a receipt may be needed for warranty claims, returns, or insurance. Exclude consumables (food, drinks, toiletries), services, and low-value items regardless of category.`;
+- For notableItems: include any line item priced above ~$50 that falls into a durable-goods category such as electronics, appliances, tools, furniture, sporting equipment, or similar. These are purchases where a receipt may be needed for warranty claims, returns, or insurance. Exclude consumables (food, drinks, toiletries), services, and low-value items regardless of category.
+- Deduplication: if the same line item (identical name and price) appears more than once in the image — for example because two overlapping receipt segments were photographed — include it only ONCE in the products array. Do not repeat identical line items.`;
 
 function buildContentPart(base64: string, contentType: string) {
   if (contentType === "application/pdf") {

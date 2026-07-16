@@ -148,6 +148,28 @@ export const GetMerchantBreakdownResponse = zod.array(GetMerchantBreakdownRespon
 
 
 /**
+ * Returns a list of non-draft completed receipts for the authenticated user
+that exactly match the given merchant, purchaseDate, and total.
+Used to warn the user before saving a potentially duplicate receipt.
+
+ * @summary Check if a receipt with matching merchant, date, and total already exists
+ */
+export const CheckSimilarReceiptQueryParams = zod.object({
+  "merchant": zod.coerce.string().optional().describe('Merchant name to match exactly.'),
+  "purchaseDate": zod.coerce.string().optional().describe('Purchase date in YYYY-MM-DD format.'),
+  "total": zod.coerce.number().optional().describe('Total amount to match exactly.')
+})
+
+export const CheckSimilarReceiptResponseItem = zod.object({
+  "id": zod.number(),
+  "merchant": zod.string().nullish(),
+  "purchaseDate": zod.string().nullish().describe('Purchase date in ISO format (YYYY-MM-DD).'),
+  "total": zod.number().nullish()
+})
+export const CheckSimilarReceiptResponse = zod.array(CheckSimilarReceiptResponseItem)
+
+
+/**
  * @summary Get a single receipt with full details
  */
 export const GetReceiptParams = zod.object({

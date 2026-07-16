@@ -145,6 +145,43 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/MerchantSpend"
+  /receipts/check-similar:
+    get:
+      operationId: checkSimilarReceipt
+      tags: [receipts]
+      summary: Check if a receipt with matching merchant, date, and total already exists
+      description: |
+        Returns a list of non-draft completed receipts for the authenticated user
+        that exactly match the given merchant, purchaseDate, and total.
+        Used to warn the user before saving a potentially duplicate receipt.
+      parameters:
+        - name: merchant
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Merchant name to match exactly.
+        - name: purchaseDate
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Purchase date in YYYY-MM-DD format.
+        - name: total
+          in: query
+          required: false
+          schema:
+            type: number
+          description: Total amount to match exactly.
+      responses:
+        "200":
+          description: List of similar receipts (may be empty)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SimilarReceiptMatch"
   /receipts/{id}:
     get:
       operationId: getReceipt
@@ -562,6 +599,20 @@ components:
         limit:
           type: integer
           description: Total daily upload limit.
+    SimilarReceiptMatch:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        merchant:
+          type: ["string", "null"]
+        purchaseDate:
+          type: ["string", "null"]
+          description: Purchase date in ISO format (YYYY-MM-DD).
+        total:
+          type: ["number", "null"]
     ErrorEnvelope:
       type: object
       required: [error]

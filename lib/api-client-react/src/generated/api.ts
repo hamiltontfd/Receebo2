@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CheckSimilarReceiptParams,
   DailyUploadCount,
   ErrorEnvelope,
   GetRecentReceiptsParams,
@@ -31,6 +32,7 @@ import type {
   ReceiptInput,
   ReceiptStats,
   ReceiptUpdate,
+  SimilarReceiptMatch,
   UploadUrlRequest,
   UploadUrlResponse
 } from './api.schemas';
@@ -583,6 +585,94 @@ export function useGetMerchantBreakdown<TData = Awaited<ReturnType<typeof getMer
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetMerchantBreakdownQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCheckSimilarReceiptUrl = (params?: CheckSimilarReceiptParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/receipts/check-similar?${stringifiedParams}` : `/api/receipts/check-similar`
+}
+
+/**
+ * Returns a list of non-draft completed receipts for the authenticated user
+that exactly match the given merchant, purchaseDate, and total.
+Used to warn the user before saving a potentially duplicate receipt.
+
+ * @summary Check if a receipt with matching merchant, date, and total already exists
+ */
+export const checkSimilarReceipt = async (params?: CheckSimilarReceiptParams, options?: RequestInit): Promise<SimilarReceiptMatch[]> => {
+
+  return customFetch<SimilarReceiptMatch[]>(getCheckSimilarReceiptUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckSimilarReceiptQueryKey = (params?: CheckSimilarReceiptParams,) => {
+    return [
+    `/api/receipts/check-similar`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getCheckSimilarReceiptQueryOptions = <TData = Awaited<ReturnType<typeof checkSimilarReceipt>>, TError = ErrorType<unknown>>(params?: CheckSimilarReceiptParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkSimilarReceipt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCheckSimilarReceiptQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof checkSimilarReceipt>>> = ({ signal }) => checkSimilarReceipt(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof checkSimilarReceipt>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CheckSimilarReceiptQueryResult = NonNullable<Awaited<ReturnType<typeof checkSimilarReceipt>>>
+export type CheckSimilarReceiptQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Check if a receipt with matching merchant, date, and total already exists
+ */
+
+export function useCheckSimilarReceipt<TData = Awaited<ReturnType<typeof checkSimilarReceipt>>, TError = ErrorType<unknown>>(
+ params?: CheckSimilarReceiptParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkSimilarReceipt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCheckSimilarReceiptQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
