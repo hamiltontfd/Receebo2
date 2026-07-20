@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
-import { Search as SearchIcon, Loader2, ScanLine, Camera } from "lucide-react";
+import { Search as SearchIcon, Loader2, ScanLine, Camera, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,85 @@ import {
 } from "@/components/PageTransition";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
+
+const DEMO_RECEIPTS = [
+  { id: "d1", merchant: "Apple Store",    category: "Electronics",      date: "Jul 12", total: 1299.00, notableItem: "MacBook Pro 14\"",   itemPrice: 1299.00 },
+  { id: "d2", merchant: "Whole Foods",    category: "Groceries",        date: "Jul 10", total: 68.42,   notableItem: "Organic Almond Milk", itemPrice: 5.99  },
+  { id: "d3", merchant: "Nike",           category: "Clothing & Apparel",date: "Jul 7",  total: 124.95,  notableItem: "Air Max 270",        itemPrice: 124.95 },
+  { id: "d4", merchant: "Delta Airlines", category: "Other",            date: "Jun 30", total: 389.00,  notableItem: null,                  itemPrice: null   },
+  { id: "d5", merchant: "IKEA",           category: "Home",             date: "Jun 28", total: 214.50,  notableItem: null,                  itemPrice: null   },
+];
+
+function DemoView({ onScan }: { onScan: () => void }) {
+  const notableItems = DEMO_RECEIPTS.filter((r) => r.notableItem).slice(0, 3);
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
+      {/* Banner */}
+      <div className="flex items-center gap-2 rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
+        <Sparkles className="w-4 h-4 shrink-0" />
+        <span>Sample data — scan a receipt to start your own history.</span>
+        <button onClick={onScan} className="ml-auto shrink-0 text-foreground font-semibold underline underline-offset-2">
+          Scan now
+        </button>
+      </div>
+
+      {/* Notable items carousel */}
+      <section className="opacity-50 pointer-events-none select-none">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Worth keeping</h2>
+        <div className="flex gap-3 overflow-x-auto pb-1 -mx-5 px-5 snap-x snap-mandatory scrollbar-none">
+          {notableItems.map((item) => {
+            const Icon = categoryIcon(item.category);
+            return (
+              <div key={item.id} className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start">
+                <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
+                  <Icon className="w-4 h-4" />
+                </span>
+                <p className="font-semibold text-sm leading-tight line-clamp-2">{item.notableItem}</p>
+                {item.itemPrice != null && (
+                  <p className="font-mono font-bold text-base">${item.itemPrice.toFixed(2)}</p>
+                )}
+                <div className="mt-auto">
+                  <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Recent list */}
+      <section className="opacity-50 pointer-events-none select-none">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Recent</h2>
+        <ul className="divide-y">
+          {DEMO_RECEIPTS.map((r) => {
+            const Icon = categoryIcon(r.category);
+            return (
+              <li key={r.id}>
+                <div className="flex items-center justify-between gap-4 py-4">
+                  <div className="min-w-0 flex items-center gap-3">
+                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(r.category)}`}>
+                      <Icon className="w-4 h-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">{r.merchant}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs text-muted-foreground">{r.date}</span>
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
+                          {r.category}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <span className="font-mono font-semibold shrink-0">${r.total.toFixed(2)}</span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </motion.div>
+  );
+}
 
 function ReceiptRow({ r, index }: { r: Receipt; index: number }) {
   const Icon = categoryIcon(r.category);
@@ -278,29 +357,7 @@ export default function SearchPage() {
                     </motion.ul>
                   </section>
                 ) : recent && recent.length === 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex flex-col items-center justify-center px-8 py-16 text-center gap-5"
-                  >
-                    <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center">
-                      <ScanLine className="w-9 h-9 text-muted-foreground" />
-                    </div>
-                    <div className="space-y-2 max-w-xs">
-                      <h2 className="text-xl font-extrabold tracking-tight">
-                        No receipts yet.
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        Scan your first receipt to build your searchable purchase history.
-                      </p>
-                    </div>
-                    <Button
-                      className="rounded-full h-12 px-8 font-semibold"
-                      onClick={() => setLocation("/scan")}
-                    >
-                      Scan Receipt
-                    </Button>
-                  </motion.div>
+                  <DemoView onScan={() => setLocation("/scan")} />
                 ) : null}
               </>
             )}

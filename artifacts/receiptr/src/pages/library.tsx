@@ -1,13 +1,97 @@
 import { useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
-import { Loader2, FileText, Receipt } from "lucide-react";
+import { Loader2, FileText, Receipt, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListReceipts, useGetReceiptStats } from "@workspace/api-client-react";
 import type { Receipt as ReceiptItem } from "@workspace/api-client-react";
 import { currencySymbol } from "@/lib/currency";
 import { categoryStyle } from "@/lib/categories";
+
+const DEMO_RECEIPTS: Array<{
+  id: string;
+  merchant: string;
+  category: string;
+  purchaseDate: string;
+  total: number;
+  currency: string;
+}> = [
+  { id: "d1", merchant: "Apple Store", category: "Electronics", purchaseDate: "2026-07-12", total: 1299.00, currency: "USD" },
+  { id: "d2", merchant: "Whole Foods", category: "Groceries", purchaseDate: "2026-07-10", total: 68.42, currency: "USD" },
+  { id: "d3", merchant: "Nike", category: "Clothing & Apparel", purchaseDate: "2026-07-07", total: 124.95, currency: "USD" },
+  { id: "d4", merchant: "Delta Airlines", category: "Other", purchaseDate: "2026-06-30", total: 389.00, currency: "USD" },
+  { id: "d5", merchant: "IKEA", category: "Home", purchaseDate: "2026-06-28", total: 214.50, currency: "USD" },
+];
+
+function DemoLibrary({ onScan }: { onScan: () => void }) {
+  return (
+    <div className="flex-1 w-full max-w-lg md:max-w-3xl mx-auto px-5 py-6 flex flex-col gap-6">
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight">Library</h1>
+          <p className="text-4xl font-extrabold tracking-tight mt-1">2026</p>
+        </div>
+        <p className="text-sm text-muted-foreground pb-1">5 purchases</p>
+      </div>
+
+      <div className="flex items-center gap-2 rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
+        <Sparkles className="w-4 h-4 shrink-0" />
+        <span>This is sample data. Scan a receipt to start your own library.</span>
+        <button
+          onClick={onScan}
+          className="ml-auto shrink-0 text-foreground font-semibold underline underline-offset-2"
+        >
+          Scan now
+        </button>
+      </div>
+
+      <div className="space-y-8 opacity-60 pointer-events-none select-none">
+        {[
+          { label: "July", items: DEMO_RECEIPTS.slice(0, 3) },
+          { label: "June", items: DEMO_RECEIPTS.slice(3) },
+        ].map((group) => (
+          <section key={group.label}>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-bold">{group.label}</h2>
+              <span className="text-sm text-muted-foreground">{group.items.length}</span>
+            </div>
+            <ul className="divide-y border-t">
+              {group.items.map((r) => (
+                <li key={r.id}>
+                  <div className="flex items-center justify-between gap-4 py-4">
+                    <div className="min-w-0 flex items-center gap-3">
+                      <span className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold truncate">{r.merchant}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(r.purchaseDate), "MMM d")}
+                          </span>
+                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
+                            {r.category}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="font-mono font-semibold shrink-0">
+                      {currencySymbol(r.currency)}{r.total.toFixed(2)}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p className="text-right text-xs text-muted-foreground mt-2 font-mono">
+              ${group.items.reduce((s, r) => s + r.total, 0).toFixed(2)}
+            </p>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function monthKey(r: ReceiptItem): string {
   const d = new Date(r.purchaseDate || r.createdAt);
@@ -59,27 +143,7 @@ export default function Library() {
   }
 
   if (!receipts || receipts.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center px-8 text-center gap-5 py-20">
-        <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center">
-          <Receipt className="w-9 h-9 text-muted-foreground" />
-        </div>
-        <div className="space-y-2 max-w-xs">
-          <h2 className="text-xl font-extrabold tracking-tight">
-            Your purchases will appear here.
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Scan your first receipt to build your searchable purchase history.
-          </p>
-        </div>
-        <Button
-          className="rounded-full h-12 px-8 font-semibold"
-          onClick={() => setLocation("/scan")}
-        >
-          Scan Receipt
-        </Button>
-      </div>
-    );
+    return <DemoLibrary onScan={() => setLocation("/scan")} />;
   }
 
   return (
