@@ -41,7 +41,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
       </div>
 
       {/* Notable items carousel */}
-      <section className="opacity-50 pointer-events-none select-none">
+      <section>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Worth keeping</h2>
         <div className="flex gap-3 overflow-x-auto pb-1 -mx-5 px-5 snap-x snap-mandatory scrollbar-none">
           {notableItems.map((item) => {
@@ -65,7 +65,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
       </section>
 
       {/* Recent list */}
-      <section className="opacity-50 pointer-events-none select-none">
+      <section>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Recent</h2>
         <ul className="divide-y">
           {DEMO_RECEIPTS.map((r) => {
