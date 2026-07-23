@@ -47,7 +47,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
           {notableItems.map((item) => {
             const Icon = categoryIcon(item.category);
             return (
-              <div key={item.id} className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start">
+              <button key={item.id} onClick={onScan} className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start text-left hover:bg-secondary/50 transition-colors active:scale-95">
                 <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
                   <Icon className="w-4 h-4" />
                 </span>
@@ -58,7 +58,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
                 <div className="mt-auto">
                   <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -72,7 +72,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
             const Icon = categoryIcon(r.category);
             return (
               <li key={r.id}>
-                <div className="flex items-center justify-between gap-4 py-4">
+                <button onClick={onScan} className="w-full flex items-center justify-between gap-4 py-4 hover:underline text-left active:opacity-70 transition-opacity">
                   <div className="min-w-0 flex items-center gap-3">
                     <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(r.category)}`}>
                       <Icon className="w-4 h-4" />
@@ -88,7 +88,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
                     </div>
                   </div>
                   <span className="font-mono font-semibold shrink-0">${r.total.toFixed(2)}</span>
-                </div>
+                </button>
               </li>
             );
           })}
