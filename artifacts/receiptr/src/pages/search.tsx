@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
-import { Search as SearchIcon, Loader2, ScanLine, Camera, Sparkles } from "lucide-react";
+import { Search as SearchIcon, Loader2, ScanLine, Camera, Sparkles, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useListReceipts, useGetRecentReceipts } from "@workspace/api-client-react";
 import type { Receipt } from "@workspace/api-client-react";
 import { currencySymbol } from "@/lib/currency";
@@ -19,82 +20,234 @@ import {
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
-const DEMO_RECEIPTS = [
-  { id: "d1", merchant: "Apple Store",    category: "Electronics",      date: "Jul 12", total: 1299.00, notableItem: "MacBook Pro 14\"",   itemPrice: 1299.00 },
-  { id: "d2", merchant: "Whole Foods",    category: "Groceries",        date: "Jul 10", total: 68.42,   notableItem: "Organic Almond Milk", itemPrice: 5.99  },
-  { id: "d3", merchant: "Nike",           category: "Clothing & Apparel",date: "Jul 7",  total: 124.95,  notableItem: "Air Max 270",        itemPrice: 124.95 },
-  { id: "d4", merchant: "Delta Airlines", category: "Other",            date: "Jun 30", total: 389.00,  notableItem: null,                  itemPrice: null   },
-  { id: "d5", merchant: "IKEA",           category: "Home",             date: "Jun 28", total: 214.50,  notableItem: null,                  itemPrice: null   },
+type DemoReceipt = {
+  id: string;
+  merchant: string;
+  category: string;
+  date: string;
+  total: number;
+  notableItem: string | null;
+  itemPrice: number | null;
+  summary: string;
+  products: { name: string; price: number; qty: number }[];
+};
+
+const DEMO_RECEIPTS: DemoReceipt[] = [
+  {
+    id: "d1", merchant: "Apple Store", category: "Electronics", date: "Jul 12",
+    total: 1299.00, notableItem: "MacBook Pro 14\"", itemPrice: 1199.00,
+    summary: "MacBook Pro 14-inch M3 with AppleCare+ purchased at Apple Store.",
+    products: [
+      { name: "MacBook Pro 14\" M3", price: 1199.00, qty: 1 },
+      { name: "AppleCare+ (3 Years)", price: 99.00, qty: 1 },
+      { name: "USB-C to MagSafe Cable", price: 1.00, qty: 1 },
+    ],
+  },
+  {
+    id: "d2", merchant: "Whole Foods", category: "Groceries", date: "Jul 10",
+    total: 68.42, notableItem: "Organic Almond Milk", itemPrice: 5.99,
+    summary: "Weekly grocery run including organic produce and pantry essentials.",
+    products: [
+      { name: "Organic Almond Milk (6-pack)", price: 5.99, qty: 1 },
+      { name: "Sourdough Bread", price: 7.49, qty: 2 },
+      { name: "Avocados", price: 4.99, qty: 1 },
+      { name: "Organic Eggs (12ct)", price: 8.99, qty: 1 },
+      { name: "Greek Yogurt", price: 5.49, qty: 2 },
+      { name: "Baby Spinach", price: 3.99, qty: 1 },
+      { name: "Olive Oil", price: 12.99, qty: 1 },
+    ],
+  },
+  {
+    id: "d3", merchant: "Nike", category: "Clothing & Apparel", date: "Jul 7",
+    total: 124.95, notableItem: "Air Max 270", itemPrice: 109.95,
+    summary: "Nike Air Max 270 running shoes and performance socks.",
+    products: [
+      { name: "Nike Air Max 270 (Size 11)", price: 109.95, qty: 1 },
+      { name: "Nike Performance Socks (3-pack)", price: 15.00, qty: 1 },
+    ],
+  },
+  {
+    id: "d4", merchant: "Delta Airlines", category: "Other", date: "Jun 30",
+    total: 389.00, notableItem: null, itemPrice: null,
+    summary: "Round-trip flight from JFK to LAX, Economy Plus.",
+    products: [
+      { name: "Economy Plus Fare (JFK→LAX)", price: 299.00, qty: 1 },
+      { name: "Checked Bag Fee", price: 35.00, qty: 2 },
+      { name: "Seat Selection", price: 20.00, qty: 1 },
+    ],
+  },
+  {
+    id: "d5", merchant: "IKEA", category: "Home", date: "Jun 28",
+    total: 214.50, notableItem: null, itemPrice: null,
+    summary: "Home office furniture and accessories.",
+    products: [
+      { name: "BEKANT Desk (White)", price: 149.00, qty: 1 },
+      { name: "SKÅDIS Pegboard", price: 24.99, qty: 1 },
+      { name: "KALLAX Shelf Unit", price: 34.99, qty: 1 },
+      { name: "Cable Management Kit", price: 5.52, qty: 1 },
+    ],
+  },
 ];
 
-function DemoView({ onScan }: { onScan: () => void }) {
-  const notableItems = DEMO_RECEIPTS.filter((r) => r.notableItem).slice(0, 3);
+function DemoReceiptSheet({
+  receipt,
+  open,
+  onClose,
+}: {
+  receipt: DemoReceipt | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!receipt) return null;
+  const Icon = categoryIcon(receipt.category);
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
-      {/* Banner */}
-      <div className="flex items-center gap-2 rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
-        <Sparkles className="w-4 h-4 shrink-0" />
-        <span>Sample data — scan a receipt to start your own history.</span>
-        <button onClick={onScan} className="ml-auto shrink-0 text-foreground font-semibold underline underline-offset-2">
-          Scan now
-        </button>
-      </div>
-
-      {/* Notable items carousel */}
-      <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Worth keeping</h2>
-        <div className="flex gap-3 overflow-x-auto pb-1 -mx-5 px-5 snap-x snap-mandatory scrollbar-none">
-          {notableItems.map((item) => {
-            const Icon = categoryIcon(item.category);
-            return (
-              <button key={item.id} onClick={onScan} className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start text-left hover:bg-secondary/50 transition-colors active:scale-95">
-                <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
-                  <Icon className="w-4 h-4" />
-                </span>
-                <p className="font-semibold text-sm leading-tight line-clamp-2">{item.notableItem}</p>
-                {item.itemPrice != null && (
-                  <p className="font-mono font-bold text-base">${item.itemPrice.toFixed(2)}</p>
-                )}
-                <div className="mt-auto">
-                  <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
-                </div>
-              </button>
-            );
-          })}
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <SheetContent side="bottom" className="h-[85dvh] rounded-t-2xl px-0 pb-0 flex flex-col gap-0">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b shrink-0">
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="font-bold truncate">{receipt.merchant}</p>
+            <p className="text-xs text-muted-foreground">{receipt.date}</p>
+          </div>
+          <span className={`text-xs font-medium px-2 py-1 rounded-full ${categoryStyle(receipt.category)}`}>
+            {receipt.category}
+          </span>
         </div>
-      </section>
 
-      {/* Recent list */}
-      <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Recent</h2>
-        <ul className="divide-y">
-          {DEMO_RECEIPTS.map((r) => {
-            const Icon = categoryIcon(r.category);
-            return (
-              <li key={r.id}>
-                <button onClick={onScan} className="w-full flex items-center justify-between gap-4 py-4 hover:underline text-left active:opacity-70 transition-opacity">
-                  <div className="min-w-0 flex items-center gap-3">
-                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(r.category)}`}>
-                      <Icon className="w-4 h-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-semibold truncate">{r.merchant}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs text-muted-foreground">{r.date}</span>
-                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
-                          {r.category}
-                        </span>
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+          {/* Total */}
+          <div className="flex items-center gap-3">
+            <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${categoryStyle(receipt.category)}`}>
+              <Icon className="w-5 h-5" />
+            </span>
+            <div>
+              <p className="text-3xl font-extrabold font-mono tracking-tight">
+                ${receipt.total.toFixed(2)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Total</p>
+            </div>
+          </div>
+
+          {/* Summary */}
+          {receipt.summary && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Summary</p>
+              <p className="text-sm text-muted-foreground">{receipt.summary}</p>
+            </div>
+          )}
+
+          {/* Items */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Items</p>
+            <ul className="divide-y border rounded-xl overflow-hidden">
+              {receipt.products.map((p, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 px-4 py-3 bg-background">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{p.name}</p>
+                    {p.qty > 1 && <p className="text-xs text-muted-foreground">Qty {p.qty}</p>}
+                  </div>
+                  <span className="font-mono text-sm font-semibold shrink-0">${p.price.toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Demo notice */}
+          <div className="flex items-center gap-2 rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
+            <Sparkles className="w-4 h-4 shrink-0" />
+            <span>This is sample data. Your real receipts will look like this.</span>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function DemoView({ onScan }: { onScan: () => void }) {
+  const [selected, setSelected] = useState<DemoReceipt | null>(null);
+  const notableItems = DEMO_RECEIPTS.filter((r) => r.notableItem).slice(0, 3);
+
+  return (
+    <>
+      <DemoReceiptSheet receipt={selected} open={selected !== null} onClose={() => setSelected(null)} />
+
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
+        {/* Banner */}
+        <div className="flex items-center gap-2 rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
+          <Sparkles className="w-4 h-4 shrink-0" />
+          <span>Sample data — scan a receipt to start your own history.</span>
+          <button onClick={onScan} className="ml-auto shrink-0 text-foreground font-semibold underline underline-offset-2">
+            Scan now
+          </button>
+        </div>
+
+        {/* Notable items carousel */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Worth keeping</h2>
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-5 px-5 snap-x snap-mandatory scrollbar-none">
+            {notableItems.map((item) => {
+              const Icon = categoryIcon(item.category);
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setSelected(item)}
+                  className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start text-left hover:bg-secondary/50 transition-colors active:scale-95"
+                >
+                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
+                    <Icon className="w-4 h-4" />
+                  </span>
+                  <p className="font-semibold text-sm leading-tight line-clamp-2">{item.notableItem}</p>
+                  {item.itemPrice != null && (
+                    <p className="font-mono font-bold text-base">${item.itemPrice.toFixed(2)}</p>
+                  )}
+                  <div className="mt-auto">
+                    <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Recent list */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Recent</h2>
+          <ul className="divide-y">
+            {DEMO_RECEIPTS.map((r) => {
+              const Icon = categoryIcon(r.category);
+              return (
+                <li key={r.id}>
+                  <button
+                    onClick={() => setSelected(r)}
+                    className="w-full flex items-center justify-between gap-4 py-4 group text-left"
+                  >
+                    <div className="min-w-0 flex items-center gap-3">
+                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(r.category)}`}>
+                        <Icon className="w-4 h-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold truncate group-hover:underline">{r.merchant}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-xs text-muted-foreground">{r.date}</span>
+                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
+                            {r.category}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <span className="font-mono font-semibold shrink-0">${r.total.toFixed(2)}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-    </motion.div>
+                    <span className="font-mono font-semibold shrink-0">${r.total.toFixed(2)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </motion.div>
+    </>
   );
 }
 
@@ -357,7 +510,31 @@ export default function SearchPage() {
                     </motion.ul>
                   </section>
                 ) : recent && recent.length === 0 ? (
-                  <DemoView onScan={() => setLocation("/scan")} />
+                  import.meta.env.DEV ? (
+                    <DemoView onScan={() => setLocation("/scan")} />
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex flex-col items-center justify-center px-8 py-16 text-center gap-5"
+                    >
+                      <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center">
+                        <ScanLine className="w-9 h-9 text-muted-foreground" />
+                      </div>
+                      <div className="space-y-2 max-w-xs">
+                        <h2 className="text-xl font-extrabold tracking-tight">No receipts yet.</h2>
+                        <p className="text-sm text-muted-foreground">
+                          Scan your first receipt to build your searchable purchase history.
+                        </p>
+                      </div>
+                      <Button
+                        className="rounded-full h-12 px-8 font-semibold"
+                        onClick={() => setLocation("/scan")}
+                      >
+                        Scan Receipt
+                      </Button>
+                    </motion.div>
+                  )
                 ) : null}
               </>
             )}
