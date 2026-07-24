@@ -179,15 +179,14 @@ function DemoView({ onScan }: { onScan: () => void }) {
         {/* Notable items carousel */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Worth keeping</h2>
-          <div className="overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none">
-            <div className="flex gap-3">
+          <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none">
               {notableItems.map((item) => {
                 const Icon = categoryIcon(item.category);
                 return (
                   <button
                     key={item.id}
                     onClick={() => setSelected(item)}
-                    className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start text-left hover:bg-secondary/50 transition-colors active:scale-95"
+                    className="block shrink-0 w-44 rounded-2xl border border-border p-4 flex flex-col gap-2 snap-start text-left hover:bg-secondary/50 transition-colors active:scale-95"
                   >
                     <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
                       <Icon className="w-[1.1rem] h-[1.1rem]" />
@@ -202,14 +201,13 @@ function DemoView({ onScan }: { onScan: () => void }) {
                   </button>
                 );
               })}
-            </div>
           </div>
         </section>
 
         {/* Recent list */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Recent</h2>
-          <ul className="divide-y">
+          <ul className="divide-y divide-border">
             {DEMO_RECEIPTS.map((r) => {
               const Icon = categoryIcon(r.category);
               return (
@@ -443,21 +441,20 @@ export default function SearchPage() {
                     >
                       Worth keeping
                     </motion.h2>
-                    <div className="overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none">
                     <motion.div
-                      className="flex gap-3"
+                      className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none"
                       variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
                       initial="hidden"
                       animate="visible"
                     >
                       {notableItems.map((item, i) => (
-                        <motion.div key={i} variants={cardVariants}>
+                        <motion.div key={i} variants={cardVariants} className="shrink-0 w-44 snap-start">
                           {(() => {
                             const CardIcon = categoryIcon(item.category);
                             return (
                               <Link
                                 href={`/receipts/${item.receiptId}`}
-                                className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start hover:bg-secondary/50 transition-colors"
+                                className="block w-full h-full rounded-2xl border border-border p-4 flex flex-col gap-2 hover:bg-secondary/50 transition-colors"
                               >
                                 <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
                                   <CardIcon className="w-[1.1rem] h-[1.1rem]" />
@@ -479,7 +476,6 @@ export default function SearchPage() {
                         </motion.div>
                       ))}
                     </motion.div>
-                    </div>
                   </section>
                 )}
 
@@ -494,7 +490,7 @@ export default function SearchPage() {
                       Recent
                     </motion.h2>
                     <motion.ul
-                      className="divide-y"
+                      className="divide-y divide-border"
                       variants={listVariants}
                       initial="hidden"
                       animate="visible"
