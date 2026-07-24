@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { Search as SearchIcon, Loader2, ScanLine, Camera, Sparkles, ArrowLeft } from "lucide-react";
@@ -167,9 +167,30 @@ function DemoReceiptSheet({
   );
 }
 
+function useCarouselSnap() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const STEP = 176 + 12;
+    let t: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const idx = Math.round(el.scrollLeft / STEP);
+        el.scrollTo({ left: idx * STEP, behavior: 'smooth' });
+      }, 80);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => { el.removeEventListener('scroll', onScroll); clearTimeout(t); };
+  }, []);
+  return ref;
+}
+
 function DemoView({ onScan }: { onScan: () => void }) {
   const [selected, setSelected] = useState<DemoReceipt | null>(null);
   const notableItems = DEMO_RECEIPTS.filter((r) => r.notableItem).slice(0, 3);
+  const carouselRef = useCarouselSnap();
 
   return (
     <>
@@ -179,7 +200,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
         {/* Notable items carousel */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Worth keeping</h2>
-          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none" style={{ scrollSnapType: 'x mandatory' }}>
+          <div ref={carouselRef} className="flex gap-3 overflow-x-auto pb-1 scrollbar-none">
               {notableItems.map((item) => {
                 const Icon = categoryIcon(item.category);
                 return (
@@ -187,7 +208,6 @@ function DemoView({ onScan }: { onScan: () => void }) {
                     key={item.id}
                     onClick={() => setSelected(item)}
                     className="block shrink-0 w-44 rounded-2xl border border-border p-4 flex flex-col gap-2 text-left hover:bg-secondary/50 transition-colors active:scale-95"
-                    style={{ scrollSnapAlign: 'start' }}
                   >
                     <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
                       <Icon className="w-[1.1rem] h-[1.1rem]" />
@@ -292,6 +312,7 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [, setLocation] = useLocation();
+  const authCarouselRef = useCarouselSnap();
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 400);
@@ -443,14 +464,14 @@ export default function SearchPage() {
                       Worth keeping
                     </motion.h2>
                     <motion.div
+                      ref={authCarouselRef}
                       className="flex gap-3 overflow-x-auto pb-1 scrollbar-none"
-                      style={{ scrollSnapType: 'x mandatory' }}
                       variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
                       initial="hidden"
                       animate="visible"
                     >
                       {notableItems.map((item, i) => (
-                        <motion.div key={i} variants={cardVariants} className="shrink-0 w-44" style={{ scrollSnapAlign: 'start' }}>
+                        <motion.div key={i} variants={cardVariants} className="shrink-0 w-44">
                           {(() => {
                             const CardIcon = categoryIcon(item.category);
                             return (
