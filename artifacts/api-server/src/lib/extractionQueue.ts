@@ -52,6 +52,17 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
 
   try {
     const data = await extractReceiptData(objectPath, contentType);
+
+    if (!data.isReceipt) {
+      logger.info({ receiptId }, "Extraction determined image is not a receipt");
+      await db
+        .update(receiptsTable)
+        .set({ status: "not_a_receipt" })
+        .where(eq(receiptsTable.id, receiptId));
+      activeJobs.delete(receiptId);
+      return;
+    }
+
     const deduplicatedProducts = deduplicateProducts(data.products);
 
     if (deduplicatedProducts.length < data.products.length) {

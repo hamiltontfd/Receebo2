@@ -27,7 +27,7 @@ import { currencySymbol } from "@/lib/currency";
 import { CATEGORIES, categoryStyle } from "@/lib/categories";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type Phase = "capture" | "reading" | "review";
+type Phase = "capture" | "reading" | "review" | "not_a_receipt";
 
 const READING_STEPS = [
   "Merchant found",
@@ -126,9 +126,14 @@ export default function Scan() {
     return () => clearInterval(interval);
   }, [phase]);
 
-  // Move to review when extraction finishes
+  // Move to review (or not_a_receipt) when extraction finishes
   useEffect(() => {
     if (phase !== "reading" || !receipt) return undefined;
+    if (receipt.status === "not_a_receipt") {
+      setStepsDone(READING_STEPS.length);
+      const t = setTimeout(() => setPhase("not_a_receipt"), 400);
+      return () => clearTimeout(t);
+    }
     if (receipt.status === "completed" || receipt.status === "failed") {
       setStepsDone(READING_STEPS.length);
       const t = setTimeout(() => setPhase("review"), 600);
@@ -470,6 +475,36 @@ export default function Scan() {
               );
             })}
           </ul>
+        </div>
+      )}
+
+      {phase === "not_a_receipt" && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center px-2">
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-destructive" />
+          </div>
+          <div className="space-y-2 max-w-xs">
+            <h1 className="text-xl font-extrabold tracking-tight">No receipt found</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Receebo only works with purchase receipts and invoices. Make sure your photo clearly shows the receipt, not a random photo or other document.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 w-full max-w-xs">
+            <Button
+              className="rounded-full h-12 font-semibold"
+              onClick={handleRetake}
+            >
+              <Camera className="w-4 h-4 mr-2" />
+              Try again
+            </Button>
+            <Button
+              variant="ghost"
+              className="rounded-full h-12 text-muted-foreground"
+              onClick={() => setLocation("/")}
+            >
+              Go back
+            </Button>
+          </div>
         </div>
       )}
 

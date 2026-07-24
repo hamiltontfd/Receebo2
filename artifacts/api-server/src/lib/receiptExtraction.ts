@@ -18,6 +18,7 @@ export type ExtractedNotableItem = {
 };
 
 export type ExtractedReceipt = {
+  isReceipt: boolean;
   merchant: string | null;
   purchaseDate: string | null;
   total: number | null;
@@ -38,10 +39,11 @@ function normalizeCategory(value: string | null): string {
   return "Other";
 }
 
-const SYSTEM_PROMPT = `You are an expert receipt and invoice analyst. You are given an image or PDF of a purchase receipt or invoice. Read it carefully and extract structured information.
+const SYSTEM_PROMPT = `You are an expert receipt and invoice analyst. You are given an image or PDF. First determine whether the image actually shows a purchase receipt, invoice, or proof of purchase. If it does not (e.g. it is a selfie, landscape photo, document, screenshot of something unrelated, or any non-purchase document), set "isReceipt" to false and leave all other fields as null or empty.
 
 Respond ONLY with a JSON object matching this exact shape:
 {
+  "isReceipt": boolean,             // true if the image contains a purchase receipt, invoice, or proof of purchase; false otherwise
   "merchant": string | null,        // store / company / vendor name
   "purchaseDate": string | null,    // the purchase date in strict YYYY-MM-DD format, or null if not present
   "total": number | null,           // the grand total amount actually paid, as a plain number (no currency symbol)
@@ -65,6 +67,7 @@ Respond ONLY with a JSON object matching this exact shape:
 }
 
 Rules:
+- Set "isReceipt" to false for any image that is not a purchase receipt, invoice, or proof of purchase. When false, all other fields should be null or empty arrays.
 - Use null for any field you genuinely cannot determine. Do not invent values.
 - "total" and "price" must be numbers (e.g. 12.99), never strings, and must not include currency symbols.
 - Transcribe ocrText faithfully, including item lines, taxes, and totals.
@@ -168,7 +171,10 @@ export async function extractReceiptData(
       : d.toISOString().slice(0, 10);
   }
 
+  const isReceipt = typeof parsed.isReceipt === "boolean" ? parsed.isReceipt : true;
+
   return {
+    isReceipt,
     merchant: toStringOrNull(parsed.merchant),
     purchaseDate,
     total: toNumberOrNull(parsed.total),
