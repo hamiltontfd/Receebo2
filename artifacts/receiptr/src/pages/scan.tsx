@@ -121,6 +121,7 @@ export default function Scan() {
 
   const { videoRef, cameraReady, cameraError } = useCameraStream(cameraActive);
 
+  const [checkConfirmed, setCheckConfirmed] = useState(false);
   const [limitError, setLimitError] = useState<string | null>(null);
   const [similarMatches, setSimilarMatches] = useState<SimilarReceiptMatch[] | null>(null);
   const [dismissedDuplicate, setDismissedDuplicate] = useState(false);
@@ -140,15 +141,24 @@ export default function Scan() {
     },
   });
 
-  // Animate reading steps while processing
+  // Animate reading steps while processing — only after the backend confirms
+  // the image passed the pre-check (checkConfirmed=true). This prevents any
+  // green tick from flashing when a non-receipt is rejected on the first poll.
   useEffect(() => {
-    if (phase !== "reading") return;
+    if (phase !== "reading") {
+      setCheckConfirmed(false);
+      return;
+    }
     setStepsDone(0);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "reading" || !checkConfirmed) return;
     const interval = setInterval(() => {
       setStepsDone((n) => Math.min(n + 1, READING_STEPS.length - 1));
     }, 1200);
     return () => clearInterval(interval);
-  }, [phase]);
+  }, [phase, checkConfirmed]);
 
   // Move to review (or not_a_receipt) when extraction finishes
   useEffect(() => {
@@ -157,7 +167,12 @@ export default function Scan() {
       setPhase("not_a_receipt");
       return undefined;
     }
+    if (receipt.status === "processing") {
+      setCheckConfirmed(true);
+      return undefined;
+    }
     if (receipt.status === "completed" || receipt.status === "failed") {
+      setCheckConfirmed(true);
       setStepsDone(READING_STEPS.length);
       const t = setTimeout(() => setPhase("review"), 600);
       return () => clearTimeout(t);
