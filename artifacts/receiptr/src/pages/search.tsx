@@ -443,8 +443,9 @@ export default function SearchPage() {
                     >
                       Worth keeping
                     </motion.h2>
+                    <div className="overflow-x-auto -mx-5 pb-1 snap-x snap-mandatory scrollbar-none">
                     <motion.div
-                      className="flex gap-3 overflow-x-auto pb-1 -mx-5 px-5 snap-x snap-mandatory scrollbar-none"
+                      className="flex gap-3 px-5"
                       variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
                       initial="hidden"
                       animate="visible"
@@ -478,6 +479,7 @@ export default function SearchPage() {
                         </motion.div>
                       ))}
                     </motion.div>
+                    </div>
                   </section>
                 )}
 
