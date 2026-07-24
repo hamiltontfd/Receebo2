@@ -66,6 +66,18 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
 
     const data = await extractReceiptData(objectPath, contentType);
 
+    // Fallback guard: if the full extraction still returns isReceipt:false
+    // (pre-check false positive), reject cleanly rather than writing null fields.
+    if (!data.isReceipt) {
+      logger.info({ receiptId }, "Full extraction confirmed image is not a receipt");
+      await db
+        .update(receiptsTable)
+        .set({ status: "not_a_receipt" })
+        .where(eq(receiptsTable.id, receiptId));
+      activeJobs.delete(receiptId);
+      return;
+    }
+
     const deduplicatedProducts = deduplicateProducts(data.products);
 
     if (deduplicatedProducts.length < data.products.length) {

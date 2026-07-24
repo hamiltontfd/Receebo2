@@ -36,27 +36,27 @@ const READING_STEPS: Array<{
 }> = [
   {
     label: "Merchant found",
-    notFoundLabel: "Merchant not found",
+    notFoundLabel: "Merchant (not found)",
     check: (r) => r.merchant != null && r.merchant !== "",
   },
   {
     label: "Date detected",
-    notFoundLabel: "Date not found",
+    notFoundLabel: "Date (not found)",
     check: (r) => r.purchaseDate != null && r.purchaseDate !== "",
   },
   {
     label: "Products extracted",
-    notFoundLabel: "No products found",
+    notFoundLabel: "Products (not found)",
     check: (r) => Array.isArray(r.products) && r.products.length > 0,
   },
   {
     label: "Total identified",
-    notFoundLabel: "Total not found",
+    notFoundLabel: "Total (not found)",
     check: (r) => r.total != null,
   },
   {
     label: "Warranty info",
-    notFoundLabel: "No warranty info",
+    notFoundLabel: "Warranty (not on receipt)",
     check: (r) => r.warranty != null && r.warranty !== "",
   },
 ];

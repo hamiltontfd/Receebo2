@@ -104,7 +104,8 @@ export async function checkIsReceipt(
     });
     const raw = completion.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(raw) as { isReceipt?: unknown };
-    return parsed.isReceipt !== false;
+    // Require an explicit true — any other value (false, missing, malformed) rejects
+    return parsed.isReceipt === true;
   } catch (error) {
     logger.warn({ error }, "Pre-check failed, falling through to full extraction");
     return true;
