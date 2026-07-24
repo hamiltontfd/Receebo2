@@ -75,6 +75,42 @@ Rules:
 - For notableItems: include any line item priced above ~$50 that falls into a durable-goods category such as electronics, appliances, tools, furniture, sporting equipment, or similar. These are purchases where a receipt may be needed for warranty claims, returns, or insurance. Exclude consumables (food, drinks, toiletries), services, and low-value items regardless of category.
 - Deduplication: if the same line item (identical name and price) appears more than once in the image — for example because two overlapping receipt segments were photographed — include it only ONCE in the products array. Do not repeat identical line items.`;
 
+const PRE_CHECK_SYSTEM_PROMPT = `You are a document classifier. Respond ONLY with a JSON object {"isReceipt":true} if the image shows a purchase receipt, invoice, or proof of purchase from a store or service provider. Respond with {"isReceipt":false} for anything else (photos, selfies, random documents, screenshots, menus, etc.). A valid receipt must show at least a merchant name, items purchased, and a total or subtotal amount.`;
+
+export async function checkIsReceipt(
+  objectPath: string,
+  contentType: string,
+): Promise<boolean> {
+  const file = await objectStorageService.getObjectEntityFile(objectPath);
+  const [buffer] = await file.download();
+  const base64 = buffer.toString("base64");
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.4",
+      max_completion_tokens: 30,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: PRE_CHECK_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Is this a purchase receipt?" },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            buildContentPart(base64, contentType) as any,
+          ],
+        },
+      ],
+    });
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw) as { isReceipt?: unknown };
+    return parsed.isReceipt !== false;
+  } catch (error) {
+    logger.warn({ error }, "Pre-check failed, falling through to full extraction");
+    return true;
+  }
+}
+
 function buildContentPart(base64: string, contentType: string) {
   if (contentType === "application/pdf") {
     return {

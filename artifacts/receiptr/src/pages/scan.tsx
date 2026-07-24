@@ -29,12 +29,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 type Phase = "capture" | "reading" | "review" | "not_a_receipt";
 
-const READING_STEPS = [
-  "Merchant found",
-  "Date detected",
-  "Products extracted",
-  "Total identified",
-  "Warranty detected",
+const READING_STEPS: Array<{
+  label: string;
+  notFoundLabel: string;
+  check: (r: { merchant?: string | null; purchaseDate?: string | null; products?: unknown[]; total?: number | null; warranty?: string | null }) => boolean;
+}> = [
+  {
+    label: "Merchant found",
+    notFoundLabel: "Merchant not found",
+    check: (r) => r.merchant != null && r.merchant !== "",
+  },
+  {
+    label: "Date detected",
+    notFoundLabel: "Date not found",
+    check: (r) => r.purchaseDate != null && r.purchaseDate !== "",
+  },
+  {
+    label: "Products extracted",
+    notFoundLabel: "No products found",
+    check: (r) => Array.isArray(r.products) && r.products.length > 0,
+  },
+  {
+    label: "Total identified",
+    notFoundLabel: "Total not found",
+    check: (r) => r.total != null,
+  },
+  {
+    label: "Warranty info",
+    notFoundLabel: "No warranty info",
+    check: (r) => r.warranty != null && r.warranty !== "",
+  },
 ];
 
 function useCameraStream(enabled: boolean) {
@@ -456,9 +480,40 @@ export default function Scan() {
 
           <ul className="space-y-4">
             {READING_STEPS.map((step, i) => {
+              const extractionDone =
+                receipt?.status === "completed" || receipt?.status === "failed";
+
+              if (extractionDone && receipt) {
+                const found = step.check(receipt);
+                return (
+                  <li key={step.label} className="flex items-center gap-3 text-sm">
+                    <span
+                      className={`w-5 h-5 rounded-full flex items-center justify-center border transition-colors ${
+                        found
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-destructive/10 text-destructive border-destructive/40"
+                      }`}
+                    >
+                      {found ? (
+                        <Check className="w-3 h-3" />
+                      ) : (
+                        <X className="w-3 h-3" />
+                      )}
+                    </span>
+                    <span
+                      className={
+                        found ? "text-foreground font-medium" : "text-destructive"
+                      }
+                    >
+                      {found ? step.label : step.notFoundLabel}
+                    </span>
+                  </li>
+                );
+              }
+
               const done = i < stepsDone;
               return (
-                <li key={step} className="flex items-center gap-3 text-sm">
+                <li key={step.label} className="flex items-center gap-3 text-sm">
                   <span
                     className={`w-5 h-5 rounded-full flex items-center justify-center border transition-colors ${
                       done
@@ -469,7 +524,7 @@ export default function Scan() {
                     <Check className="w-3 h-3" />
                   </span>
                   <span className={done ? "text-foreground font-medium" : "text-muted-foreground"}>
-                    {step}
+                    {step.label}
                   </span>
                 </li>
               );

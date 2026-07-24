@@ -1,6 +1,6 @@
 import { db, receiptsTable } from "@workspace/db";
 import { eq, and, lt } from "drizzle-orm";
-import { extractReceiptData, type ExtractedProduct } from "./receiptExtraction";
+import { checkIsReceipt, extractReceiptData, type ExtractedProduct } from "./receiptExtraction";
 import { logger } from "./logger";
 import { sendReceiptReadyEmail } from "./emailService";
 
@@ -51,10 +51,11 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
   logger.info({ receiptId, attempt }, "Extraction job starting");
 
   try {
-    const data = await extractReceiptData(objectPath, contentType);
-
-    if (!data.isReceipt) {
-      logger.info({ receiptId }, "Extraction determined image is not a receipt");
+    // Fast pre-check: cheap AI call that only answers "is this a receipt?"
+    // Returns in ~1-2s, avoiding the expensive full extraction for non-receipts.
+    const isReceipt = await checkIsReceipt(objectPath, contentType);
+    if (!isReceipt) {
+      logger.info({ receiptId }, "Pre-check determined image is not a receipt");
       await db
         .update(receiptsTable)
         .set({ status: "not_a_receipt" })
@@ -62,6 +63,8 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
       activeJobs.delete(receiptId);
       return;
     }
+
+    const data = await extractReceiptData(objectPath, contentType);
 
     const deduplicatedProducts = deduplicateProducts(data.products);
 
