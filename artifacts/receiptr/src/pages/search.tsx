@@ -104,7 +104,7 @@ function DemoReceiptSheet({
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <SheetContent side="bottom" className="h-[85dvh] rounded-t-2xl px-0 pt-0 pb-0 flex flex-col gap-0">
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b shrink-0">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors">
             <ArrowLeft className="w-4 h-4" />
           </button>
@@ -143,7 +143,7 @@ function DemoReceiptSheet({
           {/* Items */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Items</p>
-            <ul className="divide-y border rounded-xl overflow-hidden">
+            <ul className="divide-y divide-border border border-border rounded-xl overflow-hidden">
               {receipt.products.map((p, i) => (
                 <li key={i} className="flex items-center justify-between gap-3 px-4 py-3 bg-background">
                   <div className="min-w-0">
@@ -157,7 +157,7 @@ function DemoReceiptSheet({
           </div>
 
           {/* Demo notice */}
-          <div className="flex items-center gap-2 rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
             <Sparkles className="w-4 h-4 shrink-0" />
             <span>This is sample data. Your real receipts will look like this.</span>
           </div>
