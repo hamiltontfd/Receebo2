@@ -122,7 +122,7 @@ function DemoReceiptSheet({
           {/* Total */}
           <div className="flex items-center gap-3">
             <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${categoryStyle(receipt.category)}`}>
-              <Icon className="w-5 h-5" />
+              <Icon className="w-[1.375rem] h-[1.375rem]" />
             </span>
             <div>
               <p className="text-3xl font-extrabold font-mono tracking-tight">
@@ -189,7 +189,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
                   className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start text-left hover:bg-secondary/50 transition-colors active:scale-95"
                 >
                   <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-[1.1rem] h-[1.1rem]" />
                   </span>
                   <p className="font-semibold text-sm leading-tight line-clamp-2">{item.notableItem}</p>
                   {item.itemPrice != null && (
@@ -218,7 +218,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
                   >
                     <div className="min-w-0 flex items-center gap-3">
                       <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(r.category)}`}>
-                        <Icon className="w-4 h-4" />
+                        <Icon className="w-[1.1rem] h-[1.1rem]" />
                       </span>
                       <div className="min-w-0">
                         <p className="font-semibold truncate group-hover:underline">{r.merchant}</p>
@@ -258,7 +258,7 @@ function ReceiptRow({ r, index }: { r: Receipt; index: number }) {
             {r.status === "processing" ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Icon className="w-4 h-4" />
+              <Icon className="w-[1.1rem] h-[1.1rem]" />
             )}
           </span>
           <div className="min-w-0">
@@ -457,7 +457,7 @@ export default function SearchPage() {
                                 className="block shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2 snap-start hover:bg-secondary/50 transition-colors"
                               >
                                 <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
-                                  <CardIcon className="w-4 h-4" />
+                                  <CardIcon className="w-[1.1rem] h-[1.1rem]" />
                                 </span>
                                 <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
                                 {item.price != null && (
