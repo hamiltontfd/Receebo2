@@ -154,9 +154,8 @@ export default function Scan() {
   useEffect(() => {
     if (phase !== "reading" || !receipt) return undefined;
     if (receipt.status === "not_a_receipt") {
-      setStepsDone(READING_STEPS.length);
-      const t = setTimeout(() => setPhase("not_a_receipt"), 400);
-      return () => clearTimeout(t);
+      setPhase("not_a_receipt");
+      return undefined;
     }
     if (receipt.status === "completed" || receipt.status === "failed") {
       setStepsDone(READING_STEPS.length);
