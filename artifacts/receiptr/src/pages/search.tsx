@@ -179,8 +179,8 @@ function DemoView({ onScan }: { onScan: () => void }) {
         {/* Notable items carousel */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Worth keeping</h2>
-          <div className="overflow-x-auto -mx-5 pb-1 snap-x snap-mandatory scrollbar-none">
-            <div className="flex gap-3 px-5">
+          <div className="overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none">
+            <div className="flex gap-3">
               {notableItems.map((item) => {
                 const Icon = categoryIcon(item.category);
                 return (
@@ -443,9 +443,9 @@ export default function SearchPage() {
                     >
                       Worth keeping
                     </motion.h2>
-                    <div className="overflow-x-auto -mx-5 pb-1 snap-x snap-mandatory scrollbar-none">
+                    <div className="overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none">
                     <motion.div
-                      className="flex gap-3 px-5"
+                      className="flex gap-3"
                       variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
                       initial="hidden"
                       animate="visible"
