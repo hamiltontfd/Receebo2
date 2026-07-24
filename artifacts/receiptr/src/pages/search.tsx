@@ -179,8 +179,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
         {/* Notable items carousel */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Worth keeping</h2>
-          <div className="flex gap-3 overflow-x-auto pb-1 -mx-5 snap-x snap-mandatory scrollbar-none">
-            <div className="shrink-0 w-5" />
+          <div className="flex gap-3 overflow-x-auto pb-1 -mx-5 px-5 snap-x snap-mandatory scrollbar-none">
             {notableItems.map((item) => {
               const Icon = categoryIcon(item.category);
               return (
@@ -202,7 +201,6 @@ function DemoView({ onScan }: { onScan: () => void }) {
                 </button>
               );
             })}
-            <div className="shrink-0 w-5" />
           </div>
         </section>
 
