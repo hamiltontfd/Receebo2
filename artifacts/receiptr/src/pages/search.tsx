@@ -341,7 +341,7 @@ export default function SearchPage() {
     return items;
   }, [recent]);
 
-  const showFab = !!(recent && recent.length > 0);
+  const showFab = true;
 
   return (
     <>
