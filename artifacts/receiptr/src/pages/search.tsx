@@ -102,7 +102,7 @@ function DemoReceiptSheet({
   const Icon = categoryIcon(receipt.category);
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent side="bottom" className="h-[85dvh] rounded-t-2xl px-0 pb-0 flex flex-col gap-0">
+      <SheetContent side="bottom" className="h-[85dvh] rounded-t-2xl px-0 pt-0 pb-0 flex flex-col gap-0">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b shrink-0">
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors">
