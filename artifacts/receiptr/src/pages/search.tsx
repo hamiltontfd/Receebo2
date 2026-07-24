@@ -45,7 +45,7 @@ const DEMO_RECEIPTS: DemoReceipt[] = [
   },
   {
     id: "d2", merchant: "Whole Foods", category: "Groceries", date: "Jul 10",
-    total: 68.42, notableItem: "Organic Almond Milk", itemPrice: 5.99,
+    total: 68.42, notableItem: null, itemPrice: null,
     summary: "Weekly grocery run including organic produce and pantry essentials.",
     products: [
       { name: "Organic Almond Milk (6-pack)", price: 5.99, qty: 1 },
