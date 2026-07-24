@@ -401,10 +401,10 @@ export default function Scan() {
                 />
                 {/* Framing guide */}
                 <div className="absolute inset-8 border-2 border-background/80 rounded-xl pointer-events-none" />
-                <p className="absolute bottom-24 inset-x-0 text-center text-xs text-background/90">
+                <p className="absolute bottom-36 inset-x-0 text-center text-xs text-background/90">
                   Place the receipt inside the frame
                 </p>
-                <div className="absolute bottom-6 inset-x-0 flex items-center justify-center">
+                <div className="absolute bottom-14 inset-x-0 flex items-center justify-center">
                   <button
                     aria-label="Capture receipt"
                     onClick={capturePhoto}
