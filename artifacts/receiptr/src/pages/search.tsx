@@ -176,15 +176,6 @@ function DemoView({ onScan }: { onScan: () => void }) {
       <DemoReceiptSheet receipt={selected} open={selected !== null} onClose={() => setSelected(null)} />
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
-        {/* Banner */}
-        <div className="flex items-center gap-2 rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
-          <Sparkles className="w-4 h-4 shrink-0" />
-          <span>Sample data — scan a receipt to start your own history.</span>
-          <button onClick={onScan} className="ml-auto shrink-0 text-foreground font-semibold underline underline-offset-2">
-            Scan now
-          </button>
-        </div>
-
         {/* Notable items carousel */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Worth keeping</h2>
