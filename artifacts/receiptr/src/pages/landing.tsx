@@ -78,7 +78,7 @@ export default function Landing() {
             Sign In
           </Link>
           <Button size="sm" className="rounded-full" onClick={startScanning}>
-            Try free
+            Free trial
           </Button>
         </div>
       </header>
