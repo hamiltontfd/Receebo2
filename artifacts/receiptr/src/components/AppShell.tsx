@@ -28,8 +28,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
       {/* Desktop top nav */}
       <header className="hidden md:flex h-14 border-b px-6 items-center justify-between sticky top-0 z-20 bg-background/90 backdrop-blur">
-        <Link href="/search" className="font-extrabold tracking-tight text-lg">
-          Receebo
+        <Link href="/search">
+          <img src="/logo.png" alt="Receebo" className="h-8 w-auto" />
         </Link>
         <nav className="flex items-center gap-1">
           {tabs.map(({ href, label, icon: Icon }) => (
