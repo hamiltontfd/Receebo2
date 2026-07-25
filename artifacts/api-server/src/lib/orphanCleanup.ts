@@ -199,6 +199,7 @@ export async function runTrialReminderSweep(options: { dryRun: boolean }): Promi
       FROM stripe.subscriptions s
       JOIN user_billing ub ON ub.stripe_customer_id = s.customer
       WHERE s.status = 'trialing'
+        AND s.cancel_at_period_end = false
         AND s.trial_end IS NOT NULL
         AND s.trial_end >= ${windowStart}
         AND s.trial_end < ${windowEnd}
