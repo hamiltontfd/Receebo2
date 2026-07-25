@@ -109,7 +109,7 @@ export default function Landing() {
                   </Button>
                 </Link>
               </div>
-              <p className="text-sm text-muted-foreground">No account needed to try. Free forever.</p>
+
             </div>
 
             {/* Receipt stack visual */}
