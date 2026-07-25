@@ -85,10 +85,6 @@ export default function Landing() {
           <div className="max-w-6xl mx-auto px-6 py-20 md:py-28 grid md:grid-cols-2 gap-12 items-center">
             {/* Copy */}
             <div className="flex flex-col gap-7">
-              <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground w-fit">
-                <span className="w-1.5 h-1.5 rounded-full bg-foreground inline-block" />
-                AI-powered receipt organiser
-              </div>
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.05]">
                 Receipts.<br />Easy to find.
               </h1>
