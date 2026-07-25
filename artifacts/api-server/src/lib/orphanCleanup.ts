@@ -165,12 +165,12 @@ async function runOrphanCleanup(): Promise<void> {
     logger.error({ err }, "Warranty reminder sweep failed");
   }
 
-  // Trial ending reminders — send 2 days before trial_end (once per subscription)
+  // Trial ending reminders — send once when trial_end is within 3 days (once per subscription)
   try {
     const MS_PER_DAY = 86_400_000;
     const todayUtc = new Date();
     todayUtc.setUTCHours(0, 0, 0, 0);
-    const windowStart = Math.floor((todayUtc.getTime() + 2 * MS_PER_DAY) / 1000);
+    const windowStart = Math.floor(todayUtc.getTime() / 1000);
     const windowEnd = Math.floor((todayUtc.getTime() + 3 * MS_PER_DAY) / 1000);
 
     let trialRows: Array<{ userId: string; trialEnd: number }>;
@@ -191,27 +191,46 @@ async function runOrphanCleanup(): Promise<void> {
     }
 
     let trialRemindersSent = 0;
+    let trialRemindersFailed = 0;
     for (const row of trialRows) {
-      const [existing] = await db
-        .select({ trialReminderSentAt: userBillingTable.trialReminderSentAt })
-        .from(userBillingTable)
-        .where(eq(userBillingTable.userId, row.userId));
-
-      if (existing?.trialReminderSentAt) continue; // already sent
-
       const trialEndDate = new Date(row.trialEnd * 1000);
-      void sendTrialEndingEmail(row.userId, trialEndDate);
 
-      await db
+      // Atomically claim the send slot — only one process wins when trial_reminder_sent_at IS NULL.
+      // This prevents duplicate sends in concurrent sweep runs (e.g. multi-instance or rapid restarts).
+      const claimed = await db
         .update(userBillingTable)
         .set({ trialReminderSentAt: new Date() })
-        .where(eq(userBillingTable.userId, row.userId));
+        .where(
+          and(
+            eq(userBillingTable.userId, row.userId),
+            isNull(userBillingTable.trialReminderSentAt),
+          ),
+        )
+        .returning({ userId: userBillingTable.userId });
 
-      trialRemindersSent++;
+      if (claimed.length === 0) continue; // already claimed by a previous run or concurrent process
+
+      // Send the email now that we've claimed the slot.
+      const sent = await sendTrialEndingEmail(row.userId, trialEndDate);
+
+      if (sent) {
+        trialRemindersSent++;
+      } else {
+        trialRemindersFailed++;
+        // Reset the flag so the next nightly sweep can retry.
+        await db
+          .update(userBillingTable)
+          .set({ trialReminderSentAt: null })
+          .where(eq(userBillingTable.userId, row.userId));
+        logger.warn({ userId: row.userId }, "Trial reminder email failed — flag reset for retry");
+      }
     }
 
     if (trialRemindersSent > 0) {
       logger.info({ trialRemindersSent }, "Trial ending reminder emails dispatched");
+    }
+    if (trialRemindersFailed > 0) {
+      logger.warn({ trialRemindersFailed }, "Trial ending reminder emails failed (will retry next sweep)");
     }
   } catch (err) {
     logger.error({ err }, "Trial reminder sweep failed");

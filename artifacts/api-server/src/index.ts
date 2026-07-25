@@ -45,6 +45,12 @@ async function runStartupMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS stripe_subscription_id text
     `);
 
+    // trial_reminder_sent_at column — guard for tables created before this column existed
+    await db.execute(sql`
+      ALTER TABLE user_billing
+        ADD COLUMN IF NOT EXISTS trial_reminder_sent_at timestamptz
+    `);
+
     logger.info("Startup migrations applied");
   } catch (err) {
     logger.warn({ err }, "Startup migrations warning (non-fatal) — continuing");
