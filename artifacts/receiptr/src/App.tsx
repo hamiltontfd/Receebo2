@@ -16,7 +16,7 @@ import AppShell from "@/components/AppShell";
 import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
 import { setGuestId } from "@workspace/api-client-react";
 
-const GUEST_TOKEN_KEY = "receiptr:guestToken";
+const GUEST_TOKEN_KEY = "receebo:guestToken";
 const apiBase = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -90,13 +90,13 @@ const clerkAppearance = {
 const clerkLocalization = {
   signIn: {
     start: {
-      title: "Sign in to Receiptr",
+      title: "Sign in to Receebo",
       subtitle: "Welcome back. Please sign in to continue.",
     },
   },
   signUp: {
     start: {
-      title: "Create your Receiptr account",
+      title: "Create your Receebo account",
       subtitle: "Start organizing every receipt in seconds.",
     },
   },

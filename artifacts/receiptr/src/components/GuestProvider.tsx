@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 
-const GUEST_TOKEN_KEY = "receiptr:guestToken";
+const GUEST_TOKEN_KEY = "receebo:guestToken";
 
 export interface GuestUser {
   id: string;
@@ -52,13 +52,13 @@ export function GuestProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const stored = localStorage.getItem(GUEST_TOKEN_KEY);
     if (stored) {
-      setGuestUser({ id: stored, name: "Guest", email: "guest@receiptr.local" });
+      setGuestUser({ id: stored, name: "Guest", email: "guest@receebo.local" });
     }
   }, []);
 
   const enterGuestMode = useCallback(async () => {
     const token = await issueGuestToken();
-    setGuestUser({ id: token, name: "Guest", email: "guest@receiptr.local" });
+    setGuestUser({ id: token, name: "Guest", email: "guest@receebo.local" });
   }, []);
 
   const exitGuestMode = useCallback(() => {

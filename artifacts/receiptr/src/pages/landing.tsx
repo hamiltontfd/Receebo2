@@ -68,7 +68,7 @@ export default function Landing() {
     <div className="min-h-dvh flex flex-col bg-background text-foreground">
       {/* Nav */}
       <header className="px-6 py-4 flex items-center justify-between z-20 sticky top-0 bg-background/90 backdrop-blur border-b">
-        <span className="font-extrabold text-xl tracking-tight">Receiptr</span>
+        <span className="font-extrabold text-xl tracking-tight">Receebo</span>
         <div className="flex items-center gap-4">
           <Link href="/sign-in" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
             Sign In
@@ -266,8 +266,8 @@ export default function Landing() {
       </main>
 
       <footer className="border-t py-8 px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-        <span className="font-extrabold text-foreground tracking-tight">Receiptr</span>
-        <p>&copy; {new Date().getFullYear()} Receiptr. All rights reserved.</p>
+        <span className="font-extrabold text-foreground tracking-tight">Receebo</span>
+        <p>&copy; {new Date().getFullYear()} Receebo. All rights reserved.</p>
         <div className="flex gap-5">
           <Link href="/sign-in" className="hover:text-foreground transition-colors">Sign In</Link>
           <Link href="/sign-up" className="hover:text-foreground transition-colors">Sign Up</Link>

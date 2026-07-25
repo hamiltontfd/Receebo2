@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Receiptr"
+title = "Receebo"
 version = "1.0.0"
 id = "artifacts/receiptr"
 router = "path"
