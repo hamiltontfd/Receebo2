@@ -15,6 +15,13 @@
       "when": 1784154198543,
       "tag": "0001_add_receipt_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784978196435,
+      "tag": "0002_panoramic_karma",
+      "breakpoints": true
     }
   ]
 }

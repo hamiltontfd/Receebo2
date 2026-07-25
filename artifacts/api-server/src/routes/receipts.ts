@@ -21,6 +21,7 @@ import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { enqueueExtraction } from "../lib/extractionQueue";
 import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -99,6 +100,10 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
   const userId = req.userId!;
   const midnight = todayMidnightUTC();
 
+  // Pro / trialing users are exempt from the daily upload cap
+  const subscription = await getSubscriptionStatus(userId);
+  const isUnlimited = subscription.plan === "pro" || subscription.plan === "trialing";
+
   // Atomically check the daily cap and insert within a single transaction.
   // pg_advisory_xact_lock serialises concurrent uploads for the same user so
   // two simultaneous requests cannot both observe used < 5 and both insert.
@@ -123,7 +128,7 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
 
     const totalToday = Number(countRow?.used ?? 0) + Number(attCountRow?.used ?? 0);
 
-    if (totalToday >= DAILY_UPLOAD_LIMIT) {
+    if (!isUnlimited && totalToday >= DAILY_UPLOAD_LIMIT) {
       limitReached = true;
       return;
     }

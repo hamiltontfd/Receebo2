@@ -5,6 +5,7 @@ import { CreateAttachmentBody, CreateAttachmentParams, DeleteAttachmentParams } 
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
+import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 
 const objectStorageService = new ObjectStorageService();
 const router: IRouter = Router();
@@ -44,6 +45,10 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
     return;
   }
 
+  // Pro / trialing users are exempt from the daily upload cap
+  const subscription = await getSubscriptionStatus(userId);
+  const isUnlimited = subscription.plan === "pro" || subscription.plan === "trialing";
+
   let attachment: (typeof receiptAttachmentsTable.$inferSelect) | undefined;
   let limitReached = false;
   let receiptNotFound = false;
@@ -78,7 +83,7 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
       .where(and(eq(receiptsTable.userId, userId), gte(receiptAttachmentsTable.createdAt, midnight)));
 
     const totalToday = Number(receiptCountRow?.used ?? 0) + Number(attCountRow?.used ?? 0);
-    if (totalToday >= DAILY_UPLOAD_LIMIT) {
+    if (!isUnlimited && totalToday >= DAILY_UPLOAD_LIMIT) {
       limitReached = true;
       return;
     }

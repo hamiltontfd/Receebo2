@@ -213,6 +213,75 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* Pricing */}
+        <section className="border-b">
+          <div className="max-w-6xl mx-auto px-6 py-20">
+            <div className="mb-12 text-center">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Pricing</p>
+              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Simple, honest pricing.</h2>
+              <p className="text-muted-foreground mt-3 max-w-sm mx-auto text-sm">Start free, upgrade when you need unlimited uploads.</p>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
+              {/* Free */}
+              <div className="bg-background rounded-2xl border p-6 flex flex-col gap-4">
+                <div>
+                  <p className="font-bold text-lg">Free</p>
+                  <p className="text-3xl font-extrabold mt-1">€0</p>
+                  <p className="text-xs text-muted-foreground mt-1">forever</p>
+                </div>
+                <ul className="space-y-2 text-sm text-muted-foreground flex-1">
+                  <li>5 uploads per day</li>
+                  <li>AI extraction</li>
+                  <li>Natural-language search</li>
+                  <li>Warranty reminders</li>
+                </ul>
+                <Link href="/sign-up">
+                  <Button variant="outline" size="sm" className="rounded-full w-full">Get started</Button>
+                </Link>
+              </div>
+              {/* Monthly */}
+              <div className="bg-foreground text-background rounded-2xl border border-foreground p-6 flex flex-col gap-4">
+                <div>
+                  <p className="font-bold text-lg">Pro Monthly</p>
+                  <p className="text-3xl font-extrabold mt-1">€2.99</p>
+                  <p className="text-xs opacity-60 mt-1">per month</p>
+                </div>
+                <ul className="space-y-2 text-sm opacity-80 flex-1">
+                  <li>Unlimited uploads</li>
+                  <li>AI extraction</li>
+                  <li>Natural-language search</li>
+                  <li>Warranty reminders</li>
+                  <li>7-day free trial</li>
+                </ul>
+                <Link href="/sign-up">
+                  <Button size="sm" className="rounded-full w-full bg-background text-foreground hover:bg-background/90">Start free trial</Button>
+                </Link>
+              </div>
+              {/* Yearly */}
+              <div className="bg-background rounded-2xl border p-6 flex flex-col gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-lg">Pro Yearly</p>
+                    <span className="text-xs bg-secondary rounded-full px-2 py-0.5 font-semibold">Save 30%</span>
+                  </div>
+                  <p className="text-3xl font-extrabold mt-1">€24.99</p>
+                  <p className="text-xs text-muted-foreground mt-1">per year</p>
+                </div>
+                <ul className="space-y-2 text-sm text-muted-foreground flex-1">
+                  <li>Unlimited uploads</li>
+                  <li>AI extraction</li>
+                  <li>Natural-language search</li>
+                  <li>Warranty reminders</li>
+                  <li>7-day free trial</li>
+                </ul>
+                <Link href="/sign-up">
+                  <Button variant="outline" size="sm" className="rounded-full w-full">Start free trial</Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Social proof strip */}
         <section className="border-b">
           <div className="max-w-6xl mx-auto px-6 py-16 flex flex-col md:flex-row items-center gap-8 md:gap-16">

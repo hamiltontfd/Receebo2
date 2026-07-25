@@ -126,3 +126,45 @@ export async function sendWarrantyReminderEmail(
     );
   }
 }
+
+export async function sendTrialEndingEmail(
+  userId: string,
+  trialEndAt: Date,
+): Promise<void> {
+  const email = await getUserEmail(userId);
+  if (!email) return;
+
+  const dateStr = trialEndAt.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+
+  const settingsUrl = `${appUrl()}/settings`;
+
+  const html = `<!DOCTYPE html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;max-width:480px;margin:0 auto;padding:32px 24px;background:#fff;">
+  <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#888;margin:0 0 20px;">Receebo</p>
+  <h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Your free trial ends in 2 days</h1>
+  <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 24px;">
+    Your Receebo Pro trial expires on <strong>${dateStr}</strong>. After that, your account will revert to the free plan with a limit of 5 receipts per day.
+  </p>
+  <a href="${settingsUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-weight:600;font-size:14px;">Manage Subscription</a>
+  <p style="color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;">You received this because you signed up for a Receebo Pro trial.</p>
+</body>
+</html>`;
+
+  try {
+    await resend.emails.send({
+      from: FROM,
+      to: email,
+      subject: "Your Receebo Pro trial ends in 2 days",
+      html,
+    });
+    logger.info({ userId }, "Trial ending email sent");
+  } catch (err) {
+    logger.error({ err, userId }, "Failed to send trial ending email");
+  }
+}

@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
-import { Search, Camera, LogOut } from "lucide-react";
+import { Search, Camera, LogOut, Settings } from "lucide-react";
 import { useUser, useClerk } from "@clerk/react";
 import { useGuestMode } from "@/components/GuestProvider";
 import { Button } from "@/components/ui/button";
+import TrialBanner from "@/components/TrialBanner";
 
 const tabs = [
   { href: "/search", label: "Search", icon: Search },
@@ -26,6 +27,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
+      {/* Trial banner */}
+      {!isGuest && <TrialBanner />}
+
       {/* Desktop top nav */}
       <header className="hidden md:flex h-14 border-b px-6 items-center justify-between sticky top-0 z-20 bg-background/90 backdrop-blur">
         <Link href="/search">
@@ -49,6 +53,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <span className="text-sm text-muted-foreground truncate max-w-[180px]">
             {isGuest ? guestUser?.name : user?.fullName || user?.primaryEmailAddress?.emailAddress}
           </span>
+          {!isGuest && (
+            <Link href="/settings">
+              <Button
+                variant={location.startsWith("/settings") ? "secondary" : "ghost"}
+                size="icon"
+                className="w-8 h-8 text-muted-foreground"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </Link>
+          )}
           <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" onClick={handleSignOut}>
             <LogOut className="w-4 h-4" />
           </Button>
@@ -56,6 +71,38 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="flex-1 flex flex-col">{children}</main>
+
+      {/* Mobile bottom nav */}
+      <nav className="md:hidden flex border-t bg-background sticky bottom-0 z-20">
+        {tabs.map(({ href, label, icon: Icon }) => (
+          <Link key={href} href={href} className="flex-1">
+            <button
+              className={`w-full flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors ${
+                location.startsWith(href)
+                  ? "text-foreground"
+                  : "text-muted-foreground"
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              {label}
+            </button>
+          </Link>
+        ))}
+        {!isGuest && (
+          <Link href="/settings" className="flex-1">
+            <button
+              className={`w-full flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors ${
+                location.startsWith("/settings")
+                  ? "text-foreground"
+                  : "text-muted-foreground"
+              }`}
+            >
+              <Settings className="w-5 h-5" />
+              Settings
+            </button>
+          </Link>
+        )}
+      </nav>
     </div>
   );
 }

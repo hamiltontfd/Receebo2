@@ -1,9 +1,10 @@
 import type { File as GCSFile } from "@google-cloud/storage";
-import { db, receiptsTable, receiptAttachmentsTable } from "@workspace/db";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { db, receiptsTable, receiptAttachmentsTable, userBillingTable } from "@workspace/db";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
 import { logger } from "./logger";
-import { sendWarrantyReminderEmail } from "./emailService";
+import { sendWarrantyReminderEmail, sendTrialEndingEmail } from "./emailService";
 
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const ORPHAN_AGE_THRESHOLD_DAYS = 7;
@@ -40,11 +41,6 @@ async function runOrphanCleanup(): Promise<void> {
   let knownPaths: Set<string>;
   try {
     const receiptRows = await db.select({ objectPath: receiptsTable.objectPath }).from(receiptsTable);
-    // Only include attachment paths where the parent receipt still exists (INNER JOIN).
-    // The FK + ON DELETE CASCADE means orphan attachment rows can't exist under normal
-    // operation, but using a JOIN makes the intent explicit and handles any edge cases
-    // (e.g., FK temporarily disabled, manual DML). Any attachment whose receipt is missing
-    // will not appear here and its storage object will be swept as an orphan.
     const attachmentRows = await db
       .select({ objectPath: receiptAttachmentsTable.objectPath })
       .from(receiptAttachmentsTable)
@@ -134,10 +130,6 @@ async function runOrphanCleanup(): Promise<void> {
         ),
       );
 
-    // Anchor to today's UTC midnight so the comparison is calendar-day exact.
-    // A receipt qualifies only when today + 30 days == the expiry date at UTC midnight.
-    // Running the job multiple times on the same day won't re-send because the
-    // target date doesn't change within a calendar day.
     const MS_PER_DAY = 86_400_000;
     const todayUtc = new Date();
     todayUtc.setUTCHours(0, 0, 0, 0);
@@ -152,7 +144,6 @@ async function runOrphanCleanup(): Promise<void> {
       if (!matches) continue;
 
       for (const dateStr of matches) {
-        // Parse as UTC midnight to avoid timezone offset in getTime()
         const expiryMs = new Date(`${dateStr}T00:00:00Z`).getTime();
         if (expiryMs === targetMs) {
           void sendWarrantyReminderEmail(r.userId, {
@@ -162,7 +153,7 @@ async function runOrphanCleanup(): Promise<void> {
             originalFileName: r.originalFileName,
           });
           remindersSent++;
-          break; // one reminder per receipt per run
+          break;
         }
       }
     }
@@ -172,6 +163,58 @@ async function runOrphanCleanup(): Promise<void> {
     }
   } catch (err) {
     logger.error({ err }, "Warranty reminder sweep failed");
+  }
+
+  // Trial ending reminders — send 2 days before trial_end (once per subscription)
+  try {
+    const MS_PER_DAY = 86_400_000;
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
+    const windowStart = Math.floor((todayUtc.getTime() + 2 * MS_PER_DAY) / 1000);
+    const windowEnd = Math.floor((todayUtc.getTime() + 3 * MS_PER_DAY) / 1000);
+
+    let trialRows: Array<{ userId: string; trialEnd: number }>;
+    try {
+      const result = await db.execute(sql`
+        SELECT ub.user_id AS "userId", s.trial_end AS "trialEnd"
+        FROM stripe.subscriptions s
+        JOIN user_billing ub ON ub.stripe_customer_id = s.customer
+        WHERE s.status = 'trialing'
+          AND s.trial_end IS NOT NULL
+          AND s.trial_end >= ${windowStart}
+          AND s.trial_end < ${windowEnd}
+      `);
+      trialRows = result.rows as typeof trialRows;
+    } catch {
+      // stripe schema doesn't exist yet
+      trialRows = [];
+    }
+
+    let trialRemindersSent = 0;
+    for (const row of trialRows) {
+      const [existing] = await db
+        .select({ trialReminderSentAt: userBillingTable.trialReminderSentAt })
+        .from(userBillingTable)
+        .where(eq(userBillingTable.userId, row.userId));
+
+      if (existing?.trialReminderSentAt) continue; // already sent
+
+      const trialEndDate = new Date(row.trialEnd * 1000);
+      void sendTrialEndingEmail(row.userId, trialEndDate);
+
+      await db
+        .update(userBillingTable)
+        .set({ trialReminderSentAt: new Date() })
+        .where(eq(userBillingTable.userId, row.userId));
+
+      trialRemindersSent++;
+    }
+
+    if (trialRemindersSent > 0) {
+      logger.info({ trialRemindersSent }, "Trial ending reminder emails dispatched");
+    }
+  } catch (err) {
+    logger.error({ err }, "Trial reminder sweep failed");
   }
 }
 
