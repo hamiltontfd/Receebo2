@@ -137,38 +137,22 @@ export default function Settings() {
                 {portal.isPending ? "Loading..." : "Manage subscription"}
               </Button>
             ) : (
-              <div className="pt-2 space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Upgrade to Pro for unlimited uploads.
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    size="sm"
-                    className="rounded-full"
-                    onClick={() => checkout.mutate("monthly")}
-                    disabled={checkout.isPending}
-                  >
-                    {checkout.isPending ? "Loading..." : "Monthly — €2.99/mo"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full"
-                    onClick={() => checkout.mutate("yearly")}
-                    disabled={checkout.isPending}
-                  >
-                    {checkout.isPending ? "Loading..." : "Yearly — €24.99/yr"}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">7-day free trial included.</p>
-              </div>
+              <Button
+                size="sm"
+                className="rounded-full mt-2"
+                onClick={() => {
+                  document.getElementById("upgrade-plans")?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                Upgrade to Pro
+              </Button>
             )}
           </div>
         )}
       </section>
 
       {/* Limits */}
-      <section>
+      <section className="mb-10">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
           Plan features
         </h2>
@@ -192,6 +176,53 @@ export default function Settings() {
           </div>
         </div>
       </section>
+
+      {!isPro && !isLoading && (
+        <section id="upgrade-plans">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+            Upgrade to Pro
+          </h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="border rounded-xl p-5 flex flex-col gap-4">
+              <div>
+                <p className="font-bold">Pro Monthly</p>
+                <p className="text-2xl font-extrabold mt-1">€2.99</p>
+                <p className="text-xs text-muted-foreground">per month</p>
+              </div>
+              <Button
+                size="sm"
+                className="rounded-full"
+                onClick={() => checkout.mutate("monthly")}
+                disabled={checkout.isPending}
+              >
+                {checkout.isPending ? "Loading..." : "Start 7-day free trial"}
+              </Button>
+            </div>
+            <div className="border rounded-xl p-5 flex flex-col gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-bold">Pro Yearly</p>
+                  <span className="text-xs bg-secondary rounded-full px-2 py-0.5 font-semibold">Save 30%</span>
+                </div>
+                <p className="text-2xl font-extrabold mt-1">€24.99</p>
+                <p className="text-xs text-muted-foreground">per year</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => checkout.mutate("yearly")}
+                disabled={checkout.isPending}
+              >
+                {checkout.isPending ? "Loading..." : "Start 7-day free trial"}
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            7-day free trial. We'll remind you before your trial ends. Cancel anytime with one click.
+          </p>
+        </section>
+      )}
     </div>
   );
 }

@@ -149,10 +149,10 @@ export async function sendTrialEndingEmail(
   <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#888;margin:0 0 20px;">Receebo</p>
   <h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Your free trial ends in 2 days</h1>
   <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 24px;">
-    Your Receebo Pro trial expires on <strong>${dateStr}</strong>. After that, your account will revert to the free plan with a limit of 5 receipts per day.
+    Your Receebo Pro trial expires on <strong>${dateStr}</strong>. After that, you'll be charged automatically for your subscription unless you cancel before then.
   </p>
   <a href="${settingsUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-weight:600;font-size:14px;">Manage Subscription</a>
-  <p style="color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;">You received this because you signed up for a Receebo Pro trial.</p>
+  <p style="color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;">You received this because you signed up for a Receebo Pro trial. You can cancel anytime with one click.</p>
 </body>
 </html>`;
 

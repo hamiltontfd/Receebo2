@@ -2,6 +2,8 @@ import { Link, useLocation } from "wouter";
 import { Camera, Search, ShieldCheck, Zap, FileText, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGuestMode } from "@/components/GuestProvider";
+import { useAuth } from "@clerk/react";
+import { useCreateCheckout } from "@/hooks/useBilling";
 
 const HOW_IT_WORKS = [
   {
@@ -58,6 +60,8 @@ const SAMPLE_RECEIPTS = [
 export default function Landing() {
   const { enterGuestMode } = useGuestMode();
   const [, setLocation] = useLocation();
+  const { isSignedIn } = useAuth();
+  const checkout = useCreateCheckout();
 
   const startScanning = async () => {
     await enterGuestMode();
@@ -235,9 +239,15 @@ export default function Landing() {
                   <li>Natural-language search</li>
                   <li>Warranty reminders</li>
                 </ul>
-                <Link href="/sign-up">
-                  <Button variant="outline" size="sm" className="rounded-full w-full">Get started</Button>
-                </Link>
+                {isSignedIn ? (
+                  <Link href="/scan">
+                    <Button variant="outline" size="sm" className="rounded-full w-full">Get started</Button>
+                  </Link>
+                ) : (
+                  <Link href="/sign-up">
+                    <Button variant="outline" size="sm" className="rounded-full w-full">Get started</Button>
+                  </Link>
+                )}
               </div>
               {/* Monthly */}
               <div className="bg-foreground text-background rounded-2xl border border-foreground p-6 flex flex-col gap-4">
@@ -253,9 +263,20 @@ export default function Landing() {
                   <li>Warranty reminders</li>
                   <li>7-day free trial</li>
                 </ul>
-                <Link href="/sign-up">
-                  <Button size="sm" className="rounded-full w-full bg-background text-foreground hover:bg-background/90">Start free trial</Button>
-                </Link>
+                {isSignedIn ? (
+                  <Button
+                    size="sm"
+                    className="rounded-full w-full bg-background text-foreground hover:bg-background/90"
+                    onClick={() => checkout.mutate("monthly")}
+                    disabled={checkout.isPending}
+                  >
+                    {checkout.isPending ? "Loading..." : "Start free trial"}
+                  </Button>
+                ) : (
+                  <Link href="/sign-up">
+                    <Button size="sm" className="rounded-full w-full bg-background text-foreground hover:bg-background/90">Start free trial</Button>
+                  </Link>
+                )}
               </div>
               {/* Yearly */}
               <div className="bg-background rounded-2xl border p-6 flex flex-col gap-4">
@@ -274,11 +295,26 @@ export default function Landing() {
                   <li>Warranty reminders</li>
                   <li>7-day free trial</li>
                 </ul>
-                <Link href="/sign-up">
-                  <Button variant="outline" size="sm" className="rounded-full w-full">Start free trial</Button>
-                </Link>
+                {isSignedIn ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full w-full"
+                    onClick={() => checkout.mutate("yearly")}
+                    disabled={checkout.isPending}
+                  >
+                    {checkout.isPending ? "Loading..." : "Start free trial"}
+                  </Button>
+                ) : (
+                  <Link href="/sign-up">
+                    <Button variant="outline" size="sm" className="rounded-full w-full">Start free trial</Button>
+                  </Link>
+                )}
               </div>
             </div>
+            <p className="text-center text-sm text-muted-foreground mt-8">
+              7-day free trial. We'll remind you before your trial ends. Cancel anytime with one click.
+            </p>
           </div>
         </section>
 
