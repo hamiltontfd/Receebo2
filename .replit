@@ -34,6 +34,7 @@ isValidation = true
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
+integrations = ["stripe:1.0.0"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
@@ -58,3 +59,5 @@ channel = "stable-25_05"
 
 [userenv.shared]
 RESEND_FROM = "onboarding@resend.dev"
+STRIPE_MONTHLY_PRICE_ID = "price_1Tx40jPNRVgRaJxMuAGxqGbK"
+STRIPE_YEARLY_PRICE_ID = "price_1Tx40jPNRVgRaJxM0Rz7cxq6"

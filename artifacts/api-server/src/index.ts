@@ -22,8 +22,9 @@ async function initStripe(): Promise<void> {
   if (!databaseUrl) return;
 
   try {
-    const { runMigrations } = await import("stripe-replit-sync");
-    await runMigrations({ databaseUrl });
+    // Note: runMigrations is called via the post-merge setup script (scripts/run-stripe-migrations.mjs)
+    // because esbuild bundles break __dirname path resolution for the migration directory.
+    // The stripe schema must already exist before this runs.
     logger.info("Stripe schema ready");
 
     const { getStripeSync } = await import("./stripeClient");

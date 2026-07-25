@@ -134,11 +134,11 @@ importers:
         specifier: ^6.17.2
         version: 6.17.2
       stripe:
-        specifier: ^17.7.0
-        version: 17.7.0
+        specifier: ^22.3.2
+        version: 22.3.2(@types/node@25.6.2)
       stripe-replit-sync:
-        specifier: ^0.0.10
-        version: 0.0.10(stripe@17.7.0)
+        specifier: ^1.0.0
+        version: 1.0.0(stripe@22.3.2(@types/node@25.6.2))
     devDependencies:
       '@types/cookie-parser':
         specifier: ^1.4.10
@@ -4635,19 +4635,10 @@ packages:
     resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
     engines: {node: '>=14.16'}
 
-  stripe-replit-sync@0.0.10:
-    resolution: {integrity: sha512-wZugiVECQXLzFY8wSlfrWE4PF7eYYdG4I3trlK/ZVqlGdk9hjdrAyes/X/hty/Da1RhXaaH5QWbsE0y5qRd1Zg==}
-    peerDependencies:
-      stripe: '> 11'
-
   stripe-replit-sync@1.0.0:
     resolution: {integrity: sha512-Bkbih3k+IX/GugN8bKWNpwDiI2xkSLOAR+P34W7pjaR8fXyVay/QqztbrvbHZcU1JlfXncmBhuODY5TYY6DXlw==}
     peerDependencies:
       stripe: '> 11'
-
-  stripe@17.7.0:
-    resolution: {integrity: sha512-aT2BU9KkizY9SATf14WhhYVv2uOapBWX0OFWF4xvcj1mPaNotlSc2CsxpS4DS46ZueSppmCF5BX1sNYBtwBvfw==}
-    engines: {node: '>=12.*'}
 
   stripe@22.3.2:
     resolution: {integrity: sha512-O13QOvgEIQvDlTy6Ubb5kB980wpbhmoZNsgCXKILjCMZS67f+bW+6w99k3gnSi/N1lkryoj1WYdpGT5Wc5edjg==}
@@ -8858,18 +8849,6 @@ snapshots:
 
   strip-json-comments@5.0.3: {}
 
-  stripe-replit-sync@0.0.10(stripe@17.7.0):
-    dependencies:
-      pg: 8.20.0
-      pg-node-migrations: 0.0.8
-      stripe: 17.7.0
-      ws: 8.21.1
-      yesql: 7.0.0
-    transitivePeerDependencies:
-      - bufferutil
-      - pg-native
-      - utf-8-validate
-
   stripe-replit-sync@1.0.0(stripe@22.3.2(@types/node@25.6.2)):
     dependencies:
       pg: 8.20.0
@@ -8881,11 +8860,6 @@ snapshots:
       - bufferutil
       - pg-native
       - utf-8-validate
-
-  stripe@17.7.0:
-    dependencies:
-      '@types/node': 25.6.2
-      qs: 6.15.1
 
   stripe@22.3.2(@types/node@25.6.2):
     optionalDependencies:
