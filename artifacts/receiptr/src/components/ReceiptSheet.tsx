@@ -26,6 +26,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { StoreFullscreen } from "@/components/StoreFullscreen";
+import { generateReceiptPdf } from "@/lib/generateReceiptPdf";
 import { currencySymbol } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -168,21 +169,29 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   };
 
   const handleShare = async () => {
-    const summary = receipt
-      ? `${receipt.merchant || receipt.originalFileName} - ${
-          receipt.total != null
-            ? `${currencySymbol(receipt.currency)}${receipt.total.toFixed(2)}`
-            : ""
-        } (${receipt.purchaseDate ? format(new Date(receipt.purchaseDate), "MMM d, yyyy") : ""})`
-      : "";
+    if (!receipt) return;
+    const merchant = receipt.merchant || receipt.originalFileName;
+    const sym = currencySymbol(receipt.currency);
     try {
-      if (navigator.share) {
-        await navigator.share({ title: "Receipt", text: summary });
+      const pdfBlob = generateReceiptPdf(receipt, sym);
+      const fileName = `${merchant.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-receipt.pdf`;
+      const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({ files: [pdfFile], title: `${merchant} Receipt` });
       } else {
-        await navigator.clipboard.writeText(summary);
-        toast({ title: "Copied", description: "Purchase details copied to clipboard." });
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "Downloaded", description: `${fileName} saved to your device.` });
       }
-    } catch {}
+    } catch (e) {
+      if (e instanceof Error && e.name !== "AbortError") {
+        toast({ title: "Error", description: "Could not generate PDF.", variant: "destructive" });
+      }
+    }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
