@@ -18,6 +18,7 @@ export function useBillingStatus() {
     enabled: !!isSignedIn,
     staleTime: 5 * 60 * 1000,
     retry: false,
+    refetchOnWindowFocus: true,
   });
 }
 

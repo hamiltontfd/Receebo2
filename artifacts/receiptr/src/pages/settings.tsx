@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useBillingStatus, useCreateCheckout, useCreatePortal } from "@/hooks/useBilling";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,6 +33,7 @@ function PlanBadge({ plan }: { plan: "free" | "trialing" | "pro" }) {
 export default function Settings() {
   const { user } = useUser();
   const [location] = useLocation();
+  const queryClient = useQueryClient();
   const { data: billing, isLoading } = useBillingStatus();
   const checkout = useCreateCheckout();
   const portal = useCreatePortal();
@@ -41,11 +43,12 @@ export default function Settings() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("checkout") === "success") {
       toast({ title: "Subscription activated", description: "Your plan has been updated." });
+      queryClient.invalidateQueries({ queryKey: ["billing", "subscription"] });
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("checkout") === "cancel") {
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, [location, toast]);
+  }, [location, toast, queryClient]);
 
   const isPro = billing?.plan === "pro" || billing?.plan === "trialing";
 
@@ -132,7 +135,16 @@ export default function Settings() {
                 variant="outline"
                 size="sm"
                 className="rounded-full mt-2"
-                onClick={() => portal.mutate()}
+                onClick={() =>
+                  portal.mutate(undefined, {
+                    onError: () =>
+                      toast({
+                        title: "Something went wrong",
+                        description: "Could not open the billing portal. Please try again.",
+                        variant: "destructive",
+                      }),
+                  })
+                }
                 disabled={portal.isPending}
               >
                 {portal.isPending ? "Loading..." : "Manage subscription"}
@@ -219,7 +231,16 @@ export default function Settings() {
               <Button
                 size="sm"
                 className="rounded-full"
-                onClick={() => checkout.mutate("monthly")}
+                onClick={() =>
+                  checkout.mutate("monthly", {
+                    onError: () =>
+                      toast({
+                        title: "Something went wrong",
+                        description: "Could not start checkout. Please try again.",
+                        variant: "destructive",
+                      }),
+                  })
+                }
                 disabled={checkout.isPending}
               >
                 {checkout.isPending ? "Loading..." : "Start 7-day free trial"}
@@ -238,7 +259,16 @@ export default function Settings() {
                 variant="outline"
                 size="sm"
                 className="rounded-full"
-                onClick={() => checkout.mutate("yearly")}
+                onClick={() =>
+                  checkout.mutate("yearly", {
+                    onError: () =>
+                      toast({
+                        title: "Something went wrong",
+                        description: "Could not start checkout. Please try again.",
+                        variant: "destructive",
+                      }),
+                  })
+                }
                 disabled={checkout.isPending}
               >
                 {checkout.isPending ? "Loading..." : "Start 7-day free trial"}
