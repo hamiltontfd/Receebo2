@@ -65,8 +65,13 @@ export async function getSubscriptionStatus(userId: string): Promise<Subscriptio
     plan = "trialing";
   } else if (sub.status === "active") {
     plan = "pro";
-  } else if (sub.status === "past_due" && currentPeriodEnd && currentPeriodEnd > now) {
-    // Keep pro access until the current period expires; Stripe will retry payment
+  } else if (
+    (sub.status === "past_due" || sub.status === "unpaid") &&
+    currentPeriodEnd &&
+    currentPeriodEnd > now
+  ) {
+    // Keep pro access until the current period expires; Stripe will retry payment.
+    // "unpaid" is the terminal failure state — also gated by period end.
     plan = "pro";
   } else if (sub.status === "canceled" && currentPeriodEnd && currentPeriodEnd > now) {
     plan = "pro";
