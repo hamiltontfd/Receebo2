@@ -75,6 +75,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
 
   const [isEditing, setIsEditing] = useState(false);
   const [storeUrl, setStoreUrl] = useState<string | null>(null);
+  const [isOpeningStore, setIsOpeningStore] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,9 +126,42 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   useEffect(() => {
     if (!open) {
       setIsEditing(false);
-      setStoreUrl(null);
+      setStoreUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return null;
+      });
     }
   }, [open]);
+
+  const openStoreView = async (apiUrl: string) => {
+    setIsOpeningStore(true);
+    try {
+      const blob = await customFetch<Blob>(apiUrl, { responseType: "blob" });
+      const blobUrl = URL.createObjectURL(blob);
+      setStoreUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return blobUrl;
+      });
+    } catch {
+      toast({ title: "Error", description: "Could not load image.", variant: "destructive" });
+    } finally {
+      setIsOpeningStore(false);
+    }
+  };
+
+  const downloadFile = async (apiUrl: string, fileName: string) => {
+    try {
+      const blob = await customFetch<Blob>(apiUrl, { responseType: "blob" });
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      toast({ title: "Error", description: "Could not download file.", variant: "destructive" });
+    }
+  };
 
   const onSubmit = async (data: EditFormValues) => {
     if (!receiptId) return;
@@ -534,10 +568,11 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                         <Button
                           variant="outline"
                           className="w-full rounded-full mt-2"
-                          onClick={() => setStoreUrl(fileUrl)}
+                          onClick={() => openStoreView(fileUrl)}
+                          disabled={isOpeningStore}
                         >
                           <ScanLine className="w-4 h-4 mr-2" />
-                          Show to store
+                          {isOpeningStore ? "Loading…" : "Show to store"}
                         </Button>
                       )}
                     </div>
@@ -574,22 +609,20 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                           <span className="flex-1 text-sm truncate">{receipt.originalFileName}</span>
                           {isImage && (
                             <button
-                              onClick={() => setStoreUrl(fileUrl)}
-                              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                              onClick={() => openStoreView(fileUrl)}
+                              disabled={isOpeningStore}
+                              className="text-muted-foreground hover:text-foreground transition-colors shrink-0 disabled:opacity-40"
                               aria-label="Show fullscreen"
                             >
                               <Maximize2 className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          <a
-                            href={fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            onClick={() => downloadFile(fileUrl, receipt.originalFileName)}
                             className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                            download={receipt.originalFileName}
                           >
                             Download
-                          </a>
+                          </button>
                         </li>
 
                         {/* Attachment rows */}
@@ -603,22 +636,20 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                               <span className="flex-1 text-sm truncate">{att.originalFileName}</span>
                               {attIsImage && (
                                 <button
-                                  onClick={() => setStoreUrl(attUrl)}
-                                  className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                                  onClick={() => openStoreView(attUrl)}
+                                  disabled={isOpeningStore}
+                                  className="text-muted-foreground hover:text-foreground transition-colors shrink-0 disabled:opacity-40"
                                   aria-label="Show fullscreen"
                                 >
                                   <Maximize2 className="w-3.5 h-3.5" />
                                 </button>
                               )}
-                              <a
-                                href={attUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                onClick={() => downloadFile(attUrl, att.originalFileName)}
                                 className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                                download={att.originalFileName}
                               >
                                 Download
-                              </a>
+                              </button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <button

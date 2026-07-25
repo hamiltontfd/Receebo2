@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ChevronDown, ChevronUp, ExternalLink, AlertTriangle, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { customFetch } from "@workspace/api-client-react";
 
 interface ReceiptPreviewProps {
   fileUrl: string;
@@ -18,6 +19,38 @@ export function ReceiptPreview({ fileUrl, contentType, fileName, defaultExpanded
   );
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [blobError, setBlobError] = useState(false);
+
+  useEffect(() => {
+    if (!fileUrl) return;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    setBlobUrl(null);
+    setBlobError(false);
+    setImageLoaded(false);
+    setImageError(false);
+
+    customFetch<Blob>(fileUrl, { responseType: "blob" })
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setBlobError(true);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [fileUrl]);
+
+  const handleOpen = useCallback(() => {
+    if (blobUrl) window.open(blobUrl, "_blank");
+  }, [blobUrl]);
 
   return (
     <div className="rounded-2xl border overflow-hidden">
@@ -39,17 +72,15 @@ export function ReceiptPreview({ fileUrl, contentType, fileName, defaultExpanded
         </div>
 
         <div className="flex items-center gap-2 shrink-0 ml-2">
-          <a
-            href={fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors disabled:opacity-40"
+            onClick={(e) => { e.stopPropagation(); handleOpen(); }}
+            disabled={!blobUrl}
             aria-label="Open original receipt in new tab"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Open
-          </a>
+          </button>
           <span className="md:hidden text-muted-foreground">
             {isExpanded ? (
               <ChevronUp className="w-4 h-4" />
@@ -64,12 +95,12 @@ export function ReceiptPreview({ fileUrl, contentType, fileName, defaultExpanded
         <div className="border-t bg-secondary/20">
           {isImage && (
             <>
-              {!imageLoaded && !imageError && (
+              {!blobUrl && !blobError && (
                 <Skeleton className="w-full h-64 rounded-none" />
               )}
-              {!imageError && (
+              {blobUrl && !imageError && (
                 <img
-                  src={fileUrl}
+                  src={blobUrl}
                   alt={fileName}
                   className={`w-full object-contain max-h-[60vh] transition-opacity duration-200 ${
                     imageLoaded ? "opacity-100" : "opacity-0 h-0"
@@ -78,18 +109,24 @@ export function ReceiptPreview({ fileUrl, contentType, fileName, defaultExpanded
                   onError={() => setImageError(true)}
                 />
               )}
-              {imageError && <PreviewError />}
+              {(blobError || imageError) && <PreviewError />}
             </>
           )}
 
           {isPdf && (
             <div className="h-[60vh]">
-              <iframe
-                src={fileUrl}
-                title={fileName}
-                className="w-full h-full border-0"
-                loading="lazy"
-              />
+              {blobUrl ? (
+                <iframe
+                  src={blobUrl}
+                  title={fileName}
+                  className="w-full h-full border-0"
+                  loading="lazy"
+                />
+              ) : blobError ? (
+                <PreviewError />
+              ) : (
+                <Skeleton className="w-full h-full rounded-none" />
+              )}
             </div>
           )}
 
