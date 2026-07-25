@@ -24,6 +24,7 @@ import {
 } from "@workspace/api-client-react";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { currencySymbol } from "@/lib/currency";
+import { compressImage, compressedFileName } from "@/lib/compressImage";
 import { CATEGORIES, categoryStyle } from "@/lib/categories";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -265,23 +266,33 @@ export default function Scan() {
   const capturePhoto = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
+    const MAX_DIM = 2000;
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > MAX_DIM || h > MAX_DIM) {
+      if (w >= h) { h = Math.round((h / w) * MAX_DIM); w = MAX_DIM; }
+      else { w = Math.round((w / h) * MAX_DIM); h = MAX_DIM; }
+    }
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext("2d")?.drawImage(video, 0, 0, w, h);
     canvas.toBlob(
       (blob) => {
         if (blob) uploadFile(blob, `scan-${Date.now()}.jpg`, "image/jpeg");
       },
       "image/jpeg",
-      0.92,
+      0.85,
     );
   }, [uploadFile, videoRef]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      uploadFile(file, file.name, file.type || "application/octet-stream");
+      const rawType = file.type || "application/octet-stream";
+      const { blob, contentType } = await compressImage(file, rawType);
+      const fileName = compressedFileName(file.name, contentType);
+      uploadFile(blob, fileName, contentType);
     }
     e.target.value = "";
   };

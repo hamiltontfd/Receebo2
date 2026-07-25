@@ -234,28 +234,32 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
     if (!file) return;
     setIsUploading(true);
     try {
+      const { compressImage, compressedFileName } = await import("@/lib/compressImage");
+      const rawType = file.type || "application/octet-stream";
+      const { blob, contentType } = await compressImage(file, rawType);
+      const fileName = compressedFileName(file.name, contentType);
       const uploadInfo = await customFetch<{ uploadURL: string; objectPath: string }>(
         "/api/storage/uploads/request-url",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+          body: JSON.stringify({ name: fileName, size: blob.size, contentType }),
         },
       );
       await fetch(uploadInfo.uploadURL, {
         method: "PUT",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
-        body: file,
+        headers: { "Content-Type": contentType },
+        body: blob,
       });
       await createAttachment.mutateAsync({
         receiptId,
         data: {
           objectPath: uploadInfo.objectPath,
-          originalFileName: file.name,
-          contentType: file.type || "application/octet-stream",
+          originalFileName: fileName,
+          contentType,
         },
       });
-      toast({ title: "File attached", description: `${file.name} added to this receipt.` });
+      toast({ title: "File attached", description: `${fileName} added to this receipt.` });
     } catch {
       toast({ title: "Upload failed", description: "Could not attach the file.", variant: "destructive" });
     } finally {
