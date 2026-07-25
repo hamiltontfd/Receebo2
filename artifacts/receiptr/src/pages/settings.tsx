@@ -5,6 +5,7 @@ import { useBillingStatus, useCreateCheckout, useCreatePortal } from "@/hooks/us
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { Check, Minus } from "lucide-react";
 
 function PlanBadge({ plan }: { plan: "free" | "trialing" | "pro" }) {
   if (plan === "pro") {
@@ -151,29 +152,55 @@ export default function Settings() {
         )}
       </section>
 
-      {/* Limits */}
+      {/* Plan comparison */}
       <section className="mb-10">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
           Plan features
         </h2>
-        <div className="border rounded-xl divide-y">
-          {[
-            { feature: "Daily uploads", free: "5/day", pro: "Unlimited" },
-            { feature: "AI extraction", free: "Included", pro: "Included" },
-            { feature: "Natural-language search", free: "Included", pro: "Included" },
-            { feature: "Warranty reminders", free: "Included", pro: "Included" },
-          ].map(({ feature, free, pro }) => (
-            <div key={feature} className="grid grid-cols-3 px-5 py-3 text-sm">
-              <span className="font-medium">{feature}</span>
-              <span className="text-muted-foreground text-center">{free}</span>
-              <span className="text-center font-semibold">{pro}</span>
-            </div>
-          ))}
-          <div className="grid grid-cols-3 px-5 py-2 text-xs text-muted-foreground">
-            <span />
-            <span className="text-center font-semibold">Free</span>
-            <span className="text-center font-semibold">Pro</span>
+        <div className="border rounded-xl overflow-hidden">
+          {/* Column headers */}
+          <div className="grid grid-cols-3 px-5 py-3 bg-secondary/50 text-xs font-semibold border-b">
+            <span className="text-muted-foreground">Feature</span>
+            <span className="text-center text-muted-foreground">Free</span>
+            <span className="text-center">Pro</span>
           </div>
+          {[
+            { feature: "Daily uploads", free: "5 per day", pro: "Unlimited", freeHighlight: false, proHighlight: true },
+            { feature: "AI receipt extraction", free: true, pro: true, freeHighlight: false, proHighlight: false },
+            { feature: "Attachment uploads", free: "5 per day (shared)", pro: "Unlimited", freeHighlight: false, proHighlight: true },
+            { feature: "Natural-language search", free: true, pro: true, freeHighlight: false, proHighlight: false },
+            { feature: "Warranty reminders", free: true, pro: true, freeHighlight: false, proHighlight: false },
+            { feature: "Export & download", free: true, pro: true, freeHighlight: false, proHighlight: false },
+          ].map(({ feature, free, pro }) => {
+            const renderCell = (val: boolean | string, isProCol: boolean) => {
+              if (val === true) {
+                return (
+                  <span className="flex justify-center">
+                    <Check className={`w-4 h-4 ${isProCol ? "text-foreground" : "text-muted-foreground"}`} />
+                  </span>
+                );
+              }
+              if (val === false) {
+                return (
+                  <span className="flex justify-center">
+                    <Minus className="w-4 h-4 text-muted-foreground/40" />
+                  </span>
+                );
+              }
+              return (
+                <span className={`text-center text-xs ${isProCol ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+                  {val}
+                </span>
+              );
+            };
+            return (
+              <div key={feature} className="grid grid-cols-3 items-center px-5 py-3 text-sm border-b last:border-b-0">
+                <span className="font-medium">{feature}</span>
+                {renderCell(free, false)}
+                {renderCell(pro, true)}
+              </div>
+            );
+          })}
         </div>
       </section>
 

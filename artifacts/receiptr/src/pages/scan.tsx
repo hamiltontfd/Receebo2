@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
-import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScanLine } from "lucide-react";
+import { useLocation, Link } from "wouter";
+import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScanLine, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
@@ -383,12 +383,19 @@ export default function Scan() {
               )}
             </div>
 
-            {limitError && (
-              <div className="mt-3 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                <X className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold">Daily limit reached</p>
-                  <p className="mt-0.5 text-destructive/80">{limitError}</p>
+            {(limitError || (dailyCount != null && dailyCount.remaining === 0)) && (
+              <div className="mt-3 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 px-4 py-3 text-sm">
+                <Zap className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="flex-1">
+                  <p className="font-semibold text-amber-900 dark:text-amber-200">Daily limit reached</p>
+                  <p className="mt-0.5 text-amber-800 dark:text-amber-300">
+                    You've used all 5 of today's free uploads. Upgrade to Pro for unlimited scans — no daily cap.
+                  </p>
+                  <Link href="/settings">
+                    <span className="inline-block mt-2 text-xs font-semibold underline text-amber-900 dark:text-amber-200 hover:opacity-80 transition-opacity cursor-pointer">
+                      Upgrade to Pro →
+                    </span>
+                  </Link>
                 </div>
               </div>
             )}

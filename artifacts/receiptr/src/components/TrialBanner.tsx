@@ -16,21 +16,25 @@ export default function TrialBanner() {
   if (!data || data.plan !== "trialing" || !data.trialEndAt) return null;
 
   const days = daysUntil(data.trialEndAt);
-  if (days > 2) return null;
+  if (days > 7) return null;
 
   const label =
     days === 0
-      ? "Your Pro trial ends today."
+      ? "Your Pro trial ends today — don't lose unlimited uploads."
       : days === 1
-        ? "Your Pro trial ends tomorrow."
-        : "Your Pro trial ends in 2 days.";
+        ? "Your Pro trial ends tomorrow — keep unlimited uploads by upgrading."
+        : days <= 3
+          ? `Your Pro trial ends in ${days} days — upgrade to keep unlimited uploads.`
+          : `Your Pro trial ends in ${days} days.`;
+
+  const cta = days <= 3 ? "Upgrade now" : "Manage subscription";
 
   return (
     <div className="bg-foreground text-background text-sm px-4 py-2 flex items-center justify-center gap-3 text-center relative">
       <span>{label}</span>
       <Link href="/settings">
         <span className="underline font-semibold cursor-pointer hover:opacity-80 transition-opacity">
-          Manage subscription
+          {cta}
         </span>
       </Link>
       <button
