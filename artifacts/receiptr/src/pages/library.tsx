@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Link, useLocation } from "wouter";
+import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { Loader2, FileText, Receipt, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { useListReceipts, useGetReceiptStats } from "@workspace/api-client-react
 import type { Receipt as ReceiptItem } from "@workspace/api-client-react";
 import { currencySymbol } from "@/lib/currency";
 import { categoryStyle } from "@/lib/categories";
+import { ReceiptSheet } from "@/components/ReceiptSheet";
 
 const DEMO_RECEIPTS: Array<{
   id: string;
@@ -100,6 +101,7 @@ function monthKey(r: ReceiptItem): string {
 
 export default function Library() {
   const [, setLocation] = useLocation();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: receipts, isLoading } = useListReceipts();
   const { data: stats } = useGetReceiptStats();
 
@@ -147,76 +149,83 @@ export default function Library() {
   }
 
   return (
-    <div className="flex-1 w-full max-w-lg md:max-w-3xl mx-auto px-5 py-6 flex flex-col gap-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Library</h1>
-          <p className="text-4xl font-extrabold tracking-tight mt-1">{year}</p>
+    <>
+      <ReceiptSheet
+        receiptId={selectedId}
+        open={selectedId !== null}
+        onClose={() => setSelectedId(null)}
+      />
+      <div className="flex-1 w-full max-w-lg md:max-w-3xl mx-auto px-5 py-6 flex flex-col gap-6">
+        <div className="flex items-end justify-between">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight">Library</h1>
+            <p className="text-4xl font-extrabold tracking-tight mt-1">{year}</p>
+          </div>
+          {stats && (
+            <p className="text-sm text-muted-foreground pb-1">
+              {stats.totalReceipts} purchase{stats.totalReceipts === 1 ? "" : "s"}
+            </p>
+          )}
         </div>
-        {stats && (
-          <p className="text-sm text-muted-foreground pb-1">
-            {stats.totalReceipts} purchase{stats.totalReceipts === 1 ? "" : "s"}
-          </p>
-        )}
-      </div>
 
-      <div className="space-y-8">
-        {groups.map((group) => (
-          <section key={group.key}>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-bold">
-                {group.year === year ? group.label : `${group.label} ${group.year}`}
-              </h2>
-              <span className="text-sm text-muted-foreground">
-                {group.items.length}
-              </span>
-            </div>
-            <ul className="divide-y border-t">
-              {group.items.map((r) => (
-                <li key={r.id}>
-                  <Link
-                    href={`/receipts/${r.id}`}
-                    className="flex items-center justify-between gap-4 py-4 group"
-                  >
-                    <div className="min-w-0 flex items-center gap-3">
-                      <span className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-                        {r.status === "processing" ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                        ) : (
-                          <FileText className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-semibold truncate group-hover:underline">
-                          {r.merchant || r.originalFileName}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-xs text-muted-foreground">
-                            {format(new Date(r.purchaseDate || r.createdAt), "MMM d")}
-                          </span>
-                          {r.category && (
-                            <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
-                              {r.category}
-                            </span>
+        <div className="space-y-8">
+          {groups.map((group) => (
+            <section key={group.key}>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-bold">
+                  {group.year === year ? group.label : `${group.label} ${group.year}`}
+                </h2>
+                <span className="text-sm text-muted-foreground">
+                  {group.items.length}
+                </span>
+              </div>
+              <ul className="divide-y border-t">
+                {group.items.map((r) => (
+                  <li key={r.id}>
+                    <button
+                      onClick={() => setSelectedId(r.id)}
+                      className="w-full flex items-center justify-between gap-4 py-4 group text-left"
+                    >
+                      <div className="min-w-0 flex items-center gap-3">
+                        <span className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                          {r.status === "processing" ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          ) : (
+                            <FileText className="w-4 h-4 text-muted-foreground" />
                           )}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate group-hover:underline">
+                            {r.merchant || r.originalFileName}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(r.purchaseDate || r.createdAt), "MMM d")}
+                            </span>
+                            {r.category && (
+                              <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
+                                {r.category}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    {r.total != null && (
-                      <span className="font-mono font-semibold shrink-0">
-                        {currencySymbol(r.currency)}{r.total.toFixed(2)}
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <p className="text-right text-xs text-muted-foreground mt-2 font-mono">
-              {currencySymbol(group.items[0]?.currency)}{group.total.toFixed(2)}
-            </p>
-          </section>
-        ))}
+                      {r.total != null && (
+                        <span className="font-mono font-semibold shrink-0">
+                          {currencySymbol(r.currency)}{r.total.toFixed(2)}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-right text-xs text-muted-foreground mt-2 font-mono">
+                {currencySymbol(group.items[0]?.currency)}{group.total.toFixed(2)}
+              </p>
+            </section>
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

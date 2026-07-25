@@ -6,14 +6,15 @@ interface ReceiptPreviewProps {
   fileUrl: string;
   contentType: string;
   fileName: string;
+  defaultExpanded?: boolean;
 }
 
-export function ReceiptPreview({ fileUrl, contentType, fileName }: ReceiptPreviewProps) {
+export function ReceiptPreview({ fileUrl, contentType, fileName, defaultExpanded }: ReceiptPreviewProps) {
   const isImage = contentType.startsWith("image/");
   const isPdf = contentType === "application/pdf";
 
   const [isExpanded, setIsExpanded] = useState(
-    () => (typeof window !== "undefined" ? window.innerWidth >= 768 : true),
+    () => defaultExpanded ?? (typeof window !== "undefined" ? window.innerWidth >= 768 : true),
   );
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);

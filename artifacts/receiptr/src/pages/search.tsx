@@ -17,6 +17,7 @@ import {
   itemVariants,
   cardVariants,
 } from "@/components/PageTransition";
+import { ReceiptSheet } from "@/components/ReceiptSheet";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -79,15 +80,21 @@ const DEMO_RECEIPTS: DemoReceipt[] = [
   {
     id: "d5", merchant: "IKEA", category: "Home", date: "Jun 28",
     total: 214.50, notableItem: null, itemPrice: null,
-    summary: "Home office furniture and accessories.",
+    summary: "Home furnishing run — bookshelf, throw pillows, and storage boxes.",
     products: [
-      { name: "BEKANT Desk (White)", price: 149.00, qty: 1 },
-      { name: "SKÅDIS Pegboard", price: 24.99, qty: 1 },
-      { name: "KALLAX Shelf Unit", price: 34.99, qty: 1 },
-      { name: "Cable Management Kit", price: 5.52, qty: 1 },
+      { name: "KALLAX Shelf Unit", price: 139.00, qty: 1 },
+      { name: "SANELA Cushion Cover (2-pack)", price: 29.99, qty: 1 },
+      { name: "KUGGIS Storage Box (4-pack)", price: 19.99, qty: 1 },
+      { name: "RÅSKOG Cart", price: 24.99, qty: 1 },
     ],
   },
 ];
+
+const notableDemoItems = DEMO_RECEIPTS.flatMap((r) =>
+  r.notableItem && r.itemPrice
+    ? [{ name: r.notableItem, price: r.itemPrice, merchant: r.merchant, category: r.category }]
+    : [],
+);
 
 function DemoReceiptSheet({
   receipt,
@@ -102,64 +109,43 @@ function DemoReceiptSheet({
   const Icon = categoryIcon(receipt.category);
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent side="bottom" className="h-[85dvh] rounded-t-2xl px-0 pt-0 pb-0 flex flex-col gap-0">
-        {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div className="min-w-0 flex-1">
-            <p className="font-bold truncate">{receipt.merchant}</p>
-            <p className="text-xs text-muted-foreground">{receipt.date}</p>
-          </div>
-          <span className={`text-xs font-medium px-2 py-1 rounded-full ${categoryStyle(receipt.category)}`}>
-            {receipt.category}
-          </span>
+      <SheetContent side="bottom" className="h-[85dvh] p-0 flex flex-col overflow-hidden rounded-t-2xl">
+        <div className="flex justify-center pt-3 pb-2 shrink-0">
+          <div className="w-10 h-1 bg-muted-foreground/25 rounded-full" />
         </div>
-
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
-          {/* Total */}
-          <div className="flex items-center gap-3">
-            <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${categoryStyle(receipt.category)}`}>
-              <Icon className="w-[1.375rem] h-[1.375rem]" />
-            </span>
-            <div>
-              <p className="text-3xl font-extrabold font-mono tracking-tight">
-                ${receipt.total.toFixed(2)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Total</p>
+        <div className="flex-1 overflow-y-auto px-5 pb-10 flex flex-col gap-5">
+          <div className="rounded-2xl bg-foreground text-background p-6 space-y-3">
+            <div className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-2 py-1">
+              <Icon className="w-3.5 h-3.5" />
+              <span className="text-xs font-semibold">{receipt.category}</span>
             </div>
+            <h2 className="text-2xl font-extrabold tracking-tight">{receipt.merchant}</h2>
+            <p className="text-sm opacity-70">{receipt.date}</p>
+            <p className="text-4xl font-extrabold tracking-tight font-mono">
+              ${receipt.total.toFixed(2)}
+            </p>
           </div>
 
-          {/* Summary */}
-          {receipt.summary && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Summary</p>
-              <p className="text-sm text-muted-foreground">{receipt.summary}</p>
-            </div>
-          )}
-
-          {/* Items */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Items</p>
-            <ul className="divide-y divide-border border border-border rounded-xl overflow-hidden">
+          <div className="rounded-2xl border p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Purchased</p>
+            <ul className="space-y-2">
               {receipt.products.map((p, i) => (
-                <li key={i} className="flex items-center justify-between gap-3 px-4 py-3 bg-background">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{p.name}</p>
-                    {p.qty > 1 && <p className="text-xs text-muted-foreground">Qty {p.qty}</p>}
-                  </div>
-                  <span className="font-mono text-sm font-semibold shrink-0">${p.price.toFixed(2)}</span>
+                <li key={i} className="flex justify-between text-sm">
+                  <span>{p.qty > 1 ? `×${p.qty} ` : ""}{p.name}</span>
+                  <span className="font-mono font-medium">${p.price.toFixed(2)}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Demo notice */}
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
-            <Sparkles className="w-4 h-4 shrink-0" />
-            <span>This is sample data. Your real receipts will look like this.</span>
+          <div className="rounded-2xl bg-secondary p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">AI Summary</p>
+            <p className="text-sm leading-relaxed">{receipt.summary}</p>
+          </div>
+
+          <div className="rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground flex items-start gap-2">
+            <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>This is sample data. Sign in to scan and store your own receipts.</span>
           </div>
         </div>
       </SheetContent>
@@ -169,42 +155,57 @@ function DemoReceiptSheet({
 
 function DemoView({ onScan }: { onScan: () => void }) {
   const [selected, setSelected] = useState<DemoReceipt | null>(null);
-  const notableItems = DEMO_RECEIPTS.filter((r) => r.notableItem).slice(0, 2);
-
   return (
     <>
-      <DemoReceiptSheet receipt={selected} open={selected !== null} onClose={() => setSelected(null)} />
+      <DemoReceiptSheet receipt={selected} open={!!selected} onClose={() => setSelected(null)} />
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
-        {/* Notable items carousel */}
-        <section>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Worth keeping</h2>
-          <div className="grid grid-cols-2 gap-3">
-              {notableItems.map((item) => {
-                const Icon = categoryIcon(item.category);
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className="flex flex-col gap-5"
+      >
+        <div className="flex items-center gap-2 rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
+          <Sparkles className="w-4 h-4 shrink-0" />
+          <span>This is sample data. Scan a receipt to start your own library.</span>
+          <button
+            onClick={onScan}
+            className="ml-auto shrink-0 text-foreground font-semibold underline underline-offset-2"
+          >
+            Scan now
+          </button>
+        </div>
+
+        {notableDemoItems.length > 0 && (
+          <section>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+              Worth keeping
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              {notableDemoItems.slice(0, 2).map((item, i) => {
+                const CardIcon = categoryIcon(item.category);
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => setSelected(item)}
-                    className="block rounded-2xl border border-border p-4 flex flex-col gap-2 text-left hover:bg-secondary/50 transition-colors active:scale-95"
-                  >
-                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
-                      <Icon className="w-[1.1rem] h-[1.1rem]" />
-                    </span>
-                    <p className="font-semibold text-sm leading-tight line-clamp-2">{item.notableItem}</p>
-                    {item.itemPrice != null && (
-                      <p className="font-mono font-bold text-base">${item.itemPrice.toFixed(2)}</p>
-                    )}
-                    <div className="mt-auto">
-                      <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
-                    </div>
-                  </button>
+                  <div key={i} className="min-w-0">
+                    <button
+                      onClick={() => setSelected(DEMO_RECEIPTS.find((r) => r.merchant === item.merchant) ?? null)}
+                      className="block w-full h-full rounded-2xl border border-border p-4 flex flex-col gap-2 hover:bg-secondary/50 transition-colors text-left"
+                    >
+                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
+                        <CardIcon className="w-[1.1rem] h-[1.1rem]" />
+                      </span>
+                      <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
+                      <p className="font-mono font-bold text-base">${item.price.toFixed(2)}</p>
+                      <div className="mt-auto">
+                        <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
+                      </div>
+                    </button>
+                  </div>
                 );
               })}
-          </div>
-        </section>
+            </div>
+          </section>
+        )}
 
-        {/* Recent list */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Recent</h2>
           <ul className="divide-y divide-border">
@@ -214,14 +215,14 @@ function DemoView({ onScan }: { onScan: () => void }) {
                 <li key={r.id}>
                   <button
                     onClick={() => setSelected(r)}
-                    className="w-full flex items-center justify-between gap-4 py-4 group text-left"
+                    className="w-full flex items-center justify-between gap-4 py-4 text-left"
                   >
                     <div className="min-w-0 flex items-center gap-3">
                       <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(r.category)}`}>
                         <Icon className="w-[1.1rem] h-[1.1rem]" />
                       </span>
                       <div className="min-w-0">
-                        <p className="font-semibold truncate group-hover:underline">{r.merchant}</p>
+                        <p className="font-semibold truncate">{r.merchant}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="text-xs text-muted-foreground">{r.date}</span>
                           <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
@@ -242,16 +243,16 @@ function DemoView({ onScan }: { onScan: () => void }) {
   );
 }
 
-function ReceiptRow({ r, index }: { r: Receipt; index: number }) {
+function ReceiptRow({ r, onOpen }: { r: Receipt; onOpen: (id: number) => void }) {
   const Icon = categoryIcon(r.category);
   return (
     <motion.li
       variants={itemVariants}
       layout
     >
-      <Link
-        href={`/receipts/${r.id}`}
-        className="flex items-center justify-between gap-4 py-4 group"
+      <button
+        onClick={() => onOpen(r.id)}
+        className="w-full flex items-center justify-between gap-4 py-4 text-left group"
       >
         <div className="min-w-0 flex items-center gap-3">
           <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(r.category)}`}>
@@ -282,7 +283,7 @@ function ReceiptRow({ r, index }: { r: Receipt; index: number }) {
             {currencySymbol(r.currency)}{r.total.toFixed(2)}
           </span>
         )}
-      </Link>
+      </button>
     </motion.li>
   );
 }
@@ -291,6 +292,8 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [, setLocation] = useLocation();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 400);
     return () => clearTimeout(t);
@@ -335,6 +338,12 @@ export default function SearchPage() {
 
   return (
     <>
+    <ReceiptSheet
+      receiptId={selectedId}
+      open={selectedId !== null}
+      onClose={() => setSelectedId(null)}
+    />
+
     <PageTransition className="flex-1 w-full max-w-lg md:max-w-3xl mx-auto px-5 py-6 flex flex-col gap-5">
       {/* Search input */}
       <div className="relative">
@@ -389,7 +398,7 @@ export default function SearchPage() {
                 animate="visible"
               >
                 {results.map((r, i) => (
-                  <ReceiptRow key={r.id} r={r} index={i} />
+                  <ReceiptRow key={r.id} r={r} onOpen={setSelectedId} />
                 ))}
               </motion.ul>
             ) : (
@@ -451,9 +460,9 @@ export default function SearchPage() {
                           {(() => {
                             const CardIcon = categoryIcon(item.category);
                             return (
-                              <Link
-                                href={`/receipts/${item.receiptId}`}
-                                className="block w-full h-full rounded-2xl border border-border p-4 flex flex-col gap-2 hover:bg-secondary/50 transition-colors"
+                              <button
+                                onClick={() => setSelectedId(item.receiptId)}
+                                className="block w-full h-full rounded-2xl border border-border p-4 flex flex-col gap-2 hover:bg-secondary/50 transition-colors text-left"
                               >
                                 <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
                                   <CardIcon className="w-[1.1rem] h-[1.1rem]" />
@@ -469,7 +478,7 @@ export default function SearchPage() {
                                     <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
                                   )}
                                 </div>
-                              </Link>
+                              </button>
                             );
                           })()}
                         </motion.div>
@@ -495,7 +504,7 @@ export default function SearchPage() {
                       animate="visible"
                     >
                       {recent.map((r, i) => (
-                        <ReceiptRow key={r.id} r={r} index={i} />
+                        <ReceiptRow key={r.id} r={r} onOpen={setSelectedId} />
                       ))}
                     </motion.ul>
                   </section>
