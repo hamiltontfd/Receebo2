@@ -273,7 +273,7 @@ export default function Landing() {
                     {checkout.isPending ? "Loading..." : "Start free trial"}
                   </Button>
                 ) : (
-                  <Link href="/sign-up">
+                  <Link href="/sign-up?plan=monthly">
                     <Button size="sm" className="rounded-full w-full bg-background text-foreground hover:bg-background/90">Start free trial</Button>
                   </Link>
                 )}
@@ -306,7 +306,7 @@ export default function Landing() {
                     {checkout.isPending ? "Loading..." : "Start free trial"}
                   </Button>
                 ) : (
-                  <Link href="/sign-up">
+                  <Link href="/sign-up?plan=yearly">
                     <Button variant="outline" size="sm" className="rounded-full w-full">Start free trial</Button>
                   </Link>
                 )}

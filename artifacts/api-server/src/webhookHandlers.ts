@@ -14,16 +14,12 @@ async function upsertUserBilling(
 ): Promise<void> {
   if (!stripeCustomerId) return;
 
-  // Find existing row by customer ID
   const [existing] = await db
     .select({ userId: userBillingTable.userId })
     .from(userBillingTable)
     .where(eq(userBillingTable.stripeCustomerId, stripeCustomerId));
 
   if (!existing) {
-    // No row yet — we can't create one without a userId. The checkout route
-    // creates the row before the session; if we reach here without one it means
-    // the customer was created outside our flow. Log and skip.
     logger.warn(
       { stripeCustomerId },
       "webhookHandlers: received event for unknown customer — no user_billing row",
@@ -40,8 +36,7 @@ async function upsertUserBilling(
 }
 
 /**
- * Handle a checkout.session.completed event.
- * Grants immediate Pro access by upserting the subscription ID.
+ * Handle checkout.session.completed — grants immediate Pro access.
  */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
   const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
@@ -56,8 +51,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
 }
 
 /**
- * Handle customer.subscription.created / updated.
- * Keeps the subscription ID in sync.
+ * Handle customer.subscription.created / updated — keeps subscription ID in sync.
  */
 async function handleSubscriptionUpsert(subscription: Stripe.Subscription): Promise<void> {
   const customerId =
@@ -71,15 +65,12 @@ async function handleSubscriptionUpsert(subscription: Stripe.Subscription): Prom
 }
 
 /**
- * Handle customer.subscription.deleted.
- * Clears the subscription ID so status falls back to free after period end.
+ * Handle customer.subscription.deleted — access revokes at period end via getSubscriptionStatus.
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
   const customerId =
     typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
   if (!customerId) return;
-  // Don't clear the row — keep it for customer portal access.
-  // getSubscriptionStatus will return "free" once current_period_end passes.
   logger.info(
     { customerId, subscriptionId: subscription.id },
     "webhookHandlers: subscription deleted — access revokes at period end",
@@ -87,9 +78,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
 }
 
 /**
- * Handle invoice.payment_failed.
- * Stripe manages retries; we log for observability. Status reverts when
- * current_period_end passes (handled by getSubscriptionStatus).
+ * Handle invoice.payment_failed — Stripe manages retries; log for observability.
  */
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
   const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
@@ -103,8 +92,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
 }
 
 /**
- * Handle invoice.paid.
- * Confirms the subscription is active; update subscription ID if needed.
+ * Handle invoice.paid — subscription is active; sync subscription ID.
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
   const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
@@ -123,31 +111,31 @@ export class WebhookHandlers {
       throw new Error(
         "STRIPE WEBHOOK ERROR: Payload must be a Buffer. " +
           "Received type: " + typeof payload + ". " +
-          "This usually means express.json() parsed the body before reaching this handler. " +
           "FIX: Ensure webhook route is registered BEFORE app.use(express.json()).",
       );
     }
 
-    // Try explicit webhook secret from env / connector; fall back to StripeSync
+    // StripeSync.processWebhook ALWAYS runs first so that stripe.subscriptions is
+    // kept in sync — this is the source of truth for getSubscriptionStatus().
+    // It also handles signature verification using the managed webhook secret.
+    const sync = await getStripeSync();
+
+    // When STRIPE_WEBHOOK_SECRET is also set we verify the signature ourselves
+    // (handles deployments using a manually configured webhook) and then still
+    // call StripeSync so the stripe schema stays current.
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    let event: Stripe.Event;
-
     if (webhookSecret) {
-      // Verify signature ourselves using the env-configured secret
       const stripe = await getUncachableStripeClient();
-      event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
-    } else {
-      // Delegate to StripeSync which handles signature verification via its managed webhook secret
-      const sync = await getStripeSync();
-      await sync.processWebhook(payload, signature);
-      // StripeSync doesn't return the event; parse it for our explicit handlers
-      // (signature already verified above by StripeSync)
-      const payloadStr = payload.toString("utf8");
-      event = JSON.parse(payloadStr) as Stripe.Event;
+      // This throws if the signature is invalid — stops processing before StripeSync
+      stripe.webhooks.constructEvent(payload, signature, webhookSecret);
     }
 
-    // Explicit handlers for the 6 required events
+    // Always sync to stripe schema (source of truth for subscription status)
+    await sync.processWebhook(payload, signature);
+
+    // Parse the event for our explicit application-level handlers
+    const event = JSON.parse(payload.toString("utf8")) as Stripe.Event;
+
     switch (event.type) {
       case "checkout.session.completed":
         await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);

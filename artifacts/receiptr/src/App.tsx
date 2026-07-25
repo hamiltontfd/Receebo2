@@ -15,7 +15,7 @@ import SearchPage from "@/pages/search";
 import Settings from "@/pages/settings";
 import AppShell from "@/components/AppShell";
 import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
-import { setGuestId } from "@workspace/api-client-react";
+import { setGuestId, createCheckoutSession } from "@workspace/api-client-react";
 
 const GUEST_TOKEN_KEY = "receebo:guestToken";
 const apiBase = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
@@ -147,6 +147,51 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+const PLAN_STORAGE_KEY = "receebo:pendingPlan";
+
+/**
+ * When a signed-out user clicks "Start free trial" on a pricing card they are
+ * sent to /sign-up?plan=monthly (or yearly). We persist the plan to
+ * sessionStorage so it survives Clerk's multi-step auth flow, then auto-start
+ * Stripe Checkout immediately after the user is signed in.
+ */
+function PostAuthCheckout() {
+  const { isSignedIn } = useAuth();
+  const checkoutFiredRef = useRef(false);
+
+  // Capture ?plan= from the URL as soon as this component mounts (i.e. when
+  // the sign-up/sign-in page renders). Clerk may add its own query params so
+  // we read from window.location.search directly.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const plan = params.get("plan");
+    if (plan === "monthly" || plan === "yearly") {
+      sessionStorage.setItem(PLAN_STORAGE_KEY, plan);
+    }
+  }, []);
+
+  // Once the user is signed in, fire checkout for the pending plan (once only).
+  useEffect(() => {
+    if (!isSignedIn || checkoutFiredRef.current) return;
+    const plan = sessionStorage.getItem(PLAN_STORAGE_KEY);
+    if (plan !== "monthly" && plan !== "yearly") return;
+
+    checkoutFiredRef.current = true;
+    sessionStorage.removeItem(PLAN_STORAGE_KEY);
+
+    const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
+    createCheckoutSession(base, plan)
+      .then(({ url }) => {
+        if (url) window.location.href = url;
+      })
+      .catch(() => {
+        // Silently ignore — user is already signed in and can upgrade from Settings
+      });
+  }, [isSignedIn]);
+
+  return null;
+}
+
 function GuestIdSync() {
   const { isGuest, guestUser, exitGuestMode } = useGuestMode();
   const { isSignedIn } = useAuth();
@@ -242,6 +287,7 @@ function ClerkProviderWithRoutes() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <ClerkQueryClientCacheInvalidator />
+          <PostAuthCheckout />
           <GuestIdSync />
           <Switch>
             <Route path="/" component={HomeRedirect} />

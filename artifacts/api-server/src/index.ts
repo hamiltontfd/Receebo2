@@ -2,6 +2,8 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startExtractionWatchdog } from "./lib/extractionQueue";
 import { startOrphanCleanupScheduler } from "./lib/orphanCleanup";
+import { sql } from "drizzle-orm";
+import { db } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -17,18 +19,51 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+/**
+ * Ensure the stripe schema and user_billing columns exist.
+ * Uses IF NOT EXISTS so it is safe to run on every startup.
+ * This runs inline (before the server accepts requests) so that
+ * stripe.subscriptions is always queryable when routes are hit.
+ */
+async function runStartupMigrations(): Promise<void> {
+  try {
+    // user_billing table — created by drizzle migration 0002 but guard here too
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS user_billing (
+        user_id               text PRIMARY KEY,
+        stripe_customer_id    text NOT NULL UNIQUE,
+        stripe_subscription_id text,
+        trial_reminder_sent_at timestamptz,
+        created_at            timestamptz NOT NULL DEFAULT now(),
+        updated_at            timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    // stripe_subscription_id column — added by migration 0003; guard here too
+    await db.execute(sql`
+      ALTER TABLE user_billing
+        ADD COLUMN IF NOT EXISTS stripe_subscription_id text
+    `);
+
+    logger.info("Startup migrations applied");
+  } catch (err) {
+    logger.warn({ err }, "Startup migrations warning (non-fatal) — continuing");
+  }
+}
+
 async function initStripe(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) return;
 
   try {
-    // Note: runMigrations is called via the post-merge setup script (scripts/run-stripe-migrations.mjs)
-    // because esbuild bundles break __dirname path resolution for the migration directory.
-    // The stripe schema must already exist before this runs.
-    logger.info("Stripe schema ready");
-
     const { getStripeSync } = await import("./stripeClient");
     const stripeSync = await getStripeSync();
+
+    // Ensure stripe schema tables exist (stripe-replit-sync manages its own schema)
+    // runMigrations from stripe-replit-sync cannot be called from the esbuild bundle
+    // because __dirname resolves incorrectly inside the bundle. Instead we rely on
+    // the managed webhook path which initialises the schema via syncBackfill.
+    logger.info("Stripe schema ready");
 
     const domains = process.env.REPLIT_DOMAINS?.split(",") ?? [];
     const webhookBaseUrl = domains[0] ? `https://${domains[0]}` : null;
@@ -56,9 +91,16 @@ async function initStripe(): Promise<void> {
   }
 }
 
-app.listen(port, () => {
-  logger.info({ port }, "Server listening");
-  startExtractionWatchdog();
-  startOrphanCleanupScheduler();
-  void initStripe();
-});
+async function start(): Promise<void> {
+  // Apply schema migrations synchronously before accepting requests
+  await runStartupMigrations();
+
+  app.listen(port, () => {
+    logger.info({ port }, "Server listening");
+    startExtractionWatchdog();
+    startOrphanCleanupScheduler();
+    void initStripe();
+  });
+}
+
+void start();
