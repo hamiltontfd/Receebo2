@@ -72,37 +72,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 flex flex-col">{children}</main>
 
-      {/* Mobile bottom nav */}
-      <nav className="md:hidden flex border-t bg-background sticky bottom-0 z-20">
-        {tabs.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href} className="flex-1">
-            <button
-              className={`w-full flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors ${
-                location.startsWith(href)
-                  ? "text-foreground"
-                  : "text-muted-foreground"
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              {label}
-            </button>
-          </Link>
-        ))}
-        {!isGuest && (
-          <Link href="/settings" className="flex-1">
-            <button
-              className={`w-full flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors ${
-                location.startsWith("/settings")
-                  ? "text-foreground"
-                  : "text-muted-foreground"
-              }`}
-            >
-              <Settings className="w-5 h-5" />
-              Settings
-            </button>
-          </Link>
-        )}
-      </nav>
+
     </div>
   );
 }
