@@ -1,0 +1,55 @@
+Integrate Stripe subscriptions into Receebo.
+
+Requirements:
+
+- Use Stripe Checkout for subscriptions.
+- Create two subscription plans:
+  - Receebo Pro Monthly — €2.99/month
+  - Receebo Pro Yearly — €24.99/year
+- Both plans include a 7-day free trial.
+- Users must authenticate before subscribing.
+- Store the Stripe Customer ID and Subscription ID in the database.
+- After checkout is completed, immediately grant the user Pro access for the duration of the trial.
+- If the subscription is cancelled or a payment ultimately fails, automatically remove Pro access when the current billing period ends.
+- Users can cancel their subscription at any time.
+- Add a "Manage Subscription" button in Settings that opens the Stripe Customer Portal.
+- Protect all premium functionality behind an active Pro subscription or active trial.
+- Use environment variables for all Stripe credentials.
+- Follow Stripe best practices and build this in a production-ready way.
+
+Trial experience:
+
+- Users have full access to every feature during the 7-day trial.
+- Automatically send an email exactly 2 days before the trial ends reminding the user that billing will begin unless they cancel.
+- Show an in-app banner during the final 2 days of the trial with the same reminder.
+- The reminder should be based on the trial end date, not on a fixed day number, so it continues to work if the trial length changes in the future.
+
+Pricing page:
+
+Display the following trust message beneath the plans:
+
+"7-day free trial. We'll remind you before your trial ends. Cancel anytime with one click."
+
+Stripe webhooks:
+
+Implement and handle the following events:
+
+- checkout.session.completed
+- customer.subscription.created
+- customer.subscription.updated
+- customer.subscription.deleted
+- invoice.payment_failed
+- invoice.paid
+
+User flow:
+
+1. User creates an account.
+2. User selects either the Monthly or Yearly plan.
+3. Stripe Checkout starts the 7-day free trial.
+4. User immediately receives full Pro access.
+5. During the final 2 days of the trial, Receebo displays an in-app reminder and sends an email that billing is approaching.
+6. If the user cancels before the trial ends, they keep access until the end of the trial and are never charged.
+7. If they do not cancel, Stripe automatically starts the subscription.
+8. Users can manage or cancel their subscription at any time through the Stripe Customer Portal.
+
+The implementation should feel simple, trustworthy, and require as few clicks as possible.
