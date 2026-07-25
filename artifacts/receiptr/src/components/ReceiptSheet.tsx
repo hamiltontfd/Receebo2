@@ -298,7 +298,10 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     const HeaderIcon = categoryIcon(receipt.category);
                     return (
                       <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(receipt.category)}`}>
-                        <HeaderIcon className="w-[1.1rem] h-[1.1rem]" />
+                        {isProcessing
+                          ? <Loader2 className="w-4 h-4 animate-spin" />
+                          : <HeaderIcon className="w-[1.1rem] h-[1.1rem]" />
+                        }
                       </span>
                     );
                   })()}
@@ -312,42 +315,17 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                         : format(new Date(receipt.createdAt), "MMM d, yyyy")}
                     </p>
                   </div>
-                  {receipt.category && (
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full shrink-0 ${categoryStyle(receipt.category)}`}>
-                      {receipt.category}
-                    </span>
-                  )}
-                </div>
-
-                {/* ── Total ── */}
-                {!isEditing && (
-                  <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
-                    {(() => {
-                      const TotalIcon = categoryIcon(receipt.category);
-                      return (
-                        <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${categoryStyle(receipt.category)}`}>
-                          {isProcessing
-                            ? <Loader2 className="w-5 h-5 animate-spin" />
-                            : <TotalIcon className="w-[1.375rem] h-[1.375rem]" />
-                          }
-                        </span>
-                      );
-                    })()}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-3xl font-extrabold font-mono tracking-tight leading-none">
-                        {receipt.total != null ? `${symbol}${receipt.total.toFixed(2)}` : "--"}
+                  <div className="shrink-0 text-right">
+                    <p className="font-bold font-mono leading-tight">
+                      {receipt.total != null ? `${symbol}${receipt.total.toFixed(2)}` : ""}
+                    </p>
+                    {receipt.transactionNumber && (
+                      <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                        #{receipt.transactionNumber}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {isProcessing ? "Extracting…" : "Total"}
-                      </p>
-                      {receipt.transactionNumber && (
-                        <p className="text-xs text-muted-foreground font-mono mt-1">
-                          #{receipt.transactionNumber}
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* ── Scrollable body ── */}
                 <div className="px-5 py-5 space-y-6 pb-10">
