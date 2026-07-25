@@ -90,7 +90,7 @@ export default function Landing() {
                 AI-powered receipt organiser
               </div>
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.05]">
-                Every receipt,<br />instantly found.
+                Receipts.<br />Easy to find.
               </h1>
               <p className="text-lg text-muted-foreground max-w-md leading-relaxed">
                 Snap, upload, or import receipts and ask for them in plain English.
