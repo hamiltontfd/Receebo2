@@ -145,7 +145,7 @@ export default function ReceiptDetail() {
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetReceiptStatsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetRecentReceiptsQueryKey() });
-      setLocation("/library");
+      setLocation("/search");
     } catch {
       toast({ title: "Error", description: "Failed to delete receipt.", variant: "destructive" });
     }
@@ -246,7 +246,7 @@ export default function ReceiptDetail() {
         <p className="text-muted-foreground mb-6">
           The receipt you're looking for doesn't exist or you don't have access to it.
         </p>
-        <Button className="rounded-full" onClick={() => setLocation("/library")}>
+        <Button className="rounded-full" onClick={() => setLocation("/search")}>
           Return to Library
         </Button>
       </div>
@@ -268,7 +268,7 @@ export default function ReceiptDetail() {
 
       <PageTransition className="w-full max-w-lg mx-auto px-5 py-6 flex flex-col gap-5">
         <div>
-          <Link href="/library" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <Link href="/search" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-4 h-4" />
             Back
           </Link>
