@@ -63,7 +63,10 @@ export async function getSubscriptionStatus(userId: string): Promise<Subscriptio
 
   if (sub.status === "trialing" && trialEndAt && trialEndAt > now) {
     plan = "trialing";
-  } else if (sub.status === "active" || sub.status === "past_due") {
+  } else if (sub.status === "active") {
+    plan = "pro";
+  } else if (sub.status === "past_due" && currentPeriodEnd && currentPeriodEnd > now) {
+    // Keep pro access until the current period expires; Stripe will retry payment
     plan = "pro";
   } else if (sub.status === "canceled" && currentPeriodEnd && currentPeriodEnd > now) {
     plan = "pro";

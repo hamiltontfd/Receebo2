@@ -78,10 +78,20 @@ router.post("/billing/create-checkout-session", requireAuth, async (req, res): P
         metadata: { userId },
       });
       customerId = customer.id;
-      await db
+
+      // Use onConflictDoUpdate to handle a race where a concurrent request
+      // already inserted a row. Re-read the winner's customer ID so the
+      // checkout session maps to the persisted customer.
+      const [upserted] = await db
         .insert(userBillingTable)
         .values({ userId, stripeCustomerId: customerId })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: userBillingTable.userId,
+          set: { stripeCustomerId: userBillingTable.stripeCustomerId },
+        })
+        .returning({ stripeCustomerId: userBillingTable.stripeCustomerId });
+
+      customerId = upserted?.stripeCustomerId ?? customerId;
     }
 
     const base = appBaseUrl(req);

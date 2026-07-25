@@ -34,12 +34,13 @@ app.use(
   }),
 );
 
-// Stripe webhook MUST be registered before express.json() so it receives
-// the raw Buffer body that Stripe signature verification requires.
-app.post(
-  "/api/stripe/webhook",
+// Stripe webhook handler — registered before express.json() so Stripe's
+// signature verification receives the raw Buffer body it requires.
+// Both paths are supported: /api/billing/webhook (spec) and
+// /api/stripe/webhook (legacy / managed-webhook URL).
+const stripeWebhookHandler = [
   express.raw({ type: "application/json" }),
-  async (req, res) => {
+  async (req: express.Request, res: express.Response) => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
       res.status(400).json({ error: "Missing stripe-signature" });
@@ -54,7 +55,10 @@ app.post(
       res.status(400).json({ error: "Webhook processing error" });
     }
   },
-);
+] as const;
+
+app.post("/api/billing/webhook", ...stripeWebhookHandler);
+app.post("/api/stripe/webhook", ...stripeWebhookHandler);
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
