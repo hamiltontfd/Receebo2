@@ -294,6 +294,14 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                   >
                     <ArrowLeft className="w-4 h-4" />
                   </button>
+                  {(() => {
+                    const HeaderIcon = categoryIcon(receipt.category);
+                    return (
+                      <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(receipt.category)}`}>
+                        <HeaderIcon className="w-[1.1rem] h-[1.1rem]" />
+                      </span>
+                    );
+                  })()}
                   <div className="min-w-0 flex-1">
                     <p className="font-bold truncate leading-tight">
                       {receipt.merchant || receipt.originalFileName}
@@ -332,12 +340,12 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       <p className="text-xs text-muted-foreground mt-1">
                         {isProcessing ? "Extracting…" : "Total"}
                       </p>
+                      {receipt.transactionNumber && (
+                        <p className="text-xs text-muted-foreground font-mono mt-1">
+                          #{receipt.transactionNumber}
+                        </p>
+                      )}
                     </div>
-                    {receipt.transactionNumber && (
-                      <p className="text-xs text-muted-foreground font-mono truncate shrink-0 max-w-[120px]">
-                        #{receipt.transactionNumber}
-                      </p>
-                    )}
                   </div>
                 )}
 
