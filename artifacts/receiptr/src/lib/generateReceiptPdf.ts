@@ -1,4 +1,3 @@
-import jsPDF from "jspdf";
 import { format } from "date-fns";
 
 export type ReceiptForPdf = {
@@ -20,7 +19,8 @@ const BLACK: [number, number, number] = [15, 15, 15];
 const MUTED: [number, number, number] = [120, 120, 120];
 const DIVIDER: [number, number, number] = [220, 220, 220];
 
-export function generateReceiptPdf(receipt: ReceiptForPdf, currencySymbol: string): Blob {
+export async function generateReceiptPdf(receipt: ReceiptForPdf, currencySymbol: string): Promise<Blob> {
+  const { default: jsPDF } = await import("jspdf");
   const doc = new jsPDF({ format: "a4", unit: "pt" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();

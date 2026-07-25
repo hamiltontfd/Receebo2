@@ -173,7 +173,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
     const merchant = receipt.merchant || receipt.originalFileName;
     const sym = currencySymbol(receipt.currency);
     try {
-      const pdfBlob = generateReceiptPdf(receipt, sym);
+      const pdfBlob = await generateReceiptPdf(receipt, sym);
       const fileName = `${merchant.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-receipt.pdf`;
       const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
