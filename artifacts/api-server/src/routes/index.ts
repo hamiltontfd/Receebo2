@@ -5,6 +5,7 @@ import receiptsRouter from "./receipts";
 import attachmentsRouter from "./attachments";
 import guestSessionRouter from "./guestSession";
 import billingRouter from "./billing";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(receiptsRouter);
 router.use(attachmentsRouter);
 router.use(guestSessionRouter);
 router.use(billingRouter);
+router.use(adminRouter);
 
 export default router;

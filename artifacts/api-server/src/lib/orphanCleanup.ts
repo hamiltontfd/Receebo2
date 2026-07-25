@@ -167,74 +167,118 @@ async function runOrphanCleanup(): Promise<void> {
 
   // Trial ending reminders — send once when trial_end is within 3 days (once per subscription)
   try {
-    const MS_PER_DAY = 86_400_000;
-    const todayUtc = new Date();
-    todayUtc.setUTCHours(0, 0, 0, 0);
-    const windowStart = Math.floor(todayUtc.getTime() / 1000);
-    const windowEnd = Math.floor((todayUtc.getTime() + 3 * MS_PER_DAY) / 1000);
+    await runTrialReminderSweep({ dryRun: false });
+  } catch (err) {
+    logger.error({ err }, "Trial reminder sweep failed");
+  }
+}
 
-    let trialRows: Array<{ userId: string; trialEnd: number }>;
-    try {
-      const result = await db.execute(sql`
-        SELECT ub.user_id AS "userId", s.trial_end AS "trialEnd"
-        FROM stripe.subscriptions s
-        JOIN user_billing ub ON ub.stripe_customer_id = s.customer
-        WHERE s.status = 'trialing'
-          AND s.trial_end IS NOT NULL
-          AND s.trial_end >= ${windowStart}
-          AND s.trial_end < ${windowEnd}
-      `);
-      trialRows = result.rows as typeof trialRows;
-    } catch {
-      // stripe schema doesn't exist yet
-      trialRows = [];
+export interface TrialReminderDryRunResult {
+  userId: string;
+  trialEnd: string;
+  alreadySent: boolean;
+}
+
+/**
+ * Run the trial-reminder sweep.
+ * - dryRun: true  → log what would be sent, return matched rows, touch nothing
+ * - dryRun: false → normal live send path (used by the nightly scheduler)
+ */
+export async function runTrialReminderSweep(options: { dryRun: boolean }): Promise<TrialReminderDryRunResult[]> {
+  const { dryRun } = options;
+  const MS_PER_DAY = 86_400_000;
+  const todayUtc = new Date();
+  todayUtc.setUTCHours(0, 0, 0, 0);
+  const windowStart = Math.floor(todayUtc.getTime() / 1000);
+  const windowEnd = Math.floor((todayUtc.getTime() + 3 * MS_PER_DAY) / 1000);
+
+  let trialRows: Array<{ userId: string; trialEnd: number }>;
+  try {
+    const result = await db.execute(sql`
+      SELECT ub.user_id AS "userId", s.trial_end AS "trialEnd"
+      FROM stripe.subscriptions s
+      JOIN user_billing ub ON ub.stripe_customer_id = s.customer
+      WHERE s.status = 'trialing'
+        AND s.trial_end IS NOT NULL
+        AND s.trial_end >= ${windowStart}
+        AND s.trial_end < ${windowEnd}
+    `);
+    trialRows = result.rows as typeof trialRows;
+  } catch {
+    // stripe schema doesn't exist yet
+    trialRows = [];
+  }
+
+  const dryRunResults: TrialReminderDryRunResult[] = [];
+  let trialRemindersSent = 0;
+  let trialRemindersFailed = 0;
+
+  for (const row of trialRows) {
+    const trialEndDate = new Date(row.trialEnd * 1000);
+
+    if (dryRun) {
+      // Check whether the reminder has already been sent (without writing anything).
+      const billingRows = await db
+        .select({ trialReminderSentAt: userBillingTable.trialReminderSentAt })
+        .from(userBillingTable)
+        .where(eq(userBillingTable.userId, row.userId))
+        .limit(1);
+      const alreadySent = (billingRows[0]?.trialReminderSentAt ?? null) !== null;
+
+      logger.info(
+        { userId: row.userId, trialEnd: trialEndDate.toISOString(), alreadySent },
+        "Trial reminder dry-run: would send email",
+      );
+
+      dryRunResults.push({
+        userId: row.userId,
+        trialEnd: trialEndDate.toISOString(),
+        alreadySent,
+      });
+      continue;
     }
 
-    let trialRemindersSent = 0;
-    let trialRemindersFailed = 0;
-    for (const row of trialRows) {
-      const trialEndDate = new Date(row.trialEnd * 1000);
+    // Atomically claim the send slot — only one process wins when trial_reminder_sent_at IS NULL.
+    // This prevents duplicate sends in concurrent sweep runs (e.g. multi-instance or rapid restarts).
+    const claimed = await db
+      .update(userBillingTable)
+      .set({ trialReminderSentAt: new Date() })
+      .where(
+        and(
+          eq(userBillingTable.userId, row.userId),
+          isNull(userBillingTable.trialReminderSentAt),
+        ),
+      )
+      .returning({ userId: userBillingTable.userId });
 
-      // Atomically claim the send slot — only one process wins when trial_reminder_sent_at IS NULL.
-      // This prevents duplicate sends in concurrent sweep runs (e.g. multi-instance or rapid restarts).
-      const claimed = await db
+    if (claimed.length === 0) continue; // already claimed by a previous run or concurrent process
+
+    // Send the email now that we've claimed the slot.
+    const sent = await sendTrialEndingEmail(row.userId, trialEndDate);
+
+    if (sent) {
+      trialRemindersSent++;
+    } else {
+      trialRemindersFailed++;
+      // Reset the flag so the next nightly sweep can retry.
+      await db
         .update(userBillingTable)
-        .set({ trialReminderSentAt: new Date() })
-        .where(
-          and(
-            eq(userBillingTable.userId, row.userId),
-            isNull(userBillingTable.trialReminderSentAt),
-          ),
-        )
-        .returning({ userId: userBillingTable.userId });
-
-      if (claimed.length === 0) continue; // already claimed by a previous run or concurrent process
-
-      // Send the email now that we've claimed the slot.
-      const sent = await sendTrialEndingEmail(row.userId, trialEndDate);
-
-      if (sent) {
-        trialRemindersSent++;
-      } else {
-        trialRemindersFailed++;
-        // Reset the flag so the next nightly sweep can retry.
-        await db
-          .update(userBillingTable)
-          .set({ trialReminderSentAt: null })
-          .where(eq(userBillingTable.userId, row.userId));
-        logger.warn({ userId: row.userId }, "Trial reminder email failed — flag reset for retry");
-      }
+        .set({ trialReminderSentAt: null })
+        .where(eq(userBillingTable.userId, row.userId));
+      logger.warn({ userId: row.userId }, "Trial reminder email failed — flag reset for retry");
     }
+  }
 
+  if (!dryRun) {
     if (trialRemindersSent > 0) {
       logger.info({ trialRemindersSent }, "Trial ending reminder emails dispatched");
     }
     if (trialRemindersFailed > 0) {
       logger.warn({ trialRemindersFailed }, "Trial ending reminder emails failed (will retry next sweep)");
     }
-  } catch (err) {
-    logger.error({ err }, "Trial reminder sweep failed");
   }
+
+  return dryRunResults;
 }
 
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;
