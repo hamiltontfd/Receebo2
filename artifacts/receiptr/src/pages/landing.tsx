@@ -93,7 +93,7 @@ export default function Landing() {
                 Receipts.<br />Easy to find.
               </h1>
               <p className="text-lg text-muted-foreground max-w-md leading-relaxed">
-                Snap or upload receipts. Search for them using plain language. Try for free.
+                Snap or upload receipts. Search for items you bought. Find them in seconds.
               </p>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <Button
