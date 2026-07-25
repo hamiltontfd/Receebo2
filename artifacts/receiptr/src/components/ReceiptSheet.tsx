@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Loader2, Trash2, Edit2, Share2, AlertTriangle, ScanLine,
-  Paperclip, FileText, ArrowLeft,
+  Paperclip, FileText, ArrowLeft, Maximize2,
 } from "lucide-react";
 
 import {
@@ -25,7 +25,6 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
-import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { StoreFullscreen } from "@/components/StoreFullscreen";
 import { currencySymbol } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
@@ -69,20 +68,12 @@ interface ReceiptSheetProps {
   onClose: () => void;
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-      {children}
-    </p>
-  );
-}
-
 export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [showStore, setShowStore] = useState(false);
+  const [storeUrl, setStoreUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -133,7 +124,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   useEffect(() => {
     if (!open) {
       setIsEditing(false);
-      setShowStore(false);
+      setStoreUrl(null);
     }
   }, [open]);
 
@@ -194,10 +185,6 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
     } catch {}
   };
 
-  const handleShowStore = useCallback(() => {
-    setShowStore(true);
-  }, []);
-
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!receiptId) return;
     const file = e.target.files?.[0];
@@ -254,35 +241,36 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   const symbol = currencySymbol(receipt?.currency);
   const isImage = receipt?.contentType.startsWith("image/") ?? false;
 
+  const hasHighlights = (receipt?.notableItems?.length ?? 0) > 0;
+
   return (
     <>
       <AnimatePresence>
-        {showStore && isImage && fileUrl && (
-          <StoreFullscreen fileUrl={fileUrl} onClose={() => setShowStore(false)} />
+        {storeUrl && (
+          <StoreFullscreen fileUrl={storeUrl} onClose={() => setStoreUrl(null)} />
         )}
       </AnimatePresence>
 
       <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
         <SheetContent
           side="bottom"
-          className="h-[85dvh] p-0 flex flex-col overflow-hidden rounded-t-2xl"
+          className="h-[85dvh] rounded-t-2xl px-0 pt-0 pb-0 flex flex-col gap-0 overflow-hidden"
         >
           {/* Drag handle */}
           <div className="flex justify-center pt-3 pb-1 shrink-0">
             <div className="w-10 h-1 bg-muted-foreground/25 rounded-full" />
           </div>
 
-          {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto">
             {isLoading ? (
               <div className="px-5 py-4 space-y-5">
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-5 w-32" />
+                <div className="flex items-center justify-between py-1">
+                  <Skeleton className="h-5 w-36" />
                   <Skeleton className="h-5 w-20 rounded-full" />
                 </div>
                 <Skeleton className="h-16 rounded-xl" />
-                <Skeleton className="h-32 rounded-xl" />
-                <Skeleton className="h-24 rounded-xl" />
+                <Skeleton className="h-28 rounded-xl" />
+                <Skeleton className="h-36 rounded-xl" />
               </div>
             ) : isError || !receipt ? (
               <div className="flex flex-col items-center justify-center px-8 py-20 text-center">
@@ -296,17 +284,17 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                 <Button className="rounded-full" onClick={onClose}>Dismiss</Button>
               </div>
             ) : (
-              <div className="flex flex-col">
-                {/* ── Header row ── */}
-                <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
+              <>
+                {/* ── Header ── */}
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
                   <button
                     onClick={onClose}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors shrink-0"
+                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors shrink-0"
                     aria-label="Close"
                   >
                     <ArrowLeft className="w-4 h-4" />
                   </button>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-bold truncate leading-tight">
                       {receipt.merchant || receipt.originalFileName}
                     </p>
@@ -317,28 +305,28 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     </p>
                   </div>
                   {receipt.category && (
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${categoryStyle(receipt.category)}`}>
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full shrink-0 ${categoryStyle(receipt.category)}`}>
                       {receipt.category}
                     </span>
                   )}
                 </div>
 
-                {/* ── Total block ── */}
+                {/* ── Total ── */}
                 {!isEditing && (
-                  <div className="flex items-center gap-4 px-5 py-5 border-b">
+                  <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
                     {(() => {
                       const TotalIcon = categoryIcon(receipt.category);
                       return (
                         <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${categoryStyle(receipt.category)}`}>
                           {isProcessing
                             ? <Loader2 className="w-5 h-5 animate-spin" />
-                            : <TotalIcon className="w-5 h-5" />
+                            : <TotalIcon className="w-[1.375rem] h-[1.375rem]" />
                           }
                         </span>
                       );
                     })()}
-                    <div>
-                      <p className="text-3xl font-extrabold tracking-tight font-mono leading-none">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-3xl font-extrabold font-mono tracking-tight leading-none">
                         {receipt.total != null ? `${symbol}${receipt.total.toFixed(2)}` : "--"}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -346,15 +334,15 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       </p>
                     </div>
                     {receipt.transactionNumber && (
-                      <p className="ml-auto text-xs text-muted-foreground font-mono truncate">
+                      <p className="text-xs text-muted-foreground font-mono truncate shrink-0 max-w-[120px]">
                         #{receipt.transactionNumber}
                       </p>
                     )}
                   </div>
                 )}
 
-                {/* ── Content sections ── */}
-                <div className="px-5 py-5 flex flex-col gap-6 pb-10">
+                {/* ── Scrollable body ── */}
+                <div className="px-5 py-5 space-y-6 pb-10">
 
                   {/* Edit form */}
                   {isEditing && (
@@ -468,50 +456,79 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     </Form>
                   )}
 
-                  {/* Summary */}
-                  {receipt.summary && !isEditing && (
+                  {/* ── Highlights carousel ── */}
+                  {!isEditing && hasHighlights && (
                     <div>
-                      <SectionLabel>Summary</SectionLabel>
-                      <p className="text-sm leading-relaxed text-foreground">{receipt.summary}</p>
-                    </div>
-                  )}
-
-                  {/* Notable items */}
-                  {receipt.notableItems && receipt.notableItems.length > 0 && !isEditing && (
-                    <NotableItemsBanner items={receipt.notableItems} currency={receipt.currency} />
-                  )}
-
-                  {/* Items */}
-                  {receipt.products && receipt.products.length > 0 && !isEditing && (
-                    <div>
-                      <SectionLabel>Items</SectionLabel>
-                      <div className="rounded-xl border divide-y">
-                        {receipt.products.map((product, i) => (
-                          <div key={i} className="flex justify-between items-center px-4 py-3 text-sm">
-                            <span className="pr-4">
-                              {product.quantity && product.quantity > 1 ? `×${product.quantity} ` : ""}{product.name}
-                            </span>
-                            {product.price != null && (
-                              <span className="font-mono font-semibold shrink-0">{symbol}{product.price.toFixed(2)}</span>
-                            )}
-                          </div>
-                        ))}
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                        Highlights
+                      </p>
+                      <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none -mx-5 px-5">
+                        {receipt.notableItems!.map((item, i) => {
+                          const CardIcon = categoryIcon(item.category);
+                          return (
+                            <div
+                              key={i}
+                              className="shrink-0 w-40 rounded-2xl border border-border p-4 flex flex-col gap-2 snap-start bg-background"
+                            >
+                              <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
+                                <CardIcon className="w-[1.1rem] h-[1.1rem]" />
+                              </span>
+                              <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
+                              {item.price != null && (
+                                <p className="font-mono font-bold text-base">{symbol}{item.price.toFixed(2)}</p>
+                              )}
+                              {item.reason && (
+                                <p className="text-xs text-muted-foreground leading-snug line-clamp-2 mt-auto">{item.reason}</p>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
 
-                  {/* Warranty (view mode only if not in edit) */}
-                  {!isEditing && receipt.warranty && (
+                  {/* ── Summary ── */}
+                  {!isEditing && receipt.summary && (
                     <div>
-                      <SectionLabel>Warranty</SectionLabel>
-                      <p className="text-sm leading-relaxed">{receipt.warranty}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Summary</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{receipt.summary}</p>
                     </div>
                   )}
 
-                  {/* Original receipt image */}
+                  {/* ── Items ── */}
+                  {!isEditing && receipt.products && receipt.products.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Items</p>
+                      <ul className="divide-y divide-border border border-border rounded-xl overflow-hidden">
+                        {receipt.products.map((product, i) => (
+                          <li key={i} className="flex items-center justify-between gap-3 px-4 py-3 bg-background">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{product.name}</p>
+                              {product.quantity && product.quantity > 1 && (
+                                <p className="text-xs text-muted-foreground">Qty {product.quantity}</p>
+                              )}
+                            </div>
+                            {product.price != null && (
+                              <span className="font-mono text-sm font-semibold shrink-0">{symbol}{product.price.toFixed(2)}</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* ── Warranty ── */}
+                  {!isEditing && receipt.warranty && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Warranty</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{receipt.warranty}</p>
+                    </div>
+                  )}
+
+                  {/* ── Original receipt ── */}
                   {!isEditing && (
-                    <div className="flex flex-col gap-2">
-                      <SectionLabel>Original Receipt</SectionLabel>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Original Receipt</p>
                       <ReceiptPreview
                         fileUrl={fileUrl}
                         contentType={receipt.contentType}
@@ -521,8 +538,8 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       {isImage && (
                         <Button
                           variant="outline"
-                          className="w-full rounded-full"
-                          onClick={handleShowStore}
+                          className="w-full rounded-full mt-2"
+                          onClick={() => setStoreUrl(fileUrl)}
                         >
                           <ScanLine className="w-4 h-4 mr-2" />
                           Show to store
@@ -531,15 +548,15 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     </div>
                   )}
 
-                  {/* Attachments */}
+                  {/* ── Files / Attachments ── */}
                   {!isEditing && (
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <SectionLabel>Files</SectionLabel>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Files</p>
                         <button
                           onClick={() => fileInputRef.current?.click()}
                           disabled={isUploading}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 mb-2"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                         >
                           {isUploading
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -555,10 +572,20 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                           onChange={handleFileSelect}
                         />
                       </div>
-                      <div className="rounded-xl border divide-y">
-                        <div className="px-4 py-3 flex items-center gap-3">
+                      <ul className="divide-y divide-border border border-border rounded-xl overflow-hidden">
+                        {/* Original file row */}
+                        <li className="flex items-center gap-3 px-4 py-3 bg-background">
                           <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
                           <span className="flex-1 text-sm truncate">{receipt.originalFileName}</span>
+                          {isImage && (
+                            <button
+                              onClick={() => setStoreUrl(fileUrl)}
+                              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                              aria-label="Show fullscreen"
+                            >
+                              <Maximize2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <a
                             href={fileUrl}
                             target="_blank"
@@ -566,16 +593,28 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
                             download={receipt.originalFileName}
                           >
-                            View
+                            Download
                           </a>
-                        </div>
+                        </li>
+
+                        {/* Attachment rows */}
                         {receipt.attachments && receipt.attachments.map((att) => {
                           const attUrl = `${import.meta.env.BASE_URL}api/storage${att.objectPath}`;
+                          const attIsImage = att.contentType.startsWith("image/");
                           const isDeleting = deletingAttachmentId === att.id;
                           return (
-                            <div key={att.id} className="px-4 py-3 flex items-center gap-3">
+                            <li key={att.id} className="flex items-center gap-3 px-4 py-3 bg-background">
                               <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
                               <span className="flex-1 text-sm truncate">{att.originalFileName}</span>
+                              {attIsImage && (
+                                <button
+                                  onClick={() => setStoreUrl(attUrl)}
+                                  className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                                  aria-label="Show fullscreen"
+                                >
+                                  <Maximize2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                               <a
                                 href={attUrl}
                                 target="_blank"
@@ -583,7 +622,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                                 className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
                                 download={att.originalFileName}
                               >
-                                View
+                                Download
                               </a>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -616,14 +655,14 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
-                            </div>
+                            </li>
                           );
                         })}
-                      </div>
+                      </ul>
                     </div>
                   )}
 
-                  {/* Actions */}
+                  {/* ── Actions ── */}
                   {!isEditing && (
                     <div className="flex items-center gap-2">
                       <Button
@@ -641,7 +680,10 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" className="flex-1 rounded-full text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/10">
+                          <Button
+                            variant="outline"
+                            className="flex-1 rounded-full text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/10"
+                          >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Delete
                           </Button>
@@ -655,7 +697,10 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            <AlertDialogAction
+                              onClick={handleDelete}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
                               Delete
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -663,8 +708,9 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       </AlertDialog>
                     </div>
                   )}
+
                 </div>
-              </div>
+              </>
             )}
           </div>
         </SheetContent>
