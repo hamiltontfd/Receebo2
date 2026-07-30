@@ -13,6 +13,7 @@ import ReceiptDetail from "@/pages/receipt-detail";
 import Scan from "@/pages/scan";
 import SearchPage from "@/pages/search";
 import Settings from "@/pages/settings";
+import ProfilePage from "@/pages/profile";
 import AppShell from "@/components/AppShell";
 import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
 import { setGuestId, createCheckoutSession } from "@workspace/api-client-react";
@@ -304,6 +305,9 @@ function ClerkProviderWithRoutes() {
             </Route>
             <Route path="/settings">
               <ProtectedShell><Settings /></ProtectedShell>
+            </Route>
+            <Route path="/profile">
+              <ProtectedShell><ProfilePage /></ProtectedShell>
             </Route>
             <Route component={NotFound} />
           </Switch>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Search, Camera, LogOut, Settings } from "lucide-react";
+import { Search, Camera, LogOut, UserCircle2 } from "lucide-react";
 import { useUser, useClerk } from "@clerk/react";
 import { useGuestMode } from "@/components/GuestProvider";
 import { Button } from "@/components/ui/button";
@@ -49,21 +49,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground truncate max-w-[180px]">
-            {isGuest ? guestUser?.name : user?.fullName || user?.primaryEmailAddress?.emailAddress}
-          </span>
-          {!isGuest && (
-            <Link href="/settings">
-              <Button
-                variant={location.startsWith("/settings") ? "secondary" : "ghost"}
-                size="icon"
-                className="w-8 h-8 text-muted-foreground"
-              >
-                <Settings className="w-4 h-4" />
-              </Button>
-            </Link>
-          )}
+        <div className="flex items-center gap-2">
+          <Link href="/profile">
+            <Button
+              variant={location.startsWith("/profile") ? "secondary" : "ghost"}
+              size="sm"
+              className="rounded-full gap-2 text-muted-foreground"
+            >
+              <UserCircle2 className="w-4 h-4" />
+              <span className="hidden lg:inline truncate max-w-[160px]">
+                {isGuest ? guestUser?.name : user?.fullName || user?.primaryEmailAddress?.emailAddress}
+              </span>
+            </Button>
+          </Link>
           <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" onClick={handleSignOut}>
             <LogOut className="w-4 h-4" />
           </Button>
