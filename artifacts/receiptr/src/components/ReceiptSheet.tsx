@@ -6,8 +6,21 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Loader2, Trash2, Edit2, Share2, AlertTriangle, ScanLine,
-  Paperclip, FileText, ArrowLeft, Maximize2,
+  Paperclip, FileText, ArrowLeft, Maximize2, X,
 } from "lucide-react";
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 768 : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isDesktop;
+}
 
 import {
   useGetReceipt,
@@ -72,6 +85,7 @@ interface ReceiptSheetProps {
 export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isDesktop = useIsDesktop();
 
   const [isEditing, setIsEditing] = useState(false);
   const [storeUrl, setStoreUrl] = useState<string | null>(null);
@@ -300,13 +314,19 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
 
       <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
         <SheetContent
-          side="bottom"
-          className="h-[85dvh] rounded-t-2xl px-0 pt-0 pb-0 flex flex-col gap-0 overflow-hidden"
+          side={isDesktop ? "right" : "bottom"}
+          className={
+            isDesktop
+              ? "w-[520px] max-w-full px-0 pt-0 pb-0 flex flex-col gap-0 overflow-hidden [&>button]:hidden"
+              : "h-[85dvh] rounded-t-2xl px-0 pt-0 pb-0 flex flex-col gap-0 overflow-hidden"
+          }
         >
-          {/* Drag handle */}
-          <div className="flex justify-center pt-3 pb-1 shrink-0">
-            <div className="w-10 h-1 bg-muted-foreground/25 rounded-full" />
-          </div>
+          {/* Drag handle — mobile only */}
+          {!isDesktop && (
+            <div className="flex justify-center pt-3 pb-1 shrink-0">
+              <div className="w-10 h-1 bg-muted-foreground/25 rounded-full" />
+            </div>
+          )}
 
           <div className="flex-1 overflow-y-auto">
             {isLoading ? (
@@ -339,7 +359,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors shrink-0"
                     aria-label="Close"
                   >
-                    <ArrowLeft className="w-4 h-4" />
+                    {isDesktop ? <X className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
                   </button>
                   {(() => {
                     const HeaderIcon = categoryIcon(receipt.category);

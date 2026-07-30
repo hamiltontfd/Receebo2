@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { Link, useLocation } from "wouter";
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 768 : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isDesktop;
+}
 import { format } from "date-fns";
-import { Search as SearchIcon, Loader2, ScanLine, Camera, Sparkles, ArrowLeft } from "lucide-react";
+import { Search as SearchIcon, Loader2, ScanLine, Camera, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -105,14 +119,46 @@ function DemoReceiptSheet({
   open: boolean;
   onClose: () => void;
 }) {
+  const isDesktop = useIsDesktop();
   if (!receipt) return null;
   const Icon = categoryIcon(receipt.category);
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <SheetContent side="bottom" className="h-[85dvh] p-0 flex flex-col overflow-hidden rounded-t-2xl">
-        <div className="flex justify-center pt-3 pb-2 shrink-0">
-          <div className="w-10 h-1 bg-muted-foreground/25 rounded-full" />
-        </div>
+      <SheetContent
+        side={isDesktop ? "right" : "bottom"}
+        className={
+          isDesktop
+            ? "w-[520px] max-w-full p-0 flex flex-col overflow-hidden [&>button]:hidden"
+            : "h-[85dvh] p-0 flex flex-col overflow-hidden rounded-t-2xl"
+        }
+      >
+        {/* Drag handle — mobile only */}
+        {!isDesktop && (
+          <div className="flex justify-center pt-3 pb-2 shrink-0">
+            <div className="w-10 h-1 bg-muted-foreground/25 rounded-full" />
+          </div>
+        )}
+        {/* Desktop close button */}
+        {isDesktop && (
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+            <div className="flex items-center gap-3">
+              <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(receipt.category)}`}>
+                <Icon className="w-[1.1rem] h-[1.1rem]" />
+              </span>
+              <div>
+                <p className="font-bold leading-tight">{receipt.merchant}</p>
+                <p className="text-xs text-muted-foreground">{receipt.date}</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors shrink-0"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto px-5 pb-10 flex flex-col gap-5">
           <div className="rounded-2xl bg-foreground text-background p-6 space-y-3">
             <div className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-2 py-1">
