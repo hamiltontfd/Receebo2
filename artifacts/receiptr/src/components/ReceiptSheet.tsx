@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Loader2, Trash2, Edit2, Share2, AlertTriangle, ScanLine,
   Paperclip, FileText, ArrowLeft, Maximize2, X,
+  Sparkles, Package, Shield, Star,
 } from "lucide-react";
 
 function useIsDesktop() {
@@ -512,7 +513,8 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                   {/* ── Highlights carousel ── */}
                   {!isEditing && hasHighlights && (
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
+                        <Star className="w-3.5 h-3.5" />
                         Highlights
                       </p>
                       <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none -mx-5 px-5">
@@ -542,16 +544,22 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
 
                   {/* ── Summary ── */}
                   {!isEditing && receipt.summary && (
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Summary</p>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{receipt.summary}</p>
+                    <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3.5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-400 mb-1.5 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Summary
+                      </p>
+                      <p className="text-sm text-blue-900/70 leading-relaxed">{receipt.summary}</p>
                     </div>
                   )}
 
                   {/* ── Items ── */}
                   {!isEditing && receipt.products && receipt.products.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Items</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
+                        <Package className="w-3.5 h-3.5" />
+                        Items
+                      </p>
                       <ul className="divide-y divide-border border border-border rounded-xl overflow-hidden">
                         {receipt.products.map((product, i) => (
                           <li key={i} className="flex items-center justify-between gap-3 px-4 py-3 bg-background">
@@ -573,7 +581,10 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                   {/* ── Warranty ── */}
                   {!isEditing && receipt.warranty && (
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Warranty</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5" />
+                        Warranty
+                      </p>
                       <p className="text-sm text-muted-foreground leading-relaxed">{receipt.warranty}</p>
                     </div>
                   )}
@@ -581,7 +592,10 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                   {/* ── Original receipt ── */}
                   {!isEditing && (
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Original Receipt</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5" />
+                        Original Receipt
+                      </p>
                       <ReceiptPreview
                         fileUrl={fileUrl}
                         contentType={receipt.contentType}
@@ -606,7 +620,10 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                   {!isEditing && (
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Files</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                          <Paperclip className="w-3.5 h-3.5" />
+                          Files
+                        </p>
                         <button
                           onClick={() => fileInputRef.current?.click()}
                           disabled={isUploading}
