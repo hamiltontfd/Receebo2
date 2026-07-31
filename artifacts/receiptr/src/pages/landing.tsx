@@ -507,9 +507,9 @@ export default function Landing() {
                 </div>
 
                 <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-[0.95]">
-                  Every receipt.
+                  Receipts.
                   <br />
-                  Always found.
+                  Easy to find.
                 </h1>
 
                 <p className="text-lg text-muted-foreground max-w-md leading-relaxed">
