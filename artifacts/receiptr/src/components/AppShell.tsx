@@ -31,9 +31,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {!isGuest && <TrialBanner />}
 
       {/* Mobile top bar */}
-      <header className="md:hidden flex h-14 border-b px-4 items-center justify-between sticky top-0 z-20 bg-background/90 backdrop-blur">
+      <header className="md:hidden flex h-14 px-4 items-center justify-between sticky top-0 z-20 bg-background/90 backdrop-blur">
         <Link href="/search">
-          <img src="/logo.svg" alt="Receebo" className="h-7 w-auto" />
+          <img src="/logo.svg" alt="Receebo" className="h-[2rem] w-auto" />
         </Link>
         <Link href="/profile">
           <button className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-bold text-foreground shrink-0">
