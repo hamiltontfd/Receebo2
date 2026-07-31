@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { X, Clock } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useGuestMode } from "@/components/GuestProvider";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -339,6 +340,7 @@ export default function SearchPage() {
   const [debounced, setDebounced] = useState("");
   const [, setLocation] = useLocation();
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { isGuest } = useGuestMode();
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 400);
@@ -391,6 +393,21 @@ export default function SearchPage() {
     />
 
     <PageTransition className="flex-1 w-full max-w-lg md:max-w-3xl mx-auto px-5 py-6 flex flex-col gap-5">
+      {/* Guest conversion banner */}
+      {isGuest && (
+        <div className="rounded-2xl bg-foreground text-background px-4 py-3.5 flex items-center gap-3">
+          <Clock className="w-4 h-4 shrink-0 opacity-70" />
+          <p className="text-sm leading-snug flex-1">
+            <span className="font-semibold">Preview mode</span> — receipts stored for 24 hours.
+          </p>
+          <Link href="/get-started">
+            <button className="shrink-0 text-xs font-bold underline underline-offset-2 whitespace-nowrap">
+              Try free 7 days →
+            </button>
+          </Link>
+        </div>
+      )}
+
       {/* Search input */}
       <div className="relative">
         <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

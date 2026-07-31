@@ -14,6 +14,7 @@ import Scan from "@/pages/scan";
 import SearchPage from "@/pages/search";
 import Settings from "@/pages/settings";
 import ProfilePage from "@/pages/profile";
+import GetStarted from "@/pages/get-started";
 import AppShell from "@/components/AppShell";
 import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
 import { setGuestId, createCheckoutSession } from "@workspace/api-client-react";
@@ -158,18 +159,22 @@ const PLAN_STORAGE_KEY = "receebo:pendingPlan";
  */
 function PostAuthCheckout() {
   const { isSignedIn } = useAuth();
+  const [location] = useLocation();
   const checkoutFiredRef = useRef(false);
 
-  // Capture ?plan= from the URL as soon as this component mounts (i.e. when
-  // the sign-up/sign-in page renders). Clerk may add its own query params so
-  // we read from window.location.search directly.
+  // Capture ?plan= from the URL on every navigation. Clerk's multi-step sign-up
+  // flow keeps the component mounted, so a mount-only effect would miss the
+  // plan when the user navigates client-side to /sign-up?plan=... from /get-started.
+  // Reading window.location.search directly because wouter's useLocation only
+  // tracks the pathname, not the query string.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const plan = params.get("plan");
     if (plan === "monthly" || plan === "yearly") {
       sessionStorage.setItem(PLAN_STORAGE_KEY, plan);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location]); // re-run on every route change so ?plan= is never missed
 
   // Once the user is signed in, fire checkout for the pending plan (once only).
   useEffect(() => {
@@ -309,6 +314,7 @@ function ClerkProviderWithRoutes() {
             <Route path="/profile">
               <ProtectedShell><ProfilePage /></ProtectedShell>
             </Route>
+            <Route path="/get-started" component={GetStarted} />
             <Route component={NotFound} />
           </Switch>
           <Toaster />

@@ -531,7 +531,7 @@ export default function Landing() {
                     Scan your first receipt
                   </Button>
                 </motion.div>
-                <Link href="/sign-up">
+                <Link href="/get-started">
                   <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
                     <Button
                       variant="outline"
@@ -800,7 +800,7 @@ export default function Landing() {
                   Try it free now
                 </Button>
               </motion.div>
-              <Link href="/sign-up">
+              <Link href="/get-started">
                 <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                   <Button
                     variant="outline"
