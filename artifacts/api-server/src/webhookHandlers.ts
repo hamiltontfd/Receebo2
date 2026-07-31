@@ -1,8 +1,9 @@
 import Stripe from "stripe";
 import { db, userBillingTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { logger } from "./lib/logger";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
+import { sendTrialEndingEmail } from "./lib/emailService";
 
 /**
  * Upsert the Stripe customer → user mapping and store the subscription ID.
@@ -92,6 +93,89 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
 }
 
 /**
+ * Handle customer.subscription.trial_will_end — send a reminder email ~3 days before trial ends.
+ * Uses the same trialReminderSentAt dedup flag as the nightly orphan-cleanup sweep so only
+ * one email is delivered regardless of which path fires first.
+ */
+async function handleTrialWillEnd(subscription: Stripe.Subscription): Promise<void> {
+  const customerId =
+    typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
+  if (!customerId) return;
+
+  // Resolve the user from our billing table
+  const [billing] = await db
+    .select({ userId: userBillingTable.userId })
+    .from(userBillingTable)
+    .where(eq(userBillingTable.stripeCustomerId, customerId));
+
+  if (!billing) {
+    logger.warn({ customerId }, "webhookHandlers: trial_will_end for unknown customer — no user_billing row");
+    return;
+  }
+
+  // Atomically claim the send slot — prevents duplicate sends with the nightly sweep
+  const claimed = await db
+    .update(userBillingTable)
+    .set({ trialReminderSentAt: new Date() })
+    .where(
+      and(
+        eq(userBillingTable.userId, billing.userId),
+        isNull(userBillingTable.trialReminderSentAt),
+      ),
+    )
+    .returning({ userId: userBillingTable.userId });
+
+  if (claimed.length === 0) {
+    logger.info({ userId: billing.userId }, "webhookHandlers: trial reminder already sent — skipping duplicate");
+    return;
+  }
+
+  const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000) : new Date();
+
+  // Extract plan name and charge amount from the subscription's price
+  const priceItem = subscription.items?.data?.[0];
+  let planName: string | undefined;
+  let planAmount: number | undefined;
+  let planCurrency: string | undefined;
+
+  if (priceItem?.price) {
+    planAmount = priceItem.price.unit_amount ?? undefined;
+    planCurrency = priceItem.price.currency ?? undefined;
+
+    const productId =
+      typeof priceItem.price.product === "string"
+        ? priceItem.price.product
+        : (priceItem.price.product as Stripe.Product | null)?.id;
+
+    if (productId) {
+      try {
+        const stripe = await getUncachableStripeClient();
+        const product = await stripe.products.retrieve(productId);
+        planName = product.name;
+      } catch (err) {
+        logger.warn({ err, productId }, "webhookHandlers: could not fetch product name for trial reminder");
+      }
+    }
+  }
+
+  logger.info(
+    { userId: billing.userId, trialEnd: trialEnd.toISOString(), planName, planAmount, planCurrency },
+    "webhookHandlers: sending trial-ending reminder email",
+  );
+
+  const sent = await sendTrialEndingEmail(billing.userId, trialEnd, { planName, planAmount, planCurrency });
+
+  if (!sent) {
+    // Reset flag so the nightly sweep can retry
+    await db
+      .update(userBillingTable)
+      .set({ trialReminderSentAt: null })
+      .where(eq(userBillingTable.userId, billing.userId));
+    logger.warn({ userId: billing.userId }, "webhookHandlers: trial reminder email failed — flag reset for retry");
+  }
+}
+
+/**
  * Handle invoice.paid — subscription is active; sync subscription ID.
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
@@ -148,6 +232,10 @@ export class WebhookHandlers {
 
       case "customer.subscription.deleted":
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        break;
+
+      case "customer.subscription.trial_will_end":
+        await handleTrialWillEnd(event.data.object as Stripe.Subscription);
         break;
 
       case "invoice.payment_failed":

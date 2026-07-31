@@ -127,9 +127,17 @@ export async function sendWarrantyReminderEmail(
   }
 }
 
+export interface TrialPlanInfo {
+  planName?: string;
+  /** Price in the smallest currency unit (e.g. cents for USD) */
+  planAmount?: number;
+  planCurrency?: string;
+}
+
 export async function sendTrialEndingEmail(
   userId: string,
   trialEndAt: Date,
+  planInfo?: TrialPlanInfo,
 ): Promise<boolean> {
   const email = await getUserEmail(userId);
   if (!email) return false;
@@ -160,16 +168,32 @@ export async function sendTrialEndingEmail(
 
   const settingsUrl = `${appUrl()}/settings`;
 
+  // Format plan name and charge amount for the email body
+  const planLabel = planInfo?.planName ?? "Receebo Pro";
+  let chargeStr: string | null = null;
+  if (planInfo?.planAmount != null && planInfo?.planCurrency) {
+    const currency = planInfo.planCurrency.toUpperCase();
+    const symbol = currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : `${currency} `;
+    chargeStr = `${symbol}${(planInfo.planAmount / 100).toFixed(2)}`;
+  }
+
+  const chargeLine = chargeStr
+    ? `After that, you'll be automatically charged <strong>${chargeStr}</strong> for <strong>${planLabel}</strong> unless you cancel before then.`
+    : `After that, you'll be charged automatically for <strong>${planLabel}</strong> unless you cancel before then.`;
+
   const html = `<!DOCTYPE html>
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;max-width:480px;margin:0 auto;padding:32px 24px;background:#fff;">
   <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#888;margin:0 0 20px;">Receebo</p>
   <h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Your free trial ends ${daysLabel}</h1>
-  <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 24px;">
-    Your Receebo Pro trial expires on <strong>${dateStr}</strong>. After that, you'll be charged automatically unless you cancel before then.
+  <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 8px;">
+    Your <strong>${planLabel}</strong> trial expires on <strong>${dateStr}</strong>. ${chargeLine}
   </p>
-  <a href="${settingsUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-weight:600;font-size:14px;">Manage Subscription</a>
-  <p style="color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;">You received this because you signed up for a Receebo Pro trial. Visit your subscription settings to cancel anytime — it only takes one click.</p>
+  <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 24px;">
+    To avoid being charged, cancel your subscription before the trial ends — it only takes one click.
+  </p>
+  <a href="${settingsUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-weight:600;font-size:14px;">Cancel or Manage Subscription</a>
+  <p style="color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;">You received this because you signed up for a Receebo Pro trial. Visit your subscription settings to cancel anytime before <strong>${dateStr}</strong>.</p>
 </body>
 </html>`;
 
@@ -180,7 +204,7 @@ export async function sendTrialEndingEmail(
       subject,
       html,
     });
-    logger.info({ userId, daysRemaining }, "Trial ending email sent");
+    logger.info({ userId, daysRemaining, planLabel, chargeStr }, "Trial ending email sent");
     return true;
   } catch (err) {
     logger.error({ err, userId }, "Failed to send trial ending email");
