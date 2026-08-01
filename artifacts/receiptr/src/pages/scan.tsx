@@ -126,6 +126,7 @@ export default function Scan() {
   const [limitError, setLimitError] = useState<string | null>(null);
   const [similarMatches, setSimilarMatches] = useState<SimilarReceiptMatch[] | null>(null);
   const [dismissedDuplicate, setDismissedDuplicate] = useState(false);
+  const [dismissedIncomplete, setDismissedIncomplete] = useState(false);
 
   const createReceipt = useCreateReceipt();
   const updateReceipt = useUpdateReceipt();
@@ -190,6 +191,7 @@ export default function Scan() {
     if (merchant == null || purchaseDate == null || total == null) return;
     setSimilarMatches(null);
     setDismissedDuplicate(false);
+    setDismissedIncomplete(false);
     checkSimilarReceipt({ merchant, purchaseDate, total }).then((matches) => {
       setSimilarMatches(matches);
     }).catch(() => {
@@ -215,6 +217,7 @@ export default function Scan() {
         category: receipt.category ?? "",
         warranty: receipt.warranty ?? "",
       });
+      setDismissedIncomplete(false);
     }
   }, [phase, receipt]);
 
@@ -744,6 +747,39 @@ export default function Scan() {
           {receipt?.notableItems && receipt.notableItems.length > 0 && (
             <NotableItemsBanner items={receipt.notableItems} currency={receipt.currency} />
           )}
+
+          {(() => {
+            const missingMerchant = !receipt?.merchant;
+            const missingTotal = receipt?.total == null || receipt.total === 0;
+            const isIncomplete = missingMerchant || missingTotal;
+            if (!isIncomplete || dismissedIncomplete) return null;
+            return (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                      Receipt looks incomplete
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                      {missingMerchant && missingTotal
+                        ? "Merchant name and total amount are missing"
+                        : missingMerchant
+                          ? "Merchant name is missing"
+                          : "Total amount is missing"} — the top or bottom of the receipt may have been cut off. This could cause problems with warranty claims or merchant returns.
+                    </p>
+                  </div>
+                  <button
+                    aria-label="Dismiss warning"
+                    onClick={() => setDismissedIncomplete(true)}
+                    className="flex-shrink-0 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="mt-auto space-y-3 pt-4">
             <Button
