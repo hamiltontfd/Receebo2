@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScanLine, Zap } from "lucide-react";
+import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScanLine, Zap, ScrollText, Square, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
@@ -127,6 +127,108 @@ export default function Scan() {
   const [similarMatches, setSimilarMatches] = useState<SimilarReceiptMatch[] | null>(null);
   const [dismissedDuplicate, setDismissedDuplicate] = useState(false);
   const [dismissedIncomplete, setDismissedIncomplete] = useState(false);
+
+  // Panoramic mode
+  const PAN_MAX_FRAMES = 12;
+  const PAN_INTERVAL_MS = 800;
+  const [panoramicMode, setPanoramicMode] = useState(false);
+  const [panCapturing, setPanCapturing] = useState(false);
+  const [panFrameCount, setPanFrameCount] = useState(0);
+  const [panStitchedBlob, setPanStitchedBlob] = useState<Blob | null>(null);
+  const [panStitchedUrl, setPanStitchedUrl] = useState<string | null>(null);
+  const panFramesRef = useRef<Blob[]>([]);
+  const panIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cleanup object URL on unmount / reset
+  const clearPanState = useCallback(() => {
+    if (panIntervalRef.current) {
+      clearInterval(panIntervalRef.current);
+      panIntervalRef.current = null;
+    }
+    setPanCapturing(false);
+    setPanFrameCount(0);
+    panFramesRef.current = [];
+    setPanStitchedBlob(null);
+    setPanStitchedUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
+  const stitchFrames = useCallback(async (frames: Blob[]): Promise<Blob | null> => {
+    if (frames.length === 0) return null;
+    try {
+      const bitmaps = await Promise.all(frames.map((f) => createImageBitmap(f)));
+      const frameW = bitmaps[0].width;
+      const frameH = bitmaps[0].height;
+      const canvas = document.createElement("canvas");
+      canvas.width = frameW;
+      canvas.height = frameH * bitmaps.length;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { bitmaps.forEach((b) => b.close()); return null; }
+      bitmaps.forEach((bm, i) => {
+        ctx.drawImage(bm, 0, i * frameH, frameW, frameH);
+        bm.close();
+      });
+      return new Promise((resolve) => {
+        canvas.toBlob((b) => resolve(b), "image/jpeg", 0.85);
+      });
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const stopPanCapture = useCallback(async () => {
+    if (panIntervalRef.current) {
+      clearInterval(panIntervalRef.current);
+      panIntervalRef.current = null;
+    }
+    setPanCapturing(false);
+    const frames = [...panFramesRef.current];
+    if (frames.length === 0) return;
+    const blob = await stitchFrames(frames);
+    if (blob) {
+      setPanStitchedBlob(blob);
+      setPanStitchedUrl(URL.createObjectURL(blob));
+    }
+  }, [stitchFrames]);
+
+  const startPanCapture = useCallback(() => {
+    clearPanState();
+    setPanCapturing(true);
+    const id = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d")?.drawImage(video, 0, 0);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        panFramesRef.current.push(blob);
+        const count = panFramesRef.current.length;
+        setPanFrameCount(count);
+        if (count >= PAN_MAX_FRAMES) {
+          // will be handled by the effect watching panCapturing + panFrameCount
+        }
+      }, "image/jpeg", 0.8);
+    }, PAN_INTERVAL_MS);
+    panIntervalRef.current = id;
+  }, [clearPanState, videoRef]);
+
+  // Auto-stop when max frames reached
+  useEffect(() => {
+    if (panCapturing && panFrameCount >= PAN_MAX_FRAMES) {
+      stopPanCapture();
+    }
+  }, [panCapturing, panFrameCount, stopPanCapture]);
+
+  // Reset panoramic state when leaving capture phase
+  useEffect(() => {
+    if (phase !== "capture") {
+      clearPanState();
+    }
+  }, [phase, clearPanState]);
 
   const createReceipt = useCreateReceipt();
   const updateReceipt = useUpdateReceipt();
@@ -455,6 +557,39 @@ export default function Scan() {
                   Upload receipt
                 </Button>
               </div>
+            ) : panStitchedUrl ? (
+              /* ── Panoramic preview ── */
+              <div className="absolute inset-0 flex flex-col bg-black">
+                <div className="flex-1 overflow-y-auto">
+                  <img
+                    src={panStitchedUrl}
+                    alt="Stitched panoramic receipt"
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex gap-3 p-4 bg-black/80">
+                  <button
+                    onClick={() => {
+                      if (panStitchedBlob) {
+                        uploadFile(panStitchedBlob, `scan-panoramic-${Date.now()}.jpg`, "image/jpeg");
+                        clearPanState();
+                      }
+                    }}
+                    disabled={uploading || !panStitchedBlob || (dailyCount != null && dailyCount.remaining === 0)}
+                    className="flex-1 h-12 rounded-full bg-white text-black font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+                  >
+                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    Use this
+                  </button>
+                  <button
+                    onClick={clearPanState}
+                    disabled={uploading}
+                    className="flex-1 h-12 rounded-full border border-white/40 text-white font-semibold text-sm disabled:opacity-40"
+                  >
+                    Retake
+                  </button>
+                </div>
+              </div>
             ) : (
               <>
                 <video
@@ -463,21 +598,112 @@ export default function Scan() {
                   muted
                   className="absolute inset-0 w-full h-full object-cover"
                 />
-                {/* Framing guide */}
-                <div className="absolute inset-8 border-2 border-background/80 rounded-xl pointer-events-none" />
-                <p className="absolute bottom-36 inset-x-0 text-center text-xs text-background/90">
-                  Place the receipt inside the frame
-                </p>
-                <div className="absolute bottom-14 inset-x-0 flex items-center justify-center">
-                  <button
-                    aria-label="Capture receipt"
-                    onClick={capturePhoto}
-                    disabled={!cameraReady || uploading || (dailyCount != null && dailyCount.remaining === 0)}
-                    className="w-16 h-16 rounded-full border-4 border-background bg-background/20 hover:bg-background/40 transition-colors disabled:opacity-40 flex items-center justify-center"
-                  >
-                    {uploading && <Loader2 className="w-6 h-6 text-background animate-spin" />}
-                  </button>
-                </div>
+
+                {panoramicMode ? (
+                  /* ── Panoramic capture UI ── */
+                  <>
+                    {/* Mode badge */}
+                    <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none">
+                      <span className="bg-black/60 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                        <ScrollText className="w-3.5 h-3.5" />
+                        Long receipt mode
+                      </span>
+                    </div>
+
+                    {panCapturing ? (
+                      /* Capturing: frame counter + animated arrow + stop button */
+                      <>
+                        <div className="absolute top-14 inset-x-0 flex flex-col items-center gap-2 pointer-events-none">
+                          <span className="bg-black/70 text-white text-xs font-medium px-3 py-1 rounded-full">
+                            {panFrameCount} / {PAN_MAX_FRAMES} frames
+                          </span>
+                          {/* Progress bar */}
+                          <div className="w-32 h-1.5 rounded-full bg-white/20 overflow-hidden">
+                            <div
+                              className="h-full bg-white rounded-full transition-all duration-300"
+                              style={{ width: `${(panFrameCount / PAN_MAX_FRAMES) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center pointer-events-none">
+                          <ChevronDown className="w-10 h-10 text-white/70 animate-bounce" />
+                        </div>
+                        <div className="absolute bottom-14 inset-x-0 flex items-center justify-center">
+                          <button
+                            aria-label="Stop panoramic capture"
+                            onClick={stopPanCapture}
+                            className="w-16 h-16 rounded-full border-4 border-red-400 bg-red-500/80 hover:bg-red-500 transition-colors flex items-center justify-center"
+                          >
+                            <Square className="w-6 h-6 text-white fill-white" />
+                          </button>
+                        </div>
+                        <p className="absolute bottom-36 inset-x-0 text-center text-xs text-background/90">
+                          Pan slowly downward — tap Stop when done
+                        </p>
+                      </>
+                    ) : (
+                      /* Ready to start: guide frame + start button */
+                      <>
+                        <div className="absolute inset-8 border-2 border-background/80 rounded-xl pointer-events-none" />
+                        <p className="absolute bottom-36 inset-x-0 text-center text-xs text-background/90">
+                          Tap Start, then pan the camera slowly downward
+                        </p>
+                        <div className="absolute bottom-14 inset-x-0 flex items-center justify-center gap-6">
+                          <button
+                            aria-label="Start panoramic capture"
+                            onClick={startPanCapture}
+                            disabled={!cameraReady || uploading || (dailyCount != null && dailyCount.remaining === 0)}
+                            className="px-8 h-14 rounded-full border-4 border-background bg-background/20 hover:bg-background/40 transition-colors disabled:opacity-40 text-background font-bold text-sm"
+                          >
+                            Start
+                          </button>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Toggle off button */}
+                    {!panCapturing && (
+                      <div className="absolute bottom-3 inset-x-0 flex justify-center">
+                        <button
+                          onClick={() => setPanoramicMode(false)}
+                          className="text-background/60 text-xs underline"
+                        >
+                          Switch to single shot
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* ── Normal single-shot UI ── */
+                  <>
+                    {/* Framing guide */}
+                    <div className="absolute inset-8 border-2 border-background/80 rounded-xl pointer-events-none" />
+                    <p className="absolute bottom-36 inset-x-0 text-center text-xs text-background/90">
+                      Place the receipt inside the frame
+                    </p>
+                    <div className="absolute bottom-14 inset-x-0 flex items-center justify-center gap-6">
+                      <button
+                        aria-label="Capture receipt"
+                        onClick={capturePhoto}
+                        disabled={!cameraReady || uploading || (dailyCount != null && dailyCount.remaining === 0)}
+                        className="w-16 h-16 rounded-full border-4 border-background bg-background/20 hover:bg-background/40 transition-colors disabled:opacity-40 flex items-center justify-center"
+                      >
+                        {uploading && <Loader2 className="w-6 h-6 text-background animate-spin" />}
+                      </button>
+                    </div>
+                    {/* Long receipt toggle */}
+                    <div className="absolute bottom-3 inset-x-0 flex justify-center">
+                      <button
+                        onClick={() => setPanoramicMode(true)}
+                        disabled={!cameraReady || uploading}
+                        className="flex items-center gap-1.5 text-background/70 text-xs disabled:opacity-40 hover:text-background/90 transition-colors"
+                      >
+                        <ScrollText className="w-3.5 h-3.5" />
+                        Long receipt
+                      </button>
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
