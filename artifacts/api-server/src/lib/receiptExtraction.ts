@@ -30,6 +30,8 @@ export type ExtractedReceipt = {
   transactionNumber: string | null;
   products: ExtractedProduct[];
   notableItems: ExtractedNotableItem[];
+  purchaseCountry: string | null;
+  isOnlinePurchase: boolean | null;
 };
 
 const CANONICAL_CATEGORIES = ["Electronics", "Home", "Clothing & Apparel", "Groceries", "Other"] as const;
@@ -53,6 +55,8 @@ Respond ONLY with a JSON object matching this exact shape:
   "ocrText": string | null,         // the full raw text content transcribed from the receipt, preserving line breaks
   "warranty": string | null,        // warranty or return-policy information printed on the receipt (e.g. "2-year manufacturer warranty", "30-day returns"), or null if none is mentioned
   "transactionNumber": string | null, // the transaction/receipt/confirmation number printed on the receipt (e.g. "TXN-4821039", "#00123456", "Order #123"), or null if not present
+  "purchaseCountry": string | null,   // ISO-3166-1 alpha-2 country code where the purchase was made (e.g. "PT", "US", "BR", "DE"), inferred from currency, merchant name, address, language, or domain. null if not determinable.
+  "isOnlinePurchase": boolean | null, // true if this is an e-commerce / online / distance purchase (order confirmation, Amazon, web store, delivery receipt, etc.); false if in-store; null if unclear.
   "products": [                      // individual line items; empty array if none are legible
     { "name": string, "quantity": number | null, "price": number | null }
   ],
@@ -210,6 +214,16 @@ export async function extractReceiptData(
 
   const isReceipt = typeof parsed.isReceipt === "boolean" ? parsed.isReceipt : true;
 
+  const purchaseCountryRaw = toStringOrNull((parsed as ExtractedReceipt).purchaseCountry);
+  const purchaseCountry =
+    purchaseCountryRaw && /^[A-Za-z]{2}$/.test(purchaseCountryRaw)
+      ? purchaseCountryRaw.toUpperCase()
+      : null;
+
+  const isOnlinePurchaseRaw = (parsed as ExtractedReceipt).isOnlinePurchase;
+  const isOnlinePurchase =
+    typeof isOnlinePurchaseRaw === "boolean" ? isOnlinePurchaseRaw : null;
+
   return {
     isReceipt,
     merchant: toStringOrNull(parsed.merchant),
@@ -223,5 +237,7 @@ export async function extractReceiptData(
     transactionNumber: toStringOrNull((parsed as ExtractedReceipt).transactionNumber),
     products,
     notableItems,
+    purchaseCountry,
+    isOnlinePurchase,
   };
 }

@@ -7,8 +7,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Loader2, Trash2, Edit2, Share2, AlertTriangle, ScanLine,
   Paperclip, FileText, ArrowLeft, Maximize2, X,
-  Sparkles, Package, Shield, Star,
+  Sparkles, Package, Shield, Star, Scale, RotateCcw, Clock,
 } from "lucide-react";
+import { deriveConsumerRights } from "@/lib/consumerRights";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -588,6 +589,79 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       <p className="text-sm text-muted-foreground leading-relaxed">{receipt.warranty}</p>
                     </div>
                   )}
+
+                  {/* ── Consumer Rights ── */}
+                  {!isEditing && (() => {
+                    const rights = deriveConsumerRights({
+                      purchaseDate: receipt.purchaseDate,
+                      category: receipt.category,
+                      currency: receipt.currency,
+                      purchaseCountry: receipt.purchaseCountry,
+                      isOnlinePurchase: receipt.isOnlinePurchase,
+                      merchant: receipt.merchant,
+                    });
+                    if (!rights.hasAny) return null;
+
+                    const urgencyClass = {
+                      green: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                      amber: "bg-amber-50 border-amber-200 text-amber-700",
+                      red: "bg-red-50 border-red-200 text-red-700",
+                      expired: "bg-muted border-border text-muted-foreground",
+                    } as const;
+
+                    return (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+                          <Scale className="w-3.5 h-3.5" />
+                          Consumer Rights{rights.countryLabel ? ` · ${rights.countryLabel}` : ""}
+                        </p>
+                        <div className="space-y-2">
+
+                          {/* Return window */}
+                          {rights.returnWindow && (
+                            <div className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${urgencyClass[rights.returnWindow.urgency]}`}>
+                              <RotateCcw className="w-4 h-4 mt-0.5 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold leading-tight">
+                                  {rights.returnWindow.isExpired
+                                    ? "Return window expired"
+                                    : `Return by ${rights.returnWindow.formattedDeadline}`}
+                                </p>
+                                <p className="text-xs mt-0.5 opacity-80">
+                                  {rights.returnWindow.isExpired
+                                    ? `Expired ${Math.abs(rights.returnWindow.daysLeft)} day${Math.abs(rights.returnWindow.daysLeft) !== 1 ? "s" : ""} ago`
+                                    : rights.returnWindow.daysLeft === 0
+                                      ? "Last day to return"
+                                      : `${rights.returnWindow.daysLeft} day${rights.returnWindow.daysLeft !== 1 ? "s" : ""} left`}
+                                  {" · "}{rights.returnWindow.source}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Statutory warranty */}
+                          {rights.warranty && (
+                            <div className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${rights.warranty.isExpired ? "bg-muted border-border text-muted-foreground" : "bg-violet-50 border-violet-200 text-violet-700"}`}>
+                              <Clock className="w-4 h-4 mt-0.5 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold leading-tight">
+                                  {rights.warranty.isExpired
+                                    ? `${rights.warranty.label} (expired)`
+                                    : `${rights.warranty.label}`}
+                                </p>
+                                <p className="text-xs mt-0.5 opacity-80">
+                                  {rights.warranty.isExpired
+                                    ? `Expired ${rights.warranty.formattedExpiry}`
+                                    : `Valid until ${rights.warranty.formattedExpiry} · ${rights.warranty.citation}`}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* ── Original receipt ── */}
                   {!isEditing && (

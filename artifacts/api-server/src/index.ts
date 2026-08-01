@@ -51,6 +51,16 @@ async function runStartupMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS trial_reminder_sent_at timestamptz
     `);
 
+    // Consumer rights columns — added to receipts table
+    await db.execute(sql`
+      ALTER TABLE receipts
+        ADD COLUMN IF NOT EXISTS purchase_country text
+    `);
+    await db.execute(sql`
+      ALTER TABLE receipts
+        ADD COLUMN IF NOT EXISTS is_online_purchase boolean
+    `);
+
     logger.info("Startup migrations applied");
   } catch (err) {
     logger.warn({ err }, "Startup migrations warning (non-fatal) — continuing");

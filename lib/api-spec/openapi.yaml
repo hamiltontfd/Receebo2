@@ -440,6 +440,12 @@ components:
         transactionNumber:
           type: ["string", "null"]
           description: Transaction or reference number from the receipt.
+        purchaseCountry:
+          type: ["string", "null"]
+          description: ISO-3166-1 alpha-2 country code where the purchase was made (e.g. "PT", "US", "BR").
+        isOnlinePurchase:
+          type: ["boolean", "null"]
+          description: True if this is an e-commerce/online/distance purchase.
         products:
           type: array
           items:

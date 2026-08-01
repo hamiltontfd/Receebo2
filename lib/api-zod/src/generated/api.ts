@@ -201,6 +201,8 @@ export const GetReceiptResponse = zod.object({
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
   "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
+  "purchaseCountry": zod.string().nullish().describe('ISO-3166-1 alpha-2 country code where the purchase was made.'),
+  "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce/online/distance purchase.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),

@@ -102,6 +102,8 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
         transactionNumber: data.transactionNumber,
         products: deduplicatedProducts,
         notableItems: data.notableItems,
+        purchaseCountry: data.purchaseCountry,
+        isOnlinePurchase: data.isOnlinePurchase,
       })
       .where(eq(receiptsTable.id, receiptId));
 

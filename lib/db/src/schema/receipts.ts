@@ -44,6 +44,8 @@ export const receiptsTable = pgTable("receipts", {
   transactionNumber: text("transaction_number"),
   products: jsonb("products").$type<ReceiptProductItem[]>().notNull().default([]),
   notableItems: jsonb("notable_items").$type<ReceiptNotableItem[]>().notNull().default([]),
+  purchaseCountry: text("purchase_country"),
+  isOnlinePurchase: boolean("is_online_purchase"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

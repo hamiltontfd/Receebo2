@@ -93,6 +93,16 @@ export interface Receipt {
      * @nullable
      */
   transactionNumber?: string | null;
+  /**
+     * ISO-3166-1 alpha-2 country code where the purchase was made.
+     * @nullable
+     */
+  purchaseCountry?: string | null;
+  /**
+     * True if this is an e-commerce/online/distance purchase.
+     * @nullable
+     */
+  isOnlinePurchase?: boolean | null;
   products?: ReceiptProduct[];
   /** Items flagged as notable (expensive or warranty-relevant). */
   notableItems?: NotableItem[];
