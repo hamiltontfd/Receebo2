@@ -132,6 +132,11 @@ export interface ReceiptUpdate {
   warranty?: string;
   /** Set to false to confirm a draft receipt into the library. */
   isDraft?: boolean;
+  /**
+     * True if this is an e-commerce/online/distance purchase.
+     * @nullable
+     */
+  isOnlinePurchase?: boolean | null;
   notableItems?: NotableItem[];
 }
 

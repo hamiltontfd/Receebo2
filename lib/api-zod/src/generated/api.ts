@@ -249,6 +249,7 @@ export const UpdateReceiptBody = zod.object({
   "category": zod.string().optional(),
   "warranty": zod.string().optional(),
   "isDraft": zod.boolean().optional().describe('Set to false to confirm a draft receipt into the library.'),
+  "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce/online/distance purchase.'),
   "notableItems": zod.array(zod.object({
   "name": zod.string(),
   "price": zod.number().nullish(),

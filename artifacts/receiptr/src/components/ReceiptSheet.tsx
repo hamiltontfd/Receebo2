@@ -74,6 +74,7 @@ const editFormSchema = z.object({
   currency: z.string().optional(),
   category: z.string().optional(),
   warranty: z.string().optional(),
+  isOnlinePurchase: z.boolean().nullable().optional(),
 });
 
 type EditFormValues = z.infer<typeof editFormSchema>;
@@ -123,6 +124,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
       currency: "USD",
       category: "",
       warranty: "",
+      isOnlinePurchase: null,
     },
   });
 
@@ -135,6 +137,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
         currency: receipt.currency || "USD",
         category: receipt.category || "",
         warranty: receipt.warranty || "",
+        isOnlinePurchase: receipt.isOnlinePurchase ?? null,
       });
     }
   }, [receipt, isEditing, form]);
@@ -191,6 +194,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
           currency: data.currency,
           category: data.category,
           warranty: data.warranty,
+          isOnlinePurchase: data.isOnlinePurchase,
         },
       });
       setIsEditing(false);
@@ -498,6 +502,41 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             )}
                           />
                         </div>
+                        <FormField
+                          control={form.control}
+                          name="isOnlinePurchase"
+                          render={({ field }) => (
+                            <FormItem className="p-4 space-y-1">
+                              <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Purchase type</FormLabel>
+                              <div className="flex gap-2 pt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => field.onChange(field.value === true ? null : true)}
+                                  className={[
+                                    "flex-1 py-1.5 rounded-full text-sm font-medium border transition-colors",
+                                    field.value === true
+                                      ? "bg-primary text-primary-foreground border-primary"
+                                      : "bg-background border-border text-muted-foreground hover:text-foreground",
+                                  ].join(" ")}
+                                >
+                                  🌐 Online
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => field.onChange(field.value === false ? null : false)}
+                                  className={[
+                                    "flex-1 py-1.5 rounded-full text-sm font-medium border transition-colors",
+                                    field.value === false
+                                      ? "bg-primary text-primary-foreground border-primary"
+                                      : "bg-background border-border text-muted-foreground hover:text-foreground",
+                                  ].join(" ")}
+                                >
+                                  🏪 In-store
+                                </button>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
                         <div className="flex items-center gap-2 mt-4">
                           <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
                             {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
