@@ -128,6 +128,9 @@ export default function Scan() {
   const [dismissedDuplicate, setDismissedDuplicate] = useState(false);
   const [dismissedIncomplete, setDismissedIncomplete] = useState(false);
 
+  // Saved draft from a warning-card retake so edits survive re-scan
+  const savedFormDraftRef = useRef<{ merchant: string; purchaseDate: string; total: string; category: string; warranty: string } | null>(null);
+
   // Panoramic mode
   const PAN_MAX_FRAMES = 12;
   const PAN_INTERVAL_MS = 800;
@@ -312,13 +315,29 @@ export default function Scan() {
 
   useEffect(() => {
     if (phase === "review" && receipt) {
-      setForm({
+      const fromScan = {
         merchant: receipt.merchant ?? "",
         purchaseDate: receipt.purchaseDate ?? "",
         total: receipt.total != null ? String(receipt.total) : "",
         category: receipt.category ?? "",
         warranty: receipt.warranty ?? "",
-      });
+      };
+      // If the user hit "Retake" from the warning card, merge their saved edits
+      // back in — the new scan's data takes priority for any field it filled;
+      // fields still empty after re-scan fall back to the user's manual values.
+      if (savedFormDraftRef.current) {
+        const draft = savedFormDraftRef.current;
+        savedFormDraftRef.current = null;
+        setForm({
+          merchant: fromScan.merchant || draft.merchant,
+          purchaseDate: fromScan.purchaseDate || draft.purchaseDate,
+          total: fromScan.total || draft.total,
+          category: fromScan.category || draft.category,
+          warranty: fromScan.warranty || draft.warranty,
+        });
+      } else {
+        setForm(fromScan);
+      }
       setDismissedIncomplete(false);
     }
   }, [phase, receipt]);
@@ -446,6 +465,14 @@ export default function Scan() {
     }
     setReceiptId(null);
     setPhase("capture");
+  };
+
+  // Retake triggered from the incomplete warning card — saves the current form
+  // draft so user edits survive re-scan (new scan data takes priority, saved
+  // values fill any gaps the new scan still leaves empty).
+  const handleWarningRetake = async () => {
+    savedFormDraftRef.current = { ...form };
+    await handleRetake();
   };
 
   const handleDiscard = async () => {
@@ -994,6 +1021,13 @@ export default function Scan() {
                           ? "Merchant name is missing"
                           : "Total amount is missing"} — the top or bottom of the receipt may have been cut off. This could cause problems with warranty claims or merchant returns.
                     </p>
+                    <button
+                      onClick={handleWarningRetake}
+                      disabled={deleteReceipt.isPending}
+                      className="mt-2 text-xs font-semibold text-amber-800 dark:text-amber-300 underline underline-offset-2 hover:opacity-70 transition-opacity disabled:opacity-40"
+                    >
+                      Retake photo
+                    </button>
                   </div>
                   <button
                     aria-label="Dismiss warning"
