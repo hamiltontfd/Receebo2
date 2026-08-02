@@ -756,7 +756,7 @@ export default function Scan() {
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight">Reading receipt</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              ReceiptAI is turning the image into a purchase.
+              Receebo is turning the image into a purchase.
             </p>
           </div>
 
