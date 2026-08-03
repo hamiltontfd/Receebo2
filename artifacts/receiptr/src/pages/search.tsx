@@ -290,8 +290,32 @@ function DemoView({ onScan }: { onScan: () => void }) {
   );
 }
 
-function ReceiptRow({ r, onOpen }: { r: Receipt; onOpen: (id: number) => void }) {
+function ReceiptRow({ r, onOpen, query }: { r: Receipt; onOpen: (id: number) => void; query?: string }) {
   const Icon = categoryIcon(r.category);
+
+  const matchingItems = useMemo(() => {
+    if (!query) return [];
+    const q = query.toLowerCase();
+    const seen = new Set<string>();
+    const items: { name: string; price?: number | null }[] = [];
+
+    // Notable items first
+    for (const n of r.notableItems ?? []) {
+      if (n.name.toLowerCase().includes(q) && !seen.has(n.name)) {
+        seen.add(n.name);
+        items.push({ name: n.name, price: n.price ?? null });
+      }
+    }
+    // Then products
+    for (const p of r.products ?? []) {
+      if (p.name.toLowerCase().includes(q) && !seen.has(p.name)) {
+        seen.add(p.name);
+        items.push({ name: p.name, price: p.price ?? null });
+      }
+    }
+    return items.slice(0, 4);
+  }, [query, r.notableItems, r.products]);
+
   return (
     <motion.li
       variants={itemVariants}
@@ -331,6 +355,24 @@ function ReceiptRow({ r, onOpen }: { r: Receipt; onOpen: (id: number) => void })
           </span>
         )}
       </button>
+      {matchingItems.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 pb-3">
+          {matchingItems.map((item, i) => (
+            <button
+              key={i}
+              onClick={() => onOpen(r.id)}
+              className="rounded-xl border border-border px-3 py-2.5 flex flex-col gap-1 hover:bg-secondary/50 transition-colors text-left"
+            >
+              <p className="text-sm font-medium leading-tight line-clamp-2">{item.name}</p>
+              {item.price != null && (
+                <p className="font-mono text-xs font-semibold text-muted-foreground">
+                  {currencySymbol(r.currency)}{item.price.toFixed(2)}
+                </p>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </motion.li>
   );
 }
@@ -461,7 +503,7 @@ export default function SearchPage() {
                 animate="visible"
               >
                 {results.map((r, i) => (
-                  <ReceiptRow key={r.id} r={r} onOpen={setSelectedId} />
+                  <ReceiptRow key={r.id} r={r} onOpen={setSelectedId} query={debounced} />
                 ))}
               </motion.ul>
             ) : (
