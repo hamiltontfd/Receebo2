@@ -51,6 +51,7 @@ router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
       ilike(receiptsTable.originalFileName, term),
       ilike(receiptsTable.currency, term),
       sql`${receiptsTable.products}::text ILIKE ${term}`,
+      sql`${receiptsTable.notableItems}::text ILIKE ${term}`,
     );
     if (search) conditions.push(search);
   }

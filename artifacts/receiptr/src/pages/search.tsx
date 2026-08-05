@@ -317,6 +317,28 @@ function ReceiptRow({ r, onOpen, query }: { r: Receipt; onOpen: (id: number) => 
         items.push({ name: p.name, price: p.price ?? null });
       }
     }
+
+    // Fallback: if no name matched (receipt found via OCR/other text), show top
+    // items so the card is never empty when the receipt has line items.
+    if (items.length === 0) {
+      for (const n of r.notableItems ?? []) {
+        if (!seen.has(n.name)) {
+          seen.add(n.name);
+          items.push({ name: n.name, price: n.price ?? null });
+          if (items.length >= 2) break;
+        }
+      }
+      if (items.length < 2) {
+        for (const p of r.products ?? []) {
+          if (!seen.has(p.name)) {
+            seen.add(p.name);
+            items.push({ name: p.name, price: p.price ?? null });
+            if (items.length >= 2) break;
+          }
+        }
+      }
+    }
+
     return items.slice(0, 4);
   }, [query, r.notableItems, r.products]);
 
