@@ -1,0 +1,422 @@
+I would actually give Replit less freedom than usual. This is your landing page, and it’s your first impression. The prompt should tell it exactly what to build, the hierarchy, the tone, and even what not to do.
+
+Here’s the prompt I’d use.
+
+⸻
+
+Replit Prompt
+
+Goal
+
+Redesign the Receebo landing page from scratch.
+
+The design should feel premium, modern and minimal, inspired by Apple, Linear, Stripe and Notion.
+
+Avoid looking like a SaaS dashboard. This is a marketing page designed to convert visitors into trial users.
+
+The page must be fully responsive and mobile-first.
+
+Use smooth animations, subtle transitions and generous spacing.
+
+Use placeholder images and placeholder videos only. I will replace all assets later.
+
+⸻
+
+Brand
+
+Product name:
+
+Receebo
+
+Main tagline:
+
+Receipts. Easy to find.
+
+Supporting text:
+
+Scan, upload or forward receipts. Find any purchase in seconds with AI-powered search.
+
+Primary CTA:
+
+Start your 7-day free trial
+
+Secondary CTA:
+
+Watch demo
+
+The trial requires a credit card.
+
+Do NOT mention guest mode or free accounts.
+
+⸻
+
+Visual style
+
+Minimal
+
+Premium
+
+Bright
+
+Lots of white space
+
+Rounded corners
+
+Soft shadows
+
+Large typography
+
+Clean typography hierarchy
+
+Use modern gradients sparingly.
+
+Animations should feel smooth and intentional.
+
+⸻
+
+Landing page structure
+
+1. Hero
+
+Large headline
+
+Receipts.
+Easy to find.
+
+Supporting copy
+
+CTA button
+
+Secondary CTA
+
+On the right (desktop) or below (mobile):
+
+Placeholder product image
+
+[ HERO IMAGE PLACEHOLDER ]
+
+⸻
+
+2. Demo section
+
+Title:
+
+See Receebo in action
+
+Three equal cards.
+
+Each card contains
+
+Placeholder looping video
+
+[ VIDEO PLACEHOLDER ]
+
+Short title
+
+One sentence
+
+Card 1
+
+Capture
+
+Scan, upload or forward receipts in seconds.
+
+Card 2
+
+Find
+
+Search products, stores or brands and instantly find the receipt you need.
+
+Card 3
+
+Protect
+
+Track warranties and return windows automatically.
+
+Videos should be approximately 8-second loops.
+
+Design the cards to support autoplay videos later.
+
+⸻
+
+3. Why Receebo
+
+Four feature cards.
+
+Capture
+
+Scan
+
+Upload
+
+Email forwarding
+
+⸻
+
+Find
+
+Search by
+
+Product
+
+Merchant
+
+Brand
+
+Category
+
+⸻
+
+Protect
+
+Warranty reminders
+
+Return window alerts
+
+Consumer rights
+
+⸻
+
+Prove
+
+Fullscreen receipt
+
+Download PDF
+
+Share receipt
+
+Proof of purchase in seconds
+
+Each card should have a placeholder illustration.
+
+⸻
+
+4. AI Extraction
+
+Section title
+
+Receebo understands your receipts.
+
+Explain that AI automatically extracts
+
+Merchant
+
+Products
+
+Date
+
+Prices
+
+Warranty
+
+Category
+
+Currency
+
+Country
+
+Transaction number
+
+Online/In-store purchase
+
+Include a large placeholder illustration.
+
+[ AI ILLUSTRATION ]
+
+⸻
+
+5. Email receipts
+
+Section title
+
+Not every receipt is on paper.
+
+Describe importing receipts from email.
+
+Use placeholder illustration
+
+[ EMAIL PLACEHOLDER ]
+
+⸻
+
+6. Consumer protection
+
+Section title
+
+More than receipt storage.
+
+Explain
+
+Return windows
+
+Warranty tracking
+
+Consumer rights
+
+Timeline visualization
+
+Use placeholder graphic.
+
+⸻
+
+7. Comparison
+
+Title
+
+Why not just save photos?
+
+Create a comparison table.
+
+Feature | Photos | Email | Receebo
+
+Search by product
+
+Warranty tracking
+
+Return alerts
+
+Consumer rights
+
+AI extraction
+
+Fullscreen proof of purchase
+
+Receebo should clearly stand out.
+
+⸻
+
+8. Pricing
+
+Two pricing cards.
+
+Monthly
+
+€2.99/month
+
+7-day free trial
+
+Unlimited scans
+
+Unlimited storage
+
+AI extraction
+
+Warranty tracking
+
+Email imports
+
+Return reminders
+
+Priority processing
+
+Button
+
+Start free trial
+
+⸻
+
+Yearly
+
+€24.99/year
+
+Save 30%
+
+Same features
+
+Highlight this plan.
+
+⸻
+
+9. FAQ
+
+Questions
+
+How does Receebo work?
+
+Can I upload PDFs?
+
+Can I import email receipts?
+
+Is my data private?
+
+Can I cancel anytime?
+
+How does the free trial work?
+
+⸻
+
+10. Final CTA
+
+Large centered section.
+
+Headline
+
+Never lose a receipt again.
+
+Supporting text
+
+Receipts.
+Easy to find.
+
+CTA
+
+Start your 7-day free trial
+
+⸻
+
+Images
+
+Do NOT generate illustrations.
+
+Use clearly marked placeholders.
+
+Example
+
+[ HERO IMAGE ]
+[ FEATURE IMAGE ]
+[ PRODUCT SCREENSHOT ]
+[ VIDEO PLACEHOLDER ]
+
+I will replace every placeholder later.
+
+⸻
+
+Motion
+
+Use tasteful animations.
+
+Fade in
+
+Slide up
+
+Hover elevation
+
+Cards animate into view
+
+Buttons have subtle hover effects
+
+Videos should support autoplay later.
+
+⸻
+
+Important
+
+Do NOT make this look like a dashboard.
+
+Do NOT use feature overload.
+
+Keep everything clean and premium.
+
+The goal is to communicate one simple promise:
+
+Receipts. Easy to find.
+
+Every section should reinforce that message.
+
+Use excellent typography and spacing.
+
+The final result should feel polished enough to resemble an Apple product page while maintaining the simplicity and trust expected from a personal finance/productivity application.
+
+⸻
+
+One final suggestion: I’d ask Replit to build the landing page as a series of reusable sections (Hero, DemoSection, Features, Pricing, FAQ, CTA) rather than one long component. That will make it much easier to iterate on individual sections as you gather feedback without constantly editing a massive page.
