@@ -1,10 +1,11 @@
 import type { File as GCSFile } from "@google-cloud/storage";
-import { db, receiptsTable, receiptAttachmentsTable, userBillingTable } from "@workspace/db";
+import { db, receiptsTable, receiptAttachmentsTable, userBillingTable, userPreferencesTable, type ReceiptNotableItem } from "@workspace/db";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
 import { logger } from "./logger";
-import { sendWarrantyReminderEmail, sendTrialEndingEmail } from "./emailService";
+import { sendWarrantyReminderEmail, sendTrialEndingEmail, sendReturnWindowEmail } from "./emailService";
+import { calcReturnWindow } from "./returnWindowCalc";
 
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const ORPHAN_AGE_THRESHOLD_DAYS = 7;
@@ -137,6 +138,21 @@ async function runOrphanCleanup(): Promise<void> {
 
     const ISO_DATE_RE = /(\d{4}-\d{2}-\d{2})/g;
     let remindersSent = 0;
+    let remindersSkippedOptOut = 0;
+
+    // Cache opt-out status per user to avoid repeated lookups
+    const warrantyOptOutCache = new Map<string, boolean>();
+    async function isWarrantyOptedOut(userId: string): Promise<boolean> {
+      if (warrantyOptOutCache.has(userId)) return warrantyOptOutCache.get(userId)!;
+      const [row] = await db
+        .select({ notificationsOptOut: userPreferencesTable.notificationsOptOut })
+        .from(userPreferencesTable)
+        .where(eq(userPreferencesTable.userId, userId))
+        .limit(1);
+      const optOut = row?.notificationsOptOut ?? false;
+      warrantyOptOutCache.set(userId, optOut);
+      return optOut;
+    }
 
     for (const r of warrantyReceipts) {
       if (!r.warranty) continue;
@@ -146,6 +162,10 @@ async function runOrphanCleanup(): Promise<void> {
       for (const dateStr of matches) {
         const expiryMs = new Date(`${dateStr}T00:00:00Z`).getTime();
         if (expiryMs === targetMs) {
+          if (await isWarrantyOptedOut(r.userId)) {
+            remindersSkippedOptOut++;
+            break;
+          }
           void sendWarrantyReminderEmail(r.userId, {
             id: r.id,
             merchant: r.merchant,
@@ -161,6 +181,9 @@ async function runOrphanCleanup(): Promise<void> {
     if (remindersSent > 0) {
       logger.info({ remindersSent }, "Warranty reminder emails dispatched");
     }
+    if (remindersSkippedOptOut > 0) {
+      logger.info({ remindersSkippedOptOut }, "Warranty reminders skipped (opt-out)");
+    }
   } catch (err) {
     logger.error({ err }, "Warranty reminder sweep failed");
   }
@@ -170,6 +193,13 @@ async function runOrphanCleanup(): Promise<void> {
     await runTrialReminderSweep({ dryRun: false });
   } catch (err) {
     logger.error({ err }, "Trial reminder sweep failed");
+  }
+
+  // Return window reminders — 7-day and 2-day alerts for online purchases
+  try {
+    await runReturnWindowSweep();
+  } catch (err) {
+    logger.error({ err }, "Return window sweep failed");
   }
 }
 
@@ -280,6 +310,182 @@ export async function runTrialReminderSweep(options: { dryRun: boolean }): Promi
   }
 
   return dryRunResults;
+}
+
+/**
+ * Nightly sweep: send return-window reminder emails at 7 days and 2 days before deadline.
+ * Skips users who have opted out of notifications.
+ * Uses optimistic atomic updates (claim-before-send) to prevent duplicate sends.
+ */
+async function runReturnWindowSweep(): Promise<void> {
+  // Load all completed non-draft receipts that are online purchases and have
+  // at least one reminder not yet sent.
+  let receipts: Array<{
+    id: number;
+    userId: string;
+    merchant: string | null;
+    notableItems: ReceiptNotableItem[];
+    purchaseDate: string | null;
+    purchaseCountry: string | null;
+    isOnlinePurchase: boolean | null;
+    currency: string | null;
+    originalFileName: string;
+    returnReminderSent7dAt: Date | null;
+    returnReminderSent2dAt: Date | null;
+  }>;
+
+  try {
+    receipts = await db
+      .select({
+        id: receiptsTable.id,
+        userId: receiptsTable.userId,
+        merchant: receiptsTable.merchant,
+        notableItems: receiptsTable.notableItems,
+        purchaseDate: receiptsTable.purchaseDate,
+        purchaseCountry: receiptsTable.purchaseCountry,
+        isOnlinePurchase: receiptsTable.isOnlinePurchase,
+        currency: receiptsTable.currency,
+        originalFileName: receiptsTable.originalFileName,
+        returnReminderSent7dAt: receiptsTable.returnReminderSent7dAt,
+        returnReminderSent2dAt: receiptsTable.returnReminderSent2dAt,
+      })
+      .from(receiptsTable)
+      .where(
+        and(
+          eq(receiptsTable.status, "completed"),
+          eq(receiptsTable.isDraft, false),
+        ),
+      );
+  } catch (err) {
+    logger.error({ err }, "Return window sweep: failed to query receipts");
+    return;
+  }
+
+  // Cache opt-out status per userId to avoid repeated DB lookups.
+  const optOutCache = new Map<string, boolean>();
+  async function isOptedOut(userId: string): Promise<boolean> {
+    if (optOutCache.has(userId)) return optOutCache.get(userId)!;
+    const [row] = await db
+      .select({ notificationsOptOut: userPreferencesTable.notificationsOptOut })
+      .from(userPreferencesTable)
+      .where(eq(userPreferencesTable.userId, userId))
+      .limit(1);
+    const optOut = row?.notificationsOptOut ?? false;
+    optOutCache.set(userId, optOut);
+    return optOut;
+  }
+
+  let sent7d = 0;
+  let sent2d = 0;
+  let skippedExpired = 0;
+  let skippedOptOut = 0;
+
+  for (const r of receipts) {
+    if (!r.purchaseDate) continue;
+
+    const window = calcReturnWindow({
+      purchaseDate: r.purchaseDate,
+      purchaseCountry: r.purchaseCountry,
+      isOnlinePurchase: r.isOnlinePurchase,
+      currency: r.currency,
+      merchant: r.merchant,
+    });
+
+    if (!window) continue;
+    const { deadlineDate, daysRemaining } = window;
+
+    // Skip already expired windows
+    if (daysRemaining < 0) {
+      skippedExpired++;
+      continue;
+    }
+
+    const needs7d = r.returnReminderSent7dAt === null && daysRemaining <= 7;
+    const needs2d = r.returnReminderSent2dAt === null && daysRemaining <= 2;
+
+    if (!needs7d && !needs2d) continue;
+
+    // Check opt-out before any DB write or email send
+    if (await isOptedOut(r.userId)) {
+      skippedOptOut++;
+      continue;
+    }
+
+    const notableItemName = r.notableItems?.[0]?.name ?? null;
+
+    // --- 7-day alert ---
+    if (needs7d) {
+      // Atomically claim the send slot
+      const claimed = await db
+        .update(receiptsTable)
+        .set({ returnReminderSent7dAt: new Date() })
+        .where(
+          and(
+            eq(receiptsTable.id, r.id),
+            isNull(receiptsTable.returnReminderSent7dAt),
+          ),
+        )
+        .returning({ id: receiptsTable.id });
+
+      if (claimed.length > 0) {
+        const ok = await sendReturnWindowEmail(r.userId, {
+          id: r.id,
+          merchant: r.merchant,
+          notableItemName,
+          deadlineDate,
+          daysRemaining,
+          originalFileName: r.originalFileName,
+        });
+        if (ok) {
+          sent7d++;
+        } else {
+          // Reset flag so the next sweep can retry
+          await db
+            .update(receiptsTable)
+            .set({ returnReminderSent7dAt: null })
+            .where(eq(receiptsTable.id, r.id));
+        }
+      }
+    }
+
+    // --- 2-day alert ---
+    if (needs2d) {
+      const claimed = await db
+        .update(receiptsTable)
+        .set({ returnReminderSent2dAt: new Date() })
+        .where(
+          and(
+            eq(receiptsTable.id, r.id),
+            isNull(receiptsTable.returnReminderSent2dAt),
+          ),
+        )
+        .returning({ id: receiptsTable.id });
+
+      if (claimed.length > 0) {
+        const ok = await sendReturnWindowEmail(r.userId, {
+          id: r.id,
+          merchant: r.merchant,
+          notableItemName,
+          deadlineDate,
+          daysRemaining,
+          originalFileName: r.originalFileName,
+        });
+        if (ok) {
+          sent2d++;
+        } else {
+          await db
+            .update(receiptsTable)
+            .set({ returnReminderSent2dAt: null })
+            .where(eq(receiptsTable.id, r.id));
+        }
+      }
+    }
+  }
+
+  logger.info(
+    { sent7d, sent2d, skippedExpired, skippedOptOut },
+    "Return window sweep complete",
+  );
 }
 
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;

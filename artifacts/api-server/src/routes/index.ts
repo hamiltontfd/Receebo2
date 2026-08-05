@@ -6,6 +6,7 @@ import attachmentsRouter from "./attachments";
 import guestSessionRouter from "./guestSession";
 import billingRouter from "./billing";
 import adminRouter from "./admin";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(attachmentsRouter);
 router.use(guestSessionRouter);
 router.use(billingRouter);
 router.use(adminRouter);
+router.use(notificationsRouter);
 
 export default router;

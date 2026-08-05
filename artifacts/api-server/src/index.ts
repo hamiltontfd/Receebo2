@@ -61,6 +61,26 @@ async function runStartupMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS is_online_purchase boolean
     `);
 
+    // Return window reminder dedup columns
+    await db.execute(sql`
+      ALTER TABLE receipts
+        ADD COLUMN IF NOT EXISTS return_reminder_sent_7d_at timestamptz
+    `);
+    await db.execute(sql`
+      ALTER TABLE receipts
+        ADD COLUMN IF NOT EXISTS return_reminder_sent_2d_at timestamptz
+    `);
+
+    // Dedicated user preferences table (notification opt-out, etc.)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id               text PRIMARY KEY,
+        notifications_opt_out boolean NOT NULL DEFAULT false,
+        created_at            timestamptz NOT NULL DEFAULT now(),
+        updated_at            timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
     logger.info("Startup migrations applied");
   } catch (err) {
     logger.warn({ err }, "Startup migrations warning (non-fatal) — continuing");

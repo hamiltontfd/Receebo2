@@ -20,3 +20,4 @@
 export * from "./receipts";
 export * from "./guestSessions";
 export * from "./userBilling";
+export * from "./userPreferences";

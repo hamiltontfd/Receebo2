@@ -46,6 +46,8 @@ export const receiptsTable = pgTable("receipts", {
   notableItems: jsonb("notable_items").$type<ReceiptNotableItem[]>().notNull().default([]),
   purchaseCountry: text("purchase_country"),
   isOnlinePurchase: boolean("is_online_purchase"),
+  returnReminderSent7dAt: timestamp("return_reminder_sent_7d_at", { withTimezone: true }),
+  returnReminderSent2dAt: timestamp("return_reminder_sent_2d_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

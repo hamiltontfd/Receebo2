@@ -1,12 +1,47 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useBillingStatus, useCreateCheckout, useCreatePortal } from "@/hooks/useBilling";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Minus } from "lucide-react";
+
+const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
+
+async function fetchNotificationPrefs(base: string): Promise<{ optOut: boolean }> {
+  const res = await fetch(`${base}api/notifications/preferences`, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to load preferences");
+  return res.json() as Promise<{ optOut: boolean }>;
+}
+
+async function patchNotificationPrefs(base: string, optOut: boolean): Promise<{ optOut: boolean }> {
+  const res = await fetch(`${base}api/notifications/preferences`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ optOut }),
+  });
+  if (!res.ok) throw new Error("Failed to update preferences");
+  return res.json() as Promise<{ optOut: boolean }>;
+}
+
+function useNotificationPreferences() {
+  const query = useQuery({
+    queryKey: ["notifications", "preferences"],
+    queryFn: () => fetchNotificationPrefs(BASE),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  const mutation = useMutation({
+    mutationFn: (optOut: boolean) => patchNotificationPrefs(BASE, optOut),
+  });
+
+  return { query, mutation };
+}
 
 function PlanBadge({ plan }: { plan: "free" | "trialing" | "pro" }) {
   if (plan === "pro") {
@@ -38,6 +73,15 @@ export default function Settings() {
   const checkout = useCreateCheckout();
   const portal = useCreatePortal();
   const { toast } = useToast();
+  const { query: notifQuery, mutation: notifMutation } = useNotificationPreferences();
+  const [notifOptOut, setNotifOptOut] = useState<boolean | null>(null);
+
+  // Sync local toggle state when preferences load
+  useEffect(() => {
+    if (notifQuery.data !== undefined && notifOptOut === null) {
+      setNotifOptOut(notifQuery.data.optOut);
+    }
+  }, [notifQuery.data, notifOptOut]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -162,6 +206,50 @@ export default function Settings() {
             )}
           </div>
         )}
+      </section>
+
+      {/* Notifications */}
+      <section className="mb-10">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+          Notifications
+        </h2>
+        <div className="border rounded-xl p-5 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Email reminders</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Receive an email before return windows expire (7 days and 2 days out).
+              </p>
+            </div>
+            {notifQuery.isLoading || notifOptOut === null ? (
+              <Skeleton className="h-6 w-10 rounded-full" />
+            ) : (
+              <Switch
+                checked={!notifOptOut}
+                disabled={notifMutation.isPending}
+                onCheckedChange={(enabled) => {
+                  const newOptOut = !enabled;
+                  setNotifOptOut(newOptOut);
+                  notifMutation.mutate(newOptOut, {
+                    onError: () => {
+                      // Revert on failure
+                      setNotifOptOut(notifOptOut);
+                      toast({
+                        title: "Something went wrong",
+                        description: "Could not update notification preferences. Please try again.",
+                        variant: "destructive",
+                      });
+                    },
+                    onSuccess: ({ optOut }) => {
+                      setNotifOptOut(optOut);
+                      queryClient.invalidateQueries({ queryKey: ["notifications", "preferences"] });
+                    },
+                  });
+                }}
+              />
+            )}
+          </div>
+        </div>
       </section>
 
       {/* Plan comparison */}
