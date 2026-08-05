@@ -43,9 +43,9 @@ export default function WhyReceeboSection() {
             variants={fadeInUp}
             className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight max-w-2xl"
           >
-            Everything your receipts need.
+            Forgot where or when?
             <br />
-            Nothing they don't.
+            We got you.
           </motion.h2>
         </motion.div>
 
