@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/mobile/"
+title = "Receebo Mobile"
+description = "A mobile companion app for Receebo receipt management. Lets users browse their receipt library, review and approve or dismiss incoming Gmail imports, and connect/disconnect their Gmail account from the mobile settings screen — mirroring the web app's Gmail auto-import flow on iPhone and Android."
+version = "1.0.0"
+id = "artifacts/receiptr-mobile"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/mobile/" ]
+localPort = 23569
+
+[services.development]
+run = "pnpm --filter @workspace/receiptr-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/receiptr-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/receiptr-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "23569"
+BASE_PATH = "/mobile/"

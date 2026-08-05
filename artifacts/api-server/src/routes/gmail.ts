@@ -405,4 +405,30 @@ router.delete(
   },
 );
 
+// ---------------------------------------------------------------------------
+// GET /gmail/connect-url  — returns the OAuth URL as JSON for mobile clients
+// Mobile apps cannot follow server-side redirects with auth headers, so this
+// endpoint returns the URL as JSON so the client can open it via Linking.
+// ---------------------------------------------------------------------------
+router.get("/gmail/connect-url", requireAuth, (req, res): void => {
+  if (!isGmailConfigured()) {
+    res.status(503).json({ error: "Gmail integration not configured." });
+    return;
+  }
+  try {
+    const nonce = randomBytes(32).toString("hex");
+    pendingOAuthNonces.set(nonce, {
+      userId: req.userId!,
+      expiresAt: Date.now() + NONCE_TTL_MS,
+    });
+    const state = buildSignedState(req.userId!, nonce);
+    const url = buildGmailOAuthUrl(redirectUri(req), state);
+    res.json({ url });
+  } catch (err) {
+    logger.error({ err }, "GET /gmail/connect-url failed");
+    res.status(500).json({ error: "Failed to build Gmail OAuth URL" });
+  }
+});
+
 export default router;
+
