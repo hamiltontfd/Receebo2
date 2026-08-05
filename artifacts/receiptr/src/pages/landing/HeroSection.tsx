@@ -97,9 +97,9 @@ export default function HeroSection() {
                   asChild
                   className="rounded-full h-13 px-8 text-base font-medium gap-2"
                 >
-                  <a href="#">
+                  <a href="#demo">
                     <Play className="w-3.5 h-3.5 fill-current" />
-                    Watch demo
+                    See it in action
                   </a>
                 </Button>
               </motion.div>

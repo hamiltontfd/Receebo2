@@ -18,7 +18,7 @@ const demos = [
 
 export default function DemoSection() {
   return (
-    <section className="py-24 lg:py-32 bg-muted/20">
+    <section id="demo" className="py-24 lg:py-32 bg-muted/20">
       <div className="max-w-7xl mx-auto px-6">
         {/* Header */}
         <motion.div
