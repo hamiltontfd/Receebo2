@@ -62,7 +62,7 @@ Respond ONLY with a JSON object matching this exact shape:
   ],
   "notableItems": [                  // items worth keeping the receipt for; empty array if none qualify
     {
-      "name": string,                // product name as it appears on the receipt
+      "name": string,                // concise human-readable product name (see naming rules below)
       "price": number | null,        // item price as a plain number, or null if not visible
       "category": string | null,     // inferred category, e.g. "Electronics", "Appliances", "Tools", "Furniture"
       "reason": string               // one-line reason, e.g. "likely has manufacturer warranty", "eligible for return", "high-value purchase"
@@ -77,7 +77,17 @@ Rules:
 - Transcribe ocrText faithfully, including item lines, taxes, and totals.
 - Do not include any commentary outside the JSON.
 - For notableItems: include any line item priced above ~$50 that falls into a durable-goods category such as electronics, appliances, tools, furniture, sporting equipment, or similar. These are purchases where a receipt may be needed for warranty claims, returns, or insurance. Exclude consumables (food, drinks, toiletries), services, and low-value items regardless of category.
-- Deduplication: if the same line item (identical name and price) appears more than once in the image — for example because two overlapping receipt segments were photographed — include it only ONCE in the products array. Do not repeat identical line items.`;
+- Deduplication: if the same line item (identical name and price) appears more than once in the image — for example because two overlapping receipt segments were photographed — include it only ONCE in the products array. Do not repeat identical line items.
+- Product naming — apply to BOTH "products[].name" AND "notableItems[].name":
+  * Write a concise, human-readable name: brand + model identifier + product type. Target 2–6 words; hard cap 60 characters.
+  * Strip all of the following: compatibility lists ("for iPhone, Android, iOS 16+…"), colour/finish suffixes ("Space Gray", "RGB", "White"), certification badges ("MFi Certified", "Works with Alexa", "Energy Star"), internal SKU or part codes that mean nothing to a consumer, and SEO keyword padding that online retailers append for search ranking.
+  * Keep the brand name when present. Keep a model name or series only when it is short and meaningful to the buyer (e.g. "Galaxy S24", "AirPods Pro", "MX Master 3S"). Drop purely internal catalogue codes.
+  * Transformation examples:
+    - "GameSir X2s Mobile Gaming Controller for iPhone Android MFi Certified Plug-and-Play Ergonomic Gamepad Hall Effect Joysticks Compatible iOS 16+ Android 10+ White" → "GameSir X2s Mobile Gaming Controller"
+    - "Instant Pot Duo 7-in-1 Electric Pressure Cooker, 6 Quart, 14 One-Touch Programs, Stainless Steel/Black" → "Instant Pot Duo 6qt Pressure Cooker"
+    - "Logitech MX Master 3S Performance Wireless Mouse Ultra-Fast Scrolling Ergo 8K DPI Track on Glass Quiet Clicks USB-C Bluetooth Windows Linux Chrome – Pale Gray" → "Logitech MX Master 3S Mouse"
+    - "Apple AirPods Pro (2nd Generation) Wireless Earbuds, Up to 2X More Active Noise Cancelling, Adaptive Transparency, Personalized Spatial Audio, MagSafe Charging Case, Bluetooth Headphones for iPhone" → "Apple AirPods Pro 2nd Gen"
+  * The full original text is preserved verbatim in "ocrText", so shortening the name here loses no information.`;
 
 const PRE_CHECK_SYSTEM_PROMPT = `You are a document classifier. Respond ONLY with a JSON object {"isReceipt":true} if the image shows a purchase receipt, invoice, or proof of purchase from a store or service provider. Respond with {"isReceipt":false} for anything else (photos, selfies, random documents, screenshots, menus, etc.). A valid receipt must show at least a merchant name, items purchased, and a total or subtotal amount.`;
 
