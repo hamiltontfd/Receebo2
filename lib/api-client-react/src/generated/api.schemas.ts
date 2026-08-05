@@ -215,11 +215,19 @@ export interface ErrorEnvelope {
   error: string;
 }
 
+export interface ReceiptPage {
+  items: Receipt[];
+  /** ISO timestamp cursor for the next page, or null if no more pages. */
+  nextCursor: string | null;
+}
+
 export type ListReceiptsParams = {
-/**
- * Natural-language search query across merchant, products, OCR text, and AI metadata.
- */
-q?: string;
+  /** Natural-language search query across merchant, products, OCR text, and AI metadata. */
+  q?: string;
+  /** Page size for non-search requests (default 20, max 50). */
+  limit?: number;
+  /** ISO timestamp cursor — returns items older than this timestamp. */
+  cursor?: string;
 };
 
 export type GetRecentReceiptsParams = {

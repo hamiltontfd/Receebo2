@@ -21,7 +21,9 @@ export const HealthCheckResponse = zod.object({
  * @summary List receipts (most recent first)
  */
 export const ListReceiptsQueryParams = zod.object({
-  "q": zod.coerce.string().optional().describe('Natural-language search query across merchant, products, OCR text, and AI metadata.')
+  "q": zod.coerce.string().optional().describe('Natural-language search query across merchant, products, OCR text, and AI metadata.'),
+  "limit": zod.coerce.number().min(1).max(50).optional().describe('Page size for non-search requests (default 20, max 50).'),
+  "cursor": zod.coerce.string().optional().describe('ISO timestamp cursor — returns items older than this timestamp.'),
 })
 
 export const ListReceiptsResponseItem = zod.object({

@@ -6,15 +6,19 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
+  InfiniteData,
   MutationFunction,
   QueryFunction,
   QueryKey,
   UseMutationOptions,
   UseMutationResult,
+  UseInfiniteQueryOptions,
+  UseInfiniteQueryResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
@@ -30,6 +34,7 @@ import type {
   MerchantSpend,
   Receipt,
   ReceiptInput,
+  ReceiptPage,
   ReceiptStats,
   ReceiptUpdate,
   SimilarReceiptMatch,
@@ -145,9 +150,9 @@ export const getListReceiptsUrl = (params?: ListReceiptsParams,) => {
 /**
  * @summary List receipts (most recent first)
  */
-export const listReceipts = async (params?: ListReceiptsParams, options?: RequestInit): Promise<Receipt[]> => {
+export const listReceipts = async (params?: ListReceiptsParams, options?: RequestInit): Promise<ReceiptPage> => {
 
-  return customFetch<Receipt[]>(getListReceiptsUrl(params),
+  return customFetch<ReceiptPage>(getListReceiptsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -167,7 +172,7 @@ export const getListReceiptsQueryKey = (params?: ListReceiptsParams,) => {
     }
 
 
-export const getListReceiptsQueryOptions = <TData = Awaited<ReturnType<typeof listReceipts>>, TError = ErrorType<unknown>>(params?: ListReceiptsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listReceipts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListReceiptsQueryOptions = <TData = Awaited<ReturnType<typeof listReceipts>>, TError = ErrorType<unknown>>(params?: ListReceiptsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listReceipts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -194,7 +199,7 @@ export type ListReceiptsQueryError = ErrorType<unknown>
  */
 
 export function useListReceipts<TData = Awaited<ReturnType<typeof listReceipts>>, TError = ErrorType<unknown>>(
- params?: ListReceiptsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listReceipts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListReceiptsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listReceipts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -203,6 +208,32 @@ export function useListReceipts<TData = Awaited<ReturnType<typeof listReceipts>>
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Infinite-query variant of useListReceipts.
+ * Uses createdAt-based cursor pagination. Only for the non-search (idle) list.
+ */
+export function useInfiniteListReceipts(
+  params?: Omit<ListReceiptsParams, 'cursor'>,
+  options?: {
+    query?: { enabled?: boolean; staleTime?: number; gcTime?: number };
+    request?: SecondParameter<typeof customFetch>;
+  }
+): UseInfiniteQueryResult<InfiniteData<ReceiptPage>, ErrorType<unknown>> & { queryKey: QueryKey } {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey: QueryKey = [...getListReceiptsQueryKey(params), 'infinite'];
+
+  const result = useInfiniteQuery<ReceiptPage, ErrorType<unknown>, InfiniteData<ReceiptPage>, QueryKey, string | null>({
+    queryKey,
+    queryFn: ({ pageParam, signal }) =>
+      listReceipts({ ...params, cursor: pageParam ?? undefined }, { signal, ...requestOptions }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    initialPageParam: null,
+    ...queryOptions,
+  });
+
+  return { ...result, queryKey };
 }
 
 

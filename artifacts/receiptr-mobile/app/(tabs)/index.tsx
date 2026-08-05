@@ -141,7 +141,7 @@ export default function LibraryScreen() {
     q: debouncedSearch || undefined,
   });
 
-  const displayReceipts = (receipts as Receipt[] | undefined)?.filter((r) => !r.isDraft) ?? [];
+  const displayReceipts = (receipts?.items ?? []).filter((r) => !r.isDraft);
 
   const topPad = isWeb ? 67 : 0;
   const bottomPad = isWeb ? 34 : insets.bottom;

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, count, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, lt, or, sql } from "drizzle-orm";
 import { db, receiptsTable, receiptAttachmentsTable } from "@workspace/db";
 import {
   CreateReceiptBody,
@@ -36,12 +36,19 @@ const router: IRouter = Router();
 
 router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const isSearch = q.length > 0;
+
+  // Pagination params — only applied when not searching
+  const limitRaw = parseInt(req.query.limit as string, 10);
+  const limit = isNaN(limitRaw) ? 20 : Math.min(Math.max(1, limitRaw), 50);
+  const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
 
   const conditions = [
     eq(receiptsTable.userId, req.userId!),
     eq(receiptsTable.isDraft, false),
   ];
-  if (q.length > 0) {
+
+  if (isSearch) {
     const term = `%${q}%`;
     const search = or(
       ilike(receiptsTable.merchant, term),
@@ -54,15 +61,35 @@ router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
       sql`${receiptsTable.notableItems}::text ILIKE ${term}`,
     );
     if (search) conditions.push(search);
+  } else if (cursor) {
+    // Cursor pagination: fetch items older than the cursor timestamp
+    try {
+      conditions.push(lt(receiptsTable.createdAt, new Date(cursor)));
+    } catch {
+      // Invalid cursor — ignore, return from the top
+    }
   }
+
+  // For search: fetch all matches. For paginated: fetch limit+1 to detect next page.
+  const fetchLimit = isSearch ? 10000 : limit + 1;
 
   const rows = await db
     .select()
     .from(receiptsTable)
     .where(and(...conditions))
-    .orderBy(desc(receiptsTable.createdAt));
+    .orderBy(desc(receiptsTable.createdAt))
+    .limit(fetchLimit);
 
-  res.json(ListReceiptsResponse.parse(rows));
+  if (isSearch) {
+    res.json({ items: ListReceiptsResponse.parse(rows), nextCursor: null });
+  } else {
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore
+      ? (items[items.length - 1].createdAt as Date).toISOString()
+      : null;
+    res.json({ items: ListReceiptsResponse.parse(items), nextCursor });
+  }
 });
 
 const DAILY_UPLOAD_LIMIT = 5;

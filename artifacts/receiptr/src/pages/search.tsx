@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { useListReceipts, useGetRecentReceipts } from "@workspace/api-client-react";
+import { useListReceipts, useInfiniteListReceipts, useGetRecentReceipts } from "@workspace/api-client-react";
 import type { Receipt } from "@workspace/api-client-react";
 import { currencySymbol } from "@/lib/currency";
 import { CATEGORIES, categoryStyle, categoryIcon } from "@/lib/categories";
@@ -433,11 +433,50 @@ export default function SearchPage() {
 
   const isSearching = debounced.length > 0;
 
+  // Notable items grid — always fetches the 10 most recent for the "Worth keeping" section
   const { data: recent, isLoading: recentLoading } = useGetRecentReceipts({ limit: 10 });
 
-  const { data: results, isLoading: searchLoading } = useListReceipts(
-    isSearching ? { q: debounced } : undefined,
+  // Full paginated list — powers the idle receipt list with infinite scroll
+  const {
+    data: infiniteData,
+    isLoading: idleLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteListReceipts(undefined, { query: { enabled: !isSearching } });
+
+  // Flatten all pages into a single receipt array
+  const allReceipts = useMemo(
+    () =>
+      (infiniteData?.pages ?? [])
+        .flatMap((p) => p?.items ?? [])
+        .filter((r): r is typeof r => r != null && typeof r === "object"),
+    [infiniteData],
   );
+
+  // Search results (non-paginated, all matches)
+  const { data: searchPage, isLoading: searchLoading } = useListReceipts(
+    isSearching ? { q: debounced } : undefined,
+    { query: { enabled: isSearching } },
+  );
+  const results = searchPage?.items;
+
+  // Sentinel ref — triggers fetchNextPage when it enters the viewport
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const notableItems = useMemo(() => {
     if (!recent) return [];
@@ -579,7 +618,7 @@ export default function SearchPage() {
             transition={{ duration: 0.18, ease }}
             className="flex flex-col gap-5"
           >
-            {recentLoading ? (
+            {(idleLoading && allReceipts.length === 0) || (recentLoading && notableItems.length === 0) ? (
               <>
                 <div className="space-y-2">
                   <Skeleton className="h-3.5 w-28 rounded-full" />
@@ -646,28 +685,45 @@ export default function SearchPage() {
                   </section>
                 )}
 
-                {recent && recent.length > 0 ? (
+                {allReceipts.length > 0 ? (
                   <section>
-                    <motion.h2
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.2, delay: 0.05 }}
-                      className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1"
-                    >
-                      Recent
-                    </motion.h2>
                     <motion.ul
                       className="divide-y divide-border"
                       variants={listVariants}
                       initial="hidden"
                       animate="visible"
                     >
-                      {recent.map((r, i) => (
-                        <ReceiptRow key={r.id} r={r} onOpen={setSelectedId} />
-                      ))}
+                      {allReceipts.flatMap((r, i) => {
+                        const year = new Date(r.createdAt).getFullYear();
+                        const prevYear = i > 0 ? new Date(allReceipts[i - 1].createdAt).getFullYear() : null;
+                        const showYearSep = prevYear !== null && year !== prevYear;
+                        const nodes = [];
+                        if (showYearSep) {
+                          nodes.push(
+                            <li key={`year-${year}`} className="!border-t-0 list-none" aria-hidden>
+                              <div className="flex items-center gap-3 py-3">
+                                <div className="flex-1 h-px bg-border" />
+                                <span className="text-xs font-semibold text-muted-foreground/60 tabular-nums tracking-wider">{year}</span>
+                                <div className="flex-1 h-px bg-border" />
+                              </div>
+                            </li>
+                          );
+                        }
+                        nodes.push(<ReceiptRow key={r.id} r={r} onOpen={setSelectedId} />);
+                        return nodes;
+                      })}
                     </motion.ul>
+
+                    {/* Infinite scroll sentinel */}
+                    <div ref={sentinelRef} className="h-1" />
+
+                    {isFetchingNextPage && (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
                   </section>
-                ) : recent && recent.length === 0 ? (
+                ) : !idleLoading ? (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
