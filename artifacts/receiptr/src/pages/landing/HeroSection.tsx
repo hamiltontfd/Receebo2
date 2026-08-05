@@ -90,12 +90,12 @@ export default function HeroSection() {
                 </Link>
               )}
 
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto">
                 <Button
                   size="lg"
                   variant="outline"
                   asChild
-                  className="rounded-full h-13 px-8 text-base font-medium gap-2"
+                  className="rounded-full h-13 px-8 text-base font-medium gap-2 w-full sm:w-auto"
                 >
                   <a href="#demo">
                     <Play className="w-3.5 h-3.5 fill-current" />
