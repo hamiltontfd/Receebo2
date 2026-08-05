@@ -120,6 +120,21 @@ async function runStartupMigrations(): Promise<void> {
       )
     `);
 
+    // Upload intents — short-lived records binding a presigned URL to the user
+    // who requested it, consumed when a receipt/attachment is created.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS upload_intents (
+        id          serial PRIMARY KEY,
+        user_id     text NOT NULL,
+        object_path text NOT NULL,
+        expires_at  timestamptz NOT NULL,
+        created_at  timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    // Purge any expired intents left over from previous runs
+    await db.execute(sql`DELETE FROM upload_intents WHERE expires_at < now()`);
+
     logger.info("Startup migrations applied");
   } catch (err) {
     logger.warn({ err }, "Startup migrations warning (non-fatal) — continuing");

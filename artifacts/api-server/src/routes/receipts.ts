@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { and, count, desc, eq, gte, ilike, lt, or, sql } from "drizzle-orm";
-import { db, receiptsTable, receiptAttachmentsTable } from "@workspace/db";
+import { and, count, desc, eq, gt, gte, ilike, lt, or, sql } from "drizzle-orm";
+import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable } from "@workspace/db";
 import {
   CreateReceiptBody,
   ListReceiptsResponse,
@@ -139,9 +139,28 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
   // automatically released when the transaction commits or rolls back.
   let receipt: (typeof receiptsTable.$inferSelect) | undefined;
   let limitReached = false;
+  let intentMissing = false;
 
   await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
+
+    // Verify the objectPath was issued by this server to this user.
+    // Atomically consume the intent so it cannot be reused.
+    const [intent] = await tx
+      .delete(uploadIntentsTable)
+      .where(
+        and(
+          eq(uploadIntentsTable.userId, userId),
+          eq(uploadIntentsTable.objectPath, parsed.data.objectPath),
+          gt(uploadIntentsTable.expiresAt, new Date()),
+        ),
+      )
+      .returning({ id: uploadIntentsTable.id });
+
+    if (!intent) {
+      intentMissing = true;
+      return;
+    }
 
     const [countRow] = await tx
       .select({ used: count() })
@@ -176,6 +195,11 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
 
     receipt = inserted;
   });
+
+  if (intentMissing) {
+    res.status(403).json({ error: "Invalid or expired upload path" });
+    return;
+  }
 
   if (limitReached) {
     res.status(429).json({

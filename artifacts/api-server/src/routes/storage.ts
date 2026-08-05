@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { and, eq } from "drizzle-orm";
-import { db, receiptsTable, receiptAttachmentsTable } from "@workspace/db";
+import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable } from "@workspace/db";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -31,6 +31,14 @@ router.post("/storage/uploads/request-url", requireAuthOrGuest, async (req: Requ
 
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+
+    // Bind this presigned URL to the requesting user so we can verify ownership
+    // when they later create a receipt or attachment referencing this objectPath.
+    await db.insert(uploadIntentsTable).values({
+      userId: req.userId!,
+      objectPath,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+    });
 
     res.json(
       RequestUploadUrlResponse.parse({

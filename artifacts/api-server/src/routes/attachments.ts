@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { and, count, eq, gte, sql } from "drizzle-orm";
-import { db, receiptsTable, receiptAttachmentsTable } from "@workspace/db";
+import { and, count, eq, gt, gte, sql } from "drizzle-orm";
+import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable } from "@workspace/db";
 import { CreateAttachmentBody, CreateAttachmentParams, DeleteAttachmentParams } from "@workspace/api-zod";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -52,6 +52,7 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
   let attachment: (typeof receiptAttachmentsTable.$inferSelect) | undefined;
   let limitReached = false;
   let receiptNotFound = false;
+  let intentMissing = false;
 
   // Same advisory-lock + transaction pattern as receipt creation so that
   // primary uploads and attachment uploads share the daily cap atomically.
@@ -66,6 +67,24 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
 
     if (!receipt) {
       receiptNotFound = true;
+      return;
+    }
+
+    // Verify the objectPath was issued by this server to this user.
+    // Atomically consume the intent so it cannot be reused.
+    const [intent] = await tx
+      .delete(uploadIntentsTable)
+      .where(
+        and(
+          eq(uploadIntentsTable.userId, userId),
+          eq(uploadIntentsTable.objectPath, parsed.data.objectPath),
+          gt(uploadIntentsTable.expiresAt, new Date()),
+        ),
+      )
+      .returning({ id: uploadIntentsTable.id });
+
+    if (!intent) {
+      intentMissing = true;
       return;
     }
 
@@ -103,6 +122,11 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
 
   if (receiptNotFound) {
     res.status(404).json({ error: "Receipt not found" });
+    return;
+  }
+
+  if (intentMissing) {
+    res.status(403).json({ error: "Invalid or expired upload path" });
     return;
   }
 
