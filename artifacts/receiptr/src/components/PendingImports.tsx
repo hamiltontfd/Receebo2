@@ -1,0 +1,234 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Check, X, Mail, RefreshCw, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
+
+const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
+
+export interface PendingImportItem {
+  id: number;
+  gmailMessageId: string;
+  originalFileName: string;
+  merchant: string | null;
+  total: number | null;
+  currency: string | null;
+  purchaseDate: string | null;
+  category: string | null;
+  summary: string | null;
+  createdAt: string;
+}
+
+async function fetchPending(): Promise<PendingImportItem[]> {
+  const res = await fetch(`${BASE}api/gmail/pending`, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to load pending imports");
+  return res.json() as Promise<PendingImportItem[]>;
+}
+
+async function approvePending(id: number): Promise<{ approved: boolean; receiptId: number }> {
+  const res = await fetch(`${BASE}api/gmail/pending/${id}/approve`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Failed to approve");
+  return res.json() as Promise<{ approved: boolean; receiptId: number }>;
+}
+
+async function dismissPending(id: number): Promise<void> {
+  const res = await fetch(`${BASE}api/gmail/pending/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Failed to dismiss");
+}
+
+async function triggerSync(): Promise<{ checked: number; queued: number }> {
+  const res = await fetch(`${BASE}api/gmail/sync`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Sync failed");
+  return res.json() as Promise<{ checked: number; queued: number }>;
+}
+
+function formatCurrency(amount: number | null, currency: string | null): string {
+  if (amount === null) return "";
+  const sym =
+    currency === "EUR"
+      ? "€"
+      : currency === "GBP"
+        ? "£"
+        : currency === "USD"
+          ? "$"
+          : currency
+            ? `${currency} `
+            : "";
+  return `${sym}${amount.toFixed(2)}`;
+}
+
+export function usePendingImportCount() {
+  const { data } = useQuery<PendingImportItem[]>({
+    queryKey: ["gmail", "pending"],
+    queryFn: fetchPending,
+    staleTime: 60_000,
+    retry: false,
+  });
+  return data?.length ?? 0;
+}
+
+export default function PendingImports() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: items = [], isLoading } = useQuery<PendingImportItem[]>({
+    queryKey: ["gmail", "pending"],
+    queryFn: fetchPending,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const approve = useMutation({
+    mutationFn: approvePending,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["gmail", "pending"] });
+      void queryClient.invalidateQueries({ queryKey: ["receipts"] });
+      toast({ title: "Receipt added to your library" });
+    },
+    onError: () =>
+      toast({
+        title: "Something went wrong",
+        description: "Could not approve receipt. Please try again.",
+        variant: "destructive",
+      }),
+  });
+
+  const dismiss = useMutation({
+    mutationFn: dismissPending,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["gmail", "pending"] });
+    },
+    onError: () =>
+      toast({
+        title: "Something went wrong",
+        description: "Could not dismiss import.",
+        variant: "destructive",
+      }),
+  });
+
+  const sync = useMutation({
+    mutationFn: triggerSync,
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["gmail", "pending"] });
+      if (result.queued > 0) {
+        toast({
+          title: `Found ${result.queued} new receipt${result.queued > 1 ? "s" : ""}`,
+          description: "Review them below.",
+        });
+      } else {
+        toast({ title: "No new receipts found" });
+      }
+    },
+    onError: () =>
+      toast({
+        title: "Sync failed",
+        description: "Could not reach Gmail. Try again shortly.",
+        variant: "destructive",
+      }),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8 text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+        <span className="text-sm">Checking inbox…</span>
+      </div>
+    );
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Mail className="w-4 h-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">
+            Found in Gmail
+            <span className="ml-1.5 bg-foreground text-background text-xs font-bold rounded-full px-1.5 py-0.5">
+              {items.length}
+            </span>
+          </h2>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-muted-foreground rounded-full"
+          onClick={() => sync.mutate()}
+          disabled={sync.isPending}
+        >
+          {sync.isPending ? (
+            <Loader2 className="w-3 h-3 animate-spin mr-1" />
+          ) : (
+            <RefreshCw className="w-3 h-3 mr-1" />
+          )}
+          Sync
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className="flex items-center gap-3 border rounded-xl px-4 py-3 bg-background"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">
+                {item.merchant ?? item.originalFileName}
+              </p>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                {item.total !== null && (
+                  <span className="text-xs font-semibold text-foreground">
+                    {formatCurrency(item.total, item.currency)}
+                  </span>
+                )}
+                {item.purchaseDate && (
+                  <span className="text-xs text-muted-foreground">
+                    {item.purchaseDate}
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  Found{" "}
+                  {formatDistanceToNow(new Date(item.createdAt), {
+                    addSuffix: true,
+                  })}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="w-8 h-8 rounded-full text-muted-foreground hover:text-destructive"
+                disabled={dismiss.isPending || approve.isPending}
+                onClick={() => dismiss.mutate(item.id)}
+                title="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+              <Button
+                size="icon"
+                className="w-8 h-8 rounded-full"
+                disabled={dismiss.isPending || approve.isPending}
+                onClick={() => approve.mutate(item.id)}
+                title="Add to library"
+              >
+                <Check className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

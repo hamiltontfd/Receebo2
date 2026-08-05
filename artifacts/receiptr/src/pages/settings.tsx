@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Minus } from "lucide-react";
+import { Check, Minus, Mail, Loader2, RefreshCw, PlugZap } from "lucide-react";
 
 const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
+
+// ─── Notification preferences ────────────────────────────────────────────────
 
 async function fetchNotificationPrefs(base: string): Promise<{ optOut: boolean }> {
   const res = await fetch(`${base}api/notifications/preferences`, { credentials: "include" });
@@ -43,6 +45,50 @@ function useNotificationPreferences() {
   return { query, mutation };
 }
 
+// ─── Gmail connection ─────────────────────────────────────────────────────────
+
+interface GmailStatus {
+  configured: boolean;
+  connected: boolean;
+  gmailEmail: string | null;
+  lastSyncedAt: string | null;
+  pendingCount: number;
+}
+
+async function fetchGmailStatus(): Promise<GmailStatus> {
+  const res = await fetch(`${BASE}api/gmail/status`, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to load Gmail status");
+  return res.json() as Promise<GmailStatus>;
+}
+
+async function disconnectGmail(): Promise<void> {
+  const res = await fetch(`${BASE}api/gmail/disconnect`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Failed to disconnect");
+}
+
+async function triggerSync(): Promise<{ checked: number; queued: number }> {
+  const res = await fetch(`${BASE}api/gmail/sync`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Sync failed");
+  return res.json() as Promise<{ checked: number; queued: number }>;
+}
+
+function useGmailStatus() {
+  return useQuery<GmailStatus>({
+    queryKey: ["gmail", "status"],
+    queryFn: fetchGmailStatus,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+// ─── Plan badge ───────────────────────────────────────────────────────────────
+
 function PlanBadge({ plan }: { plan: "free" | "trialing" | "pro" }) {
   if (plan === "pro") {
     return (
@@ -65,6 +111,8 @@ function PlanBadge({ plan }: { plan: "free" | "trialing" | "pro" }) {
   );
 }
 
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function Settings() {
   const { user } = useUser();
   const [location] = useLocation();
@@ -76,6 +124,43 @@ export default function Settings() {
   const { query: notifQuery, mutation: notifMutation } = useNotificationPreferences();
   const [notifOptOut, setNotifOptOut] = useState<boolean | null>(null);
 
+  const { data: gmailStatus, isLoading: gmailLoading } = useGmailStatus();
+
+  const disconnectMutation = useMutation({
+    mutationFn: disconnectGmail,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["gmail"] });
+      toast({ title: "Gmail disconnected" });
+    },
+    onError: () =>
+      toast({
+        title: "Something went wrong",
+        description: "Could not disconnect Gmail. Please try again.",
+        variant: "destructive",
+      }),
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: triggerSync,
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["gmail"] });
+      if (result.queued > 0) {
+        toast({
+          title: `Found ${result.queued} new receipt${result.queued > 1 ? "s" : ""}`,
+          description: "Check your pending imports.",
+        });
+      } else {
+        toast({ title: "No new receipts found" });
+      }
+    },
+    onError: () =>
+      toast({
+        title: "Sync failed",
+        description: "Could not reach Gmail. Try again shortly.",
+        variant: "destructive",
+      }),
+  });
+
   // Sync local toggle state when preferences load
   useEffect(() => {
     if (notifQuery.data !== undefined && notifOptOut === null) {
@@ -83,9 +168,21 @@ export default function Settings() {
     }
   }, [notifQuery.data, notifOptOut]);
 
+  // Handle OAuth redirect-back params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("checkout") === "success") {
+    if (params.get("gmail") === "connected") {
+      toast({ title: "Gmail connected", description: "Your inbox will be scanned shortly." });
+      void queryClient.invalidateQueries({ queryKey: ["gmail"] });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("gmail") === "error") {
+      toast({
+        title: "Gmail connection failed",
+        description: "Please try again. Make sure to allow the requested permissions.",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("checkout") === "success") {
       toast({ title: "Subscription activated", description: "Your plan has been updated." });
       queryClient.invalidateQueries({ queryKey: ["billing", "subscription"] });
       window.history.replaceState({}, "", window.location.pathname);
@@ -102,6 +199,16 @@ export default function Settings() {
       year: "numeric",
       month: "long",
       day: "numeric",
+    });
+  };
+
+  const formatDateTime = (iso: string | null) => {
+    if (!iso) return null;
+    return new Date(iso).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -127,6 +234,95 @@ export default function Settings() {
               {user?.fullName ?? "—"}
             </span>
           </div>
+        </div>
+      </section>
+
+      {/* Connected accounts */}
+      <section className="mb-10">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+          Connected accounts
+        </h2>
+
+        <div className="border rounded-xl p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Gmail</p>
+                {gmailLoading ? (
+                  <Skeleton className="h-3 w-32 mt-1" />
+                ) : gmailStatus?.connected ? (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {gmailStatus.gmailEmail ?? "Connected"}
+                    {gmailStatus.lastSyncedAt && (
+                      <> · Last synced {formatDateTime(gmailStatus.lastSyncedAt)}</>
+                    )}
+                    {gmailStatus.pendingCount > 0 && (
+                      <> ·{" "}
+                        <span className="font-semibold text-foreground">
+                          {gmailStatus.pendingCount} pending
+                        </span>
+                      </>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Auto-import receipt PDFs from your inbox
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {gmailLoading ? (
+                <Skeleton className="h-8 w-20 rounded-full" />
+              ) : gmailStatus?.connected ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full h-8 text-xs text-muted-foreground"
+                    onClick={() => syncMutation.mutate()}
+                    disabled={syncMutation.isPending || disconnectMutation.isPending}
+                  >
+                    {syncMutation.isPending ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3 h-3" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full h-8 text-xs"
+                    onClick={() => disconnectMutation.mutate()}
+                    disabled={disconnectMutation.isPending || syncMutation.isPending}
+                  >
+                    {disconnectMutation.isPending ? "Disconnecting…" : "Disconnect"}
+                  </Button>
+                </>
+              ) : gmailStatus?.configured === false ? (
+                <span className="text-xs text-muted-foreground italic">
+                  Not configured
+                </span>
+              ) : (
+                <a href={`${BASE}api/gmail/connect`}>
+                  <Button size="sm" className="rounded-full h-8 text-xs gap-1.5">
+                    <PlugZap className="w-3 h-3" />
+                    Connect Gmail
+                  </Button>
+                </a>
+              )}
+            </div>
+          </div>
+
+          {!gmailStatus?.configured && !gmailLoading && (
+            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
+              Gmail auto-import requires a Google OAuth integration. Contact the app administrator to enable it.
+            </p>
+          )}
         </div>
       </section>
 
@@ -232,7 +428,6 @@ export default function Settings() {
                   setNotifOptOut(newOptOut);
                   notifMutation.mutate(newOptOut, {
                     onError: () => {
-                      // Revert on failure
                       setNotifOptOut(notifOptOut);
                       toast({
                         title: "Something went wrong",
@@ -258,7 +453,6 @@ export default function Settings() {
           Plan features
         </h2>
         <div className="border rounded-xl overflow-hidden">
-          {/* Column headers */}
           <div className="grid grid-cols-3 px-5 py-3 bg-secondary/50 text-xs font-semibold border-b">
             <span className="text-muted-foreground">Feature</span>
             <span className="text-center text-muted-foreground">Free</span>
@@ -270,6 +464,7 @@ export default function Settings() {
             { feature: "Attachment uploads", free: "5 per day (shared)", pro: "Unlimited", freeHighlight: false, proHighlight: true },
             { feature: "Natural-language search", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Warranty reminders", free: true, pro: true, freeHighlight: false, proHighlight: false },
+            { feature: "Gmail auto-import", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Export & download", free: true, pro: true, freeHighlight: false, proHighlight: false },
           ].map(({ feature, free, pro }) => {
             const renderCell = (val: boolean | string, isProCol: boolean) => {

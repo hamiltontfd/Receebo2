@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startExtractionWatchdog } from "./lib/extractionQueue";
 import { startOrphanCleanupScheduler } from "./lib/orphanCleanup";
+import { startGmailSyncScheduler } from "./lib/gmailSync";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 
@@ -81,6 +82,44 @@ async function runStartupMigrations(): Promise<void> {
       )
     `);
 
+    // Gmail integration tables
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS gmail_connections (
+        user_id       text PRIMARY KEY,
+        gmail_email   text,
+        access_token  text,
+        refresh_token text NOT NULL,
+        token_expiry  timestamptz,
+        last_synced_at timestamptz,
+        created_at    timestamptz NOT NULL DEFAULT now(),
+        updated_at    timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS gmail_seen_messages (
+        id              serial PRIMARY KEY,
+        user_id         text NOT NULL,
+        gmail_message_id text NOT NULL,
+        created_at      timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (user_id, gmail_message_id)
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS pending_imports (
+        id                serial PRIMARY KEY,
+        user_id           text NOT NULL,
+        gmail_message_id  text NOT NULL,
+        object_path       text NOT NULL,
+        original_file_name text NOT NULL,
+        status            text NOT NULL DEFAULT 'pending',
+        extraction_data   jsonb,
+        created_at        timestamptz NOT NULL DEFAULT now(),
+        updated_at        timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
     logger.info("Startup migrations applied");
   } catch (err) {
     logger.warn({ err }, "Startup migrations warning (non-fatal) — continuing");
@@ -135,6 +174,7 @@ async function start(): Promise<void> {
     logger.info({ port }, "Server listening");
     startExtractionWatchdog();
     startOrphanCleanupScheduler();
+    startGmailSyncScheduler();
     void initStripe();
   });
 }

@@ -7,6 +7,7 @@ import guestSessionRouter from "./guestSession";
 import billingRouter from "./billing";
 import adminRouter from "./admin";
 import notificationsRouter from "./notifications";
+import gmailRouter from "./gmail";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(guestSessionRouter);
 router.use(billingRouter);
 router.use(adminRouter);
 router.use(notificationsRouter);
+router.use(gmailRouter);
 
 export default router;
