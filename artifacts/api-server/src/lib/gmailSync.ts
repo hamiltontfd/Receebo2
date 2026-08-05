@@ -11,6 +11,7 @@ import { eq, and } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
 import { extractReceiptData } from "./receiptExtraction";
 import { logger } from "./logger";
+import { encryptToken, decryptToken } from "./tokenCrypto";
 
 // ---------------------------------------------------------------------------
 // OAuth helpers
@@ -27,6 +28,57 @@ function getOAuth2Client(redirectUri?: string): OAuth2Client {
 
 export function isGmailConfigured(): boolean {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+}
+
+// ---------------------------------------------------------------------------
+// Token encryption helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a copy of `connection` with tokens decrypted to plaintext.
+ * If either stored token was still in legacy plaintext format (no `enc:v1:` prefix),
+ * a background DB update re-encrypts it so the row is migrated on first use.
+ */
+async function decryptGmailConnection(
+  connection: GmailConnection,
+): Promise<GmailConnection> {
+  let accessTokenPlain: string | null = null;
+  let accessNeedsReencrypt = false;
+
+  if (connection.accessToken !== null) {
+    const result = decryptToken(connection.accessToken);
+    accessTokenPlain = result.plaintext;
+    accessNeedsReencrypt = result.wasPlaintext;
+  }
+
+  const refreshResult = decryptToken(connection.refreshToken);
+  const refreshTokenPlain = refreshResult.plaintext;
+  const refreshNeedsReencrypt = refreshResult.wasPlaintext;
+
+  // Migrate any legacy plaintext tokens in the background
+  if (accessNeedsReencrypt || refreshNeedsReencrypt) {
+    const updates: Partial<typeof gmailConnectionsTable.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+    if (accessNeedsReencrypt && accessTokenPlain !== null) {
+      updates.accessToken = encryptToken(accessTokenPlain);
+    }
+    if (refreshNeedsReencrypt) {
+      updates.refreshToken = encryptToken(refreshTokenPlain);
+    }
+    db.update(gmailConnectionsTable)
+      .set(updates)
+      .where(eq(gmailConnectionsTable.userId, connection.userId))
+      .catch((err) =>
+        logger.warn({ err, userId: connection.userId }, "tokenCrypto: failed to re-encrypt legacy tokens"),
+      );
+  }
+
+  return {
+    ...connection,
+    accessToken: accessTokenPlain,
+    refreshToken: refreshTokenPlain,
+  };
 }
 
 /**
@@ -82,21 +134,26 @@ export async function exchangeCodeAndStore(
     logger.warn({ err }, "Gmail: failed to fetch userinfo");
   }
 
+  const encryptedAccessToken = tokens.access_token
+    ? encryptToken(tokens.access_token)
+    : null;
+  const encryptedRefreshToken = encryptToken(tokens.refresh_token);
+
   await db
     .insert(gmailConnectionsTable)
     .values({
       userId,
       gmailEmail,
-      accessToken: tokens.access_token ?? null,
-      refreshToken: tokens.refresh_token,
+      accessToken: encryptedAccessToken,
+      refreshToken: encryptedRefreshToken,
       tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
     })
     .onConflictDoUpdate({
       target: gmailConnectionsTable.userId,
       set: {
         gmailEmail,
-        accessToken: tokens.access_token ?? null,
-        refreshToken: tokens.refresh_token,
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
         tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
         updatedAt: new Date(),
       },
@@ -105,7 +162,10 @@ export async function exchangeCodeAndStore(
   return gmailEmail;
 }
 
-/** Refresh the access token using the stored refresh token and persist the new values. */
+/**
+ * Refresh the access token using the stored refresh token and persist the new values.
+ * `connection` must already have plaintext tokens (call decryptGmailConnection first).
+ */
 async function getFreshAccessToken(
   connection: GmailConnection,
 ): Promise<string> {
@@ -118,10 +178,14 @@ async function getFreshAccessToken(
 
   const { credentials } = await client.refreshAccessToken();
 
+  if (!credentials.access_token) {
+    throw new Error("Token refresh returned no access token");
+  }
+
   await db
     .update(gmailConnectionsTable)
     .set({
-      accessToken: credentials.access_token ?? null,
+      accessToken: encryptToken(credentials.access_token),
       tokenExpiry: credentials.expiry_date
         ? new Date(credentials.expiry_date)
         : null,
@@ -129,9 +193,6 @@ async function getFreshAccessToken(
     })
     .where(eq(gmailConnectionsTable.userId, connection.userId));
 
-  if (!credentials.access_token) {
-    throw new Error("Token refresh returned no access token");
-  }
   return credentials.access_token;
 }
 
@@ -232,9 +293,18 @@ export async function syncUserGmail(
 
   if (!connection) return { checked: 0, queued: 0 };
 
+  // Decrypt stored tokens before use; migrates any legacy plaintext rows in the background
+  let decryptedConnection: GmailConnection;
+  try {
+    decryptedConnection = await decryptGmailConnection(connection);
+  } catch (err) {
+    logger.error({ err, userId }, "Gmail sync: token decryption failed");
+    return { checked: 0, queued: 0 };
+  }
+
   let accessToken: string;
   try {
-    accessToken = await getFreshAccessToken(connection);
+    accessToken = await getFreshAccessToken(decryptedConnection);
   } catch (err) {
     logger.error({ err, userId }, "Gmail sync: token refresh failed");
     return { checked: 0, queued: 0 };
