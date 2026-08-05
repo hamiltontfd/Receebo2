@@ -107,7 +107,7 @@ export default function HeroSection() {
 
             {/* Social proof line */}
             <motion.p variants={fadeInUp} className="text-xs text-muted-foreground">
-              7-day free trial · Cancel any time · No hidden fees
+              7-day free trial. Cancel anytime. No hidden fees.
             </motion.p>
           </motion.div>
 
