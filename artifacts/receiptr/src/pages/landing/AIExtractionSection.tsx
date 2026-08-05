@@ -9,10 +9,6 @@ const fields = [
   "Prices & totals",
   "Warranty period",
   "Category",
-  "Currency",
-  "Country",
-  "Transaction number",
-  "Online / In-store",
 ];
 
 export default function AIExtractionSection() {
@@ -49,7 +45,7 @@ export default function AIExtractionSection() {
             {/* Field chips */}
             <motion.div
               variants={stagger}
-              className="grid grid-cols-2 gap-2.5"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2.5"
             >
               {fields.map((field) => (
                 <motion.div
