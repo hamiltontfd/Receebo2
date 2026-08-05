@@ -1,5 +1,5 @@
 import { Router, type Request } from "express";
-import { randomBytes } from "crypto";
+import { randomBytes, createHmac, timingSafeEqual } from "crypto";
 import { db } from "@workspace/db";
 import {
   gmailConnectionsTable,
@@ -19,6 +19,90 @@ import { logger } from "../lib/logger";
 const router = Router();
 
 // ---------------------------------------------------------------------------
+// OAuth state security
+//
+// Each /gmail/connect request generates a random nonce that is:
+//   1. Stored server-side with a 10-minute TTL (pendingOAuthNonces map)
+//   2. Included in a HMAC-SHA256-signed state token sent to Google
+//
+// The callback verifies the HMAC, then consumes the nonce (one-time use).
+// This prevents CSRF and state-tampering / account-linking attacks.
+// ---------------------------------------------------------------------------
+
+const NONCE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+interface NonceEntry {
+  userId: string;
+  expiresAt: number;
+}
+// nonce → {userId, expiresAt}
+const pendingOAuthNonces = new Map<string, NonceEntry>();
+
+// Prune expired nonces every 5 minutes to avoid memory growth
+setInterval(() => {
+  const now = Date.now();
+  for (const [nonce, entry] of pendingOAuthNonces) {
+    if (entry.expiresAt <= now) pendingOAuthNonces.delete(nonce);
+  }
+}, 5 * 60 * 1000).unref();
+
+function getStateSecret(): Buffer {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET env var is not set");
+  return Buffer.from(secret, "utf8");
+}
+
+/** Build a signed state token: base64url(payload) + "." + HMAC hex */
+function buildSignedState(userId: string, nonce: string): string {
+  const payload = Buffer.from(JSON.stringify({ userId, nonce })).toString("base64url");
+  const sig = createHmac("sha256", getStateSecret()).update(payload).digest("hex");
+  return `${payload}.${sig}`;
+}
+
+/**
+ * Verify a signed state token, consume the nonce, and return userId.
+ * Throws if the signature is invalid, the nonce is unknown/expired,
+ * or the parsed userId does not match the stored entry.
+ */
+function verifyAndConsumeState(state: string): string {
+  const dotIdx = state.lastIndexOf(".");
+  if (dotIdx < 0) throw new Error("Malformed state: no separator");
+
+  const payload = state.slice(0, dotIdx);
+  const receivedSig = state.slice(dotIdx + 1);
+
+  // Constant-time signature check
+  const expectedSig = createHmac("sha256", getStateSecret()).update(payload).digest("hex");
+  const expectedBuf = Buffer.from(expectedSig, "hex");
+  const receivedBuf = Buffer.from(receivedSig, "hex");
+  if (
+    expectedBuf.length !== receivedBuf.length ||
+    !timingSafeEqual(expectedBuf, receivedBuf)
+  ) {
+    throw new Error("Invalid state signature");
+  }
+
+  const parsed = JSON.parse(Buffer.from(payload, "base64url").toString()) as {
+    userId?: string;
+    nonce?: string;
+  };
+  if (!parsed.userId || !parsed.nonce) throw new Error("Incomplete state payload");
+
+  const entry = pendingOAuthNonces.get(parsed.nonce);
+  if (!entry) throw new Error("Unknown or already-used nonce");
+  if (entry.expiresAt <= Date.now()) {
+    pendingOAuthNonces.delete(parsed.nonce);
+    throw new Error("Expired nonce");
+  }
+  if (entry.userId !== parsed.userId) throw new Error("userId mismatch in state");
+
+  // Consume nonce — one-time use
+  pendingOAuthNonces.delete(parsed.nonce);
+
+  return parsed.userId;
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -29,10 +113,10 @@ function redirectUri(req: Request): string {
 }
 
 function appSettingsUrl(req: Request, params: string): string {
-  const domain = process.env.REPLIT_DEV_DOMAIN;
-  const base = domain ? `https://${domain}` : `${req.protocol}://${req.get("host")}`;
-  // The receiptr artifact is mounted at /receiptr
-  return `${base}/receiptr/settings${params}`;
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}/settings${params}`;
+  }
+  return `${req.protocol}://${req.get("host")}/settings${params}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,12 +173,14 @@ router.get("/gmail/connect", requireAuth, (req, res): void => {
   }
 
   try {
-    const nonce = randomBytes(16).toString("hex");
-    // Encode userId + nonce in state so the callback knows who to store tokens for
-    const state = Buffer.from(
-      JSON.stringify({ userId: req.userId!, nonce }),
-    ).toString("base64url");
+    const nonce = randomBytes(32).toString("hex");
+    // Store nonce server-side — validated and consumed in the callback
+    pendingOAuthNonces.set(nonce, {
+      userId: req.userId!,
+      expiresAt: Date.now() + NONCE_TTL_MS,
+    });
 
+    const state = buildSignedState(req.userId!, nonce);
     const url = buildGmailOAuthUrl(redirectUri(req), state);
     res.redirect(url);
   } catch (err) {
@@ -117,13 +203,9 @@ router.get("/gmail/callback", async (req, res): Promise<void> => {
 
   let userId: string;
   try {
-    const payload = JSON.parse(Buffer.from(state, "base64url").toString()) as {
-      userId?: string;
-    };
-    if (!payload.userId) throw new Error("Missing userId in state");
-    userId = payload.userId;
+    userId = verifyAndConsumeState(state);
   } catch (err) {
-    logger.warn({ err }, "Gmail callback: invalid state");
+    logger.warn({ err }, "Gmail callback: invalid or tampered state");
     res.redirect(appSettingsUrl(req, "?gmail=error"));
     return;
   }

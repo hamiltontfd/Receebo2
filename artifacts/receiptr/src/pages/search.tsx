@@ -5,6 +5,7 @@ import { useAuth } from "@clerk/react";
 import { useGuestMode } from "@/components/GuestProvider";
 import { useOnboarding } from "@/lib/useOnboarding";
 import { OnboardingCard } from "@/components/OnboardingCard";
+import PendingImports from "@/components/PendingImports";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -500,6 +501,9 @@ export default function SearchPage() {
           </motion.button>
         ))}
       </div>
+
+      {/* Pending Gmail imports — signed-in users only */}
+      {isSignedIn && !isGuest && <PendingImports />}
 
       {/* Content — animates between idle and search states */}
       <AnimatePresence mode="wait" initial={false}>
