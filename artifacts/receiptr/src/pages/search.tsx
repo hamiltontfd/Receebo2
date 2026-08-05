@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Clock } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@clerk/react";
 import { useGuestMode } from "@/components/GuestProvider";
+import { useOnboarding } from "@/lib/useOnboarding";
+import { OnboardingCard } from "@/components/OnboardingCard";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -383,11 +386,21 @@ export default function SearchPage() {
   const [, setLocation] = useLocation();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { isGuest } = useGuestMode();
+  const { isSignedIn } = useAuth();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const onboarding = useOnboarding();
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 400);
     return () => clearTimeout(t);
   }, [query]);
+
+  useEffect(() => {
+    if (debounced.length > 0 && onboarding.step1Done) {
+      onboarding.markSearchDone();
+    }
+  }, [debounced, onboarding.step1Done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isSearching = debounced.length > 0;
 
@@ -450,10 +463,19 @@ export default function SearchPage() {
         </div>
       )}
 
+      {/* Onboarding checklist — signed-in users only */}
+      {isSignedIn && !onboarding.dismissed && (
+        <OnboardingCard
+          {...onboarding}
+          onFocusSearch={() => searchInputRef.current?.focus()}
+        />
+      )}
+
       {/* Search input */}
       <div className="relative">
         <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
+          ref={searchInputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search purchases..."
