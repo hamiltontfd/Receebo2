@@ -36,14 +36,6 @@ export default function HeroSection() {
             animate="visible"
             className="flex flex-col gap-7 max-w-xl"
           >
-            {/* Eyebrow */}
-            <motion.div variants={fadeInUp}>
-              <span className="inline-flex items-center gap-2 rounded-full bg-primary/5 border border-primary/10 px-4 py-1.5 text-xs font-semibold text-foreground/70">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                AI-powered receipt management
-              </span>
-            </motion.div>
-
             {/* Headline */}
             <motion.div variants={fadeInUp} className="space-y-1">
               <h1 className="text-6xl sm:text-7xl lg:text-[80px] font-extrabold tracking-tighter leading-[0.93] text-foreground">
