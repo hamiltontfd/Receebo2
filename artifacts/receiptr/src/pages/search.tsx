@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Clock } from "lucide-react";
+import { X } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@clerk/react";
 import { useGuestMode } from "@/components/GuestProvider";
@@ -516,20 +516,6 @@ export default function SearchPage() {
     />
 
     <PageTransition className="flex-1 w-full max-w-lg md:max-w-3xl mx-auto px-5 py-6 flex flex-col gap-5">
-      {/* Guest conversion banner */}
-      {isGuest && (
-        <div className="rounded-2xl bg-foreground text-background px-4 py-3.5 flex items-center gap-3">
-          <Clock className="w-4 h-4 shrink-0 opacity-70" />
-          <p className="text-sm leading-snug flex-1">
-            <span className="font-semibold">Preview mode</span> — receipts stored for 24 hours.
-          </p>
-          <Link href="/get-started">
-            <button className="shrink-0 text-xs font-bold underline underline-offset-2 whitespace-nowrap">
-              Try free 7 days →
-            </button>
-          </Link>
-        </div>
-      )}
 
       {/* Onboarding checklist — signed-in users only */}
       {isSignedIn && !onboarding.dismissed && (

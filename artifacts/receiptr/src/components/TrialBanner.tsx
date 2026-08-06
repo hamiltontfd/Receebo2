@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { Link } from "wouter";
-import { X } from "lucide-react";
+import { Clock, AlertTriangle } from "lucide-react";
 import { useBillingStatus } from "@/hooks/useBilling";
 
 function daysUntil(isoDate: string): number {
@@ -10,40 +9,54 @@ function daysUntil(isoDate: string): number {
 
 export default function TrialBanner() {
   const { data } = useBillingStatus();
-  const [dismissed, setDismissed] = useState(false);
 
-  if (dismissed) return null;
-  if (!data || data.plan !== "trialing" || !data.trialEndAt) return null;
+  if (!data) return null;
 
-  const days = daysUntil(data.trialEndAt);
-  if (days > 7) return null;
+  // Trialing — show days remaining in trial
+  if (data.plan === "trialing" && data.trialEndAt) {
+    const days = daysUntil(data.trialEndAt);
+    const label =
+      days === 0
+        ? "Your free trial ends today."
+        : days === 1
+          ? "1 day left in your free trial."
+          : `${days} days left in your free trial.`;
 
-  const label =
-    days === 0
-      ? "Your Pro trial ends today — don't lose unlimited uploads."
-      : days === 1
-        ? "Your Pro trial ends tomorrow — keep unlimited uploads by upgrading."
-        : days <= 3
-          ? `Your Pro trial ends in ${days} days — upgrade to keep unlimited uploads.`
-          : `Your Pro trial ends in ${days} days.`;
+    return (
+      <div className="bg-amber-50 border-b border-amber-200 text-amber-900 text-sm px-4 py-2.5 flex items-center justify-center gap-2.5 text-center">
+        <Clock className="w-3.5 h-3.5 shrink-0 opacity-70" />
+        <span>{label}</span>
+        <Link href="/settings">
+          <span className="underline font-semibold cursor-pointer hover:opacity-75 transition-opacity whitespace-nowrap">
+            Upgrade to keep access →
+          </span>
+        </Link>
+      </div>
+    );
+  }
 
-  const cta = days <= 3 ? "Upgrade now" : "Manage subscription";
+  // Cancelled — subscription active but will not renew
+  if (data.plan === "pro" && data.cancelAtPeriodEnd && data.currentPeriodEnd) {
+    const days = daysUntil(data.currentPeriodEnd);
+    const label =
+      days === 0
+        ? "Your subscription ends today. After this, your data will become inaccessible."
+        : days === 1
+          ? "Your subscription was cancelled. 1 day left to access your data."
+          : `Your subscription was cancelled. ${days} days left to access your data.`;
 
-  return (
-    <div className="bg-foreground text-background text-sm px-4 py-2 flex items-center justify-center gap-3 text-center relative">
-      <span>{label}</span>
-      <Link href="/settings">
-        <span className="underline font-semibold cursor-pointer hover:opacity-80 transition-opacity">
-          {cta}
-        </span>
-      </Link>
-      <button
-        onClick={() => setDismissed(true)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-60 hover:opacity-100 transition-opacity"
-        aria-label="Dismiss"
-      >
-        <X className="w-4 h-4" />
-      </button>
-    </div>
-  );
+    return (
+      <div className="bg-red-50 border-b border-red-200 text-red-900 text-sm px-4 py-2.5 flex items-center justify-center gap-2.5 text-center">
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0 opacity-70" />
+        <span>{label}</span>
+        <Link href="/settings">
+          <span className="underline font-semibold cursor-pointer hover:opacity-75 transition-opacity whitespace-nowrap">
+            Resubscribe →
+          </span>
+        </Link>
+      </div>
+    );
+  }
+
+  return null;
 }
