@@ -48,7 +48,7 @@ export default function ConsumerProtectionSection() {
               >
                 More than
                 <br />
-                receipt storage.
+                a receipts storage.
               </motion.h2>
               <motion.p variants={fadeInUp} className="text-lg text-muted-foreground leading-relaxed">
                 Receebo tracks every return window, warranty, and consumer right
