@@ -4,10 +4,11 @@ import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getAuth } from "@clerk/express";
 import { logger } from "../lib/logger";
+import { guestSessionRateLimiter } from "../middlewares/guestSessionRateLimiter";
 
 const router: IRouter = Router();
 
-router.post("/guest-session", async (req, res): Promise<void> => {
+router.post("/guest-session", guestSessionRateLimiter, async (req, res): Promise<void> => {
   try {
     // Idempotent: if the client re-submits an existing token, confirm and return it
     const submitted = typeof req.body?.token === "string" ? req.body.token : null;
