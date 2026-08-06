@@ -3,8 +3,9 @@ import { logger } from "./lib/logger";
 import { startExtractionWatchdog } from "./lib/extractionQueue";
 import { startOrphanCleanupScheduler } from "./lib/orphanCleanup";
 import { startGmailSyncScheduler } from "./lib/gmailSync";
-import { sql } from "drizzle-orm";
-import { db } from "@workspace/db";
+import { encryptToken, decryptToken } from "./lib/tokenCrypto";
+import { sql, eq } from "drizzle-orm";
+import { db, gmailConnectionsTable } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -141,6 +142,72 @@ async function runStartupMigrations(): Promise<void> {
   }
 }
 
+/**
+ * One-time migration: encrypt any gmail_connections rows that still have
+ * plaintext access_token / refresh_token values (stored before AES-256-GCM
+ * encryption was introduced).
+ *
+ * Idempotent — rows that are already encrypted (prefixed with `enc:v1:`) are
+ * left untouched.  Safe to run on every startup.
+ */
+async function migrateGmailTokenEncryption(): Promise<void> {
+  try {
+    const encKey = process.env.GMAIL_TOKEN_ENCRYPTION_KEY;
+    if (!encKey) {
+      logger.info(
+        "GMAIL_TOKEN_ENCRYPTION_KEY not set — skipping Gmail token encryption migration",
+      );
+      return;
+    }
+
+    const rows = await db.select().from(gmailConnectionsTable);
+    if (rows.length === 0) {
+      logger.info("Gmail token encryption migration: no rows found, nothing to do");
+      return;
+    }
+
+    let migrated = 0;
+
+    for (const row of rows) {
+      const updates: Partial<typeof gmailConnectionsTable.$inferInsert> = {};
+
+      // Check and encrypt access_token if plaintext
+      if (row.accessToken !== null) {
+        const { wasPlaintext } = decryptToken(row.accessToken);
+        if (wasPlaintext) {
+          updates.accessToken = encryptToken(row.accessToken);
+        }
+      }
+
+      // Check and encrypt refresh_token if plaintext
+      const { wasPlaintext: refreshWasPlaintext } = decryptToken(row.refreshToken);
+      if (refreshWasPlaintext) {
+        updates.refreshToken = encryptToken(row.refreshToken);
+      }
+
+      if (Object.keys(updates).length > 0) {
+        updates.updatedAt = new Date();
+        await db
+          .update(gmailConnectionsTable)
+          .set(updates)
+          .where(eq(gmailConnectionsTable.userId, row.userId));
+        migrated++;
+        logger.info(
+          { userId: row.userId },
+          "Gmail token encryption migration: encrypted plaintext tokens",
+        );
+      }
+    }
+
+    logger.info(
+      { total: rows.length, migrated },
+      "Gmail token encryption migration complete",
+    );
+  } catch (err) {
+    logger.warn({ err }, "Gmail token encryption migration failed (non-fatal) — continuing");
+  }
+}
+
 async function initStripe(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) return;
@@ -184,6 +251,8 @@ async function initStripe(): Promise<void> {
 async function start(): Promise<void> {
   // Apply schema migrations synchronously before accepting requests
   await runStartupMigrations();
+  // Encrypt any gmail_connections rows that still have plaintext tokens
+  await migrateGmailTokenEncryption();
 
   app.listen(port, () => {
     logger.info({ port }, "Server listening");

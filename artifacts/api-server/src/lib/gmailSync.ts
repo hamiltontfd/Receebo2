@@ -36,43 +36,21 @@ export function isGmailConfigured(): boolean {
 
 /**
  * Returns a copy of `connection` with tokens decrypted to plaintext.
- * If either stored token was still in legacy plaintext format (no `enc:v1:` prefix),
- * a background DB update re-encrypts it so the row is migrated on first use.
+ * All rows are expected to be encrypted by the startup migration in index.ts;
+ * the lazy re-encryption path has been removed now that the migration runs on
+ * every deploy.
  */
-async function decryptGmailConnection(
+function decryptGmailConnection(
   connection: GmailConnection,
-): Promise<GmailConnection> {
+): GmailConnection {
   let accessTokenPlain: string | null = null;
-  let accessNeedsReencrypt = false;
 
   if (connection.accessToken !== null) {
-    const result = decryptToken(connection.accessToken);
-    accessTokenPlain = result.plaintext;
-    accessNeedsReencrypt = result.wasPlaintext;
+    const { plaintext } = decryptToken(connection.accessToken);
+    accessTokenPlain = plaintext;
   }
 
-  const refreshResult = decryptToken(connection.refreshToken);
-  const refreshTokenPlain = refreshResult.plaintext;
-  const refreshNeedsReencrypt = refreshResult.wasPlaintext;
-
-  // Migrate any legacy plaintext tokens in the background
-  if (accessNeedsReencrypt || refreshNeedsReencrypt) {
-    const updates: Partial<typeof gmailConnectionsTable.$inferInsert> = {
-      updatedAt: new Date(),
-    };
-    if (accessNeedsReencrypt && accessTokenPlain !== null) {
-      updates.accessToken = encryptToken(accessTokenPlain);
-    }
-    if (refreshNeedsReencrypt) {
-      updates.refreshToken = encryptToken(refreshTokenPlain);
-    }
-    db.update(gmailConnectionsTable)
-      .set(updates)
-      .where(eq(gmailConnectionsTable.userId, connection.userId))
-      .catch((err) =>
-        logger.warn({ err, userId: connection.userId }, "tokenCrypto: failed to re-encrypt legacy tokens"),
-      );
-  }
+  const { plaintext: refreshTokenPlain } = decryptToken(connection.refreshToken);
 
   return {
     ...connection,
@@ -293,10 +271,10 @@ export async function syncUserGmail(
 
   if (!connection) return { checked: 0, queued: 0 };
 
-  // Decrypt stored tokens before use; migrates any legacy plaintext rows in the background
+  // Decrypt stored tokens before use
   let decryptedConnection: GmailConnection;
   try {
-    decryptedConnection = await decryptGmailConnection(connection);
+    decryptedConnection = decryptGmailConnection(connection);
   } catch (err) {
     logger.error({ err, userId }, "Gmail sync: token decryption failed");
     return { checked: 0, queued: 0 };
