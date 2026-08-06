@@ -146,7 +146,7 @@ export default function WhyReceeboSection() {
           {/* Slide content */}
           <div className="grid md:grid-cols-2 min-h-[420px]">
             {/* Left — content */}
-            <div className="flex items-center p-8 md:p-12 border-b md:border-b-0 md:border-r border-border">
+            <div className="flex items-center p-8 md:p-12 border-b md:border-b-0">
               <AnimatePresence custom={dir} mode="wait">
                 <motion.div
                   key={active + "-text"}
