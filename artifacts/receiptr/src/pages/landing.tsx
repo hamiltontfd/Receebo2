@@ -65,11 +65,16 @@ export default function Landing() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
           >
-            <Link
-              href="/sign-in"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:inline-block"
-            >
-              Sign in
+            <Link href="/sign-in" className="hidden sm:inline-block">
+              <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full bg-white font-semibold text-sm text-foreground px-4 hover:bg-white/90"
+                >
+                  Sign in
+                </Button>
+              </motion.div>
             </Link>
 
             {isSignedIn ? (
