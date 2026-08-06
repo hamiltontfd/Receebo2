@@ -145,28 +145,8 @@ export default function WhyReceeboSection() {
 
           {/* Slide content */}
           <div className="grid lg:grid-cols-2 min-h-[420px]">
-            {/* Left — image */}
-            <div className="relative overflow-hidden border-b lg:border-b-0 lg:border-r border-border">
-              <AnimatePresence custom={dir} mode="wait">
-                <motion.div
-                  key={active + "-img"}
-                  custom={dir}
-                  variants={slideVariants}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  className="absolute inset-0 p-6 flex items-center justify-center"
-                >
-                  <Placeholder
-                    label={feature.placeholder}
-                    className="w-full h-full min-h-[240px]"
-                  />
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Right — content */}
-            <div className="flex items-center p-8 lg:p-12">
+            {/* Left — content */}
+            <div className="flex items-center p-8 lg:p-12 border-b lg:border-b-0 lg:border-r border-border">
               <AnimatePresence custom={dir} mode="wait">
                 <motion.div
                   key={active + "-text"}
@@ -215,6 +195,26 @@ export default function WhyReceeboSection() {
                       />
                     ))}
                   </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Right — image */}
+            <div className="relative overflow-hidden min-h-[280px] lg:min-h-[420px]">
+              <AnimatePresence custom={dir} mode="wait">
+                <motion.div
+                  key={active + "-img"}
+                  custom={dir}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  className="absolute inset-0 p-6 flex items-center justify-center"
+                >
+                  <Placeholder
+                    label={feature.placeholder}
+                    className="w-full h-full"
+                  />
                 </motion.div>
               </AnimatePresence>
             </div>
