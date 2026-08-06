@@ -60,7 +60,7 @@ export default function Landing() {
           />
 
           <motion.div
-            className="flex items-center gap-3"
+            className="flex items-center gap-4"
             initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
