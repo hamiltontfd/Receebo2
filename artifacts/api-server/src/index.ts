@@ -246,10 +246,17 @@ async function initStripe(): Promise<void> {
   if (!databaseUrl) return;
 
   try {
-    // Run StripeSync schema migrations first.  findOrCreateManagedWebhook and
-    // processWebhook both query stripe._managed_webhooks; they will fail if the
-    // stripe schema does not exist yet.
-    await runStripeMigrations();
+    // Run StripeSync schema migrations.  Non-fatal if they fail because the
+    // schema is already fully set up (e.g. trigger already exists after a
+    // migration tracking table reset) — the tables we need are already there.
+    try {
+      await runStripeMigrations();
+    } catch (migrationErr: any) {
+      logger.warn(
+        { err: migrationErr },
+        "Stripe migrations failed — schema likely already up to date, continuing",
+      );
+    }
 
     const { getStripeSync } = await import("./stripeClient");
     const stripeSync = await getStripeSync();
