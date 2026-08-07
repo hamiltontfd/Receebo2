@@ -16,6 +16,7 @@ import Settings from "@/pages/settings";
 import ProfilePage from "@/pages/profile";
 import GetStarted from "@/pages/get-started";
 import AppShell from "@/components/AppShell";
+import { PlanSelectionGate } from "@/components/PlanSelectionGate";
 import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
 import { setGuestId, createCheckoutSession } from "@workspace/api-client-react";
 
@@ -136,15 +137,15 @@ function HomeRedirect() {
 }
 
 function ProtectedShell({ children }: { children: React.ReactNode }) {
-  const { isGuest } = useGuestMode();
   return (
     <>
       <Show when="signed-in">
-        <AppShell>{children}</AppShell>
+        <PlanSelectionGate>
+          <AppShell>{children}</AppShell>
+        </PlanSelectionGate>
       </Show>
       <Show when="signed-out">
         {/* Guest bypass disabled — app uses 7-day trial instead. */}
-        {/* {isGuest ? <AppShell>{children}</AppShell> : <Redirect to="/" />} */}
         <Redirect to="/" />
       </Show>
     </>

@@ -27,10 +27,11 @@ export default function GetStarted() {
   const { isSignedIn } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Already signed in — redirect to settings upgrade section (in effect, not render)
+  // Already signed in — PlanSelectionGate inside ProtectedShell handles gating.
+  // Send them straight to the app; the gate will intercept if needed.
   useEffect(() => {
     if (isSignedIn) {
-      setLocation("/settings");
+      setLocation("/search");
     }
   }, [isSignedIn, setLocation]);
 

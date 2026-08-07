@@ -101,8 +101,8 @@ router.post("/billing/create-checkout-session", requireAuth, async (req, res): P
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       subscription_data: { trial_period_days: 7 },
-      success_url: `${base}/settings?checkout=success`,
-      cancel_url: `${base}/settings?checkout=cancel`,
+      success_url: `${base}/search?checkout=success`,
+      cancel_url: `${base}/search?checkout=cancel`,
     });
 
     res.json({ url: session.url });
