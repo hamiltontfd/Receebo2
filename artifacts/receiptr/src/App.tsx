@@ -143,7 +143,9 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
         <AppShell>{children}</AppShell>
       </Show>
       <Show when="signed-out">
-        {isGuest ? <AppShell>{children}</AppShell> : <Redirect to="/" />}
+        {/* Guest bypass disabled — app uses 7-day trial instead. */}
+        {/* {isGuest ? <AppShell>{children}</AppShell> : <Redirect to="/" />} */}
+        <Redirect to="/" />
       </Show>
     </>
   );

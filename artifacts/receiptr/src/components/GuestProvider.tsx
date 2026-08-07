@@ -48,13 +48,14 @@ export function GuestProvider({ children }: { children: React.ReactNode }) {
   const [guestUser, setGuestUser] = useState<GuestUser | null>(null);
   const isGuest = guestUser !== null;
 
-  // Auto-restore guest mode from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(GUEST_TOKEN_KEY);
-    if (stored) {
-      setGuestUser({ id: stored, name: "Guest", email: "guest@receebo.local" });
-    }
-  }, []);
+  // Guest mode entry disabled — app uses 7-day trial instead.
+  // Auto-restore from localStorage is intentionally suppressed.
+  // useEffect(() => {
+  //   const stored = localStorage.getItem(GUEST_TOKEN_KEY);
+  //   if (stored) {
+  //     setGuestUser({ id: stored, name: "Guest", email: "guest@receebo.local" });
+  //   }
+  // }, []);
 
   const enterGuestMode = useCallback(async () => {
     const token = await issueGuestToken();
