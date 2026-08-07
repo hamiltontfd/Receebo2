@@ -215,17 +215,31 @@ export class WebhookHandlers {
     // It also handles signature verification using the managed webhook secret.
     const sync = await getStripeSync();
 
-    // When STRIPE_WEBHOOK_SECRET is also set we verify the signature ourselves
-    // (handles deployments using a manually configured webhook) and then still
-    // call StripeSync so the stripe schema stays current.
+    // Optional secondary verification using STRIPE_WEBHOOK_SECRET when it is
+    // explicitly set (e.g. to test a specific webhook endpoint's secret).
+    // This check is intentionally non-fatal: it logs a warning and continues
+    // so that the authoritative signature check inside sync.processWebhook
+    // (which uses the managed-webhook secret stored in stripe._managed_webhooks)
+    // remains the single security gate.  Making this non-fatal also avoids
+    // breaking production when the shared STRIPE_WEBHOOK_SECRET corresponds to
+    // the dev endpoint rather than the currently active managed webhook.
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (webhookSecret) {
-      const stripe = await getUncachableStripeClient();
-      // This throws if the signature is invalid — stops processing before StripeSync
-      stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+      try {
+        const stripe = await getUncachableStripeClient();
+        stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+      } catch (err) {
+        logger.warn(
+          { err },
+          "webhookHandlers: STRIPE_WEBHOOK_SECRET pre-check failed — " +
+            "proceeding to StripeSync verification (DB-backed managed webhook secret)",
+        );
+      }
     }
 
-    // Always sync to stripe schema (source of truth for subscription status)
+    // Primary verification: StripeSync verifies the signature using the
+    // managed-webhook secret from stripe._managed_webhooks and keeps the
+    // stripe schema (source of truth for subscription status) in sync.
     await sync.processWebhook(payload, signature);
 
     // Parse the event for our explicit application-level handlers

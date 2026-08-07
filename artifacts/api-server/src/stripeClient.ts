@@ -60,44 +60,6 @@ async function resolveStripeSecretKey(): Promise<string> {
   return secretKey;
 }
 
-/**
- * Resolve the Stripe webhook secret.
- *
- * Priority: STRIPE_WEBHOOK_SECRET env var → connector's webhook_secret field.
- */
-async function resolveWebhookSecret(): Promise<string | undefined> {
-  if (process.env.STRIPE_WEBHOOK_SECRET) {
-    return process.env.STRIPE_WEBHOOK_SECRET;
-  }
-
-  // Try to get from connector (best-effort, non-blocking)
-  try {
-    const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-    const xReplitToken = process.env.REPL_IDENTITY
-      ? "repl " + process.env.REPL_IDENTITY
-      : process.env.WEB_REPL_RENEWAL
-        ? "depl " + process.env.WEB_REPL_RENEWAL
-        : null;
-
-    if (!hostname || !xReplitToken) return undefined;
-
-    const resp = await fetch(
-      `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=stripe`,
-      {
-        headers: { Accept: "application/json", X_REPLIT_TOKEN: xReplitToken },
-        signal: AbortSignal.timeout(5_000),
-      },
-    );
-    if (!resp.ok) return undefined;
-
-    const data = await resp.json() as {
-      items?: Array<{ settings?: { webhook_secret?: string } }>;
-    };
-    return data.items?.[0]?.settings?.webhook_secret;
-  } catch {
-    return undefined;
-  }
-}
 
 export async function getUncachableStripeClient(): Promise<Stripe> {
   const secretKey = await resolveStripeSecretKey();
@@ -111,11 +73,19 @@ export async function getStripeSync(): Promise<StripeSync> {
   }
 
   const secretKey = await resolveStripeSecretKey();
-  const webhookSecret = await resolveWebhookSecret();
 
+  // Do NOT pass a stripeWebhookSecret here.  StripeSync's processWebhook
+  // falls back to querying stripe._managed_webhooks (the DB table populated
+  // by findOrCreateManagedWebhook at startup) when no explicit secret is
+  // provided.  This is the correct verification path for both dev and
+  // production: each environment registers its own managed webhook endpoint
+  // whose secret is stored in the DB and used for signature validation.
+  //
+  // Passing STRIPE_WEBHOOK_SECRET here would break production if the shared
+  // secret corresponds to the dev webhook endpoint (different signing key).
   return new StripeSync({
     poolConfig: { connectionString: databaseUrl },
     stripeSecretKey: secretKey,
-    stripeWebhookSecret: webhookSecret ?? "",
+    stripeWebhookSecret: "",
   });
 }

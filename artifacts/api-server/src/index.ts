@@ -6,6 +6,8 @@ import { startGmailSyncScheduler } from "./lib/gmailSync";
 import { encryptToken, decryptToken } from "./lib/tokenCrypto";
 import { sql, eq } from "drizzle-orm";
 import { db, gmailConnectionsTable } from "@workspace/db";
+import { spawn } from "child_process";
+import path from "path";
 
 const rawPort = process.env["PORT"];
 
@@ -208,28 +210,59 @@ async function migrateGmailTokenEncryption(): Promise<void> {
   }
 }
 
+/**
+ * Run stripe-replit-sync schema migrations via the standalone script at
+ * scripts/run-stripe-migrations.mjs.  The bundled server cannot call
+ * runMigrations() directly because esbuild rewrites __dirname to a virtual
+ * path that does not resolve to the package's migrations directory.  Spawning
+ * an external Node.js process avoids this constraint.
+ *
+ * Throws if the script exits with a non-zero code so callers know the
+ * stripe._managed_webhooks table may not exist.
+ */
+async function runStripeMigrations(): Promise<void> {
+  const scriptPath = path.join(process.cwd(), "scripts/run-stripe-migrations.mjs");
+  return new Promise<void>((resolve, reject) => {
+    const proc = spawn(process.execPath, [scriptPath], {
+      env: process.env,
+      stdio: "inherit",
+    });
+    proc.on("close", (code) => {
+      if (code === 0) {
+        logger.info("Stripe schema migrations applied");
+        resolve();
+      } else {
+        reject(new Error(`Stripe migration script exited with code ${code}`));
+      }
+    });
+    proc.on("error", (err) => {
+      reject(new Error(`Failed to spawn Stripe migration script: ${err.message}`));
+    });
+  });
+}
+
 async function initStripe(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) return;
 
   try {
+    // Run StripeSync schema migrations first.  findOrCreateManagedWebhook and
+    // processWebhook both query stripe._managed_webhooks; they will fail if the
+    // stripe schema does not exist yet.
+    await runStripeMigrations();
+
     const { getStripeSync } = await import("./stripeClient");
     const stripeSync = await getStripeSync();
 
-    // Ensure stripe schema tables exist (stripe-replit-sync manages its own schema)
-    // runMigrations from stripe-replit-sync cannot be called from the esbuild bundle
-    // because __dirname resolves incorrectly inside the bundle. Instead we rely on
-    // the managed webhook path which initialises the schema via syncBackfill.
-    logger.info("Stripe schema ready");
-
     const domains = process.env.REPLIT_DOMAINS?.split(",") ?? [];
     const webhookBaseUrl = domains[0] ? `https://${domains[0]}` : null;
-    if (webhookBaseUrl) {
-      const webhookUrl = `${webhookBaseUrl}/api/stripe/webhook`;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (stripeSync as any).findOrCreateManagedWebhook(webhookUrl);
-      logger.info("Stripe managed webhook configured");
+    if (!webhookBaseUrl) {
+      throw new Error("REPLIT_DOMAINS not set — cannot register Stripe webhook");
     }
+    const webhookUrl = `${webhookBaseUrl}/api/stripe/webhook`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (stripeSync as any).findOrCreateManagedWebhook(webhookUrl);
+    logger.info({ webhookUrl }, "Stripe managed webhook configured");
 
     void stripeSync.syncBackfill().then(() => {
       logger.info("Stripe backfill complete");
@@ -243,7 +276,7 @@ async function initStripe(): Promise<void> {
     ) {
       logger.info("Stripe integration not connected — skipping Stripe init");
     } else {
-      logger.warn({ err }, "Stripe init failed (non-fatal) — continuing startup");
+      logger.error({ err }, "Stripe init failed — live payments may not activate subscriptions");
     }
   }
 }
