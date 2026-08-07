@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { motion } from "framer-motion";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useClerk } from "@clerk/react";
 import { useBillingStatus, useCreateCheckout } from "@/hooks/useBilling";
 
 const PLAN_STORAGE_KEY = "receebo:pendingPlan";
@@ -55,11 +56,20 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  const { signOut } = useClerk();
+
   // No subscription — show plan picker
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
-      <header className="flex h-14 px-5 items-center justify-center border-b">
+      <header className="flex h-14 px-5 items-center justify-between border-b">
+        <button
+          onClick={() => signOut({ redirectUrl: "/" })}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Sign out
+        </button>
         <img src="/logo.svg" alt="Receebo" className="h-7 w-auto" />
+        <div className="w-16" />
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-5 py-12">
