@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,15 @@ function isCheckoutSuccess() {
   return new URLSearchParams(window.location.search).get("checkout") === "success";
 }
 
+/** Remove ?checkout=success from the URL without a page reload. */
+function clearCheckoutParam() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("checkout");
+  window.history.replaceState({}, "", url.toString());
+}
+
 const PLAN_STORAGE_KEY = "receebo:pendingPlan";
+const ACTIVATING_TIMEOUT_MS = 10_000;
 
 const FEATURES = [
   "Unlimited receipt scans",
@@ -39,6 +47,7 @@ const fadeUp = {
 export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
   const { data: billing, isLoading } = useBillingStatus();
   const checkout = useCreateCheckout();
+  const { signOut } = useClerk();
 
   // If PostAuthCheckout already captured a ?plan= and is about to redirect
   // to Stripe, show a spinner instead of flashing the gate.
@@ -46,6 +55,30 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
     typeof sessionStorage !== "undefined" &&
       sessionStorage.getItem(PLAN_STORAGE_KEY) !== null,
   );
+
+  // Track whether the activating-spinner has timed out.
+  const [activatingTimedOut, setActivatingTimedOut] = useState(false);
+
+  // Start a countdown the moment we enter the "activating" state (checkout
+  // success but plan still free). If the webhook doesn't propagate within
+  // ACTIVATING_TIMEOUT_MS, clear the URL param and fall back to the plan
+  // picker with an explanatory message.
+  const inActivatingState =
+    !isLoading &&
+    !hasPendingRedirect.current &&
+    !checkout.isPending &&
+    billing?.plan === "free" &&
+    isCheckoutSuccess() &&
+    !activatingTimedOut;
+
+  useEffect(() => {
+    if (!inActivatingState) return;
+    const timer = setTimeout(() => {
+      clearCheckoutParam();
+      setActivatingTimedOut(true);
+    }, ACTIVATING_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [inActivatingState]);
 
   // Show loader while billing loads OR while a checkout redirect is in-flight
   if (isLoading || hasPendingRedirect.current || checkout.isPending) {
@@ -64,7 +97,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
   // Webhook hasn't fired yet — show a friendly "activating" state instead of
   // re-flashing the plan picker. useBillingStatus polls every 2 s in this
   // case and will flip to the children once the plan propagates.
-  if (isCheckoutSuccess()) {
+  if (inActivatingState) {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-background text-foreground">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -73,9 +106,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const { signOut } = useClerk();
-
-  // No subscription — show plan picker
+  // No subscription — show plan picker (also shown after activating timeout)
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
       <header className="flex h-14 px-5 items-center justify-between border-b">
@@ -90,6 +121,17 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-5 py-12">
+        {activatingTimedOut && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="mb-6 max-w-md w-full rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground text-center"
+          >
+            Something took longer than expected — try refreshing, or pick a plan below to start again.
+          </motion.div>
+        )}
+
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
