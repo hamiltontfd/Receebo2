@@ -128,8 +128,17 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
   const userId = req.userId!;
   const midnight = todayMidnightUTC();
 
-  // Pro / trialing users are exempt from the daily upload cap
+  // Free users (no active subscription) cannot upload receipts at all
   const subscription = await getSubscriptionStatus(userId);
+  if (subscription.plan === "free") {
+    res.status(403).json({
+      error: "subscription_required",
+      message: "An active subscription is required to upload receipts.",
+    });
+    return;
+  }
+
+  // Pro / trialing users are exempt from the daily upload cap
   const isUnlimited = subscription.plan === "pro" || subscription.plan === "trialing";
 
   // Atomically check the daily cap and insert within a single transaction.

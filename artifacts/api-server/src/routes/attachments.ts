@@ -45,8 +45,17 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
     return;
   }
 
-  // Pro / trialing users are exempt from the daily upload cap
+  // Free users (no active subscription) cannot upload attachments at all
   const subscription = await getSubscriptionStatus(userId);
+  if (subscription.plan === "free") {
+    res.status(403).json({
+      error: "subscription_required",
+      message: "An active subscription is required to upload attachments.",
+    });
+    return;
+  }
+
+  // Pro / trialing users are exempt from the daily upload cap
   const isUnlimited = subscription.plan === "pro" || subscription.plan === "trialing";
 
   let attachment: (typeof receiptAttachmentsTable.$inferSelect) | undefined;
