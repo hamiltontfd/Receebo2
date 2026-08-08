@@ -5,6 +5,7 @@ import { shadcn } from "@clerk/themes";
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { toast } from "@/hooks/use-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import NotFound from "@/pages/not-found";
@@ -194,7 +195,12 @@ function PostAuthCheckout() {
         if (url) window.location.href = url;
       })
       .catch(() => {
-        // Silently ignore — user is already signed in and can upgrade from Settings
+        toast({
+          variant: "destructive",
+          title: "Couldn't start checkout",
+          description:
+            "Something went wrong starting your trial. Pick a plan again to retry.",
+        });
       });
   }, [isSignedIn]);
 
