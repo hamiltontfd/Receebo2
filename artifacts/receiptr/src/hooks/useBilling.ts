@@ -6,6 +6,7 @@ import {
   createPortalSession,
   type SubscriptionStatus,
 } from "@workspace/api-client-react";
+import { toast } from "@/hooks/use-toast";
 
 const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
 
@@ -46,6 +47,13 @@ export function useCreateCheckout() {
     mutationFn: (planType: "monthly" | "yearly") => createCheckoutSession(base, planType),
     onSuccess: ({ url }) => {
       if (url) window.location.href = url;
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Couldn't start checkout",
+        description: "Something went wrong on our side. Please try again in a moment.",
+      });
     },
   });
 }
