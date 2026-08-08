@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, count, desc, eq, gt, gte, ilike, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, ilike, lt, or, sql } from "drizzle-orm";
 import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable } from "@workspace/db";
 import {
   CreateReceiptBody,
@@ -92,32 +92,6 @@ router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   }
 });
 
-const DAILY_UPLOAD_LIMIT = 5;
-
-function todayMidnightUTC(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
-
-router.get("/receipts/daily-count", requireAuthOrGuest, async (req, res): Promise<void> => {
-  const midnight = todayMidnightUTC();
-  const userId = req.userId!;
-
-  const [receiptRow] = await db
-    .select({ used: count() })
-    .from(receiptsTable)
-    .where(and(eq(receiptsTable.userId, userId), gte(receiptsTable.createdAt, midnight)));
-
-  const [attRow] = await db
-    .select({ used: count() })
-    .from(receiptAttachmentsTable)
-    .innerJoin(receiptsTable, eq(receiptAttachmentsTable.receiptId, receiptsTable.id))
-    .where(and(eq(receiptsTable.userId, userId), gte(receiptAttachmentsTable.createdAt, midnight)));
-
-  const used = Number(receiptRow?.used ?? 0) + Number(attRow?.used ?? 0);
-  res.json({ used, remaining: Math.max(0, DAILY_UPLOAD_LIMIT - used), limit: DAILY_UPLOAD_LIMIT });
-});
-
 router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   const parsed = CreateReceiptBody.safeParse(req.body);
   if (!parsed.success) {
@@ -126,7 +100,6 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
   }
 
   const userId = req.userId!;
-  const midnight = todayMidnightUTC();
 
   // Free users (no active subscription) cannot upload receipts at all
   const subscription = await getSubscriptionStatus(userId);
@@ -138,16 +111,12 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
     return;
   }
 
-  // Pro / trialing users are exempt from the daily upload cap
-  const isUnlimited = subscription.plan === "pro" || subscription.plan === "trialing";
-
-  // Atomically check the daily cap and insert within a single transaction.
+  // Atomically verify the upload intent and insert within a single transaction.
   // pg_advisory_xact_lock serialises concurrent uploads for the same user so
-  // two simultaneous requests cannot both observe used < 5 and both insert.
+  // two simultaneous requests cannot both consume the same intent.
   // The lock key is derived from the user ID string via hashtext() and is
   // automatically released when the transaction commits or rolls back.
   let receipt: (typeof receiptsTable.$inferSelect) | undefined;
-  let limitReached = false;
   let intentMissing = false;
 
   await db.transaction(async (tx) => {
@@ -171,24 +140,6 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
       return;
     }
 
-    const [countRow] = await tx
-      .select({ used: count() })
-      .from(receiptsTable)
-      .where(and(eq(receiptsTable.userId, userId), gte(receiptsTable.createdAt, midnight)));
-
-    const [attCountRow] = await tx
-      .select({ used: count() })
-      .from(receiptAttachmentsTable)
-      .innerJoin(receiptsTable, eq(receiptAttachmentsTable.receiptId, receiptsTable.id))
-      .where(and(eq(receiptsTable.userId, userId), gte(receiptAttachmentsTable.createdAt, midnight)));
-
-    const totalToday = Number(countRow?.used ?? 0) + Number(attCountRow?.used ?? 0);
-
-    if (!isUnlimited && totalToday >= DAILY_UPLOAD_LIMIT) {
-      limitReached = true;
-      return;
-    }
-
     const [inserted] = await tx
       .insert(receiptsTable)
       .values({
@@ -207,14 +158,6 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
 
   if (intentMissing) {
     res.status(403).json({ error: "Invalid or expired upload path" });
-    return;
-  }
-
-  if (limitReached) {
-    res.status(429).json({
-      error: "daily_limit_reached",
-      message: "You've reached your 5 receipt limit for today. Come back tomorrow.",
-    });
     return;
   }
 

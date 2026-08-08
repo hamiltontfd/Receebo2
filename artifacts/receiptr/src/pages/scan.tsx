@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScanLine, Zap, ScrollText, Square, ChevronDown } from "lucide-react";
+import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScrollText, Square, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
@@ -11,15 +11,12 @@ import {
   useUpdateReceipt,
   useDeleteReceipt,
   useGetReceipt,
-  useGetDailyUploadCount,
   checkSimilarReceipt,
   getGetReceiptQueryKey,
   getListReceiptsQueryKey,
   getGetReceiptStatsQueryKey,
   getGetRecentReceiptsQueryKey,
-  getGetDailyUploadCountQueryKey,
   customFetch,
-  ApiError,
   type SimilarReceiptMatch,
 } from "@workspace/api-client-react";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
@@ -123,7 +120,6 @@ export default function Scan() {
   const { videoRef, cameraReady, cameraError } = useCameraStream(cameraActive);
 
   const [checkConfirmed, setCheckConfirmed] = useState(false);
-  const [limitError, setLimitError] = useState<string | null>(null);
   const [similarMatches, setSimilarMatches] = useState<SimilarReceiptMatch[] | null>(null);
   const [dismissedDuplicate, setDismissedDuplicate] = useState(false);
   const [dismissedIncomplete, setDismissedIncomplete] = useState(false);
@@ -237,8 +233,6 @@ export default function Scan() {
   const updateReceipt = useUpdateReceipt();
   const deleteReceipt = useDeleteReceipt();
 
-  const { data: dailyCount, refetch: refetchDailyCount } = useGetDailyUploadCount();
-
   const { data: receipt } = useGetReceipt(receiptId ?? 0, {
     query: {
       enabled: receiptId != null && phase === "reading",
@@ -344,7 +338,6 @@ export default function Scan() {
 
   const uploadFile = useCallback(
     async (blob: Blob, fileName: string, contentType: string) => {
-      setLimitError(null);
       setUploading(true);
       try {
         const { uploadURL, objectPath } = await customFetch<{
@@ -366,25 +359,19 @@ export default function Scan() {
         const created = await createReceipt.mutateAsync({
           data: { objectPath, originalFileName: fileName, contentType },
         });
-        refetchDailyCount();
         setReceiptId(created.id);
         setPhase("reading");
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 429) {
-          setLimitError("You've reached your 5 receipt limit for today. Come back tomorrow.");
-          refetchDailyCount();
-        } else {
-          toast({
-            title: "Upload failed",
-            description: "Could not upload the receipt. Please try again.",
-            variant: "destructive",
-          });
-        }
+      } catch {
+        toast({
+          title: "Upload failed",
+          description: "Could not upload the receipt. Please try again.",
+          variant: "destructive",
+        });
       } finally {
         setUploading(false);
       }
     },
-    [createReceipt, toast, refetchDailyCount],
+    [createReceipt, toast],
   );
 
   const capturePhoto = useCallback(() => {
@@ -500,37 +487,12 @@ export default function Scan() {
       {phase === "capture" && (
         <div className="flex-1 flex flex-col gap-6">
           <div>
-            <div className="flex items-start justify-between gap-2">
-              <div>
+            <div>
                 <h1 className="text-2xl font-extrabold tracking-tight">Scan receipt</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Place the receipt inside the frame, or upload a file.
                 </p>
               </div>
-              {dailyCount != null && (
-                <div className="flex-shrink-0 flex items-center gap-1.5 mt-1 px-3 py-1.5 rounded-full bg-secondary text-xs font-medium text-muted-foreground">
-                  <ScanLine className="w-3.5 h-3.5" />
-                  <span>{dailyCount.remaining}/{dailyCount.limit} left today</span>
-                </div>
-              )}
-            </div>
-
-            {(limitError || (dailyCount != null && dailyCount.remaining === 0)) && (
-              <div className="mt-3 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 px-4 py-3 text-sm">
-                <Zap className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
-                <div className="flex-1">
-                  <p className="font-semibold text-amber-900 dark:text-amber-200">Daily limit reached</p>
-                  <p className="mt-0.5 text-amber-800 dark:text-amber-300">
-                    You've used all 5 of today's free uploads. Upgrade to Pro for unlimited scans — no daily cap.
-                  </p>
-                  <Link href="/settings">
-                    <span className="inline-block mt-2 text-xs font-semibold underline text-amber-900 dark:text-amber-200 hover:opacity-80 transition-opacity cursor-pointer">
-                      Upgrade to Pro →
-                    </span>
-                  </Link>
-                </div>
-              </div>
-            )}
           </div>
 
           {isDesktop && !cameraRequested ? (
@@ -547,7 +509,7 @@ export default function Scan() {
               <Button
                 className="rounded-full h-12 px-8 font-semibold"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploading || (dailyCount != null && dailyCount.remaining === 0)}
+                disabled={uploading}
               >
                 {uploading ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -560,7 +522,7 @@ export default function Scan() {
                 variant="ghost"
                 className="rounded-full text-muted-foreground"
                 onClick={() => setCameraRequested(true)}
-                disabled={uploading || (dailyCount != null && dailyCount.remaining === 0)}
+                disabled={uploading}
               >
                 <Camera className="w-4 h-4 mr-2" />
                 Use camera instead
@@ -578,7 +540,7 @@ export default function Scan() {
                   variant="secondary"
                   className="rounded-full"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading || (dailyCount != null && dailyCount.remaining === 0)}
+                  disabled={uploading}
                 >
                   <Upload className="w-4 h-4 mr-2" />
                   Upload receipt
@@ -602,7 +564,7 @@ export default function Scan() {
                         clearPanState();
                       }
                     }}
-                    disabled={uploading || !panStitchedBlob || (dailyCount != null && dailyCount.remaining === 0)}
+                    disabled={uploading || !panStitchedBlob}
                     className="flex-1 h-12 rounded-full bg-white text-black font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
                   >
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -679,7 +641,7 @@ export default function Scan() {
                           <button
                             aria-label="Start panoramic capture"
                             onClick={startPanCapture}
-                            disabled={!cameraReady || uploading || (dailyCount != null && dailyCount.remaining === 0)}
+                            disabled={!cameraReady || uploading}
                             className="px-8 h-14 rounded-full border-4 border-background bg-background/20 hover:bg-background/40 transition-colors disabled:opacity-40 text-background font-bold text-sm"
                           >
                             Start
@@ -712,7 +674,7 @@ export default function Scan() {
                       <button
                         aria-label="Capture receipt"
                         onClick={capturePhoto}
-                        disabled={!cameraReady || uploading || (dailyCount != null && dailyCount.remaining === 0)}
+                        disabled={!cameraReady || uploading}
                         className="w-16 h-16 rounded-full border-4 border-background bg-background/20 hover:bg-background/40 transition-colors disabled:opacity-40 flex items-center justify-center"
                       >
                         {uploading && <Loader2 className="w-6 h-6 text-background animate-spin" />}
@@ -742,7 +704,7 @@ export default function Scan() {
               variant="outline"
               className="rounded-full h-12"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || (dailyCount != null && dailyCount.remaining === 0)}
+              disabled={uploading}
             >
               <Upload className="w-4 h-4 mr-2" />
               Upload a file instead

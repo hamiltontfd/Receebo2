@@ -74,16 +74,6 @@ export const CreateReceiptBody = zod.object({
 
 
 /**
- * @summary Get the number of receipts uploaded today (resets at midnight UTC)
- */
-export const GetDailyUploadCountResponse = zod.object({
-  "used": zod.number().describe('Number of receipts uploaded today (since midnight UTC).'),
-  "remaining": zod.number().describe('Number of uploads remaining for today.'),
-  "limit": zod.number().describe('Total daily upload limit.')
-})
-
-
-/**
  * @summary Aggregate stats for the current user's receipts
  */
 export const GetReceiptStatsResponse = zod.object({

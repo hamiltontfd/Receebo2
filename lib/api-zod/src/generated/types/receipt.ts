@@ -54,7 +54,7 @@ export interface Receipt {
      */
   transactionNumber?: string | null;
   /**
-     * ISO-3166-1 alpha-2 country code where the purchase was made.
+     * ISO-3166-1 alpha-2 country code where the purchase was made (e.g. "PT", "US", "BR").
      * @nullable
      */
   purchaseCountry?: string | null;

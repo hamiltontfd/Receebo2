@@ -25,7 +25,6 @@ import type {
 
 import type {
   CheckSimilarReceiptParams,
-  DailyUploadCount,
   ErrorEnvelope,
   GetRecentReceiptsParams,
   GuestClaimBody,
@@ -313,76 +312,9 @@ export const useCreateReceipt = <TError = ErrorType<ErrorEnvelope>,
       return useMutation(getCreateReceiptMutationOptions(options));
     }
 
-export const getGetDailyUploadCountUrl = () => {
 
 
 
-
-  return `/api/receipts/daily-count`
-}
-
-/**
- * @summary Get the number of receipts uploaded today (resets at midnight UTC)
- */
-export const getDailyUploadCount = async ( options?: RequestInit): Promise<DailyUploadCount> => {
-
-  return customFetch<DailyUploadCount>(getGetDailyUploadCountUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetDailyUploadCountQueryKey = () => {
-    return [
-    `/api/receipts/daily-count`
-    ] as const;
-    }
-
-
-export const getGetDailyUploadCountQueryOptions = <TData = Awaited<ReturnType<typeof getDailyUploadCount>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDailyUploadCount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetDailyUploadCountQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDailyUploadCount>>> = ({ signal }) => getDailyUploadCount({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDailyUploadCount>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetDailyUploadCountQueryResult = NonNullable<Awaited<ReturnType<typeof getDailyUploadCount>>>
-export type GetDailyUploadCountQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Get the number of receipts uploaded today (resets at midnight UTC)
- */
-
-export function useGetDailyUploadCount<TData = Awaited<ReturnType<typeof getDailyUploadCount>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDailyUploadCount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetDailyUploadCountQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
 
 
 

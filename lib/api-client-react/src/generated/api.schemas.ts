@@ -189,15 +189,6 @@ export interface GuestClaimBody {
   guestToken: string;
 }
 
-export interface DailyUploadCount {
-  /** Number of receipts uploaded today (since midnight UTC). */
-  used: number;
-  /** Number of uploads remaining for today. */
-  remaining: number;
-  /** Total daily upload limit. */
-  limit: number;
-}
-
 export interface SimilarReceiptMatch {
   id: number;
   /** @nullable */

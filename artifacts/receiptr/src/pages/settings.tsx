@@ -364,12 +364,6 @@ export default function Settings() {
               </div>
             )}
 
-            {billing?.plan === "free" && (
-              <p className="text-sm text-muted-foreground">
-                Free plan — 5 uploads per day.
-              </p>
-            )}
-
             {isPro ? (
               <Button
                 variant="outline"
@@ -459,9 +453,9 @@ export default function Settings() {
             <span className="text-center">Pro</span>
           </div>
           {[
-            { feature: "Daily uploads", free: "5 per day", pro: "Unlimited", freeHighlight: false, proHighlight: true },
+            { feature: "Daily uploads", free: "Unlimited", pro: "Unlimited", freeHighlight: false, proHighlight: false },
             { feature: "AI receipt extraction", free: true, pro: true, freeHighlight: false, proHighlight: false },
-            { feature: "Attachment uploads", free: "5 per day (shared)", pro: "Unlimited", freeHighlight: false, proHighlight: true },
+            { feature: "Attachment uploads", free: "Unlimited", pro: "Unlimited", freeHighlight: false, proHighlight: false },
             { feature: "Natural-language search", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Warranty reminders", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Gmail auto-import", free: true, pro: true, freeHighlight: false, proHighlight: false },

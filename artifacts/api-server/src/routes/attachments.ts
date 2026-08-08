@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, count, eq, gt, gte, sql } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable } from "@workspace/db";
 import { CreateAttachmentBody, CreateAttachmentParams, DeleteAttachmentParams } from "@workspace/api-zod";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
@@ -9,13 +9,6 @@ import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 
 const objectStorageService = new ObjectStorageService();
 const router: IRouter = Router();
-
-const DAILY_UPLOAD_LIMIT = 5;
-
-function todayMidnightUTC(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
 
 /** POST /receipts/:id/attachments */
 router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): Promise<void> => {
@@ -33,7 +26,6 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
 
   const userId = req.userId!;
   const receiptId = params.data.id;
-  const midnight = todayMidnightUTC();
 
   // Validate that the objectPath was issued by this server (i.e. it lives under
   // the expected private uploads directory). This prevents a malicious client
@@ -55,16 +47,10 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
     return;
   }
 
-  // Pro / trialing users are exempt from the daily upload cap
-  const isUnlimited = subscription.plan === "pro" || subscription.plan === "trialing";
-
   let attachment: (typeof receiptAttachmentsTable.$inferSelect) | undefined;
-  let limitReached = false;
   let receiptNotFound = false;
   let intentMissing = false;
 
-  // Same advisory-lock + transaction pattern as receipt creation so that
-  // primary uploads and attachment uploads share the daily cap atomically.
   await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
 
@@ -97,25 +83,6 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
       return;
     }
 
-    // Count receipt uploads today
-    const [receiptCountRow] = await tx
-      .select({ used: count() })
-      .from(receiptsTable)
-      .where(and(eq(receiptsTable.userId, userId), gte(receiptsTable.createdAt, midnight)));
-
-    // Count attachment uploads today (join to get only this user's attachments)
-    const [attCountRow] = await tx
-      .select({ used: count() })
-      .from(receiptAttachmentsTable)
-      .innerJoin(receiptsTable, eq(receiptAttachmentsTable.receiptId, receiptsTable.id))
-      .where(and(eq(receiptsTable.userId, userId), gte(receiptAttachmentsTable.createdAt, midnight)));
-
-    const totalToday = Number(receiptCountRow?.used ?? 0) + Number(attCountRow?.used ?? 0);
-    if (!isUnlimited && totalToday >= DAILY_UPLOAD_LIMIT) {
-      limitReached = true;
-      return;
-    }
-
     const [inserted] = await tx
       .insert(receiptAttachmentsTable)
       .values({
@@ -136,14 +103,6 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
 
   if (intentMissing) {
     res.status(403).json({ error: "Invalid or expired upload path" });
-    return;
-  }
-
-  if (limitReached) {
-    res.status(429).json({
-      error: "daily_limit_reached",
-      message: "You've reached your 5 upload limit for today. Come back tomorrow.",
-    });
     return;
   }
 

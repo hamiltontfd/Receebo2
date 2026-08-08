@@ -191,13 +191,6 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* Free plan copy */}
-          {!billingLoading && billing?.plan === "free" && (
-            <div className="px-4 py-3.5">
-              <p className="text-xs text-muted-foreground">5 uploads per day.</p>
-            </div>
-          )}
-
           {/* Actions */}
           {!billingLoading && (
             <div className="px-4 py-3.5 flex flex-col gap-2">

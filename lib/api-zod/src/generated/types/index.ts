@@ -7,7 +7,6 @@
  */
 
 export * from './checkSimilarReceiptParams';
-export * from './dailyUploadCount';
 export * from './errorEnvelope';
 export * from './getRecentReceiptsParams';
 export * from './guestClaimBody';
