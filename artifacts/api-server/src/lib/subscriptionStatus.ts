@@ -22,6 +22,19 @@ const FREE: SubscriptionStatus = {
 export async function getSubscriptionStatus(userId: string): Promise<SubscriptionStatus> {
   if (!userId || userId.startsWith("guest")) return FREE;
 
+  // Development-only bypass: treat every signed-in user as having full access
+  // so the app can be tested without a real Stripe subscription. Driven purely
+  // by NODE_ENV — production builds always enforce the real paywall.
+  if (process.env.NODE_ENV !== "production") {
+    return {
+      plan: "pro",
+      trialEndAt: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      stripeSubscriptionId: null,
+    };
+  }
+
   const [billing] = await db
     .select({ stripeCustomerId: userBillingTable.stripeCustomerId })
     .from(userBillingTable)
