@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import { useClerk } from "@clerk/react";
 import { useBillingStatus, useCreateCheckout } from "@/hooks/useBilling";
 
+function isCheckoutSuccess() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("checkout") === "success";
+}
+
 const PLAN_STORAGE_KEY = "receebo:pendingPlan";
 
 const FEATURES = [
@@ -54,6 +59,18 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
   // Active trial or paid — let them in
   if (billing?.plan !== "free") {
     return <>{children}</>;
+  }
+
+  // Webhook hasn't fired yet — show a friendly "activating" state instead of
+  // re-flashing the plan picker. useBillingStatus polls every 2 s in this
+  // case and will flip to the children once the plan propagates.
+  if (isCheckoutSuccess()) {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-background text-foreground">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Activating your trial…</p>
+      </div>
+    );
   }
 
   const { signOut } = useClerk();

@@ -9,14 +9,33 @@ import {
 
 const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
 
+/**
+ * Returns true when the user just came back from Stripe Checkout (the
+ * ?checkout=success param is still present in the URL).  We use this to
+ * poll billing status until the webhook propagates.
+ */
+function isCheckoutSuccess() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("checkout") === "success";
+}
+
 export function useBillingStatus() {
   const { isSignedIn } = useAuth();
+  const afterCheckout = isCheckoutSuccess();
 
   return useQuery<SubscriptionStatus>({
     queryKey: ["billing", "subscription"],
     queryFn: () => getSubscriptionStatus(base),
     enabled: !!isSignedIn,
-    staleTime: 5 * 60 * 1000,
+    // After checkout, poll every 2 s until the plan becomes non-free so the
+    // gate doesn't flash the plan picker while the webhook is in-flight.
+    staleTime: afterCheckout ? 0 : 5 * 60 * 1000,
+    refetchInterval: afterCheckout
+      ? (query) => {
+          const data = query.state.data as SubscriptionStatus | undefined;
+          return data && data.plan !== "free" ? false : 2000;
+        }
+      : false,
     retry: false,
     refetchOnWindowFocus: true,
   });

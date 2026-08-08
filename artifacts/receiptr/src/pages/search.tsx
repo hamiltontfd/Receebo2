@@ -6,6 +6,7 @@ import { useGuestMode } from "@/components/GuestProvider";
 import { useOnboarding } from "@/lib/useOnboarding";
 import { OnboardingCard } from "@/components/OnboardingCard";
 import PendingImports from "@/components/PendingImports";
+import { useToast } from "@/hooks/use-toast";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -417,8 +418,27 @@ export default function SearchPage() {
   const { isGuest } = useGuestMode();
   const { isSignedIn } = useAuth();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const onboarding = useOnboarding();
+
+  // Show a welcome toast when the user lands after Stripe Checkout, then
+  // immediately clear the param so it doesn't reappear on refresh.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") !== "success") return;
+
+    // Strip the param from the URL without adding a history entry
+    params.delete("checkout");
+    const newSearch = params.toString();
+    const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+    window.history.replaceState(null, "", newUrl);
+
+    toast({
+      title: "Your 7-day trial has started — welcome to Receebo!",
+      description: "Scan your first receipt to get started.",
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query), 400);
