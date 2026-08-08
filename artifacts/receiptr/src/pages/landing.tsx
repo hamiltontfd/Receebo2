@@ -9,7 +9,6 @@ import { useCreateCheckout } from "@/hooks/useBilling";
 import HeroSection from "./landing/HeroSection";
 import DemoSection from "./landing/DemoSection";
 import WhyReceeboSection from "./landing/WhyReceeboSection";
-import AIExtractionSection from "./landing/AIExtractionSection";
 import EmailReceiptsSection from "./landing/EmailReceiptsSection";
 import ConsumerProtectionSection from "./landing/ConsumerProtectionSection";
 import ComparisonSection from "./landing/ComparisonSection";
@@ -108,7 +107,6 @@ export default function Landing() {
           <HeroSection />
           <DemoSection />
           <WhyReceeboSection />
-          <AIExtractionSection />
           <EmailReceiptsSection />
           <ConsumerProtectionSection />
           <ComparisonSection />
