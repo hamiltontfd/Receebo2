@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
 import { logger } from "./logger";
 import { sendWarrantyReminderEmail, sendTrialEndingEmail, sendReturnWindowEmail } from "./emailService";
+import { sendPushNotification } from "./pushNotifications";
 import { calcReturnWindow } from "./returnWindowCalc";
 
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -332,6 +333,8 @@ async function runReturnWindowSweep(): Promise<void> {
     originalFileName: string;
     returnReminderSent7dAt: Date | null;
     returnReminderSent2dAt: Date | null;
+    returnPushSent2dAt: Date | null;
+    returnPushSent1dAt: Date | null;
   }>;
 
   try {
@@ -348,6 +351,8 @@ async function runReturnWindowSweep(): Promise<void> {
         originalFileName: receiptsTable.originalFileName,
         returnReminderSent7dAt: receiptsTable.returnReminderSent7dAt,
         returnReminderSent2dAt: receiptsTable.returnReminderSent2dAt,
+        returnPushSent2dAt: receiptsTable.returnPushSent2dAt,
+        returnPushSent1dAt: receiptsTable.returnPushSent1dAt,
       })
       .from(receiptsTable)
       .where(
@@ -402,19 +407,22 @@ async function runReturnWindowSweep(): Promise<void> {
 
     const needs7d = r.returnReminderSent7dAt === null && daysRemaining <= 7;
     const needs2d = r.returnReminderSent2dAt === null && daysRemaining <= 2;
+    const needsPush2d = r.returnPushSent2dAt === null && daysRemaining <= 2;
+    const needsPush1d = r.returnPushSent1dAt === null && daysRemaining <= 1;
 
-    if (!needs7d && !needs2d) continue;
+    if (!needs7d && !needs2d && !needsPush2d && !needsPush1d) continue;
 
-    // Check opt-out before any DB write or email send
-    if (await isOptedOut(r.userId)) {
+    // Email reminders respect the existing email opt-out. Browser push is
+    // managed independently by adding/removing the device subscription.
+    const optedOut = await isOptedOut(r.userId);
+    if (optedOut && (needs7d || needs2d)) {
       skippedOptOut++;
-      continue;
     }
 
     const notableItemName = r.notableItems?.[0]?.name ?? null;
 
     // --- 7-day alert ---
-    if (needs7d) {
+    if (needs7d && !optedOut) {
       // Atomically claim the send slot
       const claimed = await db
         .update(receiptsTable)
@@ -449,7 +457,7 @@ async function runReturnWindowSweep(): Promise<void> {
     }
 
     // --- 2-day alert ---
-    if (needs2d) {
+    if (needs2d && !optedOut) {
       const claimed = await db
         .update(receiptsTable)
         .set({ returnReminderSent2dAt: new Date() })
@@ -476,6 +484,44 @@ async function runReturnWindowSweep(): Promise<void> {
           await db
             .update(receiptsTable)
             .set({ returnReminderSent2dAt: null })
+            .where(eq(receiptsTable.id, r.id));
+        }
+      }
+    }
+
+    // --- 2-day and 1-day push alerts ---
+    // Push delivery has its own deduplication markers so email preferences do
+    // not accidentally suppress browser notifications.
+    const shouldSendPush = needsPush1d || needsPush2d;
+    const pushField = needsPush1d
+      ? receiptsTable.returnPushSent1dAt
+      : receiptsTable.returnPushSent2dAt;
+    if (shouldSendPush) {
+      const claimed = await db
+        .update(receiptsTable)
+        .set(needsPush1d
+          ? { returnPushSent1dAt: new Date() }
+          : { returnPushSent2dAt: new Date() })
+        .where(and(eq(receiptsTable.id, r.id), isNull(pushField)))
+        .returning({ id: receiptsTable.id });
+
+      if (claimed.length > 0) {
+        const sent = await sendPushNotification(r.userId, {
+          title: "Return window closing soon",
+          body: `${notableItemName || r.merchant || "Your purchase"} · closes ${deadlineDate.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            timeZone: "UTC",
+          })}`,
+          receiptId: r.id,
+        });
+        if (!sent) {
+          await db
+            .update(receiptsTable)
+            .set(needsPush1d
+              ? { returnPushSent1dAt: null }
+              : { returnPushSent2dAt: null })
             .where(eq(receiptsTable.id, r.id));
         }
       }

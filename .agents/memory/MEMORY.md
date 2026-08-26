@@ -2,3 +2,4 @@
 - [object-storage-web lib composite build](object-storage-web-composite.md) — the lib ships unbuilt without composite:true; add composite opts + run `tsc -b` on it so a consuming artifact's `tsc -p` typecheck resolves its .d.ts.
 - [Guest-mode auth pitfalls](guest-auth.md) — raw fetch skips the guest header (use the API client's customFetch); server must prefer validated Clerk auth over x-guest-id or signed-in users act as guests.
 - [stripe-replit-sync esbuild migration path break](stripe-replit-sync-migrations.md) — esbuild bundles break __dirname in stripe-replit-sync's runMigrations; run migrations via a standalone .mjs script instead. Also: connector settings field is "secret" not "secret_key".
+- [PWA dev worker fallback](pwa-dev-worker.md) — injectManifest dev mode has an empty precache; only bind the app-shell navigation fallback in production.

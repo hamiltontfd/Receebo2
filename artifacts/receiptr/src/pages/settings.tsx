@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Minus, Mail, Loader2, RefreshCw, PlugZap } from "lucide-react";
+import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 
 const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
 
@@ -438,6 +439,7 @@ export default function Settings() {
               />
             )}
           </div>
+          <PushNotificationSettings />
         </div>
       </section>
 

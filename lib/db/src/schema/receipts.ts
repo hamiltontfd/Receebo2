@@ -48,6 +48,8 @@ export const receiptsTable = pgTable("receipts", {
   isOnlinePurchase: boolean("is_online_purchase"),
   returnReminderSent7dAt: timestamp("return_reminder_sent_7d_at", { withTimezone: true }),
   returnReminderSent2dAt: timestamp("return_reminder_sent_2d_at", { withTimezone: true }),
+  returnPushSent2dAt: timestamp("return_push_sent_2d_at", { withTimezone: true }),
+  returnPushSent1dAt: timestamp("return_push_sent_1d_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

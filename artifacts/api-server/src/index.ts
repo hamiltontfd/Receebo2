@@ -74,6 +74,14 @@ async function runStartupMigrations(): Promise<void> {
       ALTER TABLE receipts
         ADD COLUMN IF NOT EXISTS return_reminder_sent_2d_at timestamptz
     `);
+    await db.execute(sql`
+      ALTER TABLE receipts
+        ADD COLUMN IF NOT EXISTS return_push_sent_2d_at timestamptz
+    `);
+    await db.execute(sql`
+      ALTER TABLE receipts
+        ADD COLUMN IF NOT EXISTS return_push_sent_1d_at timestamptz
+    `);
 
     // Dedicated user preferences table (notification opt-out, etc.)
     await db.execute(sql`
@@ -82,6 +90,18 @@ async function runStartupMigrations(): Promise<void> {
         notifications_opt_out boolean NOT NULL DEFAULT false,
         created_at            timestamptz NOT NULL DEFAULT now(),
         updated_at            timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id           serial PRIMARY KEY,
+        user_id      text NOT NULL,
+        endpoint     text NOT NULL UNIQUE,
+        p256dh       text NOT NULL,
+        auth         text NOT NULL,
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        updated_at   timestamptz NOT NULL DEFAULT now()
       )
     `);
 

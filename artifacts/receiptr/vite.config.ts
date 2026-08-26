@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { VitePWA } from "vite-plugin-pwa";
 
 const rawPort = process.env.PORT;
 
@@ -32,6 +33,50 @@ export default defineConfig({
     react(),
     tailwindcss({ optimize: false }),
     runtimeErrorOverlay(),
+    VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      registerType: "autoUpdate",
+      injectRegister: null,
+      includeAssets: ["logo.svg", "logo.png", "icons/*.png"],
+      manifest: {
+        name: "Receebo — Receipts. Easy to find.",
+        short_name: "Receebo",
+        description: "Store, organise, and find your receipts in seconds.",
+        theme_color: "#ffffff",
+        background_color: "#ffffff",
+        display: "standalone",
+        orientation: "portrait",
+        start_url: basePath || "/",
+        scope: basePath || "/",
+        icons: [
+          {
+            src: `${basePath}icons/icon-192.png`,
+            sizes: "192x192",
+            type: "image/png",
+          },
+          {
+            src: `${basePath}icons/icon-512.png`,
+            sizes: "512x512",
+            type: "image/png",
+          },
+          {
+            src: `${basePath}icons/icon-512-maskable.png`,
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
+        ],
+      },
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+      },
+      devOptions: {
+        enabled: true,
+        type: "module",
+      },
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
