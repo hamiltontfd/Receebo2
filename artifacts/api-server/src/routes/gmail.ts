@@ -384,53 +384,78 @@ router.post(
     }
 
     try {
-      const [imp] = await db
-        .select()
-        .from(pendingImportsTable)
-        .where(
-          and(
-            eq(pendingImportsTable.id, id),
-            eq(pendingImportsTable.userId, req.userId!),
-            eq(pendingImportsTable.status, "pending"),
-          ),
-        )
-        .limit(1);
+      const receipt = await db.transaction(async (tx) => {
+        const [imp] = await tx
+          .update(pendingImportsTable)
+          .set({ status: "approved", updatedAt: new Date() })
+          .where(
+            and(
+              eq(pendingImportsTable.id, id),
+              eq(pendingImportsTable.userId, req.userId!),
+              eq(pendingImportsTable.status, "pending"),
+            ),
+          )
+          .returning();
 
-      if (!imp) {
-        res.status(404).json({ error: "Pending import not found" });
+        if (!imp) return null;
+        if (!imp.extractionData) {
+          throw new Error("Pending import has no extraction data");
+        }
+
+        const data = imp.extractionData;
+        const [created] = await tx
+          .insert(receiptsTable)
+          .values({
+            userId: req.userId!,
+            objectPath: imp.objectPath,
+            originalFileName: imp.originalFileName,
+            contentType: "application/pdf",
+            status: "completed",
+            merchant: data.merchant,
+            purchaseDate: data.purchaseDate,
+            total: data.total,
+            currency: data.currency,
+            category: data.category ?? "Other",
+            summary: data.summary,
+            ocrText: data.ocrText,
+            warranty: data.warranty,
+            transactionNumber: data.transactionNumber,
+            products: data.products ?? [],
+            notableItems: data.notableItems ?? [],
+            purchaseCountry: data.purchaseCountry,
+            isOnlinePurchase: data.isOnlinePurchase,
+          })
+          .returning();
+        await tx
+          .update(pendingImportsTable)
+          .set({ approvedReceiptId: created.id, updatedAt: new Date() })
+          .where(eq(pendingImportsTable.id, imp.id));
+        return created;
+      });
+
+      if (!receipt) {
+        const [existing] = await db
+          .select({
+            status: pendingImportsTable.status,
+            approvedReceiptId: pendingImportsTable.approvedReceiptId,
+          })
+          .from(pendingImportsTable)
+          .where(
+            and(
+              eq(pendingImportsTable.id, id),
+              eq(pendingImportsTable.userId, req.userId!),
+            ),
+          )
+          .limit(1);
+        if (existing?.status === "approved" && existing.approvedReceiptId) {
+          res.json({ approved: true, receiptId: existing.approvedReceiptId });
+          return;
+        }
+        res.status(existing ? 409 : 404).json({
+          error: existing ? "Pending import was already handled" : "Pending import not found",
+        });
         return;
       }
-
-      const data = imp.extractionData!;
-
-      const [receipt] = await db
-        .insert(receiptsTable)
-        .values({
-          userId: req.userId!,
-          objectPath: imp.objectPath,
-          originalFileName: imp.originalFileName,
-          contentType: "application/pdf",
-          status: "completed",
-          merchant: data.merchant,
-          purchaseDate: data.purchaseDate,
-          total: data.total,
-          currency: data.currency,
-          category: data.category ?? "Other",
-          summary: data.summary,
-          ocrText: data.ocrText,
-          warranty: data.warranty,
-          transactionNumber: data.transactionNumber,
-          products: data.products ?? [],
-          notableItems: data.notableItems ?? [],
-          purchaseCountry: data.purchaseCountry,
-          isOnlinePurchase: data.isOnlinePurchase,
-        })
-        .returning();
-
-      await db
-        .update(pendingImportsTable)
-        .set({ status: "approved", updatedAt: new Date() })
-        .where(eq(pendingImportsTable.id, id));
 
       logger.info(
         { userId: req.userId, importId: id, receiptId: receipt.id },
@@ -543,4 +568,3 @@ router.get("/gmail/connect-url", requireAuth, requireCurrentLegalAcceptance, (re
 });
 
 export default router;
-

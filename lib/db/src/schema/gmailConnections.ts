@@ -1,4 +1,5 @@
 import {
+  integer,
   pgTable,
   serial,
   text,
@@ -71,23 +72,30 @@ export const gmailSeenMessagesTable = pgTable(
  * Receipt candidates extracted from Gmail PDF attachments, waiting for
  * the user to approve or dismiss before landing in the main receipts table.
  */
-export const pendingImportsTable = pgTable("pending_imports", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(),
-  gmailMessageId: text("gmail_message_id").notNull(),
-  objectPath: text("object_path").notNull(),
-  originalFileName: text("original_file_name").notNull(),
-  /** pending | approved | dismissed */
-  status: text("status").notNull().default("pending"),
-  extractionData: jsonb("extraction_data").$type<PendingImportExtractionData>(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-});
+export const pendingImportsTable = pgTable(
+  "pending_imports",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    gmailMessageId: text("gmail_message_id").notNull(),
+    gmailAttachmentId: text("gmail_attachment_id"),
+    claimToken: text("claim_token"),
+    objectPath: text("object_path").notNull(),
+    originalFileName: text("original_file_name").notNull(),
+    /** processing | pending | approved | dismissed */
+    status: text("status").notNull().default("pending"),
+    approvedReceiptId: integer("approved_receipt_id"),
+    extractionData: jsonb("extraction_data").$type<PendingImportExtractionData>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [unique().on(t.userId, t.gmailMessageId, t.gmailAttachmentId)],
+);
 
 export type GmailConnection = typeof gmailConnectionsTable.$inferSelect;
 export type PendingImport = typeof pendingImportsTable.$inferSelect;

@@ -159,13 +159,26 @@ async function runStartupMigrations(): Promise<void> {
         id                serial PRIMARY KEY,
         user_id           text NOT NULL,
         gmail_message_id  text NOT NULL,
+        gmail_attachment_id text,
+        claim_token       text,
         object_path       text NOT NULL,
         original_file_name text NOT NULL,
         status            text NOT NULL DEFAULT 'pending',
+        approved_receipt_id integer,
         extraction_data   jsonb,
         created_at        timestamptz NOT NULL DEFAULT now(),
         updated_at        timestamptz NOT NULL DEFAULT now()
       )
+    `);
+    await db.execute(sql`
+      ALTER TABLE pending_imports
+        ADD COLUMN IF NOT EXISTS gmail_attachment_id text,
+        ADD COLUMN IF NOT EXISTS claim_token text,
+        ADD COLUMN IF NOT EXISTS approved_receipt_id integer
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS pending_imports_gmail_attachment_unique
+      ON pending_imports (user_id, gmail_message_id, gmail_attachment_id)
     `);
 
     // Upload intents — short-lived records binding a presigned URL to the user

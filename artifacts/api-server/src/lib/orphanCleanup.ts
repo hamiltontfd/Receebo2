@@ -1,6 +1,6 @@
 import type { File as GCSFile } from "@google-cloud/storage";
-import { db, receiptsTable, receiptAttachmentsTable, userBillingTable, userPreferencesTable, type ReceiptNotableItem } from "@workspace/db";
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, userBillingTable, userPreferencesTable, type ReceiptNotableItem } from "@workspace/db";
+import { and, eq, gt, isNotNull, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
 import { logger } from "./logger";
@@ -47,9 +47,14 @@ async function runOrphanCleanup(): Promise<void> {
       .select({ objectPath: receiptAttachmentsTable.objectPath })
       .from(receiptAttachmentsTable)
       .innerJoin(receiptsTable, eq(receiptAttachmentsTable.receiptId, receiptsTable.id));
+    const activeUploadRows = await db
+      .select({ objectPath: uploadIntentsTable.objectPath })
+      .from(uploadIntentsTable)
+      .where(gt(uploadIntentsTable.expiresAt, new Date()));
     knownPaths = new Set([
       ...receiptRows.map((r) => r.objectPath),
       ...attachmentRows.map((a) => a.objectPath),
+      ...activeUploadRows.map((u) => u.objectPath),
     ]);
     logger.info({ count: knownPaths.size }, "Loaded known object paths from DB");
   } catch (err) {
