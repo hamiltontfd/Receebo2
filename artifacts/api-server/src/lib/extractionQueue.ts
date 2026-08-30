@@ -3,6 +3,8 @@ import { eq, and, lt } from "drizzle-orm";
 import { checkIsReceipt, extractReceiptData, type ExtractedProduct } from "./receiptExtraction";
 import { logger } from "./logger";
 import { sendReceiptReadyEmail } from "./emailService";
+import { isAccountDeletionInProgress } from "./accountDeletionState";
+import { withUserDataLock } from "./userDataLock";
 
 function deduplicateProducts(products: ExtractedProduct[]): ExtractedProduct[] {
   const seen = new Map<string, ExtractedProduct>();
@@ -31,6 +33,7 @@ const STUCK_THRESHOLD_MS = 5 * 60 * 1000;
 const WATCHDOG_INTERVAL_MS = 60 * 1000;
 
 export interface ExtractionJob {
+  userId: string;
   receiptId: number;
   objectPath: string;
   contentType: string;
@@ -46,7 +49,7 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
+async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<void> {
   const { receiptId, objectPath, contentType } = job;
   logger.info({ receiptId, attempt }, "Extraction job starting");
 
@@ -118,7 +121,7 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
         .limit(1);
       const userId = rows[0]?.userId;
       if (userId) {
-        void sendReceiptReadyEmail(userId, {
+        await sendReceiptReadyEmail(userId, {
           id: receiptId,
           merchant: data.merchant,
           total: data.total,
@@ -139,7 +142,7 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
       const delay = backoffMs(attempt);
       logger.info({ receiptId, attempt, delay }, "Scheduling extraction retry");
       await sleep(delay);
-      await processJob(job, attempt + 1);
+      await processJobUnlocked(job, attempt + 1);
     } else {
       logger.error(
         { receiptId, attempt },
@@ -155,6 +158,32 @@ async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
       }
       activeJobs.delete(receiptId);
     }
+  }
+}
+
+export async function runDeletionAwareExtraction(
+  userId: string,
+  operation: () => Promise<void>,
+): Promise<boolean> {
+  return withUserDataLock(userId, async () => {
+    if (await isAccountDeletionInProgress(userId)) {
+      return false;
+    }
+    await operation();
+    return true;
+  });
+}
+
+async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
+  const processed = await runDeletionAwareExtraction(job.userId, async () => {
+    await processJobUnlocked(job, attempt);
+  });
+  if (!processed) {
+    logger.info(
+      { receiptId: job.receiptId, userId: job.userId },
+      "Extraction skipped because account deletion is in progress",
+    );
+    activeJobs.delete(job.receiptId);
   }
 }
 

@@ -16,6 +16,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import * as SecureStore from 'expo-secure-store';
 import { setAuthTokenGetter, setBaseUrl } from '@workspace/api-client-react';
+import { LegalConsentGate } from '@/components/LegalConsentGate';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -87,14 +88,16 @@ function RootLayoutNav() {
     <>
       <ApiAuthSync />
       <AuthGuard />
-      <Stack screenOptions={{ headerBackTitle: 'Back' }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="receipt/[id]"
-          options={{ title: 'Receipt', headerBackTitle: 'Library' }}
-        />
-      </Stack>
+      <LegalConsentGate>
+        <Stack screenOptions={{ headerBackTitle: 'Back' }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="receipt/[id]"
+            options={{ title: 'Receipt', headerBackTitle: 'Library' }}
+          />
+        </Stack>
+      </LegalConsentGate>
     </>
   );
 }

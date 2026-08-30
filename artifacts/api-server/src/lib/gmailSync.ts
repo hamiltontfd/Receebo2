@@ -8,10 +8,35 @@ import {
   type GmailConnection,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { objectStorageClient } from "./objectStorage";
+import {
+  ObjectNotFoundError,
+  ObjectStorageService,
+  objectStorageClient,
+} from "./objectStorage";
 import { extractReceiptData } from "./receiptExtraction";
 import { logger } from "./logger";
 import { encryptToken, decryptToken } from "./tokenCrypto";
+import { isAccountDeletionInProgress } from "./accountDeletionState";
+import { withUserDataLock } from "./userDataLock";
+
+const objectStorageService = new ObjectStorageService();
+
+async function cleanupSyncObject(
+  userId: string,
+  objectPath: string,
+  reason: string,
+): Promise<void> {
+  try {
+    await objectStorageService.deleteObject(objectPath);
+  } catch (err) {
+    if (!(err instanceof ObjectNotFoundError)) {
+      logger.error(
+        { err, userId, objectPath, reason },
+        "Gmail sync could not clean an uploaded object",
+      );
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // OAuth helpers
@@ -28,6 +53,15 @@ function getOAuth2Client(redirectUri?: string): OAuth2Client {
 
 export function isGmailConfigured(): boolean {
   return !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+}
+
+export async function revokeGmailAccess(
+  connection: GmailConnection,
+): Promise<void> {
+  if (!isGmailConfigured()) return;
+  const decrypted = decryptGmailConnection(connection);
+  const client = getOAuth2Client();
+  await client.revokeToken(decrypted.refreshToken);
 }
 
 // ---------------------------------------------------------------------------
@@ -260,9 +294,17 @@ function collectPdfParts(part: GmailMessagePart): GmailMessagePart[] {
  * Message IDs are written to gmail_seen_messages *before* extraction starts so
  * that a crash mid-extraction never re-queues the same file.
  */
-export async function syncUserGmail(
+async function syncUserGmailUnlocked(
   userId: string,
 ): Promise<{ checked: number; queued: number }> {
+  if (await isAccountDeletionInProgress(userId)) {
+    logger.info(
+      { userId },
+      "Gmail sync skipped because account deletion is in progress",
+    );
+    return { checked: 0, queued: 0 };
+  }
+
   const [connection] = await db
     .select()
     .from(gmailConnectionsTable)
@@ -344,6 +386,10 @@ export async function syncUserGmail(
     if (pdfParts.length === 0) continue;
 
     for (const part of pdfParts) {
+      if (await isAccountDeletionInProgress(userId)) {
+        return { checked, queued };
+      }
+
       const attachmentId = part.body!.attachmentId!;
       const filename = part.filename || "receipt.pdf";
 
@@ -373,22 +419,33 @@ export async function syncUserGmail(
         continue;
       }
 
+      if (await isAccountDeletionInProgress(userId)) {
+        await cleanupSyncObject(userId, objectPath, "account deletion began");
+        return { checked, queued };
+      }
+
       // AI extraction
       let extraction: Awaited<ReturnType<typeof extractReceiptData>>;
       try {
         extraction = await extractReceiptData(objectPath, "application/pdf");
       } catch (err) {
         logger.warn({ err, objectPath }, "Gmail sync: extraction failed");
+        await cleanupSyncObject(userId, objectPath, "extraction failed");
         continue;
       }
 
       if (!extraction.isReceipt) {
         logger.info({ objectPath }, "Gmail sync: PDF is not a receipt, skipping");
+        await cleanupSyncObject(userId, objectPath, "not a receipt");
         continue;
       }
 
       // Store as pending import
       try {
+        if (await isAccountDeletionInProgress(userId)) {
+          await cleanupSyncObject(userId, objectPath, "account deletion began");
+          return { checked, queued };
+        }
         await db.insert(pendingImportsTable).values({
           userId,
           gmailMessageId: messageId,
@@ -417,6 +474,7 @@ export async function syncUserGmail(
         );
       } catch (err) {
         logger.error({ err, userId }, "Gmail sync: failed to store pending import");
+        await cleanupSyncObject(userId, objectPath, "database insert failed");
       }
     }
   }
@@ -429,6 +487,12 @@ export async function syncUserGmail(
 
   logger.info({ userId, checked, queued }, "Gmail sync complete");
   return { checked, queued };
+}
+
+export async function syncUserGmail(
+  userId: string,
+): Promise<{ checked: number; queued: number }> {
+  return withUserDataLock(userId, () => syncUserGmailUnlocked(userId));
 }
 
 /** Sweep all connected Gmail accounts. Called by the scheduler. */

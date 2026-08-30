@@ -2,9 +2,10 @@ import { Router, type IRouter } from "express";
 import { db, guestSessionsTable, receiptsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { getAuth } from "@clerk/express";
 import { logger } from "../lib/logger";
 import { guestSessionRateLimiter } from "../middlewares/guestSessionRateLimiter";
+import { requireAuth } from "../middlewares/requireAuth";
+import { lockUserDataMutation } from "../lib/userDataLock";
 
 const router: IRouter = Router();
 
@@ -33,13 +34,8 @@ router.post("/guest-session", guestSessionRateLimiter, async (req, res): Promise
   }
 });
 
-router.post("/guest-session/claim", async (req, res): Promise<void> => {
-  const auth = getAuth(req);
-  const clerkUserId = (auth?.sessionClaims?.userId as string | undefined) || auth?.userId;
-  if (!clerkUserId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
+router.post("/guest-session/claim", requireAuth, lockUserDataMutation(async (req, res): Promise<void> => {
+  const clerkUserId = req.userId!;
 
   const guestToken = typeof req.body?.guestToken === "string" ? req.body.guestToken : null;
   if (!guestToken) {
@@ -81,6 +77,6 @@ router.post("/guest-session/claim", async (req, res): Promise<void> => {
     logger.error({ error, clerkUserId, guestToken }, "Failed to claim guest session");
     res.status(500).json({ error: "Failed to claim guest session" });
   }
-});
+}));
 
 export default router;

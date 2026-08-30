@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
-import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, useLocation, Router as WouterRouter, Redirect, Link } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { toast } from "@/hooks/use-toast";
@@ -16,8 +16,14 @@ import SearchPage from "@/pages/search";
 import Settings from "@/pages/settings";
 import ProfilePage from "@/pages/profile";
 import GetStarted from "@/pages/get-started";
+import PrivacyPolicy from "@/pages/privacy";
+import TermsOfService from "@/pages/terms";
 import AppShell from "@/components/AppShell";
 import { PlanSelectionGate } from "@/components/PlanSelectionGate";
+import {
+  LEGAL_ACCEPTED_EVENT,
+  LegalConsentGate,
+} from "@/components/LegalConsentGate";
 import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
 import { setGuestId, createCheckoutSession } from "@workspace/api-client-react";
 
@@ -117,8 +123,22 @@ function SignInPage() {
 
 function SignUpPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
-      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-10">
+      <div className="flex w-full max-w-[440px] flex-col items-center gap-4">
+        <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+        <p className="max-w-sm text-center text-xs leading-5 text-muted-foreground">
+          Before using Receebo, you’ll be asked to confirm that you are 18+ and
+          agree to the{" "}
+          <Link href="/terms" className="underline underline-offset-4">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="underline underline-offset-4">
+            Privacy Policy
+          </Link>
+          . Optional Gmail and notification permissions are separate.
+        </p>
+      </div>
     </div>
   );
 }
@@ -141,9 +161,11 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <Show when="signed-in">
-        <PlanSelectionGate>
-          <AppShell>{children}</AppShell>
-        </PlanSelectionGate>
+        <LegalConsentGate>
+          <PlanSelectionGate>
+            <AppShell>{children}</AppShell>
+          </PlanSelectionGate>
+        </LegalConsentGate>
       </Show>
       <Show when="signed-out">
         {/* Guest bypass disabled — app uses 7-day trial instead. */}
@@ -180,29 +202,51 @@ function PostAuthCheckout() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]); // re-run on every route change so ?plan= is never missed
 
-  // Once the user is signed in, fire checkout for the pending plan (once only).
-  useEffect(() => {
+  const startCheckoutIfAccepted = useCallback(async () => {
     if (!isSignedIn || checkoutFiredRef.current) return;
     const plan = sessionStorage.getItem(PLAN_STORAGE_KEY);
     if (plan !== "monthly" && plan !== "yearly") return;
 
-    checkoutFiredRef.current = true;
-    sessionStorage.removeItem(PLAN_STORAGE_KEY);
+    try {
+      const acceptanceResponse = await fetch(
+        `${apiBase}/api/legal/acceptance`,
+        { credentials: "include" },
+      );
+      if (!acceptanceResponse.ok) return;
+      const acceptance = (await acceptanceResponse.json()) as {
+        accepted: boolean;
+      };
+      if (!acceptance.accepted) return;
 
-    const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
-    createCheckoutSession(base, plan)
-      .then(({ url }) => {
-        if (url) window.location.href = url;
-      })
-      .catch(() => {
-        toast({
-          variant: "destructive",
-          title: "Couldn't start checkout",
-          description:
-            "Something went wrong starting your trial. Pick a plan again to retry.",
-        });
+      checkoutFiredRef.current = true;
+      const { url } = await createCheckoutSession(
+        `${apiBase}/`,
+        plan,
+      );
+      if (url) {
+        sessionStorage.removeItem(PLAN_STORAGE_KEY);
+        window.location.href = url;
+      } else {
+        checkoutFiredRef.current = false;
+      }
+    } catch {
+      checkoutFiredRef.current = false;
+      toast({
+        variant: "destructive",
+        title: "Couldn't start checkout",
+        description:
+          "Something went wrong starting your trial. Pick a plan again to retry.",
       });
+    }
   }, [isSignedIn]);
+
+  // Start checkout only after the current legal documents have been accepted.
+  useEffect(() => {
+    void startCheckoutIfAccepted();
+    const onAccepted = () => void startCheckoutIfAccepted();
+    window.addEventListener(LEGAL_ACCEPTED_EVENT, onAccepted);
+    return () => window.removeEventListener(LEGAL_ACCEPTED_EVENT, onAccepted);
+  }, [startCheckoutIfAccepted]);
 
   return null;
 }
@@ -308,6 +352,8 @@ function ClerkProviderWithRoutes() {
             <Route path="/" component={HomeRedirect} />
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
+            <Route path="/privacy" component={PrivacyPolicy} />
+            <Route path="/terms" component={TermsOfService} />
             <Route path="/search">
               <ProtectedShell><SearchPage /></ProtectedShell>
             </Route>

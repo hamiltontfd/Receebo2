@@ -2,6 +2,8 @@ import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
 import { db, guestSessionsTable, receiptsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { hasCurrentLegalAcceptance } from "../lib/legalAcceptance";
+import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
 
 export async function requireAuthOrGuest(
   req: Request,
@@ -11,7 +13,21 @@ export async function requireAuthOrGuest(
   const auth = getAuth(req);
   const clerkUserId = (auth?.sessionClaims?.userId as string | undefined) || auth?.userId;
   if (clerkUserId) {
-    (req as any).userId = clerkUserId;
+    if (await isAccountDeletionInProgress(clerkUserId)) {
+      res.status(423).json({
+        error: "Account deletion is in progress",
+        code: "ACCOUNT_DELETION_IN_PROGRESS",
+      });
+      return;
+    }
+    if (!(await hasCurrentLegalAcceptance(clerkUserId))) {
+      res.status(428).json({
+        error: "Current Terms, Privacy Policy, and 18+ confirmation are required",
+        code: "LEGAL_ACCEPTANCE_REQUIRED",
+      });
+      return;
+    }
+    req.userId = clerkUserId;
     return next();
   }
 
@@ -26,7 +42,7 @@ export async function requireAuthOrGuest(
       .limit(1);
 
     if (session) {
-      (req as any).userId = guestToken;
+      req.userId = guestToken;
       return next();
     }
 
@@ -46,7 +62,7 @@ export async function requireAuthOrGuest(
           .insert(guestSessionsTable)
           .values({ token: guestToken })
           .onConflictDoNothing();
-        (req as any).userId = guestToken;
+        req.userId = guestToken;
         return next();
       }
     }

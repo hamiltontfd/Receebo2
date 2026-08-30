@@ -2,6 +2,8 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, userBillingTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
+import { lockUserDataMutation } from "../lib/userDataLock";
 import { getUncachableStripeClient } from "../stripeClient";
 import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 import { clerkClient } from "@clerk/express";
@@ -42,7 +44,7 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
 });
 
 /** POST /billing/create-checkout-session — start Stripe Checkout */
-router.post("/billing/create-checkout-session", requireAuth, async (req, res): Promise<void> => {
+router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegalAcceptance, lockUserDataMutation(async (req, res): Promise<void> => {
   const { planType } = req.body as { planType?: string };
   if (!planType || !["monthly", "yearly"].includes(planType)) {
     res.status(400).json({ error: "planType must be 'monthly' or 'yearly'" });
@@ -110,7 +112,7 @@ router.post("/billing/create-checkout-session", requireAuth, async (req, res): P
     logger.error({ err }, "billing: create-checkout-session failed");
     res.status(500).json({ error: "Failed to create checkout session" });
   }
-});
+}));
 
 /** POST /billing/create-portal-session — open Stripe Customer Portal */
 router.post("/billing/create-portal-session", requireAuth, async (req, res): Promise<void> => {

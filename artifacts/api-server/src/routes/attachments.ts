@@ -1,17 +1,18 @@
 import { Router, type IRouter } from "express";
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable } from "@workspace/db";
 import { CreateAttachmentBody, CreateAttachmentParams, DeleteAttachmentParams } from "@workspace/api-zod";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 import { getSubscriptionStatus } from "../lib/subscriptionStatus";
+import { lockUserDataMutation } from "../lib/userDataLock";
 
 const objectStorageService = new ObjectStorageService();
 const router: IRouter = Router();
 
 /** POST /receipts/:id/attachments */
-router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): Promise<void> => {
+router.post("/receipts/:id/attachments", requireAuthOrGuest, lockUserDataMutation(async (req, res): Promise<void> => {
   const params = CreateAttachmentParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -31,7 +32,7 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
   // the expected private uploads directory). This prevents a malicious client
   // from associating an arbitrary GCS path — potentially belonging to another
   // user — with a receipt and then reading it via the /storage/objects/* proxy.
-  const expectedPrefix = `${objectStorageService.getPrivateObjectDir()}/uploads/`;
+  const expectedPrefix = "/objects/uploads/";
   if (!parsed.data.objectPath.startsWith(expectedPrefix)) {
     res.status(400).json({ error: "Invalid objectPath" });
     return;
@@ -52,8 +53,6 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
   let intentMissing = false;
 
   await db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
-
     const [receipt] = await tx
       .select({ id: receiptsTable.id })
       .from(receiptsTable)
@@ -108,13 +107,13 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, async (req, res): P
 
   logger.info({ receiptId, attachmentId: attachment!.id }, "Attachment created");
   res.status(201).json(attachment!);
-});
+}));
 
 /** DELETE /receipts/:id/attachments/:attachmentId */
 router.delete(
   "/receipts/:id/attachments/:attachmentId",
   requireAuthOrGuest,
-  async (req, res): Promise<void> => {
+  lockUserDataMutation(async (req, res): Promise<void> => {
     const params = DeleteAttachmentParams.safeParse(req.params);
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
@@ -156,7 +155,7 @@ router.delete(
       .where(eq(receiptAttachmentsTable.id, existing.id));
 
     res.sendStatus(204);
-  },
+  }),
 );
 
 export default router;

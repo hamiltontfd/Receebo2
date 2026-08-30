@@ -6,17 +6,27 @@ import {
   pendingImportsTable,
   receiptsTable,
 } from "@workspace/db";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   buildGmailOAuthUrl,
   exchangeCodeAndStore,
   syncUserGmail,
   isGmailConfigured,
+  revokeGmailAccess,
 } from "../lib/gmailSync";
 import { logger } from "../lib/logger";
+import {
+  ObjectNotFoundError,
+  ObjectStorageService,
+} from "../lib/objectStorage";
+import { deletePendingImportObjects } from "../lib/gmailCleanup";
+import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
+import { lockUserDataMutation, withUserDataLock } from "../lib/userDataLock";
+import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
 
 const router = Router();
+const objectStorageService = new ObjectStorageService();
 
 // ---------------------------------------------------------------------------
 // OAuth state security
@@ -163,7 +173,7 @@ router.get("/gmail/status", requireAuth, async (req, res): Promise<void> => {
 // ---------------------------------------------------------------------------
 // GET /gmail/connect  — redirect user to Google OAuth consent screen
 // ---------------------------------------------------------------------------
-router.get("/gmail/connect", requireAuth, (req, res): void => {
+router.get("/gmail/connect", requireAuth, requireCurrentLegalAcceptance, (req, res): void => {
   if (!isGmailConfigured()) {
     res.status(503).json({
       error:
@@ -211,7 +221,12 @@ router.get("/gmail/callback", async (req, res): Promise<void> => {
   }
 
   try {
-    await exchangeCodeAndStore(userId, code, redirectUri(req));
+    await withUserDataLock(userId, async () => {
+      if (await isAccountDeletionInProgress(userId)) {
+        throw new Error("Account deletion is in progress");
+      }
+      await exchangeCodeAndStore(userId, code, redirectUri(req));
+    });
     // Kick off an immediate background sync — don't await
     void syncUserGmail(userId).catch((err) =>
       logger.warn({ err, userId }, "Gmail: post-connect background sync failed"),
@@ -226,19 +241,74 @@ router.get("/gmail/callback", async (req, res): Promise<void> => {
 // ---------------------------------------------------------------------------
 // DELETE /gmail/disconnect
 // ---------------------------------------------------------------------------
-router.delete("/gmail/disconnect", requireAuth, async (req, res): Promise<void> => {
+router.delete("/gmail/disconnect", requireAuth, lockUserDataMutation(async (req, res): Promise<void> => {
   try {
+    const removableImports = await db
+      .select({
+        id: pendingImportsTable.id,
+        objectPath: pendingImportsTable.objectPath,
+      })
+      .from(pendingImportsTable)
+      .where(
+        and(
+          eq(pendingImportsTable.userId, req.userId!),
+          ne(pendingImportsTable.status, "approved"),
+        ),
+      );
+
+    const failedFiles = await deletePendingImportObjects(
+      removableImports,
+      (objectPath) => objectStorageService.deleteObject(objectPath),
+      (err) => err instanceof ObjectNotFoundError,
+      (pendingImport, err) => {
+        logger.warn(
+          {
+            err,
+            userId: req.userId,
+            importId: pendingImport.id,
+            objectPath: pendingImport.objectPath,
+          },
+          "Could not delete unapproved Gmail import during disconnect",
+        );
+      },
+    );
+
+    if (failedFiles.length > 0) {
+      res.status(503).json({
+        error:
+          "Could not remove all unapproved Gmail files. Gmail remains connected; please try again.",
+      });
+      return;
+    }
+
+    const [connection] = await db
+      .select()
+      .from(gmailConnectionsTable)
+      .where(eq(gmailConnectionsTable.userId, req.userId!))
+      .limit(1);
+
+    if (connection) {
+      try {
+        await revokeGmailAccess(connection);
+      } catch (err) {
+        logger.warn(
+          { err, userId: req.userId },
+          "Gmail token revocation failed; removing local credentials",
+        );
+      }
+    }
+
     await db
       .delete(gmailConnectionsTable)
       .where(eq(gmailConnectionsTable.userId, req.userId!));
 
-    // Remove pending (unapproved) imports — approved ones became real receipts
+    // Approved imports became real receipts and retain their receipt objects.
     await db
       .delete(pendingImportsTable)
       .where(
         and(
           eq(pendingImportsTable.userId, req.userId!),
-          eq(pendingImportsTable.status, "pending"),
+          ne(pendingImportsTable.status, "approved"),
         ),
       );
 
@@ -247,12 +317,12 @@ router.delete("/gmail/disconnect", requireAuth, async (req, res): Promise<void> 
     logger.error({ err }, "DELETE /gmail/disconnect failed");
     res.status(500).json({ error: "Failed to disconnect Gmail" });
   }
-});
+}));
 
 // ---------------------------------------------------------------------------
 // POST /gmail/sync  — manual trigger
 // ---------------------------------------------------------------------------
-router.post("/gmail/sync", requireAuth, async (req, res): Promise<void> => {
+router.post("/gmail/sync", requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
   try {
     const result = await syncUserGmail(req.userId!);
     res.json(result);
@@ -265,7 +335,7 @@ router.post("/gmail/sync", requireAuth, async (req, res): Promise<void> => {
 // ---------------------------------------------------------------------------
 // GET /gmail/pending  — list pending imports
 // ---------------------------------------------------------------------------
-router.get("/gmail/pending", requireAuth, async (req, res): Promise<void> => {
+router.get("/gmail/pending", requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
   try {
     const rows = await db
       .select()
@@ -305,7 +375,8 @@ router.get("/gmail/pending", requireAuth, async (req, res): Promise<void> => {
 router.post(
   "/gmail/pending/:id/approve",
   requireAuth,
-  async (req, res): Promise<void> => {
+  requireCurrentLegalAcceptance,
+  lockUserDataMutation(async (req, res): Promise<void> => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) {
       res.status(400).json({ error: "Invalid id" });
@@ -370,7 +441,7 @@ router.post(
       logger.error({ err }, "POST /gmail/pending/:id/approve failed");
       res.status(500).json({ error: "Failed to approve import" });
     }
-  },
+  }),
 );
 
 // ---------------------------------------------------------------------------
@@ -379,7 +450,8 @@ router.post(
 router.delete(
   "/gmail/pending/:id",
   requireAuth,
-  async (req, res): Promise<void> => {
+  requireCurrentLegalAcceptance,
+  lockUserDataMutation(async (req, res): Promise<void> => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) {
       res.status(400).json({ error: "Invalid id" });
@@ -387,13 +459,53 @@ router.delete(
     }
 
     try {
-      await db
-        .update(pendingImportsTable)
-        .set({ status: "dismissed", updatedAt: new Date() })
+      const [pendingImport] = await db
+        .select({
+          id: pendingImportsTable.id,
+          objectPath: pendingImportsTable.objectPath,
+        })
+        .from(pendingImportsTable)
         .where(
           and(
             eq(pendingImportsTable.id, id),
             eq(pendingImportsTable.userId, req.userId!),
+            eq(pendingImportsTable.status, "pending"),
+          ),
+        )
+        .limit(1);
+
+      if (!pendingImport) {
+        res.status(404).json({ error: "Pending import not found" });
+        return;
+      }
+
+      try {
+        await objectStorageService.deleteObject(pendingImport.objectPath);
+      } catch (err) {
+        if (!(err instanceof ObjectNotFoundError)) {
+          logger.warn(
+            {
+              err,
+              userId: req.userId,
+              importId: pendingImport.id,
+              objectPath: pendingImport.objectPath,
+            },
+            "Could not delete dismissed Gmail import object",
+          );
+          res.status(503).json({
+            error: "Could not remove this import. Please try again.",
+          });
+          return;
+        }
+      }
+
+      await db
+        .delete(pendingImportsTable)
+        .where(
+          and(
+            eq(pendingImportsTable.id, id),
+            eq(pendingImportsTable.userId, req.userId!),
+            eq(pendingImportsTable.status, "pending"),
           ),
         );
 
@@ -402,7 +514,7 @@ router.delete(
       logger.error({ err }, "DELETE /gmail/pending/:id failed");
       res.status(500).json({ error: "Failed to dismiss import" });
     }
-  },
+  }),
 );
 
 // ---------------------------------------------------------------------------
@@ -410,7 +522,7 @@ router.delete(
 // Mobile apps cannot follow server-side redirects with auth headers, so this
 // endpoint returns the URL as JSON so the client can open it via Linking.
 // ---------------------------------------------------------------------------
-router.get("/gmail/connect-url", requireAuth, (req, res): void => {
+router.get("/gmail/connect-url", requireAuth, requireCurrentLegalAcceptance, (req, res): void => {
   if (!isGmailConfigured()) {
     res.status(503).json({ error: "Gmail integration not configured." });
     return;

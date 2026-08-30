@@ -22,6 +22,7 @@ import { enqueueExtraction } from "../lib/extractionQueue";
 import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { getSubscriptionStatus } from "../lib/subscriptionStatus";
+import { lockUserDataMutation } from "../lib/userDataLock";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -92,7 +93,7 @@ router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   }
 });
 
-router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
+router.post("/receipts", requireAuthOrGuest, lockUserDataMutation(async (req, res): Promise<void> => {
   const parsed = CreateReceiptBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -112,16 +113,11 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
   }
 
   // Atomically verify the upload intent and insert within a single transaction.
-  // pg_advisory_xact_lock serialises concurrent uploads for the same user so
-  // two simultaneous requests cannot both consume the same intent.
-  // The lock key is derived from the user ID string via hashtext() and is
-  // automatically released when the transaction commits or rolls back.
+  // The route-level per-user lock serialises this mutation with account deletion.
   let receipt: (typeof receiptsTable.$inferSelect) | undefined;
   let intentMissing = false;
 
   await db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
-
     // Verify the objectPath was issued by this server to this user.
     // Atomically consume the intent so it cannot be reused.
     const [intent] = await tx
@@ -162,13 +158,14 @@ router.post("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => 
   }
 
   enqueueExtraction({
+    userId,
     receiptId: receipt!.id,
     objectPath: receipt!.objectPath,
     contentType: receipt!.contentType,
   });
 
   res.status(201).json(GetReceiptResponse.parse(receipt!));
-});
+}));
 
 router.get("/receipts/stats", requireAuthOrGuest, async (req, res): Promise<void> => {
   const rows = await db
@@ -350,7 +347,7 @@ router.get("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void> 
   res.json(GetReceiptResponse.parse({ ...receipt, attachments }));
 });
 
-router.patch("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void> => {
+router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (req, res): Promise<void> => {
   const params = UpdateReceiptParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -385,9 +382,9 @@ router.patch("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void
   }
 
   res.json(UpdateReceiptResponse.parse(receipt));
-});
+}));
 
-router.delete("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void> => {
+router.delete("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (req, res): Promise<void> => {
   const params = DeleteReceiptParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -440,6 +437,6 @@ router.delete("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<voi
     .where(eq(receiptsTable.id, existing.id));
 
   res.sendStatus(204);
-});
+}));
 
 export default router;

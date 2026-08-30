@@ -4,6 +4,7 @@ import { db, pushSubscriptionsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { getVapidPublicKey } from "../lib/pushNotifications";
 import { logger } from "../lib/logger";
+import { lockUserDataMutation } from "../lib/userDataLock";
 
 const router: IRouter = Router();
 
@@ -16,7 +17,7 @@ router.get("/push/vapid-key", (_req, res): void => {
   res.json({ configured: true, publicKey });
 });
 
-router.post("/push/subscribe", requireAuth, async (req, res): Promise<void> => {
+router.post("/push/subscribe", requireAuth, lockUserDataMutation(async (req, res): Promise<void> => {
   const body = req.body as {
     endpoint?: unknown;
     keys?: { p256dh?: unknown; auth?: unknown };
@@ -58,7 +59,7 @@ router.post("/push/subscribe", requireAuth, async (req, res): Promise<void> => {
     logger.error({ err, userId: req.userId }, "push/subscribe failed");
     res.status(500).json({ error: "Failed to save push subscription" });
   }
-});
+}));
 
 router.post("/push/status", requireAuth, async (req, res): Promise<void> => {
   const endpoint = typeof req.body?.endpoint === "string" ? req.body.endpoint.trim() : "";
@@ -80,7 +81,7 @@ router.post("/push/status", requireAuth, async (req, res): Promise<void> => {
   }
 });
 
-router.delete("/push/subscribe", requireAuth, async (req, res): Promise<void> => {
+router.delete("/push/subscribe", requireAuth, lockUserDataMutation(async (req, res): Promise<void> => {
   const endpoint = typeof req.body?.endpoint === "string" ? req.body.endpoint.trim() : "";
   if (!endpoint) {
     res.status(400).json({ error: "Endpoint is required" });
@@ -101,6 +102,6 @@ router.delete("/push/subscribe", requireAuth, async (req, res): Promise<void> =>
     logger.error({ err, userId: req.userId }, "push/subscribe DELETE failed");
     res.status(500).json({ error: "Failed to remove push subscription" });
   }
-});
+}));
 
 export default router;

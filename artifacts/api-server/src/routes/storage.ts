@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
+import { lockUserDataMutation } from "../lib/userDataLock";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -19,7 +20,7 @@ const objectStorageService = new ObjectStorageService();
  * The client sends JSON metadata (name, size, contentType) — NOT the file.
  * Then uploads the file directly to the returned presigned URL.
  */
-router.post("/storage/uploads/request-url", requireAuthOrGuest, async (req: Request, res: Response) => {
+router.post("/storage/uploads/request-url", requireAuthOrGuest, lockUserDataMutation(async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });
@@ -51,7 +52,7 @@ router.post("/storage/uploads/request-url", requireAuthOrGuest, async (req: Requ
     req.log.error({ err: error }, "Error generating upload URL");
     res.status(500).json({ error: "Failed to generate upload URL" });
   }
-});
+}));
 
 /**
  * GET /storage/public-objects/*

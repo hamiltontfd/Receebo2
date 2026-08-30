@@ -9,6 +9,7 @@ import adminRouter from "./admin";
 import notificationsRouter from "./notifications";
 import gmailRouter from "./gmail";
 import pushRouter from "./push";
+import accountRouter from "./account";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(adminRouter);
 router.use(notificationsRouter);
 router.use(gmailRouter);
 router.use(pushRouter);
+router.use(accountRouter);
 
 export default router;

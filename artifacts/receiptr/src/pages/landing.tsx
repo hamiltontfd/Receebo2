@@ -127,6 +127,18 @@ export default function Landing() {
               </div>
               <div className="flex items-center gap-6 text-sm">
                 <Link
+                  href="/privacy"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Privacy
+                </Link>
+                <Link
+                  href="/terms"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Terms
+                </Link>
+                <Link
                   href="/sign-in"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >

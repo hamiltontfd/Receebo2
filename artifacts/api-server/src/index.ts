@@ -105,6 +105,31 @@ async function runStartupMigrations(): Promise<void> {
       )
     `);
 
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS legal_acceptances (
+        id              serial PRIMARY KEY,
+        user_id         text NOT NULL,
+        terms_version   text NOT NULL,
+        privacy_version text NOT NULL,
+        confirmed_age   boolean NOT NULL DEFAULT true,
+        accepted_at     timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      ALTER TABLE legal_acceptances
+      ADD COLUMN IF NOT EXISTS confirmed_age boolean NOT NULL DEFAULT true
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS account_deletion_requests (
+        user_id      text PRIMARY KEY,
+        stage        text NOT NULL DEFAULT 'requested',
+        last_error   text,
+        created_at   timestamptz NOT NULL DEFAULT now(),
+        updated_at   timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
     // Gmail integration tables
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS gmail_connections (

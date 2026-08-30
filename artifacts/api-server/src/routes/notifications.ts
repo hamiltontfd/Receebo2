@@ -4,6 +4,8 @@ import { db, userPreferencesTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { parseUnsubscribeToken } from "../lib/emailService";
 import { logger } from "../lib/logger";
+import { lockUserDataMutation, withUserDataLock } from "../lib/userDataLock";
+import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
 
 const router: IRouter = Router();
 
@@ -29,13 +31,16 @@ router.get("/notifications/unsubscribe", async (req, res): Promise<void> => {
   }
 
   try {
-    await db
-      .insert(userPreferencesTable)
-      .values({ userId, notificationsOptOut: true })
-      .onConflictDoUpdate({
-        target: userPreferencesTable.userId,
-        set: { notificationsOptOut: true },
-      });
+    await withUserDataLock(userId, async () => {
+      if (await isAccountDeletionInProgress(userId)) return;
+      await db
+        .insert(userPreferencesTable)
+        .values({ userId, notificationsOptOut: true })
+        .onConflictDoUpdate({
+          target: userPreferencesTable.userId,
+          set: { notificationsOptOut: true },
+        });
+    });
 
     logger.info({ userId }, "User unsubscribed from return window emails");
 
@@ -88,7 +93,7 @@ router.get(
 router.patch(
   "/notifications/preferences",
   requireAuth,
-  async (req, res): Promise<void> => {
+  lockUserDataMutation(async (req, res): Promise<void> => {
     const userId = req.userId!;
     const { optOut } = req.body as { optOut?: unknown };
 
@@ -112,7 +117,7 @@ router.patch(
       logger.error({ err, userId }, "notifications/preferences PATCH failed");
       res.status(500).json({ error: "Failed to update preferences" });
     }
-  },
+  }),
 );
 
 export default router;
