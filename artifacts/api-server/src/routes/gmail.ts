@@ -24,6 +24,7 @@ import { deletePendingImportObjects } from "../lib/gmailCleanup";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
 import { lockUserDataMutation, withUserDataLock } from "../lib/userDataLock";
 import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
+import { gmailOrigin } from "../lib/gmailUrls";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -117,16 +118,11 @@ function verifyAndConsumeState(state: string): string {
 // ---------------------------------------------------------------------------
 
 function redirectUri(req: Request): string {
-  const domain = process.env.REPLIT_DEV_DOMAIN;
-  if (domain) return `https://${domain}/api/gmail/callback`;
-  return `${req.protocol}://${req.get("host")}/api/gmail/callback`;
+  return `${gmailOrigin(req)}/api/gmail/callback`;
 }
 
 function appSettingsUrl(req: Request, params: string): string {
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    return `https://${process.env.REPLIT_DEV_DOMAIN}/settings${params}`;
-  }
-  return `${req.protocol}://${req.get("host")}/settings${params}`;
+  return `${gmailOrigin(req)}/settings${params}`;
 }
 
 // ---------------------------------------------------------------------------
