@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './billingAccessStatus';
+export * from './billingAccessStatusPlan';
 export * from './checkSimilarReceiptParams';
 export * from './errorEnvelope';
 export * from './getRecentReceiptsParams';

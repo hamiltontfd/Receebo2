@@ -1,5 +1,6 @@
 import { db, userBillingTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
+import { hasOwnerAccess } from "./ownerAccess";
 
 export type UserPlan = "free" | "trialing" | "pro";
 
@@ -9,6 +10,8 @@ export interface SubscriptionStatus {
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
   stripeSubscriptionId: string | null;
+  ownerAccess?: boolean;
+  hasBillingAccount?: boolean;
 }
 
 const FREE: SubscriptionStatus = {
@@ -20,6 +23,27 @@ const FREE: SubscriptionStatus = {
 };
 
 export async function getSubscriptionStatus(userId: string): Promise<SubscriptionStatus> {
+  const ownerAccess = await hasOwnerAccess(userId);
+  const status = await getPaidSubscriptionStatus(userId);
+  if (!ownerAccess) return status;
+  const [billing] = await db
+    .select({ stripeSubscriptionId: userBillingTable.stripeSubscriptionId })
+    .from(userBillingTable)
+    .where(eq(userBillingTable.userId, userId));
+  return {
+    ...status,
+    plan: "pro",
+    ownerAccess: true,
+    hasBillingAccount: Boolean(billing),
+    trialEndAt: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    // Keep the real subscription reference for account-deletion cancellation.
+    stripeSubscriptionId: status.stripeSubscriptionId ?? billing?.stripeSubscriptionId ?? null,
+  };
+}
+
+async function getPaidSubscriptionStatus(userId: string): Promise<SubscriptionStatus> {
   if (!userId || userId.startsWith("guest")) return FREE;
 
   // Development-only bypass: treat every signed-in user as having full access

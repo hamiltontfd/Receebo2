@@ -1,13 +1,9 @@
 import { customFetch } from "./custom-fetch";
+import type { BillingAccessStatus } from "./generated/api.schemas";
 
 export type UserPlan = "free" | "trialing" | "pro";
 
-export interface SubscriptionStatus {
-  plan: UserPlan;
-  trialEndAt: string | null;
-  currentPeriodEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-}
+export type SubscriptionStatus = BillingAccessStatus;
 
 export async function getSubscriptionStatus(base: string): Promise<SubscriptionStatus> {
   return customFetch<SubscriptionStatus>(`${base}api/billing/subscription`);

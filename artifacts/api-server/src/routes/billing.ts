@@ -8,6 +8,7 @@ import { getUncachableStripeClient } from "../stripeClient";
 import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 import { clerkClient } from "@clerk/express";
 import { logger } from "../lib/logger";
+import { hasOwnerAccess } from "../lib/ownerAccess";
 
 const router: IRouter = Router();
 
@@ -36,6 +37,8 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
       trialEndAt: status.trialEndAt?.toISOString() ?? null,
       currentPeriodEnd: status.currentPeriodEnd?.toISOString() ?? null,
       cancelAtPeriodEnd: status.cancelAtPeriodEnd,
+      ownerAccess: status.ownerAccess === true,
+      hasBillingAccount: status.hasBillingAccount === true,
     });
   } catch (err) {
     logger.error({ err }, "billing: failed to get subscription status");
@@ -45,6 +48,13 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
 
 /** POST /billing/create-checkout-session — start Stripe Checkout */
 router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegalAcceptance, lockUserDataMutation(async (req, res): Promise<void> => {
+  if (await hasOwnerAccess(req.userId!)) {
+    res.status(409).json({
+      error: "OWNER_ACCESS_INCLUDED",
+      message: "Your Owner access already includes all Pro features. No subscription is needed.",
+    });
+    return;
+  }
   const { planType } = req.body as { planType?: string };
   if (!planType || !["monthly", "yearly"].includes(planType)) {
     res.status(400).json({ error: "planType must be 'monthly' or 'yearly'" });

@@ -15,6 +15,19 @@ tags:
   - name: Storage
     description: Object storage upload and serving endpoints.
 paths:
+  /billing/subscription:
+    get:
+      operationId: fetchBillingAccessStatus
+      summary: Current authenticated user's subscription and complimentary access
+      responses:
+        "200":
+          description: Server-verified product entitlement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingAccessStatus"
+        "401":
+          description: Authentication required
   /healthz:
     get:
       operationId: healthCheck
@@ -594,3 +607,22 @@ components:
       properties:
         error:
           type: string
+    BillingAccessStatus:
+      type: object
+      required: [plan, trialEndAt, currentPeriodEnd, cancelAtPeriodEnd]
+      properties:
+        plan:
+          type: string
+          enum: [free, trialing, pro]
+        trialEndAt:
+          type: [string, "null"]
+        currentPeriodEnd:
+          type: [string, "null"]
+        cancelAtPeriodEnd:
+          type: boolean
+        ownerAccess:
+          type: boolean
+          description: Complimentary entitlement verified by the server, never supplied by the client.
+        hasBillingAccount:
+          type: boolean
+          description: For complimentary owners, indicates an existing Stripe customer whose billing portal remains available.

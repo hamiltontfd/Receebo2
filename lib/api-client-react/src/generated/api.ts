@@ -12,18 +12,18 @@ import {
 } from '@tanstack/react-query';
 import type {
   InfiniteData,
+  UseInfiniteQueryResult,
   MutationFunction,
   QueryFunction,
   QueryKey,
   UseMutationOptions,
   UseMutationResult,
-  UseInfiniteQueryOptions,
-  UseInfiniteQueryResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
+  BillingAccessStatus,
   CheckSimilarReceiptParams,
   ErrorEnvelope,
   GetRecentReceiptsParams,
@@ -50,6 +50,83 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getFetchBillingAccessStatusUrl = () => {
+
+
+
+
+  return `/api/billing/subscription`
+}
+
+/**
+ * @summary Current authenticated user's subscription and complimentary access
+ */
+export const fetchBillingAccessStatus = async ( options?: RequestInit): Promise<BillingAccessStatus> => {
+
+  return customFetch<BillingAccessStatus>(getFetchBillingAccessStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getFetchBillingAccessStatusQueryKey = () => {
+    return [
+    `/api/billing/subscription`
+    ] as const;
+    }
+
+
+export const getFetchBillingAccessStatusQueryOptions = <TData = Awaited<ReturnType<typeof fetchBillingAccessStatus>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof fetchBillingAccessStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getFetchBillingAccessStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof fetchBillingAccessStatus>>> = ({ signal }) => fetchBillingAccessStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof fetchBillingAccessStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type FetchBillingAccessStatusQueryResult = NonNullable<Awaited<ReturnType<typeof fetchBillingAccessStatus>>>
+export type FetchBillingAccessStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Current authenticated user's subscription and complimentary access
+ */
+
+export function useFetchBillingAccessStatus<TData = Awaited<ReturnType<typeof fetchBillingAccessStatus>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof fetchBillingAccessStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getFetchBillingAccessStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 
@@ -209,10 +286,12 @@ export function useListReceipts<TData = Awaited<ReturnType<typeof listReceipts>>
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-/**
- * Infinite-query variant of useListReceipts.
- * Uses createdAt-based cursor pagination. Only for the non-search (idle) list.
- */
+
+
+
+
+
+
 export function useInfiniteListReceipts(
   params?: Omit<ListReceiptsParams, 'cursor'>,
   options?: {
@@ -222,7 +301,6 @@ export function useInfiniteListReceipts(
 ): UseInfiniteQueryResult<InfiniteData<ReceiptPage>, ErrorType<unknown>> & { queryKey: QueryKey } {
   const { query: queryOptions, request: requestOptions } = options ?? {};
   const queryKey: QueryKey = [...getListReceiptsQueryKey(params), 'infinite'];
-
   const result = useInfiniteQuery<ReceiptPage, ErrorType<unknown>, InfiniteData<ReceiptPage>, QueryKey, string | null>({
     queryKey,
     queryFn: ({ pageParam, signal }) =>
@@ -231,15 +309,8 @@ export function useInfiniteListReceipts(
     initialPageParam: null,
     ...queryOptions,
   });
-
   return { ...result, queryKey };
 }
-
-
-
-
-
-
 
 export const getCreateReceiptUrl = () => {
 
@@ -311,16 +382,6 @@ export const useCreateReceipt = <TError = ErrorType<ErrorEnvelope>,
       > => {
       return useMutation(getCreateReceiptMutationOptions(options));
     }
-
-
-
-
-
-
-
-
-
-
 
 export const getGetReceiptStatsUrl = () => {
 

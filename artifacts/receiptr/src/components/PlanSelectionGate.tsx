@@ -81,7 +81,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
   }, [inActivatingState]);
 
   // Show loader while billing loads OR while a checkout redirect is in-flight
-  if (isLoading || hasPendingRedirect.current || checkout.isPending) {
+  if (isLoading || (hasPendingRedirect.current && !billing?.ownerAccess) || checkout.isPending) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-background">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

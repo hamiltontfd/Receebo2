@@ -94,7 +94,7 @@ export interface Receipt {
      */
   transactionNumber?: string | null;
   /**
-     * ISO-3166-1 alpha-2 country code where the purchase was made.
+     * ISO-3166-1 alpha-2 country code where the purchase was made (e.g. "PT", "US", "BR").
      * @nullable
      */
   purchaseCountry?: string | null;
@@ -106,7 +106,6 @@ export interface Receipt {
   products?: ReceiptProduct[];
   /** Items flagged as notable (expensive or warranty-relevant). */
   notableItems?: NotableItem[];
-  /** Additional files attached to this receipt. */
   attachments?: ReceiptAttachment[];
   createdAt: string;
 }
@@ -124,6 +123,7 @@ export interface ReceiptInput {
 }
 
 export interface ReceiptUpdate {
+  isOnlinePurchase?: boolean | null;
   merchant?: string;
   purchaseDate?: string;
   total?: number;
@@ -132,11 +132,6 @@ export interface ReceiptUpdate {
   warranty?: string;
   /** Set to false to confirm a draft receipt into the library. */
   isDraft?: boolean;
-  /**
-     * True if this is an e-commerce/online/distance purchase.
-     * @nullable
-     */
-  isOnlinePurchase?: boolean | null;
   notableItems?: NotableItem[];
 }
 
@@ -206,20 +201,41 @@ export interface ErrorEnvelope {
   error: string;
 }
 
-export interface ReceiptPage {
-  items: Receipt[];
-  /** ISO timestamp cursor for the next page, or null if no more pages. */
-  nextCursor: string | null;
+export type BillingAccessStatusPlan = typeof BillingAccessStatusPlan[keyof typeof BillingAccessStatusPlan];
+
+
+export const BillingAccessStatusPlan = {
+  free: 'free',
+  trialing: 'trialing',
+  pro: 'pro',
+} as const;
+
+export interface BillingAccessStatus {
+  plan: BillingAccessStatusPlan;
+  /** @nullable */
+  trialEndAt: string | null;
+  /** @nullable */
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  /** Complimentary entitlement verified by the server, never supplied by the client. */
+  ownerAccess?: boolean;
+  /** For complimentary owners, indicates an existing Stripe customer whose billing portal remains available. */
+  hasBillingAccount?: boolean;
 }
 
 export type ListReceiptsParams = {
-  /** Natural-language search query across merchant, products, OCR text, and AI metadata. */
-  q?: string;
-  /** Page size for non-search requests (default 20, max 50). */
   limit?: number;
-  /** ISO timestamp cursor — returns items older than this timestamp. */
   cursor?: string;
+/**
+ * Natural-language search query across merchant, products, OCR text, and AI metadata.
+ */
+q?: string;
 };
+
+export interface ReceiptPage {
+  items: Receipt[];
+  nextCursor: string | null;
+}
 
 export type GetRecentReceiptsParams = {
 /**

@@ -1,3 +1,4 @@
+import { OwnerAccessNotice } from "@/components/OwnerAccessNotice";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
@@ -343,7 +344,11 @@ export default function Settings() {
           <div className="border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Current plan</span>
-              <PlanBadge plan={billing?.plan ?? "free"} />
+              {billing?.ownerAccess ? (
+                <span className="text-sm font-semibold">Owner access</span>
+              ) : (
+                <PlanBadge plan={billing?.plan ?? "free"} />
+              )}
             </div>
 
             {billing?.plan === "trialing" && billing.trialEndAt && (
@@ -366,7 +371,11 @@ export default function Settings() {
               </div>
             )}
 
-            {isPro ? (
+            {billing?.ownerAccess && (
+              <OwnerAccessNotice hasBillingAccount={billing.hasBillingAccount === true} />
+            )}
+
+            {billing?.ownerAccess && !billing.hasBillingAccount ? null : isPro ? (
               <Button
                 variant="outline"
                 size="sm"

@@ -25,7 +25,7 @@ import {
   LegalConsentGate,
 } from "@/components/LegalConsentGate";
 import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
-import { setGuestId, createCheckoutSession } from "@workspace/api-client-react";
+import { setGuestId, createCheckoutSession, getSubscriptionStatus } from "@workspace/api-client-react";
 
 const GUEST_TOKEN_KEY = "receebo:guestToken";
 const apiBase = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
@@ -219,6 +219,11 @@ function PostAuthCheckout() {
       if (!acceptance.accepted) return;
 
       checkoutFiredRef.current = true;
+      const billing = await getSubscriptionStatus(`${apiBase}/`);
+      if (billing.ownerAccess) {
+        sessionStorage.removeItem(PLAN_STORAGE_KEY);
+        return;
+      }
       const { url } = await createCheckoutSession(
         `${apiBase}/`,
         plan,

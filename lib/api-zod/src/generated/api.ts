@@ -9,6 +9,19 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Current authenticated user's subscription and complimentary access
+ */
+export const FetchBillingAccessStatusResponse = zod.object({
+  "plan": zod.enum(['free', 'trialing', 'pro']),
+  "trialEndAt": zod.string().nullable(),
+  "currentPeriodEnd": zod.string().nullable(),
+  "cancelAtPeriodEnd": zod.boolean(),
+  "ownerAccess": zod.boolean().optional().describe('Complimentary entitlement verified by the server, never supplied by the client.'),
+  "hasBillingAccount": zod.boolean().optional().describe('For complimentary owners, indicates an existing Stripe customer whose billing portal remains available.')
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
@@ -21,9 +34,9 @@ export const HealthCheckResponse = zod.object({
  * @summary List receipts (most recent first)
  */
 export const ListReceiptsQueryParams = zod.object({
-  "q": zod.coerce.string().optional().describe('Natural-language search query across merchant, products, OCR text, and AI metadata.'),
-  "limit": zod.coerce.number().min(1).max(50).optional().describe('Page size for non-search requests (default 20, max 50).'),
-  "cursor": zod.coerce.string().optional().describe('ISO timestamp cursor — returns items older than this timestamp.'),
+  "limit": zod.coerce.number().min(1).max(50).optional(),
+  "cursor": zod.coerce.string().optional(),
+  "q": zod.coerce.string().optional().describe('Natural-language search query across merchant, products, OCR text, and AI metadata.')
 })
 
 export const ListReceiptsResponseItem = zod.object({
@@ -42,6 +55,8 @@ export const ListReceiptsResponseItem = zod.object({
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
   "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
+  "purchaseCountry": zod.string().nullish().describe('ISO-3166-1 alpha-2 country code where the purchase was made (e.g. \"PT\", \"US\", \"BR\").'),
+  "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -112,6 +127,8 @@ export const GetRecentReceiptsResponseItem = zod.object({
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
   "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
+  "purchaseCountry": zod.string().nullish().describe('ISO-3166-1 alpha-2 country code where the purchase was made (e.g. \"PT\", \"US\", \"BR\").'),
+  "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -175,9 +192,21 @@ export const ReceiptAttachmentSchema = zod.object({
   "originalFileName": zod.string(),
   "contentType": zod.string(),
   "createdAt": zod.coerce.date(),
-})
+});
+
+export const CreateAttachmentParams = zod.object({ "id": zod.coerce.number() });
+export const CreateAttachmentBody = zod.object({
+  "objectPath": zod.string().min(1),
+  "originalFileName": zod.string().min(1),
+  "contentType": zod.string().min(1),
+});
+export const DeleteAttachmentParams = zod.object({
+  "id": zod.coerce.number(),
+  "attachmentId": zod.coerce.number(),
+});
 
 export const GetReceiptResponse = zod.object({
+  "attachments": zod.array(ReceiptAttachmentSchema).optional(),
   "id": zod.number(),
   "objectPath": zod.string().describe('Storage path of the original uploaded file (e.g. \/objects\/uploads\/uuid).'),
   "originalFileName": zod.string(),
@@ -193,8 +222,8 @@ export const GetReceiptResponse = zod.object({
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
   "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
-  "purchaseCountry": zod.string().nullish().describe('ISO-3166-1 alpha-2 country code where the purchase was made.'),
-  "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce/online/distance purchase.'),
+  "purchaseCountry": zod.string().nullish().describe('ISO-3166-1 alpha-2 country code where the purchase was made (e.g. \"PT\", \"US\", \"BR\").'),
+  "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -206,23 +235,7 @@ export const GetReceiptResponse = zod.object({
   "category": zod.string().nullish(),
   "reason": zod.string().describe('One-line explanation of why this item is worth keeping the receipt for.')
 })).optional().describe('Items flagged as notable (expensive or warranty-relevant).'),
-  "attachments": zod.array(ReceiptAttachmentSchema).optional().describe('Additional files attached to this receipt.'),
   "createdAt": zod.coerce.date()
-})
-
-export const CreateAttachmentParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const CreateAttachmentBody = zod.object({
-  "objectPath": zod.string().min(1),
-  "originalFileName": zod.string().min(1),
-  "contentType": zod.string().min(1),
-})
-
-export const DeleteAttachmentParams = zod.object({
-  "id": zod.coerce.number(),
-  "attachmentId": zod.coerce.number(),
 })
 
 
@@ -234,6 +247,7 @@ export const UpdateReceiptParams = zod.object({
 })
 
 export const UpdateReceiptBody = zod.object({
+  "isOnlinePurchase": zod.boolean().nullish(),
   "merchant": zod.string().optional(),
   "purchaseDate": zod.string().optional(),
   "total": zod.number().optional(),
@@ -241,7 +255,6 @@ export const UpdateReceiptBody = zod.object({
   "category": zod.string().optional(),
   "warranty": zod.string().optional(),
   "isDraft": zod.boolean().optional().describe('Set to false to confirm a draft receipt into the library.'),
-  "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce/online/distance purchase.'),
   "notableItems": zod.array(zod.object({
   "name": zod.string(),
   "price": zod.number().nullish(),
@@ -266,6 +279,8 @@ export const UpdateReceiptResponse = zod.object({
   "summary": zod.string().nullish().describe('AI-generated natural-language summary of the receipt.'),
   "ocrText": zod.string().nullish().describe('Full extracted text from the receipt.'),
   "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
+  "purchaseCountry": zod.string().nullish().describe('ISO-3166-1 alpha-2 country code where the purchase was made (e.g. \"PT\", \"US\", \"BR\").'),
+  "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
