@@ -3,6 +3,7 @@
 import { clientsClaim } from "workbox-core";
 import { createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
+import { apiNavigationDenylist } from "./lib/navigationRoutes";
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<unknown>;
@@ -10,7 +11,9 @@ declare const self: ServiceWorkerGlobalScope & {
 
 precacheAndRoute(self.__WB_MANIFEST);
 if (import.meta.env.PROD) {
-  registerRoute(new NavigationRoute(createHandlerBoundToURL("index.html")));
+  registerRoute(new NavigationRoute(createHandlerBoundToURL("index.html"), {
+    denylist: apiNavigationDenylist,
+  }));
 }
 clientsClaim();
 self.skipWaiting();

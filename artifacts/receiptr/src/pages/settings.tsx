@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Check, Minus, Mail, Loader2, RefreshCw, PlugZap } from "lucide-react";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 import { PrivacyAndDataSettings } from "@/components/PrivacyAndDataSettings";
+import { getGmailConnectionUrl } from "@/lib/gmailConnection";
 
 const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
 
@@ -128,6 +129,17 @@ export default function Settings() {
   const [notifOptOut, setNotifOptOut] = useState<boolean | null>(null);
 
   const { data: gmailStatus, isLoading: gmailLoading } = useGmailStatus();
+
+  const connectMutation = useMutation({
+    mutationFn: () => getGmailConnectionUrl(BASE),
+    onSuccess: (url) => window.location.assign(url),
+    onError: () =>
+      toast({
+        title: "Gmail connection failed",
+        description: "Could not start the Google connection. Please try again.",
+        variant: "destructive",
+      }),
+  });
 
   const disconnectMutation = useMutation({
     mutationFn: disconnectGmail,
@@ -311,12 +323,15 @@ export default function Settings() {
                   Not configured
                 </span>
               ) : (
-                <a href={`${BASE}api/gmail/connect`}>
-                  <Button size="sm" className="rounded-full h-8 text-xs gap-1.5">
+                  <Button
+                    size="sm"
+                    className="rounded-full h-8 text-xs gap-1.5"
+                    onClick={() => connectMutation.mutate()}
+                    disabled={connectMutation.isPending}
+                  >
                     <PlugZap className="w-3 h-3" />
-                    Connect Gmail
+                    {connectMutation.isPending ? "Connecting…" : "Connect Gmail"}
                   </Button>
-                </a>
               )}
             </div>
           </div>
