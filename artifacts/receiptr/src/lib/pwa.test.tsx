@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
 import PwaStatus from "@/components/PwaStatus";
 import OfflineStartup from "@/components/OfflineStartup";
-import { hasPwaWork, isInstalled, isIosSafari, usePwaUpdateBlocker } from "./pwa";
+import { hasPwaWork, isInstalled, isIosSafari, isIosChrome, usePwaUpdateBlocker } from "./pwa";
 import { isAppNavigation } from "./navigationRoutes";
 import { privateFileUrl } from "./privateFileUrl";
 
@@ -39,6 +39,38 @@ function offerInstall() {
 }
 
 describe("installation guidance", () => {
+  function useIphoneChrome() {
+    Object.defineProperty(navigator, "userAgent", { value: "iPhone OS 18_0 CriOS/130.0 Mobile Safari/604.1" });
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: {} });
+    vi.stubGlobal("isSecureContext", true);
+  }
+  it("shows manual Chrome instructions on iPhone without a native install prompt", () => {
+    useIphoneChrome();
+    expect(isIosChrome()).toBe(true);
+    mountStatus();
+    expect(screen.getByText(/in Chrome, tap Share beside the address bar/)).toHaveTextContent("If the option is missing, open this page in Safari");
+    expect(screen.queryByRole("button", { name: "Install" })).not.toBeInTheDocument();
+    act(() => screen.getByRole("button", { name: "Not now" }).click());
+    expect(screen.queryByText(/in Chrome, tap Share/)).not.toBeInTheDocument();
+  });
+  it.each(["installed", "busy", "offline", "insecure"] as const)("hides iPhone Chrome guidance when %s", (state) => {
+    useIphoneChrome();
+    if (state === "installed") standalone = true;
+    if (state === "offline") Object.defineProperty(navigator, "onLine", { value: false });
+    if (state === "insecure") vi.stubGlobal("isSecureContext", false);
+    mountStatus(state === "busy");
+    expect(screen.queryByText(/in Chrome, tap Share/)).not.toBeInTheDocument();
+  });
+  it("does not show Chrome instructions during sign-in", () => {
+    useIphoneChrome();
+    window.history.replaceState({}, "", "/sign-in");
+    try {
+      mountStatus();
+      expect(screen.queryByText(/in Chrome, tap Share/)).not.toBeInTheDocument();
+    } finally {
+      window.history.replaceState({}, "", "/");
+    }
+  });
   it("does not offer install in unsupported browsers", () => {
     mountStatus();
     expect(screen.queryByRole("button", { name: "Install" })).not.toBeInTheDocument();
@@ -74,10 +106,14 @@ describe("installation guidance", () => {
   it("detects Safari on iPhone, but not embedded or other iOS browsers", () => {
     Object.defineProperty(navigator, "userAgent", { value: "iPhone Version/18 Mobile Safari/604.1" });
     expect(isIosSafari()).toBe(true);
+    expect(isIosChrome()).toBe(false);
     Object.defineProperty(navigator, "userAgent", { value: "iPhone CriOS/125 Mobile Safari/604.1" });
     expect(isIosSafari()).toBe(false);
     Object.defineProperty(navigator, "userAgent", { value: "iPhone Mobile AppleWebKit/605.1" });
     expect(isIosSafari()).toBe(false);
+    expect(isIosChrome()).toBe(false);
+    Object.defineProperty(navigator, "userAgent", { value: "Android Chrome/130 Mobile Safari/537.36" });
+    expect(isIosChrome()).toBe(false);
   });
 });
 

@@ -3,7 +3,7 @@ import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
-  getWaitingWorker, hasPwaWork, isInstalled, isIosSafari, requestUpdate,
+  getWaitingWorker, hasPwaWork, isInstalled, isIosSafari, isIosChrome, requestUpdate,
   subscribePwaWork, subscribeUpdate,
 } from "@/lib/pwa";
 
@@ -27,7 +27,8 @@ export default function PwaStatus() {
   const waiting = useSyncExternalStore(subscribeUpdate, getWaitingWorker);
   // Authentication and its callbacks should not be interrupted either.
   const blocked = work || mutations > 0 || /^\/sign-(in|up)/.test(location);
-  const ios = isIosSafari() && "serviceWorker" in navigator && window.isSecureContext;
+  const chromeIos = isIosChrome();
+  const ios = (isIosSafari() || chromeIos) && "serviceWorker" in navigator && window.isSecureContext;
 
   useEffect(() => {
     const onOnline = () => setOnline(true);
@@ -119,9 +120,13 @@ export default function PwaStatus() {
         Applying update. Please keep Receebo open…
       </div>}
       {!installed && !dismissed && online && !blocked && (installEvent || ios) && (
-        <div className="border-b px-4 py-3 text-sm flex flex-wrap items-center gap-3">
+        <div className={`border-b px-4 py-3 text-sm flex flex-wrap items-center gap-3 ${ios ? "fixed bottom-0 inset-x-0 z-[60] border-t bg-background shadow-lg pb-[max(0.75rem,env(safe-area-inset-bottom))]" : ""}`}>
           <p className="flex-1 min-w-0">
-            {ios ? "Install Receebo: in Safari, tap Share, then Add to Home Screen, then Add." : "Install Receebo for quick access from your home screen or desktop."}
+            {ios
+              ? chromeIos
+                ? "Install Receebo: in Chrome, tap Share beside the address bar, then Add to Home Screen, then Add. Launch Receebo from its new home screen icon. If the option is missing, open this page in Safari and use Share → Add to Home Screen."
+                : "Install Receebo: in Safari, tap Share, then Add to Home Screen, then Add."
+              : "Install Receebo for quick access from your home screen or desktop."}
           </p>
           {installEvent && <Button size="sm" onClick={async () => {
             try {

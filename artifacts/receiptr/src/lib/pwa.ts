@@ -34,6 +34,11 @@ export function isIosSafari() {
   return ios && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
 }
 
+export function isIosChrome() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+    /CriOS\//.test(navigator.userAgent);
+}
+
 let registration: ServiceWorkerRegistration | undefined;
 const updateListeners = new Set<() => void>();
 export const getWaitingWorker = () => registration?.waiting ?? null;
