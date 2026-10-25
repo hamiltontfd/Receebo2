@@ -1,22 +1,58 @@
 /// <reference lib="webworker" />
 
 import { clientsClaim } from "workbox-core";
-import { createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
-import { NavigationRoute, registerRoute } from "workbox-routing";
-import { apiNavigationDenylist } from "./lib/navigationRoutes";
+import { matchPrecache, precacheAndRoute } from "workbox-precaching";
+import { registerRoute } from "workbox-routing";
+import { isAppNavigation } from "./lib/navigationRoutes";
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<unknown>;
 };
 
-precacheAndRoute(self.__WB_MANIFEST);
 if (import.meta.env.PROD) {
-  registerRoute(new NavigationRoute(createHandlerBoundToURL("index.html"), {
-    denylist: apiNavigationDenylist,
-  }));
+  registerRoute(
+    ({ request, url }) =>
+      request.mode === "navigate" &&
+      url.origin === self.location.origin &&
+      isAppNavigation(url.pathname, new URL(self.registration.scope).pathname),
+    async ({ request }) => {
+      // Network-only navigation keeps online HTML fresh. On network failure,
+      // use a self-contained precached page that needs no Clerk/CDN scripts.
+      // navigator.onLine alone is not reliable (Wi-Fi can have no internet).
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000);
+      try {
+        const response = await fetch(request, { cache: "no-store", signal: controller.signal });
+        if (response.status < 500) return response;
+      } catch {
+        // No requests or mutations are queued; only static assets are cached.
+      } finally {
+        clearTimeout(timeout);
+      }
+      return (await matchPrecache("offline.html")) ?? Response.error();
+    },
+  );
 }
+// Register navigations first: Workbox's precache directoryIndex otherwise
+// matches "/" before the network/offline handler and bypasses offline startup.
+precacheAndRoute(self.__WB_MANIFEST);
 clientsClaim();
-self.skipWaiting();
+
+// Never replace a running version automatically. Refuse activation with other
+// open windows: another tab may be capturing/uploading or have unsaved edits.
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "APPLY_UPDATE") return;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const sourceId = event.source && "id" in event.source ? event.source.id : null;
+    if (windows.length !== 1 || windows[0].id !== sourceId) {
+      event.ports[0]?.postMessage({ accepted: false });
+      return;
+    }
+    event.ports[0]?.postMessage({ accepted: true });
+    await self.skipWaiting();
+  })());
+});
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;

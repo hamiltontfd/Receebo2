@@ -45,7 +45,8 @@ export function StoreFullscreen({ fileUrl, onClose }: StoreFullscreenProps) {
         transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
       />
       <button
-        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+        style={{ top: "max(1rem, env(safe-area-inset-top))", right: "max(1rem, env(safe-area-inset-right))" }}
+        className="absolute w-11 h-11 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-colors"
         onClick={onClose}
         aria-label="Close"
       >

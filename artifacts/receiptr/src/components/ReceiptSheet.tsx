@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { usePwaUpdateBlocker } from "@/lib/pwa";
+import { privateFileUrl } from "@/lib/privateFileUrl";
 import { AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
@@ -95,6 +97,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   const [isOpeningStore, setIsOpeningStore] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
+  usePwaUpdateBlocker(isEditing || isUploading || isOpeningStore || deletingAttachmentId !== null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const createAttachment = useCreateAttachment();
@@ -302,7 +305,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   };
 
   const fileUrl = receipt
-    ? `${import.meta.env.BASE_URL}api/storage${receipt.objectPath}`
+    ? privateFileUrl(receipt.objectPath)
     : "";
   const isProcessing = receipt?.status === "processing";
   const symbol = currencySymbol(receipt?.currency);
@@ -326,6 +329,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
               ? "w-[520px] max-w-full px-0 pt-0 pb-0 flex flex-col gap-0 overflow-hidden [&>button]:hidden"
               : "h-[85dvh] rounded-t-2xl px-0 pt-0 pb-0 flex flex-col gap-0 overflow-hidden"
           }
+          style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}
         >
           {/* Drag handle — mobile only */}
           {!isDesktop && (
@@ -781,7 +785,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
 
                         {/* Attachment rows */}
                         {receipt.attachments && receipt.attachments.map((att) => {
-                          const attUrl = `${import.meta.env.BASE_URL}api/storage${att.objectPath}`;
+                          const attUrl = privateFileUrl(att.objectPath);
                           const attIsImage = att.contentType.startsWith("image/");
                           const isDeleting = deletingAttachmentId === att.id;
                           return (

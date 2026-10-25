@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePwaUpdateBlocker } from "@/lib/pwa";
 import { useClerk } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download, ExternalLink, Loader2, ShieldCheck, Trash2 } from "lucide-react";
@@ -34,6 +35,7 @@ export function PrivacyAndDataSettings() {
   const [deleting, setDeleting] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  usePwaUpdateBlocker(exporting || deleting || dialogOpen);
   const { signOut } = useClerk();
   const queryClient = useQueryClient();
   const { toast } = useToast();

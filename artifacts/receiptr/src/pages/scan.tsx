@@ -24,6 +24,7 @@ import { currencySymbol } from "@/lib/currency";
 import { compressImage, compressedFileName } from "@/lib/compressImage";
 import { CATEGORIES, categoryStyle } from "@/lib/categories";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { usePwaUpdateBlocker } from "@/lib/pwa";
 
 type Phase = "capture" | "reading" | "review" | "not_a_receipt";
 
@@ -98,6 +99,9 @@ function useCameraStream(enabled: boolean) {
 }
 
 export default function Scan() {
+  // Conservative: capture permission, image conversion, stitching, extraction,
+  // retake drafts and review all belong to this session. Leave Scan to update.
+  usePwaUpdateBlocker(true);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -338,6 +342,10 @@ export default function Scan() {
 
   const uploadFile = useCallback(
     async (blob: Blob, fileName: string, contentType: string) => {
+      if (!navigator.onLine) {
+        toast({ title: "Connection required", description: "Connect before uploading a receipt. Nothing was uploaded.", variant: "destructive" });
+        return;
+      }
       setUploading(true);
       try {
         const { uploadURL, objectPath } = await customFetch<{
@@ -447,7 +455,8 @@ export default function Scan() {
         await deleteReceipt.mutateAsync({ id: receiptId });
         invalidateLists();
       } catch {
-        // Receipt may already be gone; continue with retake regardless
+        toast({ title: "Could not remove receipt", description: "Check your connection and try again.", variant: "destructive" });
+        return;
       }
     }
     setReceiptId(null);
@@ -468,7 +477,8 @@ export default function Scan() {
         await deleteReceipt.mutateAsync({ id: receiptId });
         invalidateLists();
       } catch {
-        // Receipt may already be gone; navigate regardless
+        toast({ title: "Could not discard receipt", description: "Check your connection and try again. The receipt has not been discarded.", variant: "destructive" });
+        return;
       }
     }
     setLocation("/");

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
@@ -19,6 +19,8 @@ import GetStarted from "@/pages/get-started";
 import PrivacyPolicy from "@/pages/privacy";
 import TermsOfService from "@/pages/terms";
 import AppShell from "@/components/AppShell";
+import PwaStatus from "@/components/PwaStatus";
+import { usePwaUpdateBlocker } from "@/lib/pwa";
 import { PlanSelectionGate } from "@/components/PlanSelectionGate";
 import {
   LEGAL_ACCEPTED_EVENT,
@@ -158,10 +160,11 @@ function HomeRedirect() {
 }
 
 function ProtectedShell({ children }: { children: React.ReactNode }) {
+  const { userId } = useAuth();
   return (
     <>
       <Show when="signed-in">
-        <LegalConsentGate>
+        <LegalConsentGate key={userId}>
           <PlanSelectionGate>
             <AppShell>{children}</AppShell>
           </PlanSelectionGate>
@@ -187,6 +190,8 @@ function PostAuthCheckout() {
   const { isSignedIn } = useAuth();
   const [location] = useLocation();
   const checkoutFiredRef = useRef(false);
+  const [checkingCheckout, setCheckingCheckout] = useState(false);
+  usePwaUpdateBlocker(checkingCheckout);
 
   // Capture ?plan= from the URL on every navigation. Clerk's multi-step sign-up
   // flow keeps the component mounted, so a mount-only effect would miss the
@@ -207,6 +212,7 @@ function PostAuthCheckout() {
     const plan = sessionStorage.getItem(PLAN_STORAGE_KEY);
     if (plan !== "monthly" && plan !== "yearly") return;
 
+    setCheckingCheckout(true);
     try {
       const acceptanceResponse = await fetch(
         `${apiBase}/api/legal/acceptance`,
@@ -242,6 +248,8 @@ function PostAuthCheckout() {
         description:
           "Something went wrong starting your trial. Pick a plan again to retry.",
       });
+    } finally {
+      setCheckingCheckout(false);
     }
   }, [isSignedIn]);
 
@@ -332,7 +340,10 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
-const queryClient = new QueryClient();
+// Mutations must fail offline, not pause and silently execute on reconnect.
+const queryClient = new QueryClient({
+  defaultOptions: { mutations: { networkMode: "always", retry: false } },
+});
 
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
@@ -353,6 +364,7 @@ function ClerkProviderWithRoutes() {
           <ClerkQueryClientCacheInvalidator />
           <PostAuthCheckout />
           <GuestIdSync />
+          <PwaStatus />
           <Switch>
             <Route path="/" component={HomeRedirect} />
             <Route path="/sign-in/*?" component={SignInPage} />

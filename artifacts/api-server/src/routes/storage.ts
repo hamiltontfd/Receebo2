@@ -13,6 +13,15 @@ import { lockUserDataMutation } from "../lib/userDataLock";
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
+// Apply even to authentication/errors. Public assets retain their own policy.
+router.use(["/storage/objects", "/storage/uploads"], (_req, res, next) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  res.vary("Cookie");
+  res.vary("Authorization");
+  res.vary("x-guest-id");
+  next();
+});
+
 /**
  * POST /storage/uploads/request-url
  *
@@ -138,6 +147,8 @@ router.get("/storage/objects/*path", requireAuthOrGuest, async (req: Request, re
 
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
+    // The private route is always private, regardless of an object's ACL.
+    res.setHeader("Cache-Control", "private, no-store");
 
     if (response.body) {
       const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { usePwaUpdateBlocker } from "@/lib/pwa";
 import { Link } from "wouter";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ export function LegalConsentGate({ children }: { children: React.ReactNode }) {
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  usePwaUpdateBlocker((!status?.accepted && confirmed) || submitting);
 
   const loadStatus = useCallback(async () => {
     setError(null);

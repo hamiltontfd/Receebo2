@@ -32,7 +32,7 @@ export function ReceiptPreview({ fileUrl, contentType, fileName, defaultExpanded
     setImageLoaded(false);
     setImageError(false);
 
-    customFetch<Blob>(fileUrl, { responseType: "blob" })
+    customFetch<Blob>(fileUrl, { responseType: "blob", cache: "no-store" })
       .then((blob) => {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);

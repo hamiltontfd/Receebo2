@@ -37,7 +37,7 @@ export default defineConfig({
       strategies: "injectManifest",
       srcDir: "src",
       filename: "sw.ts",
-      registerType: "autoUpdate",
+      registerType: "prompt",
       injectRegister: null,
       includeAssets: ["logo.svg", "logo.png", "icons/*.png"],
       manifest: {
@@ -47,6 +47,7 @@ export default defineConfig({
         theme_color: "#ffffff",
         background_color: "#ffffff",
         display: "standalone",
+        id: basePath,
         orientation: "portrait",
         start_url: basePath || "/",
         scope: basePath || "/",

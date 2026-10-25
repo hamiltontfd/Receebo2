@@ -37,6 +37,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CATEGORIES, categoryStyle, categoryIcon } from "@/lib/categories";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { usePwaUpdateBlocker } from "@/lib/pwa";
+import { privateFileUrl } from "@/lib/privateFileUrl";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +74,7 @@ export default function ReceiptDetail() {
   const [showStore, setShowStore] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
+  usePwaUpdateBlocker(isEditing || isUploading || deletingAttachmentId !== null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const createAttachment = useCreateAttachment();
@@ -253,7 +256,7 @@ export default function ReceiptDetail() {
     );
   }
 
-  const fileUrl = `${import.meta.env.BASE_URL}api/storage${receipt.objectPath}`;
+  const fileUrl = privateFileUrl(receipt.objectPath);
   const isProcessing = receipt.status === "processing";
   const symbol = currencySymbol(receipt.currency);
   const isImage = receipt.contentType.startsWith("image/");
@@ -557,7 +560,7 @@ export default function ReceiptDetail() {
 
             {/* Attachments */}
             {receipt.attachments && receipt.attachments.map((att) => {
-              const attUrl = `${import.meta.env.BASE_URL}api/storage${att.objectPath}`;
+              const attUrl = privateFileUrl(att.objectPath);
               const isDeleting = deletingAttachmentId === att.id;
               return (
                 <div key={att.id} className="px-4 py-3 flex items-center gap-3">
