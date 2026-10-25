@@ -19,6 +19,7 @@ import GetStarted from "@/pages/get-started";
 import PrivacyPolicy from "@/pages/privacy";
 import TermsOfService from "@/pages/terms";
 import AppShell from "@/components/AppShell";
+import AuthModal from "@/components/AuthModal";
 import PwaStatus from "@/components/PwaStatus";
 import { usePwaUpdateBlocker } from "@/lib/pwa";
 import { PlanSelectionGate } from "@/components/PlanSelectionGate";
@@ -117,16 +118,16 @@ const clerkLocalization = {
 
 function SignInPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+    <AuthModal title="Sign in to Receebo">
       <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
-    </div>
+    </AuthModal>
   );
 }
 
 function SignUpPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-10">
-      <div className="flex w-full max-w-[440px] flex-col items-center gap-4">
+    <AuthModal title="Create your Receebo account">
+      <div className="flex min-w-0 w-full max-w-[440px] flex-col items-center gap-4">
         <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
         <p className="max-w-sm text-center text-xs leading-5 text-muted-foreground">
           Before using Receebo, you’ll be asked to confirm that you are 18+ and
@@ -141,7 +142,7 @@ function SignUpPage() {
           . Optional Gmail and notification permissions are separate.
         </p>
       </div>
-    </div>
+    </AuthModal>
   );
 }
 
@@ -203,9 +204,11 @@ function PostAuthCheckout() {
     const plan = params.get("plan");
     if (plan === "monthly" || plan === "yearly") {
       sessionStorage.setItem(PLAN_STORAGE_KEY, plan);
+    } else if (location === "/" && isSignedIn === false) {
+      // Browser Back cancels auth just like the modal's close controls.
+      sessionStorage.removeItem(PLAN_STORAGE_KEY);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location]); // re-run on every route change so ?plan= is never missed
+  }, [location, isSignedIn]);
 
   const startCheckoutIfAccepted = useCallback(async () => {
     if (!isSignedIn || checkoutFiredRef.current) return;
