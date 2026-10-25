@@ -19,7 +19,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 import { getUncachableStripeClient } from "../stripeClient";
-import { logger } from "../lib/logger";
+import { logger, gmailLogger } from "../lib/logger";
 import { revokeGmailAccess } from "../lib/gmailSync";
 import {
   cancelSubscriptionForDeletion,
@@ -413,7 +413,7 @@ router.delete("/account", requireAuth, async (req, res): Promise<void> => {
       try {
         await revokeGmailAccess(gmailConnection);
       } catch (err) {
-        logger.warn(
+        gmailLogger.warn(
           { err, userId },
           "Gmail token revocation failed during account deletion; continuing local deletion",
         );

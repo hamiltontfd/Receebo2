@@ -1,5 +1,5 @@
 import app from "./app";
-import { logger } from "./lib/logger";
+import { logger, gmailLogger } from "./lib/logger";
 import { startExtractionWatchdog } from "./lib/extractionQueue";
 import { startOrphanCleanupScheduler } from "./lib/orphanCleanup";
 import { startGmailSyncScheduler } from "./lib/gmailSync";
@@ -264,7 +264,7 @@ async function migrateGmailTokenEncryption(): Promise<void> {
       "Gmail token encryption migration complete",
     );
   } catch (err) {
-    logger.warn({ err }, "Gmail token encryption migration failed (non-fatal) — continuing");
+    gmailLogger.warn({ err }, "Gmail token encryption migration failed (non-fatal) — continuing");
   }
 }
 

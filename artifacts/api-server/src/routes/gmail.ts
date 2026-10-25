@@ -15,7 +15,7 @@ import {
   isGmailConfigured,
   revokeGmailAccess,
 } from "../lib/gmailSync";
-import { logger } from "../lib/logger";
+import { gmailLogger as logger } from "../lib/logger";
 import {
   ObjectNotFoundError,
   ObjectStorageService,
@@ -202,7 +202,10 @@ router.get("/gmail/callback", async (req, res): Promise<void> => {
   const { code, state, error } = req.query as Record<string, string | undefined>;
 
   if (error || !code || !state) {
-    logger.warn({ error, hasCode: !!code }, "Gmail callback: missing params or OAuth error");
+    logger.warn(
+      { err: { code: error }, hasCode: !!code },
+      "Gmail callback: missing params or OAuth error",
+    );
     res.redirect(appSettingsUrl(req, "?gmail=error"));
     return;
   }

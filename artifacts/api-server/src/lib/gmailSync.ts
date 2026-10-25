@@ -13,7 +13,7 @@ import {
   objectStorageClient,
 } from "./objectStorage";
 import { extractReceiptData } from "./receiptExtraction";
-import { logger } from "./logger";
+import { gmailLogger as logger } from "./logger";
 import { encryptToken, decryptToken } from "./tokenCrypto";
 import { isAccountDeletionInProgress } from "./accountDeletionState";
 import { withUserDataLock } from "./userDataLock";
@@ -250,8 +250,11 @@ async function gmailGet(accessToken: string, path: string): Promise<unknown> {
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Gmail API ${res.status}: ${body.slice(0, 200)}`);
+    // Response bodies can contain private email data. Keep only the status.
+    await res.body?.cancel().catch(() => {});
+    throw Object.assign(new Error("Gmail API request failed"), {
+      status: res.status,
+    });
   }
   return res.json();
 }
@@ -469,7 +472,7 @@ async function syncUserGmailUnlocked(
         });
         queued++;
         logger.info(
-          { userId, messageId, filename, merchant: extraction.merchant },
+          { userId, messageId },
           "Gmail sync: receipt queued as pending import",
         );
       } catch (err) {
@@ -777,7 +780,7 @@ async function syncUserGmailClaimed(
         }
         queued++;
         logger.info(
-          { userId, messageId, filename, merchant: extraction.merchant },
+          { userId, messageId },
           "Gmail sync: receipt queued as pending import",
         );
       } catch (err) {
