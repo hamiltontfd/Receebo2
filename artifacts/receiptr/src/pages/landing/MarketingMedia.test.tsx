@@ -51,4 +51,21 @@ describe("real-app marketing media", () => {
     expect(screen.getByText(/fictional sample data/)).toBeInTheDocument();
     cleanup();
   });
+
+  it.each([
+    ["email-settings.webp", "Gmail connection settings", "380"],
+    ["protection.webp", "Consumer rights panel", "420"],
+    ["original-receipt.webp", "Full original receipt", "420"],
+  ])("gives %s outer spacing and an inset image surface without cropping", (file, alt, height) => {
+    render(<AppCapture file={file} alt={alt} className={`h-[${height}px]`} caption="Sample screen caption" />);
+    const img = screen.getByRole("img", { name: alt });
+    const figure = img.closest("figure")!;
+    expect(figure).toHaveClass("p-6", "sm:p-8", "gap-5", "min-w-0");
+    expect(img).toHaveClass("p-4", "sm:p-5", "object-contain", "min-h-0");
+    expect(img).not.toHaveClass("object-cover");
+    expect(img).toHaveAttribute("src", marketingMedia(file));
+    expect(figure.querySelector("figcaption")).toHaveClass("shrink-0");
+    expect(screen.getByText("Sample screen caption")).toBeVisible();
+    cleanup();
+  });
 });

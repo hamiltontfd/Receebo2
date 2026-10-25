@@ -23,7 +23,7 @@ export function AppCapture({
 }) {
   const [width, height] = dimensions[file] ?? [1200, 900];
   return (
-    <figure className={cn("rounded-2xl border border-border bg-gradient-to-br from-blue-50/70 to-violet-50/70 p-5 flex flex-col justify-center gap-4 overflow-hidden", className)}>
+    <figure data-marketing-capture className={cn("rounded-2xl border border-border bg-gradient-to-br from-blue-50/70 to-violet-50/70 p-6 sm:p-8 flex min-w-0 flex-col justify-center gap-5 overflow-hidden", className)}>
       <img
         src={marketingMedia(file)}
         alt={alt}
@@ -31,7 +31,7 @@ export function AppCapture({
         height={height}
         loading="lazy"
         decoding="async"
-        className="w-full min-h-0 object-contain rounded-xl shadow-sm border border-border/60 bg-white"
+        className="block w-full min-h-0 object-contain rounded-xl shadow-sm border border-border/60 bg-white p-4 sm:p-5"
       />
       <figcaption className="text-center text-[11px] text-muted-foreground leading-relaxed shrink-0">
         {caption}

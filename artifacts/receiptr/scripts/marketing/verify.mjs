@@ -237,6 +237,39 @@ for (const engine of engines) {
               await image.evaluate(i => i.decode());
               assert.equal(await tab.getAttribute("aria-pressed"), "true");
             }
+            for (const image of await page.locator("figure[data-marketing-capture] img").all()) {
+              await image.scrollIntoViewIfNeeded();
+              await image.evaluate(i => i.decode());
+              await page.waitForTimeout(600);
+              const spacing = await image.evaluate(img => {
+                const figure = img.closest("figure");
+                const caption = figure.querySelector("figcaption");
+                const frame = figure.getBoundingClientRect();
+                const picture = img.getBoundingClientRect();
+                const text = caption.getBoundingClientRect();
+                const frameStyle = getComputedStyle(figure);
+                const imageStyle = getComputedStyle(img);
+                const sides = ["Top", "Right", "Bottom", "Left"];
+                return {
+                  file: new URL(img.src).pathname.split("/").pop(),
+                  framePadding: sides.map(side => parseFloat(frameStyle[`padding${side}`])),
+                  imagePadding: sides.map(side => parseFloat(imageStyle[`padding${side}`])),
+                  inset: [picture.top - frame.top, frame.right - picture.right, frame.bottom - text.bottom, picture.left - frame.left],
+                  captionGap: text.top - picture.bottom,
+                  imageHeight: img.clientHeight,
+                  objectFit: imageStyle.objectFit,
+                  captionFits: text.left >= frame.left && text.right <= frame.right && text.bottom <= frame.bottom,
+                };
+              });
+              assert(spacing.framePadding.every(p => p >= 24), JSON.stringify(spacing));
+              assert(spacing.imagePadding.every(p => p >= 16), JSON.stringify(spacing));
+              assert(spacing.inset.every(p => p >= 23.5), JSON.stringify(spacing));
+              assert(spacing.captionGap >= 19.5 && spacing.captionFits, JSON.stringify(spacing));
+              assert(spacing.imageHeight > spacing.imagePadding[0] + spacing.imagePadding[2], JSON.stringify(spacing));
+              assert.equal(spacing.objectFit, "contain", JSON.stringify(spacing));
+              await image.locator("..").screenshot({ path: `${out}/padded-${spacing.file}-${id}.png` });
+            }
+            assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Screenshot panels must not cause horizontal overflow");
             assert.deepEqual(mediaFailures, [], "Marketing asset HTTP failures");
             assert.deepEqual(errors, [], "Browser errors");
           });
