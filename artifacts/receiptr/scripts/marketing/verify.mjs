@@ -115,18 +115,23 @@ for (const engine of engines) {
             // state, API writes, integration actions, or response interception.
             await page.goto(url);
             await page.getByRole("heading", { name: "Receipts. Easy to find." }).waitFor();
-            await page.locator("#demo video").first().waitFor();
+            await page.locator("#demo button[data-demo]").first().waitFor();
             assert.equal(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches), reducedMotion === "reduce");
             await page.evaluate(() => document.fonts.ready);
             await page.waitForTimeout(600);
             assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Horizontal overflow");
             await page.screenshot({ path: `${out}/hero-${id}.png` });
-            assert.equal(await page.locator("#demo video").count(), 3);
+            assert.equal(await page.locator("#demo button[data-demo]").count(), 3);
+            assert.equal(await page.locator("video").count(), 0, "No video loads before a visitor chooses a demo");
             return true;
           });
           if (!loaded) continue;
-          const videos = page.locator("#demo video");
-          for (const video of await videos.all()) {
+          const triggers = page.locator("#demo button[data-demo]");
+          for (const trigger of await triggers.all()) {
+            await trigger.click();
+            const dialog = page.getByRole("dialog");
+            await dialog.waitFor();
+            const video = dialog.locator("video");
             const clip = await video.getAttribute("aria-label");
             const clipDetails = { ...details, clip };
             const sources = await check("controls-poster-no-autoplay", clipDetails, async () => {
@@ -138,7 +143,8 @@ for (const engine of engines) {
                 await image.decode();
                 return {
                   autoplay: v.autoplay, controls: v.controls, preload: v.preload,
-                  paused: v.paused, time: v.currentTime, loop: v.loop, inline: v.playsInline,
+                  muted: v.muted, loop: v.loop, inline: v.playsInline,
+                  fullscreenDisabled: v.getAttribute("controlslist")?.includes("nofullscreen"),
                   posterWidth: image.naturalWidth,
                   sources: Array.from(v.querySelectorAll("source"), s => ({
                     src: s.src, type: s.type, supported: v.canPlayType(s.type),
@@ -148,15 +154,19 @@ for (const engine of engines) {
                 };
               });
               assert.deepEqual(
-                [properties.autoplay, properties.controls, properties.preload, properties.paused, properties.time, properties.loop, properties.inline],
-                [false, true, "none", true, 0, false, true],
+                [properties.autoplay, properties.controls, properties.preload, properties.muted, properties.loop, properties.inline, properties.fullscreenDisabled],
+                [true, true, "metadata", true, false, true, true],
               );
-              assert(properties.posterWidth > 0, "Poster must decode with autoplay disabled");
+              assert(properties.posterWidth > 0, "Poster must decode");
               assert.deepEqual(properties.sources.map(s => s.type), ["video/webm", "video/mp4"]);
               assert(properties.sources.every(s => new URL(s.src).origin === target.origin && s.src.includes("/api/storage/public-objects/marketing/")), "Only public marketing assets may be tested");
               return properties.sources;
             });
-            if (!sources) continue;
+            if (!sources) {
+              await dialog.getByRole("button", { name: "Close video", exact: true }).click();
+              await dialog.waitFor({ state: "detached" });
+              continue;
+            }
             for (const source of sources) {
               if (!checkedRanges.has(source.src)) {
                 checkedRanges.add(source.src);
@@ -186,7 +196,7 @@ for (const engine of engines) {
                   v.controls = true;
                   v.playsInline = true;
                   v.width = 480;
-                  document.querySelector("#demo").append(v);
+                  document.querySelector('[role="dialog"]').append(v);
                 }, source);
                 const probe = page.locator("#marketing-format-probe");
                 try {
@@ -197,6 +207,15 @@ for (const engine of engines) {
                 }
               });
             }
+            await check("modal-close-stops-playback", clipDetails, async () => {
+              const element = await video.elementHandle();
+              await dialog.getByRole("button", { name: "Close video", exact: true }).click();
+              assert(await element.evaluate(v => v.paused), "Closing must stop playback immediately");
+              await dialog.waitFor({ state: "detached" });
+              assert.equal(await page.locator("video").count(), 0);
+              assert.equal(new URL(page.url()).pathname, target.pathname, "Video must not navigate away from the landing page");
+              return true;
+            });
           }
           await check("feature-images-and-browser-errors", details, async () => {
             await page.locator("#demo").scrollIntoViewIfNeeded();
