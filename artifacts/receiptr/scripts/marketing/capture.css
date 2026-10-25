@@ -1,0 +1,3 @@
+@import "../../src/index.css";
+/* The isolated Vite root is tooling, so include the real app's utility classes. */
+@source "../../src";

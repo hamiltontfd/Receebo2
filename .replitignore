@@ -5,3 +5,4 @@
 .local
 /generated-artifacts/
 .cache/ms-playwright/
+artifacts/receiptr/scripts/marketing/

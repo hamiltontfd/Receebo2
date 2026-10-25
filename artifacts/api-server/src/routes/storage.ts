@@ -80,6 +80,36 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
       return;
     }
 
+    // Browser video controls need byte ranges for seeking. Keep this confined
+    // to already-public video assets; protected receipt serving is unchanged.
+    const [metadata] = await file.getMetadata();
+    const contentType = String(metadata.contentType || "");
+    const size = Number(metadata.size);
+    if (contentType.startsWith("video/") && Number.isSafeInteger(size) && size > 0) {
+      res.setHeader("Accept-Ranges", "bytes");
+      const ranges = req.range(size);
+      if (ranges === -1 || (Array.isArray(ranges) && ranges.length !== 1)) {
+        res.setHeader("Content-Range", `bytes */${size}`);
+        res.status(416).end();
+        return;
+      }
+      if (Array.isArray(ranges) && ranges.type === "bytes") {
+        const { start, end } = ranges[0];
+        res.status(206);
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Content-Range", `bytes ${start}-${end}/${size}`);
+        res.setHeader("Content-Length", String(end - start + 1));
+        res.setHeader("Cache-Control", "public, max-age=3600");
+        file.createReadStream({ start, end })
+          .on("error", (error) => {
+            req.log.error({ err: error }, "Error streaming public video range");
+            res.destroy(error);
+          })
+          .pipe(res);
+        return;
+      }
+    }
+
     const response = await objectStorageService.downloadObject(file);
 
     res.status(response.status);

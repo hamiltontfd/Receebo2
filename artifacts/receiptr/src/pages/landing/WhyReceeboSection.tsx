@@ -1,31 +1,34 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { fadeInUp, stagger, Placeholder, VIEWPORT, SectionLabel } from "./shared";
+import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
+import { AppCapture } from "./MarketingMedia";
 
 const FEATURES = [
   {
     title: "Capture",
     items: ["Scan paper receipts", "Upload PDF, JPG or PNG", "Forward email receipts"],
-    placeholder: "Capture illustration",
+    image: "capture-poster.webp",
+    alt: "Receebo's real review form displaying Northline Audio, 20 October 2026 and a €189 total from a fictional receipt.",
   },
   {
     title: "Find",
     items: ["Search by product", "Search by merchant", "Search by brand or category"],
-    placeholder: "Find illustration",
+    image: "find-poster.webp",
+    alt: "A search for headphones in the real Receebo interface finds the fictional Northline Audio purchase.",
   },
   {
     title: "Protect",
     items: ["Warranty reminders", "Return window alerts", "Consumer rights info"],
-    placeholder: "Protect illustration",
+    image: "protection.webp",
+    alt: "Actual consumer-rights information for the sample Portugal purchase, including return and legal warranty dates.",
   },
   {
     title: "Prove",
     items: ["Fullscreen receipt view", "Download as PDF", "Share proof of purchase"],
-    placeholder: "Prove illustration",
+    image: "original-receipt.webp",
+    alt: "Receebo's original receipt viewer showing the fictional Northline Audio receipt, with €169 headphones and a €20 case.",
   },
 ];
-
-const SLIDE_DURATION = 4000; // ms per slide
 
 const slideVariants = {
   enter: (dir: number) => ({
@@ -47,44 +50,11 @@ const slideVariants = {
 export default function WhyReceeboSection() {
   const [active, setActive] = useState(0);
   const [dir, setDir] = useState(1);
-  const [progress, setProgress] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef<number>(Date.now());
 
   const goTo = (idx: number) => {
     setDir(idx > active ? 1 : -1);
     setActive(idx);
-    setProgress(0);
-    startTimeRef.current = Date.now();
   };
-
-  // Progress animation via rAF
-  useEffect(() => {
-    let raf: number;
-    const tick = () => {
-      const elapsed = Date.now() - startTimeRef.current;
-      setProgress(Math.min(elapsed / SLIDE_DURATION, 1));
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [active]);
-
-  // Auto-advance
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setDir(1);
-      setActive((prev) => {
-        const next = (prev + 1) % FEATURES.length;
-        return next;
-      });
-      setProgress(0);
-      startTimeRef.current = Date.now();
-    }, SLIDE_DURATION);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [active]);
 
   const feature = FEATURES[active];
 
@@ -126,17 +96,18 @@ export default function WhyReceeboSection() {
               <button
                 key={f.title}
                 onClick={() => goTo(i)}
+                aria-pressed={i === active}
                 className="relative flex-1 py-4 text-sm font-semibold transition-colors focus-visible:outline-none"
                 style={{
                   color: i === active ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
                 }}
               >
                 {f.title}
-                {/* Progress bar — only on active tab */}
+                {/* Manual tabs keep detailed screenshots readable without auto-advance. */}
                 {i === active && (
                   <span
                     className="absolute bottom-0 left-0 h-0.5 bg-foreground rounded-full"
-                    style={{ width: `${progress * 100}%`, transition: "none" }}
+                    style={{ width: "100%" }}
                   />
                 )}
               </button>
@@ -211,8 +182,9 @@ export default function WhyReceeboSection() {
                   exit="exit"
                   className="absolute inset-0 p-6 flex items-center justify-center"
                 >
-                  <Placeholder
-                    label={feature.placeholder}
+                  <AppCapture
+                    file={feature.image}
+                    alt={feature.alt}
                     className="w-full h-full"
                   />
                 </motion.div>

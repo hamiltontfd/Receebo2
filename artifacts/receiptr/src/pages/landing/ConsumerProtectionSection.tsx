@@ -1,12 +1,13 @@
 import { motion } from "framer-motion";
 import { ShieldCheck, Clock, RotateCcw, Scale } from "lucide-react";
-import { fadeInUp, slideInRight, stagger, Placeholder, VIEWPORT, SectionLabel } from "./shared";
+import { fadeInUp, slideInRight, stagger, VIEWPORT, SectionLabel } from "./shared";
+import { AppCapture } from "./MarketingMedia";
 
 const protections = [
   {
     icon: RotateCcw,
     title: "Return windows",
-    body: "Know exactly how many days you have to return any purchase.",
+    body: "View estimated return dates where purchase details and local rules are available.",
   },
   {
     icon: ShieldCheck,
@@ -16,7 +17,7 @@ const protections = [
   {
     icon: Scale,
     title: "Consumer rights",
-    body: "Understand your legal rights for every purchase, by country.",
+    body: "View country-specific guidance, with sources and applicable limits.",
   },
   {
     icon: Clock,
@@ -51,8 +52,9 @@ export default function ConsumerProtectionSection() {
                 a receipts storage.
               </motion.h2>
               <motion.p variants={fadeInUp} className="text-lg text-muted-foreground leading-relaxed">
-                Receebo tracks every return window, warranty, and consumer right
-                attached to your purchases — so you're always protected.
+                Keep available warranty details and return information with your
+                purchases. Coverage depends on the product, seller, country, and
+                purchase details — always check the applicable terms.
               </motion.p>
             </div>
 
@@ -76,15 +78,17 @@ export default function ConsumerProtectionSection() {
             </motion.div>
           </motion.div>
 
-          {/* Right — placeholder */}
+          {/* Actual receipt-level consumer-rights information */}
           <motion.div
             variants={slideInRight}
             initial="hidden"
             whileInView="visible"
             viewport={VIEWPORT}
           >
-            <Placeholder
-              label="Graphic Placeholder"
+            <AppCapture
+              file="protection.webp"
+              alt="Real Receebo consumer-rights panel for a fictional online purchase in Portugal, displaying a 3 November 2026 return date and a three-year legal warranty with legal citations."
+              caption="Fictional Portugal example, captured 25 Oct 2026. General guidance, not a guarantee of eligibility."
               className="w-full h-[420px] lg:h-[500px]"
             />
           </motion.div>

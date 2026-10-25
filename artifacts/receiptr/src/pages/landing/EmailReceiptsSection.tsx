@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { Mail, Upload, Camera } from "lucide-react";
-import { fadeInUp, slideInLeft, stagger, Placeholder, VIEWPORT, SectionLabel } from "./shared";
+import { fadeInUp, slideInLeft, stagger, VIEWPORT, SectionLabel } from "./shared";
+import { AppCapture } from "./MarketingMedia";
 
 const methods = [
-  { icon: Mail, label: "Forward from Gmail" },
+  { icon: Mail, label: "Connect Gmail" },
   { icon: Upload, label: "Upload from files" },
   { icon: Camera, label: "Scan with camera" },
 ];
@@ -13,7 +14,7 @@ export default function EmailReceiptsSection() {
     <section className="py-24 lg:py-32">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-          {/* Left — placeholder */}
+          {/* Actual disconnected Gmail settings view */}
           <motion.div
             variants={slideInLeft}
             initial="hidden"
@@ -21,8 +22,10 @@ export default function EmailReceiptsSection() {
             viewport={VIEWPORT}
             className="order-2 lg:order-1"
           >
-            <Placeholder
-              label="Email Placeholder"
+            <AppCapture
+              file="email-settings.webp"
+              alt="Receebo's Connected accounts settings with Gmail disconnected and a Connect Gmail button."
+              caption="Actual connection settings · no inbox connected or email imported in this sample"
               className="w-full h-[380px] lg:h-[440px]"
             />
           </motion.div>

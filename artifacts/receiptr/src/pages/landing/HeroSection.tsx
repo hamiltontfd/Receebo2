@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/react";
 import { useCreateCheckout } from "@/hooks/useBilling";
 import { ArrowRight, Play } from "lucide-react";
-import { fadeInUp, slideInRight, stagger, VIEWPORT, Placeholder } from "./shared";
+import { fadeInUp, slideInRight, stagger } from "./shared";
+import { marketingMedia } from "./MarketingMedia";
 
 export default function HeroSection() {
   const { isSignedIn } = useAuth();
@@ -103,32 +104,28 @@ export default function HeroSection() {
             </motion.p>
           </motion.div>
 
-          {/* Right — Product visual placeholder */}
+          {/* Genuine app captures, composed without inventing interface elements */}
           <motion.div
             variants={slideInRight}
             initial="hidden"
             animate="visible"
             className="relative"
           >
-            <Placeholder
-              label="Hero Image Placeholder"
-              className="w-full h-[420px] lg:h-[500px]"
-            />
-            {/* Floating badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.8, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute -bottom-4 -left-4 bg-background rounded-2xl border border-border shadow-lg px-4 py-3 flex items-center gap-3"
-            >
-              <div className="w-8 h-8 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
-                <span className="text-green-600 text-sm">✓</span>
-              </div>
-              <div>
-                <p className="text-xs font-semibold leading-none mb-0.5">Receipt found</p>
-                <p className="text-[10px] text-muted-foreground">MacBook Pro · Apple Store · Jul 2024</p>
-              </div>
-            </motion.div>
+            <figure>
+              <img
+                src={marketingMedia("hero-1200.webp")}
+                srcSet={`${marketingMedia("hero-600.webp")} 600w, ${marketingMedia("hero-1200.webp")} 1200w`}
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                width={1200}
+                height={1100}
+                fetchPriority="high"
+                alt="Actual Receebo library and receipt detail screens showing a fictional Northline Audio purchase: €169 headphones and a €20 travel case."
+                className="w-full h-[420px] lg:h-[500px] object-contain rounded-2xl"
+              />
+              <figcaption className="text-[11px] text-muted-foreground text-center mt-3">
+                Real Receebo screens. Fictional sample purchases.
+              </figcaption>
+            </figure>
           </motion.div>
         </div>
       </div>
