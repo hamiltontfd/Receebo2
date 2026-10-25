@@ -7,3 +7,4 @@
 - [API generation compatibility](api-codegen-compatibility.md) — legacy generated-client extensions are not all represented in the spec; review regeneration diffs before accepting them.
 - [Google login branding](google-login-branding.md) — production sign-in uses its own Google project; preserve the separate Gmail import credentials and testing configuration.
 - [Browser video codecs](browser-video-codecs.md) — installed Chromium may lack H.264 despite valid ffmpeg output; check browser codec support and verify a compatible alternate format.
+- [Marketing verification safety](marketing-verification-safety.md) — a read-only landing-page check does not make ordinary API startup safe; avoid starting integration jobs just to serve public assets.

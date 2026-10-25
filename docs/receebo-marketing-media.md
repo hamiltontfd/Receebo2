@@ -131,18 +131,106 @@ Record source/export SHA-256 checksums in the manifest before uploading.
 pnpm --filter @workspace/receiptr typecheck
 pnpm --filter @workspace/receiptr test
 PORT=5000 BASE_PATH=/ pnpm --filter @workspace/receiptr build
-node artifacts/receiptr/scripts/marketing/verify.mjs
+# Install the browsers matching this package's Playwright version:
+pnpm --filter @workspace/receiptr exec playwright install chromium firefox webkit
+pnpm --filter @workspace/receiptr test:marketing-ranges
+pnpm --filter @workspace/receiptr test:marketing
 ```
 
 `verify.mjs` visits the **normal** signed-out landing page with no interception,
-at 1440 and 390 pixels with reduced motion enabled. It checks images, posters,
-no autoplay, all three clips' decodes/playback/seeking, manual feature tabs, overflow,
-and browser errors. It saves screenshots/results in the ignored verification folder.
-Set `LANDING_URL` if the development URL is not provided by the environment.
+fixtures, auth bypass, or stored login session. Chromium, Firefox, and WebKit each
+run at 1440 and 390 pixels, with both reduced motion and normal motion: 12 fresh
+contexts in total. This is landing-page media delivery coverage, not PWA
+installation testing. It checks:
+
+* Native controls, inline playback, no loop/autoplay, `preload="none"`, and videos
+  remaining paused at time zero after scrolling into view, in both motion modes.
+* Posters decoding independently before playback. Native controls are asserted
+  through DOM properties; OS-specific controls chrome is not pixel-tested.
+* The actual WebM-first / MP4-fallback source order and native `currentSrc`
+  selection, followed by separate playback probes for **each supported codec**.
+  Playback must advance and decode a 960×640 frame; seeking must emit `seeked`,
+  decode a frame near the end, and resume advancing. All media waits are bounded.
+* For all six delivered video URLs, full GET, explicit (`0-63`), open-ended,
+  suffix (`-64`), and end-clipped byte ranges, with exact status, MIME,
+  `Accept-Ranges`, `Content-Range`, length, and **byte-content** comparisons.
+  Out-of-bounds, reversed, zero suffix, and unsupported multiple ranges must return
+  416, `Content-Range: bytes */<size>`, and no video bytes.
+* Manual feature images, viewport overflow, asset HTTP failures, and page errors.
+
+Results are written after every check, including failed browser launches, to
+`generated-artifacts/receebo-marketing/verification/results.json`. Screenshots
+are named by engine, width, and motion mode. Failures name the check, engine,
+viewport and clip or asset URL, with an error stack. Any failed assertion or
+missing engine returns exit code **1**, while the remaining checks continue.
+`test:marketing-ranges` tests the verifier's ability to catch wrong bytes, headers,
+status, MIME and ignored Range requests; it does not replace the live checks.
+
+Set `LANDING_URL` to a development preview if the URL is not provided by the
+environment. Only loopback and `.replit.dev` targets are accepted, not production.
+The script only reads public marketing assets and clicks feature tabs/video
+surfaces. It never signs in, scans receipts, writes app data, or opens Gmail,
+payment, or email flows. Normal signed-out auth initialization is left intact.
+
+**Server safety:** Do not start the API's normal `src/index.ts` just for this
+check in an environment with live connections: it also runs migrations, Stripe
+webhook/backfill setup, Gmail scheduling and cleanup. Use a safe development
+server with those jobs disabled/absent. For local verification, the existing
+Express `src/app.ts` can be bundled and listened on the existing API port without
+importing `src/index.ts`; this preserves normal auth and the actual storage route
+without starting background jobs. Only public marketing GET requests are needed.
+
+### Engine limitations and failure triage
+
+* Playwright WebKit is a Safari-engine regression check, **not actual macOS/iOS
+  Safari**. Native controls styling, touch scrubbing, hardware decoding, and
+  device fullscreen behavior still need a real-device smoke check.
+* Codec availability depends on the installed browser/OS. The workspace's system
+  Chromium may lack H.264; Linux Firefox/WebKit may require multimedia libraries.
+  Generic container support is not enough: results record VP9 and H.264
+  `canPlayType` probes. Unsupported single-format probes are explicitly logged
+  as `LIMITED` and recorded under `limitations`, never described as playback
+  passes. At least native playback must succeed. A successful run with codec
+  limitations does **not** certify those formats; rerun on a codec-enabled host.
+* Missing Firefox/WebKit executables or shared libraries are **failures**, not
+  silent skips. On supported Linux CI, install browser dependencies with
+  `pnpm --filter @workspace/receiptr exec playwright install --with-deps`.
+  On Replit/Nix, use compatible system packages rather than copying the
+  Ubuntu `apt` suggestions blindly. Do not replace Firefox/WebKit with Chromium.
+* On this workspace, run Chromium with
+  `CHROMIUM_PATH=/repl/tools/bin/chromium pnpm --filter @workspace/receiptr test:marketing`.
+  `CHROMIUM_PATH` only overrides Chromium. `PLAYWRIGHT_MODULE` can select an
+  installed module; its browser versions must match. `MARKETING_ENGINES=firefox`
+  (or a comma-separated subset) is for diagnosis only: the report marks a
+  partial matrix and the console warns that it is not the full release check.
+* For `controls-poster-no-autoplay`, inspect the shipped markup/poster URL.
+  For playback/seek failures, inspect `currentSrc`, codec support, decoder errors
+  and the relevant range check. For 404/5xx, confirm the public versioned assets
+  and API routing. Never work around failures by bypassing auth or changing
+  protected receipt delivery.
+
 The capture verifies real component interactions with intercepted sample responses;
 it does **not** verify signed-in end-to-end backend extraction or external services.
 
-### Delivery verification
+### Cross-engine check in this workspace (25 October 2026)
+
+The verifier's eight regression tests passed. Chromium's desktop/phone checks
+passed in both motion modes, including independent VP9 WebM and H.264 MP4
+playback and resumed seeking for all three clips. All six public video URLs
+passed the byte-range/content checks.
+
+Firefox and WebKit were downloaded at the matching Playwright version but could
+not launch because this workspace lacks their required shared libraries (Firefox
+X11/GTK dependencies; WebKit GTK/GStreamer/ICU and related libraries). Their
+launch failures are captured in the JSON report and make the full command exit
+nonzero. **This is not a Firefox/WebKit playback pass or a full release sign-off.**
+Run the full command on a dependency-complete host before release.
+
+These checks used the ordinary signed-out landing page and the unchanged Express
+app/auth/storage handler served without the API startup entry point or its
+background jobs. No authenticated product flows were exercised.
+
+### Original media delivery baseline
 
 Desktop (1440 px) and phone (390 px) checks passed with reduced motion: all three
 clips decoded and played, native seek worked, posters and each feature image

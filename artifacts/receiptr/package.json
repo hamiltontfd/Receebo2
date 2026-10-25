@@ -10,7 +10,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:api": "vitest run --config vitest.api.config.ts",
-    "test:pwa": "node scripts/pwa-browser-check.mjs"
+    "test:pwa": "node scripts/pwa-browser-check.mjs",
+    "test:marketing": "node scripts/marketing/verify.mjs",
+    "test:marketing-ranges": "vitest run --config vitest.config.ts scripts/marketing/verify-ranges.test.mjs"
   },
   "devDependencies": {
     "@clerk/react": "^6.7.3",
