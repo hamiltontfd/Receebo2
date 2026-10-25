@@ -26,6 +26,8 @@ describe("HeroSection", () => {
     for (const id of ["img-hero-library-phone", "img-hero-receipt-phone"]) {
       const image = screen.getByTestId(id);
       expect(image.style.marginTop).toBe(`${-(32 / 390) * 100}%`);
+      expect(image.parentElement?.className).toContain("overflow-hidden");
+      expect(image.parentElement?.parentElement?.className).toContain("pt-5");
       expect(image.contains(caption)).toBe(false);
     }
   });

@@ -162,7 +162,8 @@ function PhoneFrame({
       transition={float ? { duration, repeat: Infinity, ease: "easeInOut" } : undefined}
     >
       <div className="rounded-[2.4rem] bg-[hsl(230_18%_16%)] p-[6px] shadow-[0_30px_60px_-20px_hsl(250_40%_25%/0.35)] ring-1 ring-black/5">
-        <div className="relative overflow-hidden rounded-[2rem] bg-background">
+        <div className={`relative overflow-hidden rounded-[2rem] pt-5 ${file === "receipt-phone.webp" ? "bg-[#333333]" : "bg-background"}`}>
+          <div className="overflow-hidden">
           <img
             data-testid={testId}
             src={marketingMedia(file)}
@@ -176,6 +177,7 @@ function PhoneFrame({
             // source viewport. Keep the disclosure in the figure caption instead.
             style={{ marginTop: `${-(32 / 390) * 100}%` }}
           />
+          </div>
         </div>
       </div>
     </motion.div>
