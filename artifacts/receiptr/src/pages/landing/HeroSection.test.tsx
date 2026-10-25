@@ -21,6 +21,12 @@ describe("HeroSection", () => {
     expect(screen.getByTestId("img-hero-library-phone").getAttribute("src")).toContain("library-phone.webp");
     expect(screen.getByTestId("img-hero-receipt-phone").getAttribute("src")).toContain("receipt-phone.webp");
     expect(document.body.innerHTML).not.toContain("hero-1200");
-    expect(screen.getByText("Real Receebo screens. Fictional sample purchases.")).toBeTruthy();
+    const caption = screen.getByText("Real Receebo screens. Fictional sample purchases and simulated extraction.");
+    expect(caption.tagName).toBe("FIGCAPTION");
+    for (const id of ["img-hero-library-phone", "img-hero-receipt-phone"]) {
+      const image = screen.getByTestId(id);
+      expect(image.style.marginTop).toBe(`${-(32 / 390) * 100}%`);
+      expect(image.contains(caption)).toBe(false);
+    }
   });
 });

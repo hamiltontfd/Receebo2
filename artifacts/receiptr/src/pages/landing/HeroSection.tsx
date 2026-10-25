@@ -134,7 +134,7 @@ export default function HeroSection() {
                 />
               </div>
               <figcaption className="text-[11px] text-muted-foreground text-center">
-                Real Receebo screens. Fictional sample purchases.
+                Real Receebo screens. Fictional sample purchases and simulated extraction.
               </figcaption>
             </figure>
           </motion.div>
@@ -172,6 +172,9 @@ function PhoneFrame({
             decoding="async"
             {...(priority ? { fetchPriority: "high" as const } : { loading: "eager" as const })}
             className="block w-full h-auto"
+            // Crop the capture-only 32px disclosure strip from the 390px-wide
+            // source viewport. Keep the disclosure in the figure caption instead.
+            style={{ marginTop: `${-(32 / 390) * 100}%` }}
           />
         </div>
       </div>
