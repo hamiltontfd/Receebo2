@@ -1,0 +1,26 @@
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import * as R from "react";
+
+vi.mock("framer-motion", () => ({
+  useReducedMotion: () => true,
+  motion: new Proxy({}, {
+    get: (_t, tag: string) => ({ children, variants: _v, initial: _i, animate: _a, transition: _tr, whileHover: _h, whileTap: _w, ...props }: Record<string, unknown>) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      R.createElement(tag, props, children as any),
+  }),
+}));
+vi.mock("@clerk/react", () => ({ useAuth: () => ({ isSignedIn: false }) }));
+vi.mock("@/hooks/useBilling", () => ({ useCreateCheckout: () => ({ mutate: vi.fn(), isPending: false }) }));
+
+import HeroSection from "./HeroSection";
+
+describe("HeroSection", () => {
+  it("shows real phone captures in frames with sample-data disclosure", () => {
+    render(<HeroSection />);
+    expect(screen.getByTestId("img-hero-library-phone").getAttribute("src")).toContain("library-phone.webp");
+    expect(screen.getByTestId("img-hero-receipt-phone").getAttribute("src")).toContain("receipt-phone.webp");
+    expect(document.body.innerHTML).not.toContain("hero-1200");
+    expect(screen.getByText("Real Receebo screens. Fictional sample purchases.")).toBeTruthy();
+  });
+});

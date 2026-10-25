@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/react";
 import { useCreateCheckout } from "@/hooks/useBilling";
@@ -10,6 +10,8 @@ import { marketingMedia } from "./MarketingMedia";
 export default function HeroSection() {
   const { isSignedIn } = useAuth();
   const checkout = useCreateCheckout();
+  const reduce = useReducedMotion();
+  const entrance = reduce ? false : "hidden";
 
   const handleTrial = () => {
     if (isSignedIn) {
@@ -24,7 +26,7 @@ export default function HeroSection() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse 80% 60% at 60% -10%, hsl(220 100% 97%) 0%, transparent 70%), radial-gradient(ellipse 60% 50% at 90% 60%, hsl(260 80% 97%) 0%, transparent 65%)",
+            "radial-gradient(ellipse 70% 70% at 78% 40%, hsl(258 85% 95%) 0%, transparent 70%), radial-gradient(ellipse 80% 60% at 55% -10%, hsl(220 100% 96%) 0%, transparent 70%), linear-gradient(180deg, hsl(220 60% 98.5%) 0%, hsl(var(--background)) 100%)",
         }}
       />
 
@@ -33,7 +35,7 @@ export default function HeroSection() {
           {/* Left — Copy */}
           <motion.div
             variants={stagger}
-            initial="hidden"
+            initial={entrance}
             animate="visible"
             className="flex flex-col gap-7 max-w-xl"
           >
@@ -107,22 +109,31 @@ export default function HeroSection() {
           {/* Genuine app captures, composed without inventing interface elements */}
           <motion.div
             variants={slideInRight}
-            initial="hidden"
+            initial={entrance}
             animate="visible"
             className="relative"
           >
-            <figure>
-              <img
-                src={marketingMedia("hero-1200.webp")}
-                srcSet={`${marketingMedia("hero-600.webp")} 600w, ${marketingMedia("hero-1200.webp")} 1200w`}
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                width={1200}
-                height={1100}
-                fetchPriority="high"
-                alt="Actual Receebo library and receipt detail screens showing a fictional Northline Audio purchase: €169 headphones and a €20 travel case."
-                className="w-full h-[420px] lg:h-[500px] object-contain rounded-2xl"
-              />
-              <figcaption className="text-[11px] text-muted-foreground text-center mt-3">
+            <figure data-testid="hero-phones" className="m-0">
+              <div className="relative mx-auto flex justify-center items-start w-full max-w-[560px] pt-2 pb-8">
+                <PhoneFrame
+                  file="library-phone.webp"
+                  testId="img-hero-library-phone"
+                  alt="Actual Receebo library screen on a phone, listing a fictional Northline Audio purchase."
+                  className="w-[46%] max-w-[260px] z-10 -mr-[8%]"
+                  float={reduce ? undefined : [0, -10, 0]}
+                  duration={7}
+                  priority
+                />
+                <PhoneFrame
+                  file="receipt-phone.webp"
+                  testId="img-hero-receipt-phone"
+                  alt="Actual Receebo receipt detail screen on a phone for the fictional Northline Audio purchase: €169 headphones and a €20 travel case."
+                  className="w-[46%] max-w-[260px] z-20 mt-[12%]"
+                  float={reduce ? undefined : [0, 8, 0]}
+                  duration={8}
+                />
+              </div>
+              <figcaption className="text-[11px] text-muted-foreground text-center">
                 Real Receebo screens. Fictional sample purchases.
               </figcaption>
             </figure>
@@ -130,5 +141,40 @@ export default function HeroSection() {
         </div>
       </div>
     </section>
+  );
+}
+
+function PhoneFrame({
+  file, alt, className, float, duration, priority, testId,
+}: {
+  file: string;
+  alt: string;
+  className?: string;
+  float?: number[];
+  duration: number;
+  priority?: boolean;
+  testId: string;
+}) {
+  return (
+    <motion.div
+      className={`relative shrink-0 ${className ?? ""}`}
+      animate={float ? { y: float } : undefined}
+      transition={float ? { duration, repeat: Infinity, ease: "easeInOut" } : undefined}
+    >
+      <div className="rounded-[2.4rem] bg-[hsl(230_18%_16%)] p-[6px] shadow-[0_30px_60px_-20px_hsl(250_40%_25%/0.35)] ring-1 ring-black/5">
+        <div className="relative overflow-hidden rounded-[2rem] bg-background">
+          <img
+            data-testid={testId}
+            src={marketingMedia(file)}
+            alt={alt}
+            width={780}
+            height={1688}
+            decoding="async"
+            {...(priority ? { fetchPriority: "high" as const } : { loading: "eager" as const })}
+            className="block w-full h-auto"
+          />
+        </div>
+      </div>
+    </motion.div>
   );
 }
