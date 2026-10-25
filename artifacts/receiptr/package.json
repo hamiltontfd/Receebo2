@@ -12,7 +12,11 @@
     "test:api": "vitest run --config vitest.api.config.ts",
     "test:pwa": "node scripts/pwa-browser-check.mjs",
     "test:marketing": "node scripts/marketing/verify.mjs",
-    "test:marketing-ranges": "vitest run --config vitest.config.ts scripts/marketing/verify-ranges.test.mjs"
+    "test:marketing-ranges": "vitest run --config vitest.config.ts scripts/marketing/verify-ranges.test.mjs",
+    "marketing:status": "node scripts/marketing/release-check.mjs status",
+    "marketing:check": "node scripts/marketing/release-check.mjs check",
+    "marketing:approve": "node scripts/marketing/release-check.mjs approve",
+    "test:marketing-freshness": "node --test scripts/marketing/freshness.test.mjs"
   },
   "devDependencies": {
     "@clerk/react": "^6.7.3",

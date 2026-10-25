@@ -8,3 +8,4 @@
 - [Google login branding](google-login-branding.md) — production sign-in uses its own Google project; preserve the separate Gmail import credentials and testing configuration.
 - [Browser video codecs](browser-video-codecs.md) — installed Chromium may lack H.264 despite valid ffmpeg output; check browser codec support and verify a compatible alternate format.
 - [Marketing verification safety](marketing-verification-safety.md) — a read-only landing-page check does not make ordinary API startup safe; avoid starting integration jobs just to serve public assets.
+- [Marketing media review](marketing-media-review.md) — capture success is not visual approval; preserve runtime cache paths when isolating capture environments.

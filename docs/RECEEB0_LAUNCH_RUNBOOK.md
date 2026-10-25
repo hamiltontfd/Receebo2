@@ -2,6 +2,14 @@
 
 This is the operator checklist for a web-first release. The Expo app is not part of this launch.
 
+## Marketing media release check
+
+For product-page, shared UI/style, or fictional fixture changes, run the opt-in
+`pnpm --filter @workspace/receiptr marketing:check` before release. A
+`MEDIA REVIEW REQUIRED` result must be visually reviewed and acknowledged; it is
+not permission to overwrite public images. See
+[the capture and approval instructions](receebo-marketing-media.md#opt-in-release-freshness-gate).
+
 ## 1. Production configuration
 
 Confirm these are set in the production environment without copying values into tickets or logs:

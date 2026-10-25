@@ -71,6 +71,74 @@ working application's layout. Fonts must finish loading before capture.
 
 ## Regenerate
 
+### Opt-in release freshness gate
+
+Run this before a release that changes product pages, shared components, styles,
+fixtures, public fonts/images, or API client contracts:
+
+```sh
+# Fast source-only check (no browser, services, or uploads):
+pnpm --filter @workspace/receiptr marketing:status
+# Full isolated capture check (Chromium + ffmpeg required):
+CHROMIUM_PATH="$(command -v chromium)" pnpm --filter @workspace/receiptr marketing:check
+# Tooling regression tests:
+pnpm --filter @workspace/receiptr test:marketing-freshness
+```
+
+These commands work from the workspace root or the package directory. They are
+opt-in: normal builds/tests do not regenerate media. Add `marketing:check` as an
+explicit release step when marketing freshness is relevant; do not point it at
+production or pass a signed-in browser session. Unlike `verify.mjs`, it never
+visits the normal landing page or App Storage.
+
+`marketing:check` starts its own loopback-only server on port 5199, runs
+`record.mjs` (including fixture-driven upload/save/search/protection interactions),
+`compose.mjs`, and `package.mjs`, then stops the server even on failure. No API
+server is needed. Child processes inherit only runtime/browser paths and locale,
+not service secrets or `VITE_*` configuration. Interception still fails closed;
+Google Fonts are the only allowed external reads. A busy port fails rather than
+attaching to an existing server. Runtime steps have bounded timeouts.
+
+The gate fingerprints the entire web source tree (excluding tests), public assets,
+capture tooling, package/lockfile, and shared client/storage source. This is
+deliberately conservative: unrelated source changes may also need acknowledgement.
+Added/deleted files count too. It prints changed paths and writes
+`generated-artifacts/receebo-marketing/freshness-report.json` only after a complete,
+error-free capture. A failure invalidates any prior report. A concurrent capture
+fails rather than mixing evidence; after an interrupted process, ensure no
+capture is running before deleting the ignored `.release-check-lock` directory.
+
+Exit **0** means captures passed and source inputs match a visually approved
+baseline. Exit **1** means either capture/tool failure or **MEDIA REVIEW REQUIRED**;
+read the output to distinguish them. Fresh captures do not automatically establish
+visual correctness, and binary video bytes are not used as deterministic visual
+snapshots. There is intentionally **no pre-approved baseline** for the older
+published assets: the first run also requires human inspection.
+
+After a successful capture, review every still and hero, watch each of the three
+clips in both MP4 and WebM, and follow the decoded-frame/privacy checks below.
+Compare them with the currently published media. Only then acknowledge review:
+
+```sh
+pnpm --filter @workspace/receiptr marketing:approve --visual-approved
+pnpm --filter @workspace/receiptr marketing:status
+```
+
+Approval records input and exact export hashes in
+`scripts/marketing/approved-media.json`; commit it alongside the reviewed source
+changes. This is an explicit human attestation, not automated visual approval.
+Approval refuses failed, missing, modified, or source-stale capture evidence.
+The check and approval commands **never upload anything or change landing URLs**.
+If current exports still accurately represent the product, record that decision
+in the release/PR; otherwise perform the separate versioned upload below.
+
+The uploader also requires matching visual approval and uses create-only writes:
+it will refuse to overwrite an existing public object. Before uploading refreshed
+exports, change the version prefix in `upload.ts` and `MarketingMedia.tsx`, then
+rerun the capture/review/approval (those source changes invalidate the baseline).
+Never edit an old release's version folder in place. After any regeneration,
+review and approve again before upload because the exact export bytes may differ.
+
 From the workspace root, after `pnpm install`:
 
 ```sh
