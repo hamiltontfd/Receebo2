@@ -2,7 +2,7 @@
 name: Founding customer offer
 description: Product scope and the distinction between account trial and paid founding subscriptions.
 ---
-Receebo web offers seven days with no card and three successful receipt uploads total, not a daily allowance. Founding Customer pricing is recurring (€2.99/month or €24.99/year), with eligibility lasting while the account exists, including cancellation and later resubscription. There is no promotion deadline or customer-count limit.
+Receebo web offers seven days with no card and three successful receipt uploads total, not a daily allowance. Founding Customer pricing is recurring (€2.99/month or €24.99/year), with eligibility lasting while the account exists, including cancellation and later resubscription. There is no promotion deadline or customer-count limit. No-card account-trial users must not receive payment-failure notices.
 
 **Why:** The user explicitly specified this offer and prohibited automatic conversion, a perpetual free tier, and changes to existing customers' subscriptions.
 

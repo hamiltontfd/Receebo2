@@ -9,6 +9,8 @@ import type { BillingAccessStatusAccessState } from './billingAccessStatusAccess
 import type { BillingAccessStatusPlan } from './billingAccessStatusPlan';
 
 export interface BillingAccessStatus {
+  /** The existing Stripe subscription needs payment attention. Access is governed separately by canUseApp and currentPeriodEnd. */
+  paymentAttention?: boolean;
   accessState?: BillingAccessStatusAccessState;
   /** @nullable */
   trialUploadsRemaining?: number | null;

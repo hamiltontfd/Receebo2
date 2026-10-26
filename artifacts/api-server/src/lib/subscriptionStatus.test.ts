@@ -82,4 +82,23 @@ describe("production entitlement and subscription status", () => {
     expect((await getSubscriptionStatus("user_owner")).plan).toBe("pro");
     expect((await getSubscriptionStatus("user_owner")).plan).toBe("free");
   });
+
+  it("keeps the existing grace cutoff for past_due and terminal unpaid, and clears attention on recovery", async () => {
+    mocks.billingRows = [{ stripeCustomerId: "cus_paid", stripeSubscriptionId: "sub_paid" }];
+    for (const status of ["past_due", "unpaid"]) {
+      for (const expired of [false, true]) {
+        mocks.execute.mockResolvedValue({ rows: [{
+          id: "sub_paid", status, trial_end: null,
+          current_period_end: expired ? 1 : 4102444800, cancel_at_period_end: false,
+        }] });
+        expect(await getSubscriptionStatus("user_other")).toMatchObject({
+          plan: expired ? "free" : "pro", paymentAttention: true, canUseApp: !expired,
+        });
+      }
+    }
+    mocks.execute.mockResolvedValue({ rows: [{
+      id: "sub_paid", status: "active", current_period_end: 4102444800,
+    }] });
+    expect(await getSubscriptionStatus("user_other")).toMatchObject({ plan: "pro", paymentAttention: false });
+  });
 });

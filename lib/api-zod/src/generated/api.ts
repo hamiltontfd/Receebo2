@@ -41,6 +41,7 @@ export const ReleaseUploadReservationBody = zod.object({
  * @summary Current authenticated user's subscription and complimentary access
  */
 export const FetchBillingAccessStatusResponse = zod.object({
+  "paymentAttention": zod.boolean().optional().describe('The existing Stripe subscription needs payment attention. Access is governed separately by canUseApp and currentPeriodEnd.'),
   "accessState": zod.enum(['not_started', 'account_trial', 'trial_exhausted', 'trial_expired', 'legacy_stripe_trial', 'paid', 'owner', 'subscription_required']).optional(),
   "trialUploadsRemaining": zod.number().nullish(),
   "trialUploadsUsed": zod.number().optional(),

@@ -45,6 +45,14 @@ async function runStartupMigrations(): Promise<void> {
       )
     `);
 
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS payment_notices (
+        invoice_id text PRIMARY KEY,
+        user_id text NOT NULL REFERENCES user_billing(user_id) ON DELETE CASCADE,
+        sent_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
     // stripe_subscription_id column — added by migration 0003; guard here too
     await db.execute(sql`
       ALTER TABLE user_billing

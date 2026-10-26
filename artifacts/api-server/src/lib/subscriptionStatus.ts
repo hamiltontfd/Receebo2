@@ -13,6 +13,7 @@ export interface SubscriptionStatus {
   stripeSubscriptionId: string | null;
   ownerAccess?: boolean;
   hasBillingAccount?: boolean;
+  paymentAttention?: boolean;
   accessState?: "not_started" | "account_trial" | "trial_exhausted" | "trial_expired" | "legacy_stripe_trial" | "paid" | "owner" | "subscription_required";
   trialUploadsRemaining?: number | null;
   trialUploadsUsed?: number;
@@ -132,5 +133,6 @@ async function getPaidSubscriptionStatus(userId: string): Promise<SubscriptionSt
     plan = "pro";
   }
 
-  return { plan, trialEndAt, currentPeriodEnd, cancelAtPeriodEnd, stripeSubscriptionId: sub.id, hasBillingAccount: true };
+  return { plan, trialEndAt, currentPeriodEnd, cancelAtPeriodEnd, stripeSubscriptionId: sub.id, hasBillingAccount: true,
+    paymentAttention: sub.status === "past_due" || sub.status === "unpaid" };
 }

@@ -684,6 +684,9 @@ components:
       type: object
       required: [plan, trialEndAt, currentPeriodEnd, cancelAtPeriodEnd]
       properties:
+        paymentAttention:
+          type: boolean
+          description: The existing Stripe subscription needs payment attention. Access is governed separately by canUseApp and currentPeriodEnd.
         accessState:
           type: string
           enum: [not_started, account_trial, trial_exhausted, trial_expired, legacy_stripe_trial, paid, owner, subscription_required]

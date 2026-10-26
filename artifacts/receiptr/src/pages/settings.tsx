@@ -389,6 +389,20 @@ export default function Settings() {
               <AccessBadge billing={billing} />
             </div>
 
+            {billing?.paymentAttention && (
+              <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" data-testid="payment-attention">
+                <p className="font-semibold">Your renewal payment needs attention</p>
+                <p className="mt-1">
+                  {isOwner
+                    ? "Your Owner access is unchanged, but your subscription has an outstanding payment."
+                    : billing.canUseApp && billing.currentPeriodEnd
+                      ? `Your Pro access continues until ${formatDateTime(billing.currentPeriodEnd)}. Update your payment details before then to avoid losing access.`
+                      : "Your Pro access has ended. Update your payment details and settle the outstanding invoice to restore access."}
+                  {" "}Stripe may retry your payment. Use the button below to open Stripe's secure billing portal.
+                </p>
+              </div>
+            )}
+
             {(accessState === "account_trial" || accessState === "trial_exhausted" || accessState === "trial_expired") && (
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Trial uploads used</span>
@@ -431,7 +445,7 @@ export default function Settings() {
               <OwnerAccessNotice hasBillingAccount={billing.hasBillingAccount === true} />
             )}
 
-            {isOwner && !billing?.hasBillingAccount ? null : isPro || isOwner ? (
+            {isOwner && !billing?.hasBillingAccount ? null : isPro || isOwner || billing?.paymentAttention ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -448,7 +462,7 @@ export default function Settings() {
                 }
                 disabled={portal.isPending}
               >
-                {portal.isPending ? "Loading..." : "Manage subscription"}
+                {portal.isPending ? "Loading..." : billing?.paymentAttention ? "Update payment details" : "Manage subscription"}
               </Button>
             ) : (
               showPlans && (

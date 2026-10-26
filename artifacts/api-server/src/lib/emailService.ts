@@ -2,9 +2,26 @@ import { Resend } from "resend";
 import { createHmac } from "crypto";
 import { clerkClient } from "@clerk/express";
 import { logger } from "./logger";
+import { billingOrigin } from "./billingUrls";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = process.env.RESEND_FROM ?? "onboarding@resend.dev";
+
+export async function sendPaymentAttentionEmail(
+  userId: string, invoiceId: string, accessMessage: string,
+): Promise<void> {
+  const email = await getUserEmail(userId);
+  if (!email) throw new Error("Payment notice recipient unavailable");
+  // A durable sign-in-protected link, not an expiring bearer portal session.
+  const settingsUrl = `${billingOrigin()}/settings`;
+  const text = `Your Receebo renewal payment failed. ${accessMessage} Open ${settingsUrl} and choose Update payment details to open Stripe's secure billing portal. Stripe may retry your payment.`;
+  const result = await resend.emails.send({
+    from: FROM, to: email, subject: "Action needed: update your Receebo payment details",
+    text,
+    html: `<h1>Your renewal payment failed</h1><p>${accessMessage}</p><p>Stripe may retry your payment. Open Settings and choose Update payment details to use Stripe's secure billing portal.</p><p><a href="${settingsUrl}">Update payment details in Receebo</a></p>`,
+  }, { idempotencyKey: `payment-attention/${invoiceId}` });
+  if (result.error) throw new Error(`Payment notice delivery failed: ${result.error.name}`);
+}
 
 async function getUserEmail(userId: string): Promise<string | null> {
   if (userId.startsWith("guest_")) return null;

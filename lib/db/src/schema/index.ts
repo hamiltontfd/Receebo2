@@ -28,3 +28,4 @@ export * from "./legalAcceptances";
 export * from "./accountDeletionRequests";
 export * from "./accountTrials";
 export * from "./trialFunnel";
+export * from "./paymentNotices";

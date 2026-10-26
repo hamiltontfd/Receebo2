@@ -5,6 +5,7 @@ import { logger } from "./lib/logger";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { sendTrialEndingEmail } from "./lib/emailService";
 import { confirmPaidFunnel, safeFunnel } from "./lib/trialFunnel";
+import { notifyPaymentFailure } from "./lib/paymentAttention";
 
 /**
  * Upsert the Stripe customer → user mapping and store the subscription ID.
@@ -80,7 +81,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
 }
 
 /**
- * Handle invoice.payment_failed — Stripe manages retries; log for observability.
+ * Handle invoice.payment_failed — Stripe manages retries; notify paid renewals.
  */
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
   const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
@@ -91,6 +92,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
     { customerId, invoiceId: invoice.id, subscriptionId },
     "webhookHandlers: invoice payment failed — Stripe will retry",
   );
+  await notifyPaymentFailure(invoice);
 }
 
 /**

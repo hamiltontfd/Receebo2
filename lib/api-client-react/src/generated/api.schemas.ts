@@ -258,6 +258,8 @@ export const BillingAccessStatusPlan = {
 } as const;
 
 export interface BillingAccessStatus {
+  /** The existing Stripe subscription needs payment attention. Access is governed separately by canUseApp and currentPeriodEnd. */
+  paymentAttention?: boolean;
   accessState?: BillingAccessStatusAccessState;
   /** @nullable */
   trialUploadsRemaining?: number | null;
