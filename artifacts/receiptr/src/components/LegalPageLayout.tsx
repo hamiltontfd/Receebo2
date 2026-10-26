@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import DisputeResolutionLine from "@/components/DisputeResolutionLine";
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
@@ -77,6 +78,9 @@ export function LegalPageLayout({
               Terms of Service
             </Link>
           </div>
+        </div>
+        <div className="mx-auto max-w-4xl px-6 pb-8">
+          <DisputeResolutionLine className="text-xs text-muted-foreground" />
         </div>
       </footer>
     </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import DisputeResolutionLine from "@/components/DisputeResolutionLine";
 import { Link } from "wouter";
 import { motion, MotionConfig } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -134,6 +135,7 @@ export default function Landing() {
                 </Link>
               </div>
             </div>
+            <DisputeResolutionLine className="mt-5 text-xs text-muted-foreground text-center sm:text-left" />
           </div>
         </footer>
 
