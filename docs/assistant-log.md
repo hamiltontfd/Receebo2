@@ -44,7 +44,13 @@ Receipt keeper PWA for everyday shoppers (PT/EU focus): capture receipts (upload
 - [ ] Add Replit Secrets `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` (optional `MICROSOFT_TENANT`, `MAIL_PROVIDERS_ENABLED`); confirm `GMAIL_TOKEN_ENCRYPTION_KEY` and `SESSION_SECRET` exist for the deployment.
 - [ ] Test Outlook end to end with Hamilton's own account on the dev URL (Amazon order email should appear), then publish.
 - [ ] Disconnect the old Gmail test connection from Settings once Outlook works (revokes Google access).
-- [ ] Update privacy policy/terms and landing/FAQ copy for Outlook (they still mention Gmail only).
+- [x] Update privacy policy/terms and landing/FAQ copy for Outlook (commit `00057db`, 26 Oct 2026; session 11).
+- [ ] Legal: decide whether the Outlook privacy/terms change is "material". If yes, bump `TERMS_VERSION`/`PRIVACY_VERSION` in `api-server/src/lib/legalAcceptance.ts` together with the "Effective 30 August 2026" date in `receiptr/src/components/LegalPageLayout.tsx` (forces every user to re-accept). Not done in session 11.
+- [ ] Legal review of the new privacy section 5 (Microsoft Graph scopes) and the "earlier Gmail connections" note; confirm whether Google API Limited Use wording is needed while legacy Gmail tokens exist.
+- [ ] Legacy Gmail tokens stay stored (encrypted) but are no longer synced. Data minimisation: revoke/delete them automatically, or at least disconnect Hamilton's own test connection.
+- [ ] Re-record the marketing screenshot `email-settings.webp` (still shows Gmail; no longer used on the landing, replaced by a coded illustration). Marketing capture fixtures `scripts/marketing/{fixtures,record}.mjs` still mock `/api/gmail/status` and click "Connect Gmail".
+- [ ] Mobile Outlook connect is wired (opens Microsoft sign-in, polls `/mail/status`) but untested on a device; OAuth callback returns to the web Settings page, not the app.
+- [ ] Until `MICROSOFT_CLIENT_ID`/`SECRET` are set, `/api/mail/providers` is empty: the landing then says "connect your inbox" and Settings shows no inbox option. Do not publish the copy change before Outlook is configured and tested.
 - [ ] Publisher verification with Microsoft (free; Partner Program + DNS-verified receebo.net).
 - [ ] Client secret expires (max 24 months): set a renewal reminder.
 
@@ -54,3 +60,5 @@ Receipt keeper PWA for everyday shoppers (PT/EU focus): capture receipts (upload
 - 26 Oct 2026: Email import moves to Outlook (no yearly paid assessment). Gmail hidden with `MAIL_PROVIDERS_ENABLED` (default `outlook`), code and data kept so it can return if Google CASA becomes worth paying for.
 
 - 26 Oct 2026: Critical business review done (see hackathon-log session 4). Leaning toward free tier + pivot exploration; no decision yet.
+
+- 26 Oct 2026 (session 11): Provider names in marketing copy come from public `GET /api/mail/providers` (same flag as Settings), never hard-coded. Legal pages stay static and describe Microsoft only, plus a legacy-Gmail note; if Gmail is re-enabled, the privacy policy must be updated again. Forwarding is not mentioned in marketing copy.
