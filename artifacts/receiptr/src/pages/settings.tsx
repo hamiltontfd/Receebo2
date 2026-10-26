@@ -17,10 +17,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Minus, Mail, Loader2, RefreshCw, PlugZap } from "lucide-react";
+import { Check, Minus } from "lucide-react";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 import { PrivacyAndDataSettings } from "@/components/PrivacyAndDataSettings";
-import { getGmailConnectionUrl } from "@/lib/gmailConnection";
+import { MailConnections } from "@/components/MailConnections";
+import { MAIL_PROVIDER_LABELS, readMailOAuthResult } from "@/lib/mailConnection";
 
 const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
 
@@ -56,48 +57,6 @@ function useNotificationPreferences() {
   });
 
   return { query, mutation };
-}
-
-// ─── Gmail connection ─────────────────────────────────────────────────────────
-
-interface GmailStatus {
-  configured: boolean;
-  connected: boolean;
-  gmailEmail: string | null;
-  lastSyncedAt: string | null;
-  pendingCount: number;
-}
-
-async function fetchGmailStatus(): Promise<GmailStatus> {
-  const res = await fetch(`${BASE}api/gmail/status`, { credentials: "include" });
-  if (!res.ok) throw new Error("Failed to load Gmail status");
-  return res.json() as Promise<GmailStatus>;
-}
-
-async function disconnectGmail(): Promise<void> {
-  const res = await fetch(`${BASE}api/gmail/disconnect`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error("Failed to disconnect");
-}
-
-async function triggerSync(): Promise<{ checked: number; queued: number }> {
-  const res = await fetch(`${BASE}api/gmail/sync`, {
-    method: "POST",
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error("Sync failed");
-  return res.json() as Promise<{ checked: number; queued: number }>;
-}
-
-function useGmailStatus() {
-  return useQuery<GmailStatus>({
-    queryKey: ["gmail", "status"],
-    queryFn: fetchGmailStatus,
-    staleTime: 60_000,
-    retry: false,
-  });
 }
 
 // ─── Plan badge ───────────────────────────────────────────────────────────────
@@ -144,54 +103,6 @@ export default function Settings() {
   const { query: notifQuery, mutation: notifMutation } = useNotificationPreferences();
   const [notifOptOut, setNotifOptOut] = useState<boolean | null>(null);
 
-  const { data: gmailStatus, isLoading: gmailLoading } = useGmailStatus();
-
-  const connectMutation = useMutation({
-    mutationFn: () => getGmailConnectionUrl(BASE),
-    onSuccess: (url) => window.location.assign(url),
-    onError: () =>
-      toast({
-        title: "Gmail connection failed",
-        description: "Could not start the Google connection. Please try again.",
-        variant: "destructive",
-      }),
-  });
-
-  const disconnectMutation = useMutation({
-    mutationFn: disconnectGmail,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["gmail"] });
-      toast({ title: "Gmail disconnected" });
-    },
-    onError: () =>
-      toast({
-        title: "Something went wrong",
-        description: "Could not disconnect Gmail. Please try again.",
-        variant: "destructive",
-      }),
-  });
-
-  const syncMutation = useMutation({
-    mutationFn: triggerSync,
-    onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ["gmail"] });
-      if (result.queued > 0) {
-        toast({
-          title: `Found ${result.queued} new receipt${result.queued > 1 ? "s" : ""}`,
-          description: "Check your pending imports.",
-        });
-      } else {
-        toast({ title: "No new receipts found" });
-      }
-    },
-    onError: () =>
-      toast({
-        title: "Sync failed",
-        description: "Could not reach Gmail. Try again shortly.",
-        variant: "destructive",
-      }),
-  });
-
   // Sync local toggle state when preferences load
   useEffect(() => {
     if (notifQuery.data !== undefined && notifOptOut === null) {
@@ -202,13 +113,15 @@ export default function Settings() {
   // Handle OAuth redirect-back params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("gmail") === "connected") {
-      toast({ title: "Gmail connected", description: "Your inbox will be scanned shortly." });
-      void queryClient.invalidateQueries({ queryKey: ["gmail"] });
+    const mailResult = readMailOAuthResult(window.location.search);
+    if (mailResult?.result === "connected") {
+      const label = MAIL_PROVIDER_LABELS[mailResult.provider];
+      toast({ title: `${label} connected`, description: "Your inbox will be scanned shortly." });
+      void queryClient.invalidateQueries({ queryKey: ["mail"] });
       window.history.replaceState({}, "", window.location.pathname);
-    } else if (params.get("gmail") === "error") {
+    } else if (mailResult?.result === "error") {
       toast({
-        title: "Gmail connection failed",
+        title: `${MAIL_PROVIDER_LABELS[mailResult.provider]} connection failed`,
         description: "Please try again. Make sure to allow the requested permissions.",
         variant: "destructive",
       });
@@ -285,90 +198,7 @@ export default function Settings() {
           Connected accounts
         </h2>
 
-        <div className="border rounded-xl p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                <Mail className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Gmail</p>
-                {gmailLoading ? (
-                  <Skeleton className="h-3 w-32 mt-1" />
-                ) : gmailStatus?.connected ? (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {gmailStatus.gmailEmail ?? "Connected"}
-                    {gmailStatus.lastSyncedAt && (
-                      <> · Last synced {formatDateTime(gmailStatus.lastSyncedAt)}</>
-                    )}
-                    {gmailStatus.pendingCount > 0 && (
-                      <> ·{" "}
-                        <span className="font-semibold text-foreground">
-                          {gmailStatus.pendingCount} pending
-                        </span>
-                      </>
-                    )}
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Auto-import receipt PDFs from your inbox
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              {gmailLoading ? (
-                <Skeleton className="h-8 w-20 rounded-full" />
-              ) : gmailStatus?.connected ? (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full h-8 text-xs text-muted-foreground"
-                    onClick={() => syncMutation.mutate()}
-                    disabled={syncMutation.isPending || disconnectMutation.isPending}
-                  >
-                    {syncMutation.isPending ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-3 h-3" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full h-8 text-xs"
-                    onClick={() => disconnectMutation.mutate()}
-                    disabled={disconnectMutation.isPending || syncMutation.isPending}
-                  >
-                    {disconnectMutation.isPending ? "Disconnecting…" : "Disconnect"}
-                  </Button>
-                </>
-              ) : gmailStatus?.configured === false ? (
-                <span className="text-xs text-muted-foreground italic">
-                  Not configured
-                </span>
-              ) : (
-                  <Button
-                    size="sm"
-                    className="rounded-full h-8 text-xs gap-1.5"
-                    onClick={() => connectMutation.mutate()}
-                    disabled={connectMutation.isPending}
-                  >
-                    <PlugZap className="w-3 h-3" />
-                    {connectMutation.isPending ? "Connecting…" : "Connect Gmail"}
-                  </Button>
-              )}
-            </div>
-          </div>
-
-          {!gmailStatus?.configured && !gmailLoading && (
-            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
-              Gmail auto-import requires a Google OAuth integration. Contact the app administrator to enable it.
-            </p>
-          )}
-        </div>
+        <MailConnections />
       </section>
 
       {/* Subscription */}
@@ -545,7 +375,7 @@ export default function Settings() {
                         { feature: "Access period", free: "7 days", pro: "While subscribed", freeHighlight: false, proHighlight: false },
             { feature: "Natural-language search", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Warranty reminders", free: true, pro: true, freeHighlight: false, proHighlight: false },
-            { feature: "Gmail auto-import", free: true, pro: true, freeHighlight: false, proHighlight: false },
+            { feature: "Email auto-import", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Export & download", free: true, pro: true, freeHighlight: false, proHighlight: false },
           ].map(({ feature, free, pro }) => {
             const renderCell = (val: boolean | string, isProCol: boolean) => {

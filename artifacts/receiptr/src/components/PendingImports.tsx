@@ -1,13 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, X, Mail, RefreshCw, Loader2 } from "lucide-react";
+import { Check, X, Mail, RefreshCw, Loader2, AlertTriangle } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { useMailStatus } from "@/components/MailConnections";
+import { MAIL_PROVIDER_LABELS, syncMail, type MailProviderId } from "@/lib/mailConnection";
 
 const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
 
 export interface PendingImportItem {
   id: number;
+  provider?: MailProviderId;
   gmailMessageId: string;
   originalFileName: string;
   merchant: string | null;
@@ -20,13 +24,13 @@ export interface PendingImportItem {
 }
 
 async function fetchPending(): Promise<PendingImportItem[]> {
-  const res = await fetch(`${BASE}api/gmail/pending`, { credentials: "include" });
+  const res = await fetch(`${BASE}api/mail/pending`, { credentials: "include" });
   if (!res.ok) throw new Error("Failed to load pending imports");
   return res.json() as Promise<PendingImportItem[]>;
 }
 
 async function approvePending(id: number): Promise<{ approved: boolean; receiptId: number }> {
-  const res = await fetch(`${BASE}api/gmail/pending/${id}/approve`, {
+  const res = await fetch(`${BASE}api/mail/pending/${id}/approve`, {
     method: "POST",
     credentials: "include",
   });
@@ -35,20 +39,15 @@ async function approvePending(id: number): Promise<{ approved: boolean; receiptI
 }
 
 async function dismissPending(id: number): Promise<void> {
-  const res = await fetch(`${BASE}api/gmail/pending/${id}`, {
+  const res = await fetch(`${BASE}api/mail/pending/${id}`, {
     method: "DELETE",
     credentials: "include",
   });
   if (!res.ok) throw new Error("Failed to dismiss");
 }
 
-async function triggerSync(): Promise<{ checked: number; queued: number }> {
-  const res = await fetch(`${BASE}api/gmail/sync`, {
-    method: "POST",
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error("Sync failed");
-  return res.json() as Promise<{ checked: number; queued: number }>;
+function triggerSync() {
+  return syncMail(BASE);
 }
 
 function formatCurrency(amount: number | null, currency: string | null): string {
@@ -68,7 +67,7 @@ function formatCurrency(amount: number | null, currency: string | null): string 
 
 export function usePendingImportCount() {
   const { data } = useQuery<PendingImportItem[]>({
-    queryKey: ["gmail", "pending"],
+    queryKey: ["mail", "pending"],
     queryFn: fetchPending,
     staleTime: 60_000,
     retry: false,
@@ -81,7 +80,7 @@ export default function PendingImports() {
   const queryClient = useQueryClient();
 
   const { data: items = [], isLoading } = useQuery<PendingImportItem[]>({
-    queryKey: ["gmail", "pending"],
+    queryKey: ["mail", "pending"],
     queryFn: fetchPending,
     staleTime: 60_000,
     retry: false,
@@ -90,7 +89,7 @@ export default function PendingImports() {
   const approve = useMutation({
     mutationFn: approvePending,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["gmail", "pending"] });
+      void queryClient.invalidateQueries({ queryKey: ["mail", "pending"] });
       void queryClient.invalidateQueries({ queryKey: ["receipts"] });
       toast({ title: "Receipt added to your library" });
     },
@@ -105,7 +104,7 @@ export default function PendingImports() {
   const dismiss = useMutation({
     mutationFn: dismissPending,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["gmail", "pending"] });
+      void queryClient.invalidateQueries({ queryKey: ["mail", "pending"] });
     },
     onError: () =>
       toast({
@@ -115,11 +114,22 @@ export default function PendingImports() {
       }),
   });
 
+  const { data: mailStatus } = useMailStatus();
+  const reconnectProviders = (mailStatus?.providers ?? []).filter(
+    (p) => p.enabled && p.connected && p.needsReconnect,
+  );
+
   const sync = useMutation({
     mutationFn: triggerSync,
     onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ["gmail", "pending"] });
-      if (result.queued > 0) {
+      void queryClient.invalidateQueries({ queryKey: ["mail"] });
+      if (result.needsReconnect?.length) {
+        toast({
+          title: "Reconnect needed",
+          description: "Your email connection expired. Reconnect it in Settings.",
+          variant: "destructive",
+        });
+      } else if (result.queued > 0) {
         toast({
           title: `Found ${result.queued} new receipt${result.queued > 1 ? "s" : ""}`,
           description: "Review them below.",
@@ -131,7 +141,7 @@ export default function PendingImports() {
     onError: () =>
       toast({
         title: "Sync failed",
-        description: "Could not reach Gmail. Try again shortly.",
+        description: "Could not reach your inbox. Try again shortly.",
         variant: "destructive",
       }),
   });
@@ -145,15 +155,34 @@ export default function PendingImports() {
     );
   }
 
-  if (items.length === 0) return null;
+  const reconnectBanner = reconnectProviders.length > 0 && (
+    <div
+      role="alert"
+      data-testid="mail-reconnect-banner"
+      className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 flex items-start justify-between gap-3"
+    >
+      <p className="flex items-start gap-1.5">
+        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+        {reconnectProviders.map((p) => p.label).join(" and ")} stopped syncing. Reconnect to keep importing receipts.
+      </p>
+      <Link href="/settings" className="font-semibold underline shrink-0">
+        Reconnect
+      </Link>
+    </div>
+  );
+
+  if (items.length === 0) {
+    return reconnectBanner ? <div className="mb-6">{reconnectBanner}</div> : null;
+  }
 
   return (
     <div className="mb-6">
+      {reconnectBanner}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Mail className="w-4 h-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">
-            Found in Gmail
+            Found in your email
             <span className="ml-1.5 bg-foreground text-background text-xs font-bold rounded-full px-1.5 py-0.5">
               {items.length}
             </span>
@@ -194,6 +223,11 @@ export default function PendingImports() {
                 {item.purchaseDate && (
                   <span className="text-xs text-muted-foreground">
                     {item.purchaseDate}
+                  </span>
+                )}
+                {item.provider && MAIL_PROVIDER_LABELS[item.provider] && (
+                  <span className="text-xs text-muted-foreground">
+                    {MAIL_PROVIDER_LABELS[item.provider]}
                   </span>
                 )}
                 <span className="text-xs text-muted-foreground">
