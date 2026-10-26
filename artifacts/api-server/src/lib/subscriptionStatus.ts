@@ -49,7 +49,7 @@ async function getPaidSubscriptionStatus(userId: string): Promise<SubscriptionSt
   // Development-only bypass: treat every signed-in user as having full access
   // so the app can be tested without a real Stripe subscription. Driven purely
   // by NODE_ENV — production builds always enforce the real paywall.
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && process.env.BILLING_ENFORCE_TEST_SUBSCRIPTIONS !== "true") {
     return {
       plan: "pro",
       trialEndAt: null,
@@ -72,13 +72,17 @@ async function getPaidSubscriptionStatus(userId: string): Promise<SubscriptionSt
     trial_end: number | null;
     current_period_end: number | null;
     cancel_at_period_end: boolean;
+    cancel_at: number | null;
   }>;
 
   try {
     const result = await db.execute(sql`
-      SELECT id, status, trial_end, current_period_end, cancel_at_period_end
+      SELECT id, status, trial_end,
+        COALESCE(current_period_end, (items->'data'->0->>'current_period_end')::bigint) AS current_period_end,
+        cancel_at_period_end, cancel_at
       FROM stripe.subscriptions
       WHERE customer = ${billing.stripeCustomerId}
+        AND livemode = ${process.env.NODE_ENV === "production"}
       ORDER BY created DESC
       LIMIT 1
     `);
@@ -94,7 +98,8 @@ async function getPaidSubscriptionStatus(userId: string): Promise<SubscriptionSt
   const now = new Date();
   const trialEndAt = sub.trial_end ? new Date(sub.trial_end * 1000) : null;
   const currentPeriodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
-  const cancelAtPeriodEnd = Boolean(sub.cancel_at_period_end);
+  // Current Stripe portals may schedule cancel_at without setting the legacy flag.
+  const cancelAtPeriodEnd = Boolean(sub.cancel_at_period_end || sub.cancel_at);
 
   let plan: UserPlan = "free";
 

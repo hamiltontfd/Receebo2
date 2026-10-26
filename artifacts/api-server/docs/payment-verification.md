@@ -1,74 +1,105 @@
 # Payment verification — 2026-10-26
 
-## Status
+## Current status
 
-The redirect defect is fixed in source. Payments are **not certified ready for
-customers**. No live charges, subscriptions, portal configurations, webhooks,
-credentials, prices, or deployments were created or changed during verification.
+The code and test environment are verified, including a real hosted Stripe
+Checkout and portal cancellation with an ordinary authenticated test user.
+Production configuration is prepared, but the new backend and production webhook
+registration are **not active until the owner republishes**. Do not describe the
+currently published release as payment-certified.
 
-## Code and isolated verification
+No live charges, customers, subscriptions, refunds or deployments were created.
+With the owner's explicit approval, separate non-secret test/live price and portal
+settings were saved, and a portal configuration was created in each Stripe account.
+No existing prices, subscriptions or webhook endpoints were deleted or modified.
 
-- Production checkout success returns to `https://receebo.net/search?checkout=success`.
-- Checkout cancellation returns to `https://receebo.net/search?checkout=cancel`.
-- The customer portal returns to `https://receebo.net/settings`.
-- Production ignores workspace-domain variables and client-supplied destinations.
-- Development uses a validated workspace domain and fails before creating Stripe
-  resources when that configuration is missing or unsafe.
-- HTTP route tests use an ordinary, non-owner identity and production entitlement
-  rules, avoiding the development subscription bypass.
-- Local fixtures cover both prices, existing customers, authentication, consent,
-  checkout and portal errors, and the free → trial → cancellation → expired
-  entitlement transition, plus active renewal.
-- Real Stripe signature generation/verification is exercised locally, but the
-  Stripe sync adapter, Stripe API, authentication provider and database are mocked.
-  This is **not** a Stripe-hosted checkout or browser end-to-end test.
-- Existing owner-access feature-route tests continue to verify the separate
-  owner exemption and ordinary paid-user access.
+## Fixes
 
-Verification command:
+- Checkout success/cancellation returns to the verified `receebo.net` origin in
+  production and the validated workspace origin in development. Client-provided
+  hosts, redirect parameters and workspace variables cannot override production.
+- Development cannot use a shared live credential. It uses an explicit test key
+  or the test-mode connector; production requires an explicit live key.
+- Separate test/live price identifiers resolve correctly. Prices are checked for
+  mode, currency, amount, recurrence and active status before customer creation.
+- Explicit portal configurations enable payment-method updates, invoice history
+  and cancellation at period end.
+- Subscription queries filter by Stripe mode and support modern item-level
+  period dates and scheduled `cancel_at`, not just `cancel_at_period_end`.
+- The trial-ending webhook reminder respects both cancellation fields.
+- The existing Stripe migration runner now resolves relative to the deployed
+  bundle rather than the current working directory. Webhook registration uses
+  the trusted environment origin, not the first runtime domain.
+- Normal free development access and complimentary owner access are preserved.
+  The hosted verification process explicitly enforces test subscriptions.
+
+## Verification
+
+35 isolated tests passed, covering trusted redirects, ordinary-user lifecycle,
+price mismatch protection, credential isolation and existing owner access.
+The complete API suite also passed: 104 tests, with the opt-in hosted journey
+skipped in that default run and passed separately below. API TypeScript checking
+passed, and the managed API workflow restarted successfully.
 
 ```sh
 pnpm --filter @workspace/receiptr exec vitest run --config vitest.api.config.ts \
   src/lib/billingUrls.test.ts src/routes/billingFlow.test.ts \
-  src/routes/ownerFeatureAccess.test.ts
+  src/routes/ownerFeatureAccess.test.ts src/stripeClient.test.ts
 ```
 
-28 tests passed; API TypeScript checking passed.
+One additional **real hosted browser journey passed**:
 
-## Read-only Stripe findings
+```sh
+RUN_STRIPE_HOSTED_E2E=true pnpm --filter @workspace/receiptr exec vitest run \
+  --config vitest.api.config.ts src/routes/billingHosted.test.ts
+```
 
-Two credential paths were checked separately:
+That opt-in test:
 
-1. **Connector:** test mode. The configured price identifiers resolve to active
-   EUR 2.99/month and EUR 24.99/year prices with seven-day trials. Only an enabled
-   workspace webhook was returned. No portal configurations were returned.
-2. **Effective workspace backend client:** the explicit application key takes
-   precedence over the connector and accesses **live mode**. Active monthly and
-   yearly prices exist, but retrieving each configured monthly/yearly price
-   identifier with this client returned **404**. Therefore the workspace's
-   effective credentials and configured price identifiers do not match.
-   Only an enabled workspace webhook was returned, with no production-domain
-   endpoint. No portal configurations were returned.
+1. Requires test-mode Clerk and Stripe credentials and creates a disposable,
+   non-owner Clerk user.
+2. Signs the browser in using a genuine short-lived Clerk sign-in ticket.
+3. Calls the real Express app with Clerk verification and legal acceptance.
+   Neither authentication, Stripe, the database nor Stripe Sync is mocked.
+4. Confirms the ordinary user is free with the development bypass disabled.
+5. Opens a real Stripe-hosted monthly checkout and submits the standard test card.
+6. Verifies the browser returns to the development `/search?checkout=success`.
+7. Waits for the ordinary API's actual signed Stripe webhook and database sync,
+   then verifies trial access, non-owner status and the exact seven-day period.
+8. Opens the real portal, requests cancellation and observes the real Stripe
+   update and the corresponding cancellation flag in Receebo.
+9. Confirms access remains trialing during the scheduled cancellation period.
+10. Cancels/deletes the disposable test subscription/customer and removes the
+    test Clerk user and application billing/legal records in cleanup.
 
-Neither inspection proves which credentials the deployed process is using.
-Shared configuration metadata is not proof of the values in a running release.
-Never copy connector test identifiers into a live-key environment.
+The signed-in browser and hosted checkout/portal were exercised, but the React
+plan-gate transitions were not asserted: entitlement checks used the real API in
+an isolated process that enforces test subscriptions. Normal preview access
+intentionally remains free.
 
-## Published-site observations and remaining limits
+## Production evidence and activation boundary
 
-- Deployment metadata reports a successful public deployment at `https://receebo.net`.
-- An unsigned POST to its Stripe webhook returned HTTP 400 with
-  `Missing stripe-signature`. This proves route reachability and the missing-header
-  guard only, **not** successful delivery, signature verification or subscription activation.
-- Read-only production database access was refused because the session lacks an
-  authenticated production-database user. No production database data was read.
-- Production prices, delivery history and effective credentials remain unverified.
-- No isolated Stripe-hosted checkout, portal cancellation, or signed-in UI
-  end-to-end run was performed. Creating a live session or reusing the ordinary
-  development backend would not be a safe substitute: that backend has live
-  credentials and startup integration side effects.
-- Before customer launch, separate test/live configuration, resolve the price
-  mismatch, configure and verify the intended environment's webhook and portal,
-  and run the real checkout/activation/portal journey in an isolated Stripe test
-  environment with an ordinary user.
-- Publishing the redirect fix does not by itself repair Stripe configuration.
+- Deployment metadata confirms the existing public release at `https://receebo.net`.
+- An unsigned webhook request returns HTTP 400, proving route reachability only.
+- The effective live client resolves active EUR 2.99/month and EUR 24.99/year
+  prices. Their identifiers and the live portal configuration are saved in the
+  production-specific configuration, separate from development.
+- The live account initially had only a workspace webhook. No managed production
+  webhook is active yet: the existing release must be replaced to register one
+  and store its signing secret in its own database safely.
+- After the owner authorized configuration, read-only production database access
+  became available. Inspection found no `stripe` tables. No production DDL or
+  data writes were attempted. The owner must review the schema changes surfaced
+  by publishing; the corrected existing migration runner is included in the new
+  backend. Do not manually push development data into production.
+- Live configuration was validated with read-only Stripe calls and saved
+  environment metadata, not a live checkout or payment. A running older release
+  can still have old values until republished.
+- After publication, verify successful production Stripe initialization, the
+  canonical live webhook and actual event delivery before inviting paying users.
+  No automatic publication or live payment test was performed.
+- Development startup still reports the pre-existing duplicate `handle_updated_at`
+  trigger migration warning. It continues successfully, registers the test
+  webhook and completes Stripe backfill; the hosted journey passed against this
+  environment. Do not interpret that warning as successful migration execution
+  in a fresh production environment; review startup logs after publishing.

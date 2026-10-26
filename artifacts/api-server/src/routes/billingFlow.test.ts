@@ -8,9 +8,10 @@ const state = vi.hoisted(() => ({
   billing: null as null | { userId: string; stripeCustomerId: string; stripeSubscriptionId?: string },
   subscription: null as null | {
     id: string; status: string; trial_end: number; current_period_end: number;
-    cancel_at_period_end: boolean;
+    cancel_at_period_end: boolean; cancel_at?: number | null;
   },
   customer: vi.fn(),
+  price: vi.fn(),
   checkout: vi.fn(),
   portal: vi.fn(),
   sync: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock("../lib/emailService", () => ({ sendTrialEndingEmail: vi.fn() }));
 vi.mock("../stripeClient", () => ({
   getUncachableStripeClient: async () => ({
     customers: { create: state.customer },
+    prices: { retrieve: state.price },
     checkout: { sessions: { create: state.checkout } },
     billingPortal: { sessions: { create: state.portal } },
   }),
@@ -96,10 +98,19 @@ beforeEach(() => {
   vi.stubEnv("STRIPE_MONTHLY_PRICE_ID", "price_monthly_fixture");
   vi.stubEnv("STRIPE_YEARLY_PRICE_ID", "price_yearly_fixture");
   vi.stubEnv("STRIPE_WEBHOOK_SECRET", "");
+  for (const mode of ["LIVE", "TEST"]) {
+    for (const period of ["MONTHLY", "YEARLY"]) vi.stubEnv(`STRIPE_${mode}_${period}_PRICE_ID`, "");
+    vi.stubEnv(`STRIPE_${mode}_PORTAL_CONFIGURATION_ID`, "");
+  }
   state.billing = null;
   state.subscription = null;
   vi.clearAllMocks();
   state.customer.mockResolvedValue({ id: "cus_fixture" });
+  state.price.mockImplementation(async (id: string) => ({
+    active: true, livemode: process.env.NODE_ENV === "production", currency: "eur",
+    unit_amount: id.includes("yearly") ? 2499 : 299,
+    recurring: { interval: id.includes("yearly") ? "year" : "month", interval_count: 1 },
+  }));
   state.checkout.mockResolvedValue({ url: "https://checkout.stripe.com/c/test_fixture" });
   state.portal.mockResolvedValue({ url: "https://billing.stripe.com/p/session/test_fixture" });
   // Model the external sync adapter only. App handlers and entitlement logic are real.
@@ -193,6 +204,20 @@ describe("ordinary user billing, with isolated Stripe and database adapters", ()
     expect(state.customer).not.toHaveBeenCalled();
     expect(state.checkout).not.toHaveBeenCalled();
   });
+  it("rejects a mixed-mode price without creating a Stripe customer", async () => {
+    state.price.mockResolvedValueOnce({ active: true, livemode: false });
+    expect((await post("/billing/create-checkout-session", { planType: "monthly" })).status).toBe(503);
+    expect(state.customer).not.toHaveBeenCalled();
+    expect(state.checkout).not.toHaveBeenCalled();
+  });
+  it("prefers mode-specific prices and portal settings over shared legacy values", async () => {
+    vi.stubEnv("STRIPE_LIVE_MONTHLY_PRICE_ID", "price_monthly_live_fixture");
+    vi.stubEnv("STRIPE_LIVE_PORTAL_CONFIGURATION_ID", "bpc_live_fixture");
+    expect((await post("/billing/create-checkout-session", { planType: "monthly" })).status).toBe(200);
+    expect(state.price).toHaveBeenCalledWith("price_monthly_live_fixture");
+    expect((await post("/billing/create-portal-session")).status).toBe(200);
+    expect(state.portal).toHaveBeenCalledWith(expect.objectContaining({ configuration: "bpc_live_fixture" }));
+  });
   it("requires authentication and consent, and validates plan configuration", async () => {
     expect((await post("/billing/create-checkout-session", { planType: "monthly" },
       { "x-test-user": "" })).status).toBe(401);
@@ -221,6 +246,10 @@ describe("ordinary user billing, with isolated Stripe and database adapters", ()
     expect((await post("/billing/create-portal-session")).status).toBe(200);
     expect((await event("customer.subscription.updated",
       subscription({ cancel_at_period_end: true }))).status).toBe(200);
+    expect(await status()).toMatchObject({ plan: "trialing", cancelAtPeriodEnd: true });
+    expect((await event("customer.subscription.updated", subscription({
+      cancel_at_period_end: false, cancel_at: Math.floor(Date.now() / 1000) + 7 * 86400,
+    }))).status).toBe(200);
     expect(await status()).toMatchObject({ plan: "trialing", cancelAtPeriodEnd: true });
     const expired = Math.floor(Date.now() / 1000) - 60;
     expect((await event("customer.subscription.deleted",

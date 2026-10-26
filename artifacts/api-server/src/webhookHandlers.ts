@@ -105,7 +105,7 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription): Promise<vo
   // Skip the reminder if the user already cancelled — Stripe still fires this
   // event when cancel_at_period_end = true, but they won't be charged so there
   // is nothing useful to warn them about.
-  if (subscription.cancel_at_period_end) {
+  if (subscription.cancel_at_period_end || subscription.cancel_at) {
     logger.info(
       { customerId, subscriptionId: subscription.id },
       "webhookHandlers: trial_will_end skipped — subscription already set to cancel at period end",

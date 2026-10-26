@@ -7,7 +7,8 @@ import { encryptToken, decryptToken } from "./lib/tokenCrypto";
 import { sql, eq } from "drizzle-orm";
 import { db, gmailConnectionsTable } from "@workspace/db";
 import { spawn } from "child_process";
-import path from "path";
+import { fileURLToPath } from "node:url";
+import { billingOrigin } from "./lib/billingUrls";
 
 const rawPort = process.env["PORT"];
 
@@ -279,7 +280,8 @@ async function migrateGmailTokenEncryption(): Promise<void> {
  * stripe._managed_webhooks table may not exist.
  */
 async function runStripeMigrations(): Promise<void> {
-  const scriptPath = path.join(process.cwd(), "scripts/run-stripe-migrations.mjs");
+  // Works from both artifact-local dev commands and repository-root deployment commands.
+  const scriptPath = fileURLToPath(new URL("../scripts/run-stripe-migrations.mjs", import.meta.url));
   return new Promise<void>((resolve, reject) => {
     const proc = spawn(process.execPath, [scriptPath], {
       env: process.env,
@@ -319,11 +321,7 @@ async function initStripe(): Promise<void> {
     const { getStripeSync } = await import("./stripeClient");
     const stripeSync = await getStripeSync();
 
-    const domains = process.env.REPLIT_DOMAINS?.split(",") ?? [];
-    const webhookBaseUrl = domains[0] ? `https://${domains[0]}` : null;
-    if (!webhookBaseUrl) {
-      throw new Error("REPLIT_DOMAINS not set — cannot register Stripe webhook");
-    }
+    const webhookBaseUrl = billingOrigin();
     const webhookUrl = `${webhookBaseUrl}/api/stripe/webhook`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (stripeSync as any).findOrCreateManagedWebhook(webhookUrl);

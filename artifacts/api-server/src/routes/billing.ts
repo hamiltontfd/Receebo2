@@ -10,6 +10,7 @@ import { clerkClient } from "@clerk/express";
 import { logger } from "../lib/logger";
 import { hasOwnerAccess } from "../lib/ownerAccess";
 import { billingOrigin } from "../lib/billingUrls";
+import { billingPriceId, billingPortalConfiguration } from "../lib/billingConfig";
 
 const router: IRouter = Router();
 
@@ -55,10 +56,7 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
     return;
   }
 
-  const priceId =
-    planType === "yearly"
-      ? process.env.STRIPE_YEARLY_PRICE_ID
-      : process.env.STRIPE_MONTHLY_PRICE_ID;
+  const priceId = billingPriceId(planType as "monthly" | "yearly");
 
   if (!priceId) {
     res.status(503).json({ error: "Stripe price IDs are not configured yet" });
@@ -71,6 +69,15 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
     // Resolve configuration before creating customers or checkout sessions.
     const base = billingOrigin();
     const stripe = await getUncachableStripeClient();
+    // Reject mixed-mode or wrong-interval prices before creating a customer.
+    const price = await stripe.prices.retrieve(priceId);
+    const expectedInterval = planType === "yearly" ? "year" : "month";
+    if (!price.active || price.livemode !== (process.env.NODE_ENV === "production") ||
+      price.recurring?.interval !== expectedInterval || price.recurring.interval_count !== 1 ||
+      price.currency !== "eur" || price.unit_amount !== (planType === "yearly" ? 2499 : 299)) {
+      res.status(503).json({ error: "Stripe price does not match the configured plan and environment" });
+      return;
+    }
 
     const [existingBilling] = await db
       .select({ stripeCustomerId: userBillingTable.stripeCustomerId })
@@ -138,6 +145,7 @@ router.post("/billing/create-portal-session", requireAuth, async (req, res): Pro
     const stripe = await getUncachableStripeClient();
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: billing.stripeCustomerId,
+      ...(billingPortalConfiguration() ? { configuration: billingPortalConfiguration() } : {}),
       return_url: `${base}/settings`,
     });
 

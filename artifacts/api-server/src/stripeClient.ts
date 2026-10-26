@@ -1,21 +1,19 @@
 import Stripe from "stripe";
 import { StripeSync } from "stripe-replit-sync";
 
-/**
- * Resolve the Stripe secret key.
- *
- * Priority order:
- *   1. STRIPE_SECRET_KEY environment variable (standard / deployment-friendly)
- *   2. Replit connector credential fetch (development convenience)
- *
- * Using an env var is the recommended production path and satisfies the
- * "use environment variables for all Stripe credentials" requirement.
- */
 async function resolveStripeSecretKey(): Promise<string> {
-  // 1. Explicit env var takes priority
-  if (process.env.STRIPE_SECRET_KEY) {
-    return process.env.STRIPE_SECRET_KEY;
+  const production = process.env.NODE_ENV === "production";
+  const expectedPrefix = production ? /^(sk|rk)_live_/ : /^(sk|rk)_test_/;
+  // A shared live key must never make preview actions create live resources.
+  const explicitKey = production
+    ? process.env.STRIPE_SECRET_KEY
+    : process.env.STRIPE_TEST_SECRET_KEY ||
+      (process.env.STRIPE_SECRET_KEY?.match(/^(sk|rk)_test_/) ? process.env.STRIPE_SECRET_KEY : undefined);
+  if (explicitKey) {
+    if (!expectedPrefix.test(explicitKey)) throw new Error("Stripe credential mode does not match this environment");
+    return explicitKey;
   }
+  if (production) throw new Error("Production STRIPE_SECRET_KEY is required");
 
   // 2. Fall back to Replit connector
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
@@ -57,6 +55,9 @@ async function resolveStripeSecretKey(): Promise<string> {
     );
   }
 
+  if (!expectedPrefix.test(secretKey)) {
+    throw new Error("Development Stripe connector must use test-mode credentials");
+  }
   return secretKey;
 }
 
