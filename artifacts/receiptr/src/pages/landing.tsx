@@ -3,7 +3,6 @@ import { Link } from "wouter";
 import { motion, MotionConfig } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/react";
-import { useCreateCheckout } from "@/hooks/useBilling";
 
 // Sections
 import HeroSection from "./landing/HeroSection";
@@ -31,7 +30,6 @@ function useScrolled(threshold = 40) {
 /* ── Main Component ────────────────────────────────────────────────────── */
 export default function Landing() {
   const { isSignedIn } = useAuth();
-  const checkout = useCreateCheckout();
   const scrolled = useScrolled(40);
 
   return (
@@ -76,29 +74,13 @@ export default function Landing() {
               </motion.div>
             </Link>
 
-            {isSignedIn ? (
+            <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-nav-trial">
               <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
-                <Button
-                  size="sm"
-                  onClick={() => checkout.mutate("yearly")}
-                  disabled={checkout.isPending}
-                  className="rounded-full font-semibold text-sm px-4"
-                >
-                  Start free trial
+                <Button size="sm" className="rounded-full font-semibold text-sm px-4">
+                  {isSignedIn ? "Open app" : "Start free"}
                 </Button>
               </motion.div>
-            ) : (
-              <Link href="/sign-up?plan=yearly">
-                <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
-                  <Button
-                    size="sm"
-                    className="rounded-full font-semibold text-sm px-4"
-                  >
-                    Start free trial
-                  </Button>
-                </motion.div>
-              </Link>
-            )}
+            </Link>
           </motion.div>
         </motion.header>
 

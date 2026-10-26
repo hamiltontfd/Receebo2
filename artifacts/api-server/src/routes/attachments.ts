@@ -40,7 +40,7 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, lockUserDataMutatio
 
   // Free users (no active subscription) cannot upload attachments at all
   const subscription = await getSubscriptionStatus(userId);
-  if (subscription.plan === "free") {
+  if (!subscription.canUseApp) {
     res.status(403).json({
       error: "subscription_required",
       message: "An active subscription is required to upload attachments.",
@@ -72,6 +72,7 @@ router.post("/receipts/:id/attachments", requireAuthOrGuest, lockUserDataMutatio
         and(
           eq(uploadIntentsTable.userId, userId),
           eq(uploadIntentsTable.objectPath, parsed.data.objectPath),
+          eq(uploadIntentsTable.attachmentReceiptId, receiptId),
           gt(uploadIntentsTable.expiresAt, new Date()),
         ),
       )

@@ -5,9 +5,19 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BillingAccessStatusAccessState } from './billingAccessStatusAccessState';
 import type { BillingAccessStatusPlan } from './billingAccessStatusPlan';
 
 export interface BillingAccessStatus {
+  accessState?: BillingAccessStatusAccessState;
+  /** @nullable */
+  trialUploadsRemaining?: number | null;
+  trialUploadsUsed?: number;
+  foundingEligible?: boolean;
+  canUpload?: boolean;
+  canUseApp?: boolean;
+  /** @nullable */
+  reviewReceiptId?: number | null;
   plan: BillingAccessStatusPlan;
   /** @nullable */
   trialEndAt: string | null;

@@ -9,9 +9,35 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Start the seven-day no-card account trial once after legal consent
+ */
+export const StartAccountTrialResponse = zod.object({
+  "started": zod.boolean()
+})
+
+
+/**
+ * @summary Release an unconsumed failed upload transfer without restoring successful uses
+ */
+
+
+
+export const ReleaseUploadReservationBody = zod.object({
+  "objectPath": zod.string().min(1)
+})
+
+
+/**
  * @summary Current authenticated user's subscription and complimentary access
  */
 export const FetchBillingAccessStatusResponse = zod.object({
+  "accessState": zod.enum(['not_started', 'account_trial', 'trial_exhausted', 'trial_expired', 'legacy_stripe_trial', 'paid', 'owner', 'subscription_required']).optional(),
+  "trialUploadsRemaining": zod.number().nullish(),
+  "trialUploadsUsed": zod.number().optional(),
+  "foundingEligible": zod.boolean().optional(),
+  "canUpload": zod.boolean().optional(),
+  "canUseApp": zod.boolean().optional(),
+  "reviewReceiptId": zod.number().nullish(),
   "plan": zod.enum(['free', 'trialing', 'pro']),
   "trialEndAt": zod.string().nullable(),
   "currentPeriodEnd": zod.string().nullable(),
@@ -331,6 +357,7 @@ metadata here, then uploads the file directly to the returned URL.
 
 
 export const RequestUploadUrlBody = zod.object({
+  "receiptId": zod.number().optional().describe('For supporting attachments only; binds the upload to an existing owned receipt.'),
   "name": zod.string().min(1).describe('Original file name.'),
   "size": zod.number().min(1).describe('File size in bytes.'),
   "contentType": zod.string().min(1).describe('MIME type of the file (e.g. `image\/jpeg`).')
@@ -345,6 +372,7 @@ export const RequestUploadUrlResponse = zod.object({
   "uploadURL": zod.string().url().describe('Presigned GCS URL for PUT upload.'),
   "objectPath": zod.string().describe('Normalized object path (e.g. `\/objects\/uploads\/uuid`). Store this in your database.'),
   "metadata": zod.object({
+  "receiptId": zod.number().optional().describe('For supporting attachments only; binds the upload to an existing owned receipt.'),
   "name": zod.string().min(1).describe('Original file name.'),
   "size": zod.number().min(1).describe('File size in bytes.'),
   "contentType": zod.string().min(1).describe('MIME type of the file (e.g. `image\/jpeg`).')

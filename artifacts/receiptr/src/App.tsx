@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect, Link } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { toast } from "@/hooks/use-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import NotFound from "@/pages/not-found";
@@ -21,14 +20,11 @@ import TermsOfService from "@/pages/terms";
 import AppShell from "@/components/AppShell";
 import AuthModal from "@/components/AuthModal";
 import PwaStatus from "@/components/PwaStatus";
-import { usePwaUpdateBlocker } from "@/lib/pwa";
 import { PlanSelectionGate } from "@/components/PlanSelectionGate";
-import {
-  LEGAL_ACCEPTED_EVENT,
-  LegalConsentGate,
-} from "@/components/LegalConsentGate";
+import { LEGAL_ACCEPTED_EVENT, LegalConsentGate } from "@/components/LegalConsentGate";
+import { useBillingStatus, resolveAccessState } from "@/hooks/useBilling";
 import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
-import { setGuestId, createCheckoutSession, getSubscriptionStatus } from "@workspace/api-client-react";
+import { setGuestId } from "@workspace/api-client-react";
 
 const GUEST_TOKEN_KEY = "receebo:guestToken";
 const apiBase = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
@@ -172,7 +168,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
         </LegalConsentGate>
       </Show>
       <Show when="signed-out">
-        {/* Guest bypass disabled — app uses 7-day trial instead. */}
+        {/* Guest bypass disabled. Accounts get a seven-day, three-upload trial instead. */}
         <Redirect to="/" />
       </Show>
     </>
@@ -182,88 +178,20 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
 const PLAN_STORAGE_KEY = "receebo:pendingPlan";
 
 /**
- * When a signed-out user clicks "Start free trial" on a pricing card they are
- * sent to /sign-up?plan=monthly (or yearly). We persist the plan to
- * sessionStorage so it survives Clerk's multi-step auth flow, then auto-start
- * Stripe Checkout immediately after the user is signed in.
+ * Signup never starts checkout. The no-card trial is initialized by
+ * PlanSelectionGate after legal consent; paid checkout only happens when the
+ * user explicitly picks a plan. Older links may still carry ?plan=, so drop
+ * any stale pending-plan marker instead of acting on it.
  */
 function PostAuthCheckout() {
-  const { isSignedIn } = useAuth();
   const [location] = useLocation();
-  const checkoutFiredRef = useRef(false);
-  const [checkingCheckout, setCheckingCheckout] = useState(false);
-  usePwaUpdateBlocker(checkingCheckout);
-
-  // Capture ?plan= from the URL on every navigation. Clerk's multi-step sign-up
-  // flow keeps the component mounted, so a mount-only effect would miss the
-  // plan when the user navigates client-side to /sign-up?plan=... from /get-started.
-  // Reading window.location.search directly because wouter's useLocation only
-  // tracks the pathname, not the query string.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const plan = params.get("plan");
-    if (plan === "monthly" || plan === "yearly") {
-      sessionStorage.setItem(PLAN_STORAGE_KEY, plan);
-    } else if (location === "/" && isSignedIn === false) {
-      // Browser Back cancels auth just like the modal's close controls.
-      sessionStorage.removeItem(PLAN_STORAGE_KEY);
-    }
-  }, [location, isSignedIn]);
-
-  const startCheckoutIfAccepted = useCallback(async () => {
-    if (!isSignedIn || checkoutFiredRef.current) return;
-    const plan = sessionStorage.getItem(PLAN_STORAGE_KEY);
-    if (plan !== "monthly" && plan !== "yearly") return;
-
-    setCheckingCheckout(true);
     try {
-      const acceptanceResponse = await fetch(
-        `${apiBase}/api/legal/acceptance`,
-        { credentials: "include" },
-      );
-      if (!acceptanceResponse.ok) return;
-      const acceptance = (await acceptanceResponse.json()) as {
-        accepted: boolean;
-      };
-      if (!acceptance.accepted) return;
-
-      checkoutFiredRef.current = true;
-      const billing = await getSubscriptionStatus(`${apiBase}/`);
-      if (billing.ownerAccess) {
-        sessionStorage.removeItem(PLAN_STORAGE_KEY);
-        return;
-      }
-      const { url } = await createCheckoutSession(
-        `${apiBase}/`,
-        plan,
-      );
-      if (url) {
-        sessionStorage.removeItem(PLAN_STORAGE_KEY);
-        window.location.href = url;
-      } else {
-        checkoutFiredRef.current = false;
-      }
+      sessionStorage.removeItem(PLAN_STORAGE_KEY);
     } catch {
-      checkoutFiredRef.current = false;
-      toast({
-        variant: "destructive",
-        title: "Couldn't start checkout",
-        description:
-          "Something went wrong starting your trial. Pick a plan again to retry.",
-      });
-    } finally {
-      setCheckingCheckout(false);
+      /* storage unavailable */
     }
-  }, [isSignedIn]);
-
-  // Start checkout only after the current legal documents have been accepted.
-  useEffect(() => {
-    void startCheckoutIfAccepted();
-    const onAccepted = () => void startCheckoutIfAccepted();
-    window.addEventListener(LEGAL_ACCEPTED_EVENT, onAccepted);
-    return () => window.removeEventListener(LEGAL_ACCEPTED_EVENT, onAccepted);
-  }, [startCheckoutIfAccepted]);
-
+  }, [location]);
   return null;
 }
 
@@ -272,6 +200,34 @@ function GuestIdSync() {
   const { isSignedIn } = useAuth();
   const queryClient = useQueryClient();
   const claimAttemptedRef = useRef(false);
+  const { data: billing } = useBillingStatus();
+  // Guest receipts are only migrated once the account has accepted the
+  // current legal documents and its trial/billing entitlement exists.
+  const billingReady = !!billing && resolveAccessState(billing) !== "not_started";
+  const [legalAccepted, setLegalAccepted] = useState(false);
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      setLegalAccepted(false);
+      return;
+    }
+    let cancelled = false;
+    const check = () => {
+      fetch(`${apiBase}/api/legal/acceptance`, { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : { accepted: false }))
+        .then((j: { accepted?: boolean }) => {
+          if (!cancelled) setLegalAccepted(j.accepted === true);
+        })
+        .catch(() => undefined);
+    };
+    check();
+    const onAccepted = () => setLegalAccepted(true);
+    window.addEventListener(LEGAL_ACCEPTED_EVENT, onAccepted);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(LEGAL_ACCEPTED_EVENT, onAccepted);
+    };
+  }, [isSignedIn]);
 
   useEffect(() => {
     if (isSignedIn) {
@@ -280,10 +236,15 @@ function GuestIdSync() {
 
       // Migrate guest receipts exactly once per sign-in event
       const guestToken = localStorage.getItem(GUEST_TOKEN_KEY);
+      if (guestToken && !(legalAccepted && billingReady)) {
+        // Wait for consent + trial initialization; keep the token meanwhile.
+        return;
+      }
       if (guestToken && !claimAttemptedRef.current) {
         claimAttemptedRef.current = true;
         fetch(`${apiBase}/api/guest-session/claim`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ guestToken }),
         })
@@ -316,7 +277,7 @@ function GuestIdSync() {
     // Signed-out: reset claim guard so a subsequent guest → sign-in round-trip works
     claimAttemptedRef.current = false;
     setGuestId(isGuest ? guestUser?.id ?? null : null);
-  }, [isSignedIn, isGuest, guestUser, exitGuestMode, queryClient]);
+  }, [isSignedIn, isGuest, guestUser, exitGuestMode, queryClient, legalAccepted, billingReady]);
 
   return null;
 }

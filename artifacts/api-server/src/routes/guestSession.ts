@@ -5,7 +5,11 @@ import { randomUUID } from "node:crypto";
 import { logger } from "../lib/logger";
 import { guestSessionRateLimiter } from "../middlewares/guestSessionRateLimiter";
 import { requireAuth } from "../middlewares/requireAuth";
-import { lockUserDataMutation } from "../lib/userDataLock";
+import { lockUserDataMutation, withUserDataLock } from "../lib/userDataLock";
+import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
+import { getSubscriptionStatus } from "../lib/subscriptionStatus";
+import { accountTrialStatus } from "../lib/accountTrial";
+import { trialUploadsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -34,7 +38,7 @@ router.post("/guest-session", guestSessionRateLimiter, async (req, res): Promise
   }
 });
 
-router.post("/guest-session/claim", requireAuth, lockUserDataMutation(async (req, res): Promise<void> => {
+router.post("/guest-session/claim", requireAuth, requireCurrentLegalAcceptance, lockUserDataMutation(async (req, res): Promise<void> => {
   const clerkUserId = req.userId!;
 
   const guestToken = typeof req.body?.guestToken === "string" ? req.body.guestToken : null;
@@ -45,6 +49,7 @@ router.post("/guest-session/claim", requireAuth, lockUserDataMutation(async (req
   }
 
   try {
+    await withUserDataLock(guestToken, async () => {
     const [session] = await db
       .select()
       .from(guestSessionsTable)
@@ -57,15 +62,33 @@ router.post("/guest-session/claim", requireAuth, lockUserDataMutation(async (req
       return;
     }
 
-    // Bulk re-assign all receipts owned by the guest token
-    const updated = await db
+    const access = await getSubscriptionStatus(clerkUserId);
+    const guestReceipts = await db.select().from(receiptsTable)
+      .where(eq(receiptsTable.userId, guestToken));
+    const count = guestReceipts.filter(r => ["completed", "processing"].includes(r.status)).length;
+    const trial = access.accessState === "account_trial" ? await accountTrialStatus(clerkUserId) : null;
+    if (!access.canUseApp || (trial && trial.remaining < count)) {
+      res.status(403).json({ error: "subscription_required", message: "Upgrade to claim these receipts. Your guest data has not been deleted." });
+      return;
+    }
+    const updated = await db.transaction(async tx => {
+      const migrated = await tx
       .update(receiptsTable)
       .set({ userId: clerkUserId })
       .where(eq(receiptsTable.userId, guestToken))
       .returning({ id: receiptsTable.id });
-
-    // Remove the guest session so the token can never be replayed
-    await db.delete(guestSessionsTable).where(eq(guestSessionsTable.token, guestToken));
+      if (trial) {
+        for (const receipt of guestReceipts.filter(r => ["completed", "processing"].includes(r.status))) {
+          await tx.insert(trialUploadsTable).values({
+            userId: clerkUserId, objectPath: receipt.objectPath,
+            state: receipt.status === "completed" ? "succeeded" : "processing",
+            receiptId: receipt.id, expiresAt: trial.trial.endsAt,
+          });
+        }
+      }
+      await tx.delete(guestSessionsTable).where(eq(guestSessionsTable.token, guestToken));
+      return migrated;
+    });
 
     logger.info(
       { clerkUserId, guestToken, count: updated.length },
@@ -73,6 +96,7 @@ router.post("/guest-session/claim", requireAuth, lockUserDataMutation(async (req
     );
 
     res.sendStatus(204);
+    });
   } catch (error) {
     logger.error({ error, clerkUserId, guestToken }, "Failed to claim guest session");
     res.status(500).json({ error: "Failed to claim guest session" });

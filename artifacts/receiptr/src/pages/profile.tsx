@@ -5,7 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useGuestMode } from "@/components/GuestProvider";
-import { useBillingStatus, useCreatePortal } from "@/hooks/useBilling";
+import {
+  useBillingStatus,
+  useCreatePortal,
+  resolveAccessState,
+  isPaidLike,
+  TRIAL_UPLOAD_LIMIT,
+} from "@/hooks/useBilling";
+import { AccessBadge } from "@/pages/settings";
 import { format } from "date-fns";
 
 function Initials({ name, email }: { name: string | null; email: string | null }) {
@@ -19,28 +26,6 @@ function Initials({ name, email }: { name: string | null; email: string | null }
     <div className="w-20 h-20 rounded-full bg-foreground text-background flex items-center justify-center text-2xl font-bold shrink-0 select-none">
       {letters}
     </div>
-  );
-}
-
-function PlanBadge({ plan }: { plan: "free" | "trialing" | "pro" }) {
-  if (plan === "pro") {
-    return (
-      <span className="inline-flex items-center rounded-full bg-foreground text-background text-xs font-semibold px-3 py-1">
-        Pro
-      </span>
-    );
-  }
-  if (plan === "trialing") {
-    return (
-      <span className="inline-flex items-center rounded-full border border-foreground text-foreground text-xs font-semibold px-3 py-1">
-        Pro Trial
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center rounded-full bg-secondary text-muted-foreground text-xs font-semibold px-3 py-1">
-      Free
-    </span>
   );
 }
 
@@ -73,7 +58,9 @@ export default function ProfilePage() {
     });
   };
 
-  const isPro = billing?.plan === "pro" || billing?.plan === "trialing";
+  const accessState = resolveAccessState(billing);
+  const isPro = isPaidLike(billing) || (accessState === "owner" && billing?.hasBillingAccount === true);
+  const canSubscribe = !!billing && !isPaidLike(billing) && accessState !== "owner" && accessState !== "not_started";
 
   const formatDate = (iso: string | null | undefined) => {
     if (!iso) return null;
@@ -156,12 +143,21 @@ export default function ProfilePage() {
             {billingLoading ? (
               <Skeleton className="h-5 w-20 rounded-full" />
             ) : (
-              <PlanBadge plan={billing?.plan ?? "free"} />
+              <AccessBadge billing={billing} />
             )}
           </div>
 
+          {!billingLoading && (accessState === "account_trial" || accessState === "trial_exhausted" || accessState === "trial_expired") && (
+            <div className="flex items-center justify-between px-4 py-3.5">
+              <span className="text-sm font-medium">Trial uploads used</span>
+              <span className="text-sm text-muted-foreground font-mono" data-testid="text-profile-trial-uploads">
+                {Math.min(billing?.trialUploadsUsed ?? 0, TRIAL_UPLOAD_LIMIT)} of {TRIAL_UPLOAD_LIMIT}
+              </span>
+            </div>
+          )}
+
           {/* Trial end date */}
-          {!billingLoading && billing?.plan === "trialing" && billing.trialEndAt && (
+          {!billingLoading && (accessState === "legacy_stripe_trial" || accessState === "account_trial") && billing?.trialEndAt && (
             <div className="flex items-center justify-between px-4 py-3.5">
               <span className="text-sm font-medium">Trial ends</span>
               <span className="text-sm text-muted-foreground">
@@ -171,7 +167,7 @@ export default function ProfilePage() {
           )}
 
           {/* Billing period */}
-          {!billingLoading && billing?.plan === "pro" && billing.currentPeriodEnd && (
+          {!billingLoading && accessState === "paid" && billing?.currentPeriodEnd && (
             <div className="flex items-center justify-between px-4 py-3.5">
               <span className="text-sm font-medium">
                 {billing.cancelAtPeriodEnd ? "Access until" : "Next billing date"}
@@ -183,7 +179,7 @@ export default function ProfilePage() {
           )}
 
           {/* Cancelled notice */}
-          {!billingLoading && billing?.plan === "pro" && billing.cancelAtPeriodEnd && (
+          {!billingLoading && accessState === "paid" && billing?.cancelAtPeriodEnd && (
             <div className="px-4 py-3.5">
               <p className="text-xs text-muted-foreground">
                 Your subscription is cancelled and will not renew.
@@ -205,13 +201,13 @@ export default function ProfilePage() {
                   <CreditCard className="w-4 h-4 mr-2" />
                   {portal.isPending ? "Loading…" : "Manage subscription"}
                 </Button>
-              ) : (
-                <Link href="/settings#upgrade-plans">
-                  <Button size="sm" className="rounded-full w-full">
-                    Upgrade to Pro
-                  </Button>
+              ) : canSubscribe ? (
+                <Link href="/settings#upgrade-plans" className="w-full" data-testid="link-profile-upgrade">
+                  <span className="inline-flex h-9 w-full items-center justify-center rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground">
+                    {accessState === "account_trial" ? "Upgrade now" : "Subscribe"}
+                  </span>
                 </Link>
-              )}
+              ) : null}
             </div>
           )}
         </div>

@@ -25,6 +25,25 @@ import { compressImage, compressedFileName } from "@/lib/compressImage";
 import { CATEGORIES, categoryStyle } from "@/lib/categories";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePwaUpdateBlocker } from "@/lib/pwa";
+import {
+  useBillingStatus,
+  useRefreshBilling,
+  uploadBlockedReason,
+  quotaErrorMessage,
+  resolveAccessState,
+  TRIAL_UPLOAD_LIMIT,
+  type BillingStatus,
+} from "@/hooks/useBilling";
+import { ACTIVE_REVIEW_KEY } from "@/components/PlanSelectionGate";
+
+function setActiveReview(id: number | null) {
+  try {
+    if (id == null) sessionStorage.removeItem(ACTIVE_REVIEW_KEY);
+    else sessionStorage.setItem(ACTIVE_REVIEW_KEY, String(id));
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 type Phase = "capture" | "reading" | "review" | "not_a_receipt";
 
@@ -112,6 +131,31 @@ export default function Scan() {
   const [stepsDone, setStepsDone] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const billingQuery = useBillingStatus();
+  const billing = billingQuery.data;
+  const refreshBilling = useRefreshBilling();
+  const blockedReason = billing ? uploadBlockedReason(billing) : null;
+  const trialUploadsLeft =
+    billing && resolveAccessState(billing) === "account_trial"
+      ? billing.trialUploadsRemaining ?? null
+      : null;
+
+  useEffect(() => () => setActiveReview(null), []);
+
+  /** Synchronous preflight using the polled status (keeps user activation for pickers). */
+  const preflightUpload = (): boolean => {
+    const reason = billing ? uploadBlockedReason(billing) : "We couldn't confirm your plan. Check your connection and try again.";
+    if (reason) {
+      toast({ title: "Upload not available", description: reason, variant: "destructive" });
+      void billingQuery.refetch();
+      return false;
+    }
+    return true;
+  };
+  const openFilePicker = () => {
+    if (preflightUpload()) fileInputRef.current?.click();
+  };
+
   // On desktop, upload is the primary path; the camera is opt-in.
   const [isDesktop] = useState(
     () =>
@@ -119,7 +163,7 @@ export default function Scan() {
       window.matchMedia("(min-width: 768px)").matches,
   );
   const [cameraRequested, setCameraRequested] = useState(false);
-  const cameraActive = phase === "capture" && (!isDesktop || cameraRequested);
+  const cameraActive = phase === "capture" && !blockedReason && (!isDesktop || cameraRequested);
 
   const { videoRef, cameraReady, cameraError } = useCameraStream(cameraActive);
 
@@ -347,7 +391,19 @@ export default function Scan() {
         return;
       }
       setUploading(true);
+      let reservedPath: string | undefined;
       try {
+        // Fresh server check right before uploading, so quota used on another
+        // device is respected. Fails closed if the status can't be fetched.
+        const fresh = await billingQuery.refetch();
+        const latest = fresh.data as BillingStatus | undefined;
+        const reason = fresh.isError || !latest
+          ? "We couldn't confirm your plan. Check your connection and try again. Nothing was uploaded."
+          : uploadBlockedReason(latest);
+        if (reason) {
+          toast({ title: "Upload not available", description: reason, variant: "destructive" });
+          return;
+        }
         const { uploadURL, objectPath } = await customFetch<{
           uploadURL: string;
           objectPath: string;
@@ -356,6 +412,7 @@ export default function Scan() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: fileName, size: blob.size, contentType }),
         });
+        reservedPath = objectPath;
 
         const put = await fetch(uploadURL, {
           method: "PUT",
@@ -368,8 +425,26 @@ export default function Scan() {
           data: { objectPath, originalFileName: fileName, contentType },
         });
         setReceiptId(created.id);
+        setActiveReview(created.id);
         setPhase("reading");
-      } catch {
+        void refreshBilling();
+      } catch (err) {
+        if (reservedPath) {
+          try {
+            await customFetch(`${import.meta.env.BASE_URL}api/storage/uploads/release`, {
+              method: "POST", body: JSON.stringify({ objectPath: reservedPath }),
+            });
+          } catch {
+            // An offline/abandoned reservation expires automatically server-side.
+          }
+          void refreshBilling();
+        }
+        const quota = quotaErrorMessage(err);
+        if (quota) {
+          void refreshBilling();
+          toast({ title: "Upload limit reached", description: quota, variant: "destructive" });
+          return;
+        }
         toast({
           title: "Upload failed",
           description: "Could not upload the receipt. Please try again.",
@@ -379,7 +454,8 @@ export default function Scan() {
         setUploading(false);
       }
     },
-    [createReceipt, toast],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [createReceipt, toast, billingQuery.refetch],
   );
 
   const capturePhoto = useCallback(() => {
@@ -439,6 +515,8 @@ export default function Scan() {
       invalidateLists();
       queryClient.invalidateQueries({ queryKey: getGetReceiptQueryKey(receiptId) });
       toast({ title: "Purchase saved", description: "Added to your library." });
+      setActiveReview(null);
+      void refreshBilling();
       setLocation(`/receipts/${receiptId}`);
     } catch {
       toast({
@@ -460,6 +538,8 @@ export default function Scan() {
       }
     }
     setReceiptId(null);
+    setActiveReview(null);
+    void refreshBilling();
     setPhase("capture");
   };
 
@@ -481,6 +561,8 @@ export default function Scan() {
         return;
       }
     }
+    setActiveReview(null);
+    void refreshBilling();
     setLocation("/");
   };
 
@@ -494,7 +576,20 @@ export default function Scan() {
         onChange={handleFileChange}
       />
 
-      {phase === "capture" && (
+      {phase === "capture" && blockedReason && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center py-12" data-testid="panel-upload-blocked">
+          <span className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center">
+            <AlertTriangle className="w-6 h-6 text-muted-foreground" />
+          </span>
+          <h1 className="text-2xl font-extrabold tracking-tight">No uploads left</h1>
+          <p className="text-sm text-muted-foreground max-w-xs" data-testid="text-upload-blocked">{blockedReason}</p>
+          <Link href="/settings#upgrade-plans" className="inline-flex h-11 items-center rounded-full bg-foreground px-6 text-sm font-semibold text-background" data-testid="link-scan-subscribe">
+            See plans
+          </Link>
+        </div>
+      )}
+
+      {phase === "capture" && !blockedReason && (
         <div className="flex-1 flex flex-col gap-6">
           <div>
             <div>
@@ -502,6 +597,11 @@ export default function Scan() {
                 <p className="text-sm text-muted-foreground mt-1">
                   Place the receipt inside the frame, or upload a file.
                 </p>
+                {trialUploadsLeft != null && (
+                  <p className="text-xs font-semibold text-muted-foreground mt-2" data-testid="text-scan-trial-left">
+                    {trialUploadsLeft} of {TRIAL_UPLOAD_LIMIT} trial uploads left
+                  </p>
+                )}
               </div>
           </div>
 
@@ -518,7 +618,7 @@ export default function Scan() {
               </div>
               <Button
                 className="rounded-full h-12 px-8 font-semibold"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openFilePicker}
                 disabled={uploading}
               >
                 {uploading ? (
@@ -531,7 +631,7 @@ export default function Scan() {
               <Button
                 variant="ghost"
                 className="rounded-full text-muted-foreground"
-                onClick={() => setCameraRequested(true)}
+                onClick={() => { if (preflightUpload()) setCameraRequested(true); }}
                 disabled={uploading}
               >
                 <Camera className="w-4 h-4 mr-2" />
@@ -549,7 +649,7 @@ export default function Scan() {
                 <Button
                   variant="secondary"
                   className="rounded-full"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={openFilePicker}
                   disabled={uploading}
                 >
                   <Upload className="w-4 h-4 mr-2" />
@@ -713,7 +813,7 @@ export default function Scan() {
             <Button
               variant="outline"
               className="rounded-full h-12"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={openFilePicker}
               disabled={uploading}
             >
               <Upload className="w-4 h-4 mr-2" />

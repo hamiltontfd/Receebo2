@@ -5,7 +5,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   create: vi.fn(), update: vi.fn(), remove: vi.fn(), customFetch: vi.fn(),
   toast: vi.fn(), stop: vi.fn(), getUserMedia: vi.fn(),
+  billing: { plan: "free", accessState: "account_trial", canUseApp: true, canUpload: true, trialUploadsRemaining: 2 } as Record<string, unknown>,
 }));
+vi.mock("@/hooks/useBilling", async () => {
+  const actual = await vi.importActual<typeof import("@/hooks/useBilling")>("@/hooks/useBilling");
+  return {
+    ...actual,
+    useBillingStatus: () => ({
+      data: mocks.billing,
+      refetch: async () => ({ data: mocks.billing, isError: false }),
+    }),
+    useRefreshBilling: () => vi.fn(),
+  };
+});
 vi.mock("@workspace/api-client-react", () => ({
   useCreateReceipt: () => ({ mutateAsync: mocks.create }),
   useUpdateReceipt: () => ({ mutateAsync: mocks.update }),
@@ -17,6 +29,7 @@ vi.mock("@workspace/api-client-react", () => ({
   getListReceiptsQueryKey: () => ["receipts"],
   getGetReceiptStatsQueryKey: () => ["stats"],
   getGetRecentReceiptsQueryKey: () => ["recent"],
+  ApiError: class ApiError extends Error { status = 0; data = null; },
 }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock("@/lib/compressImage", () => ({
@@ -27,6 +40,7 @@ import Scan from "./scan";
 import { hasPwaWork } from "@/lib/pwa";
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.billing = { plan: "free", accessState: "account_trial", canUseApp: true, canUpload: true, trialUploadsRemaining: 2 };
   Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
   vi.stubGlobal("matchMedia", () => ({ matches: true }));
   mocks.create.mockResolvedValue({ id: 42 });
@@ -95,5 +109,26 @@ describe("upload paths with PWA safeguards", () => {
     await act(async () => screen.getByRole("button", { name: /take photo|capture/i }).click());
     await waitFor(() => expect(mocks.create).toHaveBeenCalled());
     expect(mocks.stop).toHaveBeenCalled();
+  });
+  it("shows trial uploads left", () => {
+    mount();
+    expect(screen.getByTestId("text-scan-trial-left").textContent).toBe("2 of 3 trial uploads left");
+  });
+  it("blocks file and camera before any request when uploads are used up", () => {
+    mocks.billing = { plan: "free", accessState: "trial_exhausted", canUseApp: false, canUpload: false };
+    mount();
+    expect(screen.getByTestId("text-upload-blocked").textContent).toContain("all 3 trial uploads");
+    expect(screen.queryByRole("button", { name: /camera/i })).toBeNull();
+    expect(mocks.getUserMedia).not.toHaveBeenCalled();
+  });
+  it("refuses an upload when the fresh server check says no slots remain", async () => {
+    const result = mount();
+    mocks.billing = { plan: "free", accessState: "account_trial", canUseApp: true, canUpload: false, trialUploadsRemaining: 0 };
+    fireEvent.change(result.container.querySelector('input[type="file"]')!, {
+      target: { files: [new File(["file"], "receipt.pdf", { type: "application/pdf" })] },
+    });
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Upload not available" })));
+    expect(mocks.customFetch).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 });

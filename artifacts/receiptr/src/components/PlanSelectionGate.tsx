@@ -1,75 +1,157 @@
-import { useRef, useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, RotateCw } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useClerk } from "@clerk/react";
-import { useBillingStatus, useCreateCheckout } from "@/hooks/useBilling";
+import {
+  useBillingStatus,
+  useStartTrial,
+  useTrialExpiryTimer,
+  resolveAccessState,
+  hasAppAccess,
+  isPaidLike,
+  TRIAL_UPLOAD_LIMIT,
+  type AccessState,
+  type BillingStatus,
+} from "@/hooks/useBilling";
+import { PlanChoice, FoundingNote } from "@/components/PlanChoice";
+
+const ACTIVATING_TIMEOUT_MS = 10_000;
+export const ACTIVE_REVIEW_KEY = "receebo:activeReviewReceiptId";
 
 function isCheckoutSuccess() {
   if (typeof window === "undefined") return false;
   return new URLSearchParams(window.location.search).get("checkout") === "success";
 }
 
-/** Remove ?checkout=success from the URL without a page reload. */
 function clearCheckoutParam() {
   const url = new URL(window.location.href);
   url.searchParams.delete("checkout");
   window.history.replaceState({}, "", url.toString());
 }
 
-const PLAN_STORAGE_KEY = "receebo:pendingPlan";
-const ACTIVATING_TIMEOUT_MS = 10_000;
+function activeScanReviewId(): number | null {
+  try {
+    const raw = sessionStorage.getItem(ACTIVE_REVIEW_KEY);
+    return raw ? Number(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
-const FEATURES = [
-  "Unlimited receipt scans",
-  "AI-powered data extraction",
-  "Natural-language search",
-  "Attachment storage",
-  "Warranty reminders",
-  "Export & download",
-];
+/**
+ * Routes reachable without app access: account settings/profile (billing,
+ * deletion, sign-out), and review of the receipt from the final trial upload.
+ * Legal pages live outside the protected shell.
+ */
+export function isRouteAllowedWithoutAccess(path: string, billing: BillingStatus | undefined): boolean {
+  if (path === "/settings" || path.startsWith("/settings/")) return true;
+  if (path === "/profile" || path.startsWith("/profile/")) return true;
+  const reviewId = billing?.reviewReceiptId ?? null;
+  if (reviewId != null) {
+    if (path === `/receipts/${reviewId}`) return true;
+    if (path === "/scan" && activeScanReviewId() === reviewId) return true;
+  }
+  return false;
+}
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as const, delay: i * 0.08 },
-  }),
+function FullScreenSkeleton({ label }: { label?: string }) {
+  return (
+    <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-background text-foreground" data-testid="status-billing-loading">
+      <div className="w-full max-w-md px-6 space-y-3" aria-hidden>
+        <div className="h-6 w-2/3 mx-auto rounded-lg bg-muted animate-pulse" />
+        <div className="h-4 w-1/2 mx-auto rounded-lg bg-muted animate-pulse" />
+      </div>
+      {label && <p className="text-sm text-muted-foreground">{label}</p>}
+    </div>
+  );
+}
+
+function GateHeader() {
+  const { signOut } = useClerk();
+  return (
+    <header className="flex h-14 px-5 items-center justify-between border-b">
+      <button
+        onClick={() => signOut({ redirectUrl: "/" })}
+        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        data-testid="button-gate-signout"
+      >
+        Sign out
+      </button>
+      <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Receebo" className="h-7 w-auto" />
+      <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground transition-colors w-16 text-right" data-testid="link-gate-settings">
+        Settings
+      </Link>
+    </header>
+  );
+}
+
+function ErrorScreen({ title, body, onRetry, retrying }: { title: string; body: string; onRetry: () => void; retrying: boolean }) {
+  return (
+    <div className="min-h-dvh bg-background text-foreground flex flex-col">
+      <GateHeader />
+      <main className="flex-1 flex flex-col items-center justify-center gap-4 px-5 text-center" data-testid="status-billing-error">
+        <span className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center">
+          <AlertTriangle className="w-5 h-5 text-muted-foreground" />
+        </span>
+        <h1 className="text-xl font-extrabold tracking-tight">{title}</h1>
+        <p className="text-sm text-muted-foreground max-w-sm">{body}</p>
+        <Button className="rounded-full gap-2" onClick={onRetry} disabled={retrying} data-testid="button-billing-retry">
+          {retrying ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+          Try again
+        </Button>
+      </main>
+    </div>
+  );
+}
+
+const PAYWALL_COPY: Partial<Record<AccessState, { eyebrow: string; title: string; body: string }>> = {
+  trial_exhausted: {
+    eyebrow: "Trial complete",
+    title: `You've used all ${TRIAL_UPLOAD_LIMIT} trial uploads.`,
+    body: "Your receipts are kept safe. Subscribe to keep scanning and searching them.",
+  },
+  trial_expired: {
+    eyebrow: "Trial ended",
+    title: "Your seven-day trial has ended.",
+    body: "Your receipts are kept safe. Subscribe to keep scanning and searching them.",
+  },
+  subscription_required: {
+    eyebrow: "Subscription needed",
+    title: "Subscribe to use Receebo.",
+    body: "Choose a plan to scan, store and search your receipts.",
+  },
 };
 
 /**
- * Wraps any protected route. If the signed-in user has no active subscription
- * (plan === "free"), shows a plan-selection screen and starts Stripe Checkout
- * directly — no sign-up redirect needed. Children only render once the user
- * has an active trial or paid subscription.
+ * Wraps protected routes. Initializes the no-card account trial after legal
+ * consent (rendered inside LegalConsentGate), admits users with access and
+ * shows an explicit paid plan choice otherwise. Fails closed on errors.
  */
 export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
-  const { data: billing, isLoading } = useBillingStatus();
-  const checkout = useCreateCheckout();
-  const { signOut } = useClerk();
-
-  // If PostAuthCheckout already captured a ?plan= and is about to redirect
-  // to Stripe, show a spinner instead of flashing the gate.
-  const hasPendingRedirect = useRef(
-    typeof sessionStorage !== "undefined" &&
-      sessionStorage.getItem(PLAN_STORAGE_KEY) !== null,
-  );
-
-  // Track whether the activating-spinner has timed out.
+  const billingQuery = useBillingStatus();
+  const { data: billing, isLoading, isError, refetch, isFetching } = billingQuery;
+  const startTrial = useStartTrial();
+  const [location] = useLocation();
+  const startFiredRef = useRef(false);
   const [activatingTimedOut, setActivatingTimedOut] = useState(false);
 
-  // Start a countdown the moment we enter the "activating" state (checkout
-  // success but plan still free). If the webhook doesn't propagate within
-  // ACTIVATING_TIMEOUT_MS, clear the URL param and fall back to the plan
-  // picker with an explanatory message.
+  useTrialExpiryTimer(billing);
+
+  const state = resolveAccessState(billing);
+
+  // Initialize the trial entitlement once when the server says not_started.
+  const startMutate = startTrial.mutate;
+  useEffect(() => {
+    if (billing && state === "not_started" && !startFiredRef.current) {
+      startFiredRef.current = true;
+      startMutate();
+    }
+  }, [billing, state, startMutate]);
+
   const inActivatingState =
-    !isLoading &&
-    !hasPendingRedirect.current &&
-    !checkout.isPending &&
-    billing?.plan === "free" &&
-    isCheckoutSuccess() &&
-    !activatingTimedOut;
+    !!billing && isCheckoutSuccess() && !isPaidLike(billing) && state !== "owner" && !activatingTimedOut;
 
   useEffect(() => {
     if (!inActivatingState) return;
@@ -80,47 +162,55 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer);
   }, [inActivatingState]);
 
-  // Show loader while billing loads OR while a checkout redirect is in-flight
-  if (isLoading || (hasPendingRedirect.current && !billing?.ownerAccess) || checkout.isPending) {
+  if (isLoading) return <FullScreenSkeleton />;
+
+  if (!billing) {
+    // Fail closed: no billing data means no app access.
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-background">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
+      <ErrorScreen
+        title="We couldn't check your plan."
+        body={isError ? "Your receipts are safe. Check your connection and try again." : "Loading your plan."}
+        onRetry={() => void refetch()}
+        retrying={isFetching}
+      />
     );
   }
 
-  // Active trial or paid — let them in
-  if (billing?.plan !== "free") {
-    return <>{children}</>;
+  if (state === "not_started") {
+    if (startTrial.isError) {
+      return (
+        <ErrorScreen
+          title="We couldn't start your trial."
+          body="Nothing was charged. Check your connection and try again."
+          onRetry={() => startTrial.mutate()}
+          retrying={startTrial.isPending}
+        />
+      );
+    }
+    return <FullScreenSkeleton label="Setting up your seven-day trial" />;
   }
 
-  // Webhook hasn't fired yet — show a friendly "activating" state instead of
-  // re-flashing the plan picker. useBillingStatus polls every 2 s in this
-  // case and will flip to the children once the plan propagates.
+  if (hasAppAccess(billing)) return <>{children}</>;
+
   if (inActivatingState) {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-background text-foreground">
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-background text-foreground" data-testid="status-activating">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Activating your trial…</p>
+        <p className="text-sm text-muted-foreground">Activating your subscription</p>
       </div>
     );
   }
 
-  // No subscription — show plan picker (also shown after activating timeout)
+  if (isRouteAllowedWithoutAccess(location, billing)) return <>{children}</>;
+
+  const copy = PAYWALL_COPY[state] ?? PAYWALL_COPY.subscription_required!;
+  const founding = billing.foundingEligible === true;
+  const reviewId = billing.reviewReceiptId ?? null;
+
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
-      <header className="flex h-14 px-5 items-center justify-between border-b">
-        <button
-          onClick={() => signOut({ redirectUrl: "/" })}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Sign out
-        </button>
-        <img src="/logo.svg" alt="Receebo" className="h-7 w-auto" />
-        <div className="w-16" />
-      </header>
-
-      <main className="flex-1 flex flex-col items-center justify-center px-5 py-12">
+      <GateHeader />
+      <main className="flex-1 flex flex-col items-center justify-center px-5 py-12" data-testid="screen-paywall">
         {activatingTimedOut && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
@@ -128,7 +218,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
             transition={{ duration: 0.35 }}
             className="mb-6 max-w-md w-full rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground text-center"
           >
-            Something took longer than expected — try refreshing, or pick a plan below to start again.
+            Your payment is taking longer than expected to confirm. Try refreshing in a moment before paying again.
           </motion.div>
         )}
 
@@ -138,127 +228,24 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           className="text-center mb-10 max-w-md"
         >
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-            One more step
-          </p>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-            7 days free,<br />no charge until it ends.
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">{copy.eyebrow}</p>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight" data-testid="text-paywall-title">
+            {copy.title}
           </h1>
-          <p className="mt-3 text-muted-foreground text-sm leading-relaxed">
-            Pick a plan to unlock Receebo. Cancel anytime before your trial ends and you won't be charged.
-          </p>
+          <p className="mt-3 text-muted-foreground text-sm leading-relaxed">{copy.body}</p>
+          {reviewId != null && (
+            <Link
+              href={`/receipts/${reviewId}`}
+              className="inline-block mt-4 text-sm font-semibold underline underline-offset-4"
+              data-testid="link-review-last-receipt"
+            >
+              Review your last uploaded receipt
+            </Link>
+          )}
         </motion.div>
 
-        <div className="w-full max-w-2xl grid sm:grid-cols-2 gap-4">
-          {/* Monthly */}
-          <motion.div
-            custom={0}
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="border-2 border-border rounded-2xl p-6 flex flex-col gap-5 bg-background"
-          >
-            <div>
-              <p className="font-bold text-lg tracking-tight">Pro Monthly</p>
-              <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-4xl font-bold font-mono tracking-tight">€2.99</span>
-                <span className="text-sm text-muted-foreground">/ month</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">after 7-day free trial</p>
-            </div>
-
-            <ul className="space-y-2 flex-1 text-xs font-mono">
-              {FEATURES.map((f) => (
-                <li key={f} className="flex items-center gap-2 text-muted-foreground">
-                  <Check className="w-3.5 h-3.5 shrink-0 text-foreground" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full rounded-full font-semibold"
-              disabled={checkout.isPending}
-              onClick={() => checkout.mutate("monthly")}
-            >
-              {checkout.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Start free trial"
-              )}
-            </Button>
-          </motion.div>
-
-          {/* Yearly — highlighted */}
-          <motion.div
-            custom={1}
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            whileHover={{ y: -4, transition: { duration: 0.2 } }}
-            className="border-2 border-foreground rounded-2xl p-6 flex flex-col gap-5 bg-foreground text-background relative overflow-hidden"
-          >
-            {/* Shimmer */}
-            <motion.div
-              className="absolute inset-0 pointer-events-none opacity-[0.06]"
-              initial={{ x: "-100%" }}
-              animate={{ x: "200%" }}
-              transition={{ delay: 0.6, duration: 1.4 }}
-              style={{
-                background:
-                  "linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.9) 50%, transparent 70%)",
-              }}
-            />
-
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <p className="font-bold text-lg tracking-tight">Pro Yearly</p>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-background/20 border border-background/30 text-background">
-                  Save 30%
-                </span>
-              </div>
-              <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-4xl font-bold font-mono tracking-tight">€24.99</span>
-                <span className="text-sm opacity-70">/ year</span>
-              </div>
-              <p className="text-xs opacity-60 mt-1">after 7-day free trial · €2.08/mo billed annually</p>
-            </div>
-
-            <ul className="space-y-2 flex-1 text-xs font-mono">
-              {FEATURES.map((f) => (
-                <li key={f} className="flex items-center gap-2 opacity-80">
-                  <Check className="w-3.5 h-3.5 shrink-0 opacity-100" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-
-            <Button
-              size="sm"
-              className="w-full rounded-full font-semibold bg-background text-foreground hover:bg-background/90"
-              disabled={checkout.isPending}
-              onClick={() => checkout.mutate("yearly")}
-            >
-              {checkout.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin text-foreground" />
-              ) : (
-                "Start free trial"
-              )}
-            </Button>
-          </motion.div>
-        </div>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.4 }}
-          className="mt-6 text-xs text-muted-foreground text-center"
-        >
-          No charge for 7 days. Cancel before trial ends and pay nothing.
-        </motion.p>
+        <PlanChoice founding={founding} />
+        <FoundingNote founding={founding} className="mt-6 max-w-md" />
       </main>
     </div>
   );

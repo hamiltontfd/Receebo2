@@ -30,7 +30,11 @@ const faqs = [
   },
   {
     q: "How does the free trial work?",
-    a: "Your 7-day free trial starts the moment you subscribe. You'll have full access to all features. We'll send you a reminder email before the trial ends. If you don't cancel, your subscription begins automatically.",
+    a: "Create an account and accept the Terms, and your trial starts. No card is needed. It lasts seven days and includes three successful receipt uploads, whichever runs out first. Nothing is charged automatically. To keep going, choose €2.99/month or €24.99/year; you're charged when you subscribe. You can also upgrade early from Settings.",
+  },
+  {
+    q: "What are founding prices?",
+    a: "€2.99/month and €24.99/year are founding prices. They stay available to you for as long as your account exists, including if you cancel and subscribe again later.",
   },
 ];
 

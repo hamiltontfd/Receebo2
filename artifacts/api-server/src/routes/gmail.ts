@@ -23,6 +23,9 @@ import {
 import { deletePendingImportObjects } from "../lib/gmailCleanup";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
 import { lockUserDataMutation, withUserDataLock } from "../lib/userDataLock";
+import { getSubscriptionStatus } from "../lib/subscriptionStatus";
+import { accountTrialStatus } from "../lib/accountTrial";
+import { trialUploadsTable } from "@workspace/db";
 import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
 import { gmailOrigin } from "../lib/gmailUrls";
 
@@ -383,6 +386,13 @@ router.post(
     }
 
     try {
+      const access = await getSubscriptionStatus(req.userId!);
+      const trial = access.accessState === "account_trial" ? await accountTrialStatus(req.userId!) : null;
+      if (!access.canUseApp || (trial && trial.remaining < 1)) {
+        res.status(403).json({ error: "subscription_required", code: access.accessState,
+          message: "No trial uploads remain. Upgrade to import more receipts." });
+        return;
+      }
       const receipt = await db.transaction(async (tx) => {
         const [imp] = await tx
           .update(pendingImportsTable)
@@ -429,6 +439,12 @@ router.post(
           .update(pendingImportsTable)
           .set({ approvedReceiptId: created.id, updatedAt: new Date() })
           .where(eq(pendingImportsTable.id, imp.id));
+        if (trial) {
+          await tx.insert(trialUploadsTable).values({
+            userId: req.userId!, objectPath: `gmail:${imp.id}`,
+            state: "succeeded", receiptId: created.id, expiresAt: trial.trial.endsAt,
+          });
+        }
         return created;
       });
 

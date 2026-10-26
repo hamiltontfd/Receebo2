@@ -4,6 +4,9 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ owned: true, authenticated: true, download: vi.fn() }));
+vi.mock("../lib/subscriptionStatus", () => ({
+  getSubscriptionStatus: async () => ({ canUseApp: true, canUpload: true }),
+}));
 vi.mock("../middlewares/guestAuth", () => ({
   requireAuthOrGuest: (req: any, res: any, next: any) => {
     if (!mocks.authenticated) return res.status(401).json({ error: "Unauthorized" });

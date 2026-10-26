@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Check, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TRIAL_UPLOAD_LIMIT } from "@/hooks/useBilling";
 
 const FEATURES = [
   "Unlimited receipt scans",
@@ -67,11 +68,15 @@ export default function GetStarted() {
             Start your free trial
           </p>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-            7 days free,<br />no charge until it ends.
+            7 days free.<br />No card needed.
           </h1>
           <p className="mt-3 text-muted-foreground text-sm leading-relaxed">
-            Pick a plan to continue. Cancel anytime before your trial ends and you won't be charged.
+            Create an account and try Receebo with up to {TRIAL_UPLOAD_LIMIT} receipt uploads over seven days.
+            Nothing is charged unless you choose a plan.
           </p>
+          <Link href="/sign-up" className="inline-flex mt-6 h-11 items-center rounded-full bg-foreground px-7 text-sm font-semibold text-background" data-testid="link-get-started-signup">
+            Create free account
+          </Link>
         </motion.div>
 
         {/* Plan cards */}
@@ -91,7 +96,7 @@ export default function GetStarted() {
                 <span className="text-4xl font-bold font-mono tracking-tight">€2.99</span>
                 <span className="text-sm text-muted-foreground">/ month</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">after 7-day free trial</p>
+              <p className="text-xs text-muted-foreground mt-1">Founding price, charged when you subscribe</p>
             </div>
 
             <ul className="space-y-2 flex-1 text-xs font-mono">
@@ -103,9 +108,9 @@ export default function GetStarted() {
               ))}
             </ul>
 
-            <Link href="/sign-up?plan=monthly">
+            <Link href="/sign-up">
               <Button variant="outline" size="sm" className="w-full rounded-full font-semibold">
-                Start free trial
+                Start with the free trial
               </Button>
             </Link>
           </motion.div>
@@ -132,17 +137,12 @@ export default function GetStarted() {
             />
 
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <p className="font-bold text-lg tracking-tight">Pro Yearly</p>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-background/20 border border-background/30 text-background">
-                  Save 30%
-                </span>
-              </div>
+              <p className="font-bold text-lg tracking-tight mb-1">Pro Yearly</p>
               <div className="flex items-baseline gap-1 mt-2">
                 <span className="text-4xl font-bold font-mono tracking-tight">€24.99</span>
                 <span className="text-sm opacity-70">/ year</span>
               </div>
-              <p className="text-xs opacity-60 mt-1">after 7-day free trial · €2.08/mo billed annually</p>
+              <p className="text-xs opacity-60 mt-1">Founding price, charged when you subscribe</p>
             </div>
 
             <ul className="space-y-2 flex-1 text-xs font-mono">
@@ -154,12 +154,12 @@ export default function GetStarted() {
               ))}
             </ul>
 
-            <Link href="/sign-up?plan=yearly">
+            <Link href="/sign-up">
               <Button
                 size="sm"
                 className="w-full rounded-full font-semibold bg-background text-foreground hover:bg-background/90"
               >
-                Start free trial
+                Start with the free trial
               </Button>
             </Link>
           </motion.div>
@@ -171,7 +171,7 @@ export default function GetStarted() {
           transition={{ delay: 0.5, duration: 0.4 }}
           className="mt-6 text-xs text-muted-foreground text-center"
         >
-          No charge for 7 days. Cancel before trial ends and pay nothing.
+          After the trial, choose a plan when you are ready. Founding prices stay available for as long as your account exists, including if you resubscribe later.
         </motion.p>
       </main>
     </div>

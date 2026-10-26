@@ -266,7 +266,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: fileName, size: blob.size, contentType }),
+          body: JSON.stringify({ name: fileName, size: blob.size, contentType, receiptId: Number(receiptId) }),
         },
       );
       await fetch(uploadInfo.uploadURL, {

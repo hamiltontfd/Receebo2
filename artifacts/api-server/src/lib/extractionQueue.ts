@@ -5,6 +5,7 @@ import { logger } from "./logger";
 import { sendReceiptReadyEmail } from "./emailService";
 import { isAccountDeletionInProgress } from "./accountDeletionState";
 import { withUserDataLock } from "./userDataLock";
+import { finishTrialUpload } from "./accountTrial";
 
 function deduplicateProducts(products: ExtractedProduct[]): ExtractedProduct[] {
   const seen = new Map<string, ExtractedProduct>();
@@ -41,6 +42,13 @@ export interface ExtractionJob {
 
 const activeJobs = new Map<number, boolean>();
 
+async function rejectReceipt(receiptId: number, objectPath: string, status: "failed" | "not_a_receipt") {
+  await db.transaction(async tx => {
+    await tx.update(receiptsTable).set({ status }).where(eq(receiptsTable.id, receiptId));
+    await finishTrialUpload(objectPath, false, receiptId, tx);
+  });
+}
+
 function backoffMs(attempt: number): number {
   return Math.min(1000 * Math.pow(2, attempt), 16000);
 }
@@ -59,10 +67,7 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
     const isReceipt = await checkIsReceipt(objectPath, contentType);
     if (!isReceipt) {
       logger.info({ receiptId }, "Pre-check determined image is not a receipt");
-      await db
-        .update(receiptsTable)
-        .set({ status: "not_a_receipt" })
-        .where(eq(receiptsTable.id, receiptId));
+      await rejectReceipt(receiptId, objectPath, "not_a_receipt");
       activeJobs.delete(receiptId);
       return;
     }
@@ -73,10 +78,7 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
     // (pre-check false positive), reject cleanly rather than writing null fields.
     if (!data.isReceipt) {
       logger.info({ receiptId }, "Full extraction confirmed image is not a receipt");
-      await db
-        .update(receiptsTable)
-        .set({ status: "not_a_receipt" })
-        .where(eq(receiptsTable.id, receiptId));
+      await rejectReceipt(receiptId, objectPath, "not_a_receipt");
       activeJobs.delete(receiptId);
       return;
     }
@@ -90,7 +92,8 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
       );
     }
 
-    await db
+    await db.transaction(async tx => {
+    await tx
       .update(receiptsTable)
       .set({
         status: "completed",
@@ -109,7 +112,8 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
         isOnlinePurchase: data.isOnlinePurchase,
       })
       .where(eq(receiptsTable.id, receiptId));
-
+    await finishTrialUpload(objectPath, true, receiptId, tx);
+    });
     logger.info({ receiptId, attempt }, "Extraction job completed");
 
     // Send "receipt ready" notification — fire and forget, never throws
@@ -149,10 +153,7 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
         "Extraction job exhausted all attempts, marking receipt as failed",
       );
       try {
-        await db
-          .update(receiptsTable)
-          .set({ status: "failed" })
-          .where(eq(receiptsTable.id, receiptId));
+        await rejectReceipt(receiptId, objectPath, "failed");
       } catch (dbError) {
         logger.error({ dbError, receiptId }, "Failed to mark receipt as failed in DB");
       }
@@ -176,6 +177,14 @@ export async function runDeletionAwareExtraction(
 
 async function processJob(job: ExtractionJob, attempt: number): Promise<void> {
   const processed = await runDeletionAwareExtraction(job.userId, async () => {
+    const [current] = await db.select({ status: receiptsTable.status })
+      .from(receiptsTable).where(eq(receiptsTable.id, job.receiptId));
+    // A watchdog or manual acceptance may have resolved a queued job before
+    // this worker obtained the lock. Never revive a released quota entry.
+    if (current && current.status !== "processing") {
+      activeJobs.delete(job.receiptId);
+      return;
+    }
     await processJobUnlocked(job, attempt);
   });
   if (!processed) {
@@ -202,22 +211,22 @@ async function runWatchdog(): Promise<void> {
   const cutoff = new Date(Date.now() - STUCK_THRESHOLD_MS);
 
   try {
-    const updated = await db
-      .update(receiptsTable)
-      .set({ status: "failed" })
+    const stuck = await db
+      .select()
+      .from(receiptsTable)
       .where(
         and(
           eq(receiptsTable.status, "processing"),
           lt(receiptsTable.createdAt, cutoff),
         ),
-      )
-      .returning({ id: receiptsTable.id });
-
-    if (updated.length > 0) {
-      logger.warn(
-        { count: updated.length, ids: updated.map((r) => r.id) },
-        "Watchdog marked stuck receipts as failed",
       );
+    for (const receipt of stuck) {
+      await withUserDataLock(receipt.userId, async () => {
+        const [current] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+        if (current?.status === "processing") {
+          await rejectReceipt(current.id, current.objectPath, "failed");
+        }
+      });
     }
   } catch (error) {
     logger.error({ error }, "Watchdog run failed");

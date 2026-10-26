@@ -4,7 +4,7 @@ import { clerkClient } from "@clerk/express";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { eq } from "drizzle-orm";
-import { db, userBillingTable, legalAcceptancesTable } from "@workspace/db";
+import { db, userBillingTable, legalAcceptancesTable, accountTrialsTable, trialUploadsTable } from "@workspace/db";
 import { getUncachableStripeClient } from "../stripeClient";
 import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 import { PRIVACY_VERSION, TERMS_VERSION } from "../lib/legalAcceptance";
@@ -42,6 +42,8 @@ describe.skipIf(!enabled)("hosted Stripe test journey with an ordinary authentic
     if (subscriptionId) await stripe.subscriptions.cancel(subscriptionId).catch(() => undefined);
     if (customerId) await stripe.customers.del(customerId).catch(() => undefined);
     if (userId) {
+      await db.delete(trialUploadsTable).where(eq(trialUploadsTable.userId, userId));
+      await db.delete(accountTrialsTable).where(eq(accountTrialsTable.userId, userId));
       await db.delete(userBillingTable).where(eq(userBillingTable.userId, userId));
       await db.delete(legalAcceptancesTable).where(eq(legalAcceptancesTable.userId, userId));
       await clerkClient.users.deleteUser(userId);
@@ -52,7 +54,7 @@ describe.skipIf(!enabled)("hosted Stripe test journey with an ordinary authentic
   }, 60000);
   it("completes hosted checkout, receives a real webhook and cancels through the portal", async () => {
     const origin = `https://${process.env.REPLIT_DEV_DOMAIN}`;
-    const context = await browser.newContext({ serviceWorkers: "block" });
+    const context = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
     await page.goto(origin);
     await page.waitForFunction(() => Boolean((window as any).Clerk?.loaded), { timeout: 30000 });
@@ -76,8 +78,18 @@ describe.skipIf(!enabled)("hosted Stripe test journey with an ordinary authentic
       expect(response.ok, `HTTP ${response.status} for ${path}`).toBe(true);
       return data;
     };
-    await request("/legal/acceptance", { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION, confirmedAge: true });
-    expect(await request("/billing/subscription")).toMatchObject({ plan: "free", ownerAccess: false });
+    expect(await request("/billing/subscription")).toMatchObject({ plan: "free", accessState: "not_started", ownerAccess: false });
+    await page.goto(`${origin}/search`);
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Agree and continue" }).click();
+    await page.getByTestId("banner-trial").waitFor({ timeout: 30000 });
+    expect(new URL(page.url()).hostname).toBe(new URL(origin).hostname);
+    expect(await request("/billing/subscription")).toMatchObject({
+      plan: "trialing", accessState: "account_trial", trialUploadsRemaining: 3,
+      foundingEligible: true, hasBillingAccount: false,
+    });
+    await page.screenshot({ path: "/tmp/receebo-account-trial-mobile.png" });
+    // An explicit early upgrade only: the account trial never opens Checkout.
     const checkout = await request("/billing/create-checkout-session", { planType: "monthly" });
     const [billing] = await db.select().from(userBillingTable).where(eq(userBillingTable.userId, userId));
     customerId = billing.stripeCustomerId;
@@ -109,14 +121,15 @@ describe.skipIf(!enabled)("hosted Stripe test journey with an ordinary authentic
         (await page.getByRole("alert").allTextContents()).join(" ").slice(0, 500)}`);
     }
     await expect.poll(async () => (await getSubscriptionStatus(userId)).plan, { timeout: 60000 })
-      .toBe("trialing");
+      .toBe("pro");
     const status = await getSubscriptionStatus(userId);
     expect(status.ownerAccess).not.toBe(true);
     subscriptionId = status.stripeSubscriptionId!;
     const stripe = await getUncachableStripeClient();
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     expect(subscription.livemode).toBe(false);
-    expect(subscription.trial_end! - subscription.trial_start!).toBe(7 * 86400);
+    expect(subscription.status).toBe("active");
+    expect(subscription.trial_end).toBeNull();
     const portal = await request("/billing/create-portal-session", {});
     await page.goto(portal.url);
     await page.waitForTimeout(2000);
@@ -135,7 +148,7 @@ describe.skipIf(!enabled)("hosted Stripe test journey with an ordinary authentic
       { timeout: 30000 }).toBe(true);
     await expect.poll(async () => (await getSubscriptionStatus(userId)).cancelAtPeriodEnd,
       { timeout: 60000 }).toBe(true);
-    expect((await request("/billing/subscription")).plan).toBe("trialing");
+    expect((await request("/billing/subscription")).plan).toBe("pro");
     await context.close();
   }, 180000);
 });

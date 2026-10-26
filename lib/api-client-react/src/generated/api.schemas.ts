@@ -5,6 +5,15 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface AccountTrialStartResult {
+  started: boolean;
+}
+
+export interface UploadReservationRelease {
+  /** @minLength 1 */
+  objectPath: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -50,6 +59,7 @@ export interface ReceiptAttachment {
 }
 
 export interface Receipt {
+  attachments?: ReceiptAttachment[];
   id: number;
   /** Storage path of the original uploaded file (e.g. /objects/uploads/uuid). */
   objectPath: string;
@@ -106,7 +116,6 @@ export interface Receipt {
   products?: ReceiptProduct[];
   /** Items flagged as notable (expensive or warranty-relevant). */
   notableItems?: NotableItem[];
-  attachments?: ReceiptAttachment[];
   createdAt: string;
 }
 
@@ -151,6 +160,8 @@ export interface MerchantSpend {
 }
 
 export interface UploadUrlRequest {
+  /** For supporting attachments only; binds the upload to an existing owned receipt. */
+  receiptId?: number;
   /**
      * Original file name.
      * @minLength 1
@@ -201,6 +212,20 @@ export interface ErrorEnvelope {
   error: string;
 }
 
+export type BillingAccessStatusAccessState = typeof BillingAccessStatusAccessState[keyof typeof BillingAccessStatusAccessState];
+
+
+export const BillingAccessStatusAccessState = {
+  not_started: 'not_started',
+  account_trial: 'account_trial',
+  trial_exhausted: 'trial_exhausted',
+  trial_expired: 'trial_expired',
+  legacy_stripe_trial: 'legacy_stripe_trial',
+  paid: 'paid',
+  owner: 'owner',
+  subscription_required: 'subscription_required',
+} as const;
+
 export type BillingAccessStatusPlan = typeof BillingAccessStatusPlan[keyof typeof BillingAccessStatusPlan];
 
 
@@ -211,6 +236,15 @@ export const BillingAccessStatusPlan = {
 } as const;
 
 export interface BillingAccessStatus {
+  accessState?: BillingAccessStatusAccessState;
+  /** @nullable */
+  trialUploadsRemaining?: number | null;
+  trialUploadsUsed?: number;
+  foundingEligible?: boolean;
+  canUpload?: boolean;
+  canUseApp?: boolean;
+  /** @nullable */
+  reviewReceiptId?: number | null;
   plan: BillingAccessStatusPlan;
   /** @nullable */
   trialEndAt: string | null;

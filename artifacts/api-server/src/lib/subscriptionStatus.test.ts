@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
 }));
 vi.mock("./ownerAccess", () => ({ hasOwnerAccess: mocks.hasOwnerAccess }));
+vi.mock("./accountTrial", () => ({ accountTrialStatus: async () => null }));
 vi.mock("@workspace/db", () => ({
   db: {
     select: () => ({
@@ -34,7 +35,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe("production entitlement and subscription status", () => {
   it("gives the verified owner Pro without any Stripe customer or subscription", async () => {
     mocks.hasOwnerAccess.mockResolvedValue(true);
-    expect(await getSubscriptionStatus("user_owner")).toEqual({
+    expect(await getSubscriptionStatus("user_owner")).toMatchObject({
       plan: "pro",
       ownerAccess: true,
       hasBillingAccount: false,

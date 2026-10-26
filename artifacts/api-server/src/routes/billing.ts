@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, userBillingTable } from "@workspace/db";
+import { db, userBillingTable, accountTrialsTable } from "@workspace/db";
+import { TRIAL_DURATION_MS } from "../lib/accountTrial";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
 import { lockUserDataMutation } from "../lib/userDataLock";
@@ -28,6 +29,8 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
   try {
     const status = await getSubscriptionStatus(req.userId!);
     res.json({
+      ...status,
+      stripeSubscriptionId: undefined,
       plan: status.plan,
       trialEndAt: status.trialEndAt?.toISOString() ?? null,
       currentPeriodEnd: status.currentPeriodEnd?.toISOString() ?? null,
@@ -40,6 +43,22 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
     res.status(500).json({ error: "Failed to load subscription" });
   }
 });
+
+router.post("/billing/start-trial", requireAuth, requireCurrentLegalAcceptance,
+  lockUserDataMutation(async (req, res): Promise<void> => {
+    const status = await getSubscriptionStatus(req.userId!);
+    if (status.accessState === "not_started") {
+      const startedAt = new Date();
+      await db.insert(accountTrialsTable).values({
+        userId: req.userId!,
+        startedAt,
+        endsAt: new Date(startedAt.getTime() + TRIAL_DURATION_MS),
+        monthlyPriceId: billingPriceId("monthly"),
+        yearlyPriceId: billingPriceId("yearly"),
+      }).onConflictDoNothing();
+    }
+    res.json({ started: true });
+  }));
 
 /** POST /billing/create-checkout-session — start Stripe Checkout */
 router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegalAcceptance, lockUserDataMutation(async (req, res): Promise<void> => {
@@ -66,11 +85,19 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
   const userId = req.userId!;
 
   try {
+    const status = await getSubscriptionStatus(userId);
+    if (status.plan === "pro" || status.accessState === "legacy_stripe_trial") {
+      res.status(409).json({ error: "SUBSCRIPTION_ALREADY_ACTIVE", message: "Manage your existing subscription in billing." });
+      return;
+    }
     // Resolve configuration before creating customers or checkout sessions.
     const base = billingOrigin();
     const stripe = await getUncachableStripeClient();
     // Reject mixed-mode or wrong-interval prices before creating a customer.
-    const price = await stripe.prices.retrieve(priceId);
+    const [eligibility] = await db.select().from(accountTrialsTable)
+      .where(eq(accountTrialsTable.userId, userId));
+    const protectedPriceId = (planType === "yearly" ? eligibility?.yearlyPriceId : eligibility?.monthlyPriceId) ?? priceId;
+    const price = await stripe.prices.retrieve(protectedPriceId);
     const expectedInterval = planType === "yearly" ? "year" : "month";
     if (!price.active || price.livemode !== (process.env.NODE_ENV === "production") ||
       price.recurring?.interval !== expectedInterval || price.recurring.interval_count !== 1 ||
@@ -109,12 +136,30 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
       customerId = upserted?.stripeCustomerId ?? customerId;
     }
 
+    // Stripe is authoritative even while webhook synchronization is delayed.
+    const subscriptions = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 });
+    if (subscriptions.data.some(s => ["active", "trialing", "past_due", "unpaid", "incomplete"].includes(s.status))) {
+      res.status(409).json({ error: "SUBSCRIPTION_ALREADY_ACTIVE", message: "Manage your existing subscription in billing." });
+      return;
+    }
+    // Freeze both intervals on first explicit checkout, independently of payment success.
+    // Abandoning checkout never removes founding eligibility.
+    if (eligibility) {
+      await db.update(accountTrialsTable).set({
+        monthlyPriceId: eligibility.monthlyPriceId ?? (planType === "monthly" ? protectedPriceId : billingPriceId("monthly")),
+        yearlyPriceId: eligibility.yearlyPriceId ?? (planType === "yearly" ? protectedPriceId : billingPriceId("yearly")),
+      }).where(eq(accountTrialsTable.userId, userId));
+    }
+    const openSessions = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 100 });
+    for (const open of openSessions.data) {
+      await stripe.checkout.sessions.expire(open.id);
+    }
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{ price: protectedPriceId, quantity: 1 }],
       mode: "subscription",
-      subscription_data: { trial_period_days: 7 },
+      subscription_data: { metadata: { userId, offer: "founding_customer" } },
       success_url: `${base}/search?checkout=success`,
       cancel_url: `${base}/search?checkout=cancel`,
     });

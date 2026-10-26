@@ -3,12 +3,10 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/react";
-import { useCreateCheckout } from "@/hooks/useBilling";
 import { fadeInUp, stagger } from "./shared";
 
 export default function FinalCTASection() {
   const { isSignedIn } = useAuth();
-  const checkout = useCreateCheckout();
 
   return (
     <section className="py-28 lg:py-36 bg-foreground text-background overflow-hidden relative">
@@ -41,35 +39,21 @@ export default function FinalCTASection() {
           </motion.div>
 
           <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-3">
-            {isSignedIn ? (
+            <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-final-trial">
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                 <Button
                   size="lg"
-                  onClick={() => checkout.mutate("yearly")}
-                  disabled={checkout.isPending}
                   className="rounded-full h-14 px-10 text-base font-semibold bg-background text-foreground hover:bg-background/90 gap-2 shadow-lg"
                 >
-                  {checkout.isPending ? "Loading…" : "Start your 7-day free trial"}
+                  {isSignedIn ? "Open Receebo" : "Start free, no card needed"}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </motion.div>
-            ) : (
-              <Link href="/sign-up?plan=yearly">
-                <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                  <Button
-                    size="lg"
-                    className="rounded-full h-14 px-10 text-base font-semibold bg-background text-foreground hover:bg-background/90 gap-2 shadow-lg"
-                  >
-                    Start your 7-day free trial
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </motion.div>
-              </Link>
-            )}
+            </Link>
           </motion.div>
 
           <motion.p variants={fadeInUp} className="text-sm text-background/40">
-            7-day free trial · Cancel any time · No hidden fees
+            7 days · 3 receipt uploads · No card needed
           </motion.p>
         </motion.div>
       </div>

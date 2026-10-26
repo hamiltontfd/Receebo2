@@ -1,6 +1,7 @@
 import { db, userBillingTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { hasOwnerAccess } from "./ownerAccess";
+import { accountTrialStatus } from "./accountTrial";
 
 export type UserPlan = "free" | "trialing" | "pro";
 
@@ -12,6 +13,13 @@ export interface SubscriptionStatus {
   stripeSubscriptionId: string | null;
   ownerAccess?: boolean;
   hasBillingAccount?: boolean;
+  accessState?: "not_started" | "account_trial" | "trial_exhausted" | "trial_expired" | "legacy_stripe_trial" | "paid" | "owner" | "subscription_required";
+  trialUploadsRemaining?: number | null;
+  trialUploadsUsed?: number;
+  foundingEligible?: boolean;
+  canUpload?: boolean;
+  canUseApp?: boolean;
+  reviewReceiptId?: number | null;
 }
 
 const FREE: SubscriptionStatus = {
@@ -25,13 +33,29 @@ const FREE: SubscriptionStatus = {
 export async function getSubscriptionStatus(userId: string): Promise<SubscriptionStatus> {
   const ownerAccess = await hasOwnerAccess(userId);
   const status = await getPaidSubscriptionStatus(userId);
-  if (!ownerAccess) return status;
+  const trial = await accountTrialStatus(userId);
+  const accessState: NonNullable<SubscriptionStatus["accessState"]> = ownerAccess ? "owner" : status.plan === "pro" ? "paid" :
+    status.plan === "trialing" ? "legacy_stripe_trial" : trial?.state ??
+      (status.stripeSubscriptionId ? "subscription_required" : "not_started");
+  const canUseApp = ["owner", "paid", "legacy_stripe_trial", "account_trial"].includes(accessState);
+  const enriched = {
+    ...status, accessState, canUseApp,
+    canUpload: canUseApp && (accessState !== "account_trial" || (trial?.remaining ?? 0) > 0),
+    trialUploadsRemaining: trial ? trial.remaining : null,
+    trialUploadsUsed: trial?.used ?? 0,
+    foundingEligible: Boolean(trial),
+    reviewReceiptId: accessState === "trial_exhausted" || accessState === "trial_expired"
+      ? trial?.reviewReceiptId ?? null : null,
+    ...(accessState === "account_trial" ? { plan: "trialing" as const, trialEndAt: trial!.trial.endsAt } :
+      trial && status.plan === "free" ? { trialEndAt: trial.trial.endsAt } : {}),
+  };
+  if (!ownerAccess) return enriched;
   const [billing] = await db
     .select({ stripeSubscriptionId: userBillingTable.stripeSubscriptionId })
     .from(userBillingTable)
     .where(eq(userBillingTable.userId, userId));
   return {
-    ...status,
+    ...enriched,
     plan: "pro",
     ownerAccess: true,
     hasBillingAccount: Boolean(billing),
@@ -46,25 +70,14 @@ export async function getSubscriptionStatus(userId: string): Promise<Subscriptio
 async function getPaidSubscriptionStatus(userId: string): Promise<SubscriptionStatus> {
   if (!userId || userId.startsWith("guest")) return FREE;
 
-  // Development-only bypass: treat every signed-in user as having full access
-  // so the app can be tested without a real Stripe subscription. Driven purely
-  // by NODE_ENV — production builds always enforce the real paywall.
-  if (process.env.NODE_ENV !== "production" && process.env.BILLING_ENFORCE_TEST_SUBSCRIPTIONS !== "true") {
-    return {
-      plan: "pro",
-      trialEndAt: null,
-      currentPeriodEnd: null,
-      cancelAtPeriodEnd: false,
-      stripeSubscriptionId: null,
-    };
-  }
-
   const [billing] = await db
-    .select({ stripeCustomerId: userBillingTable.stripeCustomerId })
+    .select({ stripeCustomerId: userBillingTable.stripeCustomerId, stripeSubscriptionId: userBillingTable.stripeSubscriptionId })
     .from(userBillingTable)
     .where(eq(userBillingTable.userId, userId));
 
   if (!billing?.stripeCustomerId) return FREE;
+  const inactive: SubscriptionStatus = { ...FREE, hasBillingAccount: true,
+    stripeSubscriptionId: billing.stripeSubscriptionId ?? null };
 
   let rows: Array<{
     id: string;
@@ -89,10 +102,10 @@ async function getPaidSubscriptionStatus(userId: string): Promise<SubscriptionSt
     rows = result.rows as typeof rows;
   } catch {
     // stripe schema not yet created (Stripe not connected)
-    return FREE;
+    return inactive;
   }
 
-  if (!rows.length) return FREE;
+  if (!rows.length) return inactive;
 
   const sub = rows[0];
   const now = new Date();
@@ -119,5 +132,5 @@ async function getPaidSubscriptionStatus(userId: string): Promise<SubscriptionSt
     plan = "pro";
   }
 
-  return { plan, trialEndAt, currentPeriodEnd, cancelAtPeriodEnd, stripeSubscriptionId: sub.id };
+  return { plan, trialEndAt, currentPeriodEnd, cancelAtPeriodEnd, stripeSubscriptionId: sub.id, hasBillingAccount: true };
 }

@@ -36,6 +36,7 @@ vi.mock("../lib/legalAcceptance", () => ({
     req.headers["x-test-consent"] === "accepted" ? next() : res.sendStatus(428),
 }));
 vi.mock("../lib/userDataLock", () => ({ lockUserDataMutation: (handler: any) => handler }));
+vi.mock("../lib/accountTrial", () => ({ accountTrialStatus: async () => null }));
 vi.mock("../lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -44,17 +45,19 @@ vi.mock("../stripeClient", () => ({
   getUncachableStripeClient: async () => ({
     customers: { create: state.customer },
     prices: { retrieve: state.price },
-    checkout: { sessions: { create: state.checkout } },
+    checkout: { sessions: { create: state.checkout, list: async () => ({ data: [] }) } },
+    subscriptions: { list: async () => ({ data: [] }) },
     billingPortal: { sessions: { create: state.portal } },
   }),
   getStripeSync: async () => ({ processWebhook: state.sync }),
 }));
 vi.mock("@workspace/db", () => ({
+  accountTrialsTable: { userId: "trialUserId" },
   userBillingTable: {
     userId: "userId", stripeCustomerId: "stripeCustomerId", stripeSubscriptionId: "stripeSubscriptionId",
   },
   db: {
-    select: () => ({ from: () => ({ where: async () => state.billing ? [state.billing] : [] }) }),
+    select: () => ({ from: (table: any) => ({ where: async () => table.userId === "trialUserId" ? [] : state.billing ? [state.billing] : [] }) }),
     insert: () => ({ values: (values: any) => ({
       onConflictDoUpdate: () => ({ returning: async () => {
         state.billing = values;
@@ -166,7 +169,7 @@ describe("ordinary user billing, with isolated Stripe and database adapters", ()
     expect(state.checkout).toHaveBeenCalledWith(expect.objectContaining({
       customer: "cus_fixture", mode: "subscription",
       line_items: [{ price: `price_${planType}_fixture`, quantity: 1 }],
-      subscription_data: { trial_period_days: 7 },
+      subscription_data: { metadata: { userId: "ordinary_user", offer: "founding_customer" } },
       success_url: "https://receebo.net/search?checkout=success",
       cancel_url: "https://receebo.net/search?checkout=cancel",
     }));
@@ -263,6 +266,15 @@ describe("ordinary user billing, with isolated Stripe and database adapters", ()
       customer: "cus_fixture", parent: { subscription_details: { subscription: "sub_fixture" } },
     })).status).toBe(200);
     expect(await status()).toMatchObject({ plan: "pro", ownerAccess: false });
+  });
+  it("never grants a second trial to an expired legacy Stripe trial customer", async () => {
+    state.billing = { userId: "ordinary_user", stripeCustomerId: "cus_fixture", stripeSubscriptionId: "sub_fixture" };
+    state.subscription = subscription({
+      status: "canceled", trial_end: 1, current_period_end: 1,
+    });
+    expect(await status()).toMatchObject({ plan: "free", accessState: "subscription_required" });
+    expect((await post("/billing/start-trial")).status).toBe(200);
+    expect(await status()).toMatchObject({ plan: "free", accessState: "subscription_required" });
   });
   it("rejects an invalid signature before updating customer access", async () => {
     state.billing = { userId: "ordinary_user", stripeCustomerId: "cus_fixture" };

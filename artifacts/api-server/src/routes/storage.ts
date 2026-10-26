@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { and, eq } from "drizzle-orm";
-import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable } from "@workspace/db";
+import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, trialUploadsTable } from "@workspace/db";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -9,6 +9,9 @@ import {
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { lockUserDataMutation } from "../lib/userDataLock";
+import { getSubscriptionStatus } from "../lib/subscriptionStatus";
+import { reserveTrialUpload } from "../lib/accountTrial";
+import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -29,7 +32,7 @@ router.use(["/storage/objects", "/storage/uploads"], (_req, res, next) => {
  * The client sends JSON metadata (name, size, contentType) — NOT the file.
  * Then uploads the file directly to the returned presigned URL.
  */
-router.post("/storage/uploads/request-url", requireAuthOrGuest, lockUserDataMutation(async (req: Request, res: Response) => {
+router.post("/storage/uploads/request-url", requireAuthOrGuest, requireCurrentLegalAcceptance, lockUserDataMutation(async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });
@@ -38,16 +41,40 @@ router.post("/storage/uploads/request-url", requireAuthOrGuest, lockUserDataMuta
 
   try {
     const { name, size, contentType } = parsed.data;
+    const subscription = await getSubscriptionStatus(req.userId!);
+    const attachmentReceiptId = req.body.receiptId;
+    if (!subscription.canUseApp || (attachmentReceiptId === undefined && !subscription.canUpload)) {
+      res.status(403).json({ error: "subscription_required", code: subscription.accessState,
+        message: subscription.canUseApp ? "All remaining trial uploads are processing. Please wait or upgrade." :
+          "Your trial has ended. Subscribe as a Founding Customer to continue." });
+      return;
+    }
+    if (attachmentReceiptId !== undefined) {
+      if (!Number.isSafeInteger(attachmentReceiptId)) {
+        res.status(400).json({ error: "Invalid receiptId" }); return;
+      }
+      const [receipt] = await db.select({ id: receiptsTable.id }).from(receiptsTable)
+        .where(and(eq(receiptsTable.userId, req.userId!), eq(receiptsTable.id, attachmentReceiptId)));
+      if (!receipt) { res.status(404).json({ error: "Receipt not found" }); return; }
+    }
 
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    const deadline = subscription.accessState === "account_trial" && subscription.trialEndAt
+      ? Math.min(Date.now() + 15 * 60 * 1000, subscription.trialEndAt.getTime())
+      : Date.now() + 15 * 60 * 1000;
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL(Math.max(0, (deadline - Date.now()) / 1000));
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+    const expiresAt = new Date(deadline);
+    if (subscription.accessState === "account_trial" && attachmentReceiptId === undefined) {
+      await reserveTrialUpload(req.userId!, objectPath, expiresAt);
+    }
 
     // Bind this presigned URL to the requesting user so we can verify ownership
     // when they later create a receipt or attachment referencing this objectPath.
     await db.insert(uploadIntentsTable).values({
       userId: req.userId!,
       objectPath,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+      attachmentReceiptId: attachmentReceiptId ?? null,
+      expiresAt,
     });
 
     res.json(
@@ -58,9 +85,34 @@ router.post("/storage/uploads/request-url", requireAuthOrGuest, lockUserDataMuta
       }),
     );
   } catch (error) {
+    if (error instanceof Error && error.message === "TRIAL_UPLOAD_LIMIT") {
+      res.status(403).json({ error: "subscription_required", code: "TRIAL_UPLOAD_LIMIT",
+        message: "Your trial has ended or all remaining uploads are reserved. Check your plan." });
+      return;
+    }
     req.log.error({ err: error }, "Error generating upload URL");
     res.status(500).json({ error: "Failed to generate upload URL" });
   }
+}));
+
+// Safely abandon a failed transfer. A consumed/processing/successful upload
+// cannot be released or reused by this endpoint, including a lost POST response.
+router.post("/storage/uploads/release", requireAuthOrGuest, lockUserDataMutation(async (req, res) => {
+  if (typeof req.body.objectPath !== "string") {
+    res.status(400).json({ error: "objectPath required" }); return;
+  }
+  await db.transaction(async tx => {
+    await tx.delete(uploadIntentsTable).where(and(
+      eq(uploadIntentsTable.objectPath, req.body.objectPath),
+      eq(uploadIntentsTable.userId, req.userId!),
+    ));
+    await tx.update(trialUploadsTable).set({ state: "released" }).where(and(
+      eq(trialUploadsTable.objectPath, req.body.objectPath),
+      eq(trialUploadsTable.userId, req.userId!),
+      eq(trialUploadsTable.state, "reserved"),
+    ));
+  });
+  res.sendStatus(204);
 }));
 
 /**
@@ -170,6 +222,11 @@ router.get("/storage/objects/*path", requireAuthOrGuest, async (req: Request, re
         res.status(404).json({ error: "Object not found" });
         return;
       }
+    }
+    const access = await getSubscriptionStatus(req.userId!);
+    if (!access.canUseApp && ownedByReceipt?.id !== access.reviewReceiptId) {
+      res.status(403).json({ error: "subscription_required", code: access.accessState });
+      return;
     }
 
     const objectFile = await objectStorageService.getObjectEntityFile(objectPath);

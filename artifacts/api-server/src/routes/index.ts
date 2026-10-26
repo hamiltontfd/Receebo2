@@ -10,10 +10,13 @@ import notificationsRouter from "./notifications";
 import gmailRouter from "./gmail";
 import pushRouter from "./push";
 import accountRouter from "./account";
+import { requireAuthOrGuest } from "../middlewares/guestAuth";
+import { requireProductAccess } from "../middlewares/productAccess";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(["/receipts", "/gmail/sync", "/gmail/pending", "/storage/objects"], requireAuthOrGuest, requireProductAccess);
 router.use(storageRouter);
 router.use(receiptsRouter);
 router.use(attachmentsRouter);

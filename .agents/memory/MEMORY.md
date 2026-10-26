@@ -13,3 +13,4 @@
 - [Brand icons](brand-icons.md) — favicon and installed-app icons use the original SVG symbol without the wordmark, on a white background.
 - [Stripe environment isolation](stripe-environment-isolation.md) — connector test mode does not imply backend test mode; inspect effective credentials and price compatibility separately.
 - [Login navigation](login-navigation.md) — login must be a dismissible modal over the landing page, including in the installed web app.
+- [Founding customer offer](founding-trial-policy.md) — no-card account trials and legacy Stripe trials are distinct; founding eligibility lasts while the account exists.

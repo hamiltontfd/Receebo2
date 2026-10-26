@@ -26,3 +26,4 @@ export * from "./uploadIntents";
 export * from "./pushSubscriptions";
 export * from "./legalAcceptances";
 export * from "./accountDeletionRequests";
+export * from "./accountTrials";

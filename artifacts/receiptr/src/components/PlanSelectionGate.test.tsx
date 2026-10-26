@@ -1,35 +1,138 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ billing: {} as Record<string, unknown> }));
-vi.mock("@/hooks/useBilling", () => ({
-  useBillingStatus: () => ({ data: mocks.billing, isLoading: false }),
-  useCreateCheckout: () => ({ isPending: false, mutate: vi.fn() }),
+const mocks = vi.hoisted(() => ({
+  billing: {} as Record<string, unknown> | undefined,
+  isError: false,
+  location: "/search",
+  startTrial: vi.fn(),
+  startTrialError: false,
+  checkout: vi.fn(),
+  refetch: vi.fn(),
 }));
-vi.mock("@clerk/react", () => ({ useClerk: () => ({ signOut: vi.fn() }) }));
-import { PlanSelectionGate } from "./PlanSelectionGate";
+
+vi.mock("@/hooks/useBilling", async () => {
+  const actual = await vi.importActual<typeof import("@/hooks/useBilling")>("@/hooks/useBilling");
+  return {
+    ...actual,
+    useBillingStatus: () => ({
+      data: mocks.billing,
+      isLoading: false,
+      isError: mocks.isError,
+      isFetching: false,
+      refetch: mocks.refetch,
+    }),
+    useStartTrial: () => ({ mutate: mocks.startTrial, isPending: false, isError: mocks.startTrialError }),
+    useTrialExpiryTimer: () => undefined,
+    useCreateCheckout: () => ({ isPending: false, variables: undefined, mutate: mocks.checkout }),
+  };
+});
+vi.mock("@clerk/react", () => ({ useClerk: () => ({ signOut: vi.fn() }), useAuth: () => ({ isSignedIn: true }) }));
+vi.mock("wouter", () => ({
+  useLocation: () => [mocks.location, vi.fn()],
+  Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
+}));
+
+import { PlanSelectionGate, ACTIVE_REVIEW_KEY } from "./PlanSelectionGate";
+
+const renderGate = () =>
+  render(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
 
 beforeEach(() => {
   sessionStorage.clear();
-  mocks.billing = { plan: "pro" };
+  mocks.billing = { plan: "pro", accessState: "paid", canUseApp: true, canUpload: true };
+  mocks.isError = false;
+  mocks.location = "/search";
+  mocks.startTrial.mockReset();
+  mocks.checkout.mockReset();
+  mocks.startTrialError = false;
 });
 
-describe("owner plan selection", () => {
-  it("admits owners even when a landing-page plan selection was pending", () => {
+describe("PlanSelectionGate", () => {
+  it("admits owners even when a legacy pending plan exists", () => {
     sessionStorage.setItem("receebo:pendingPlan", "monthly");
-    mocks.billing = { plan: "pro", ownerAccess: true };
-    render(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
+    mocks.billing = { plan: "pro", ownerAccess: true, accessState: "owner", canUseApp: true };
+    renderGate();
     expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
   });
 
   it("retains paid-user access", () => {
-    render(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
+    renderGate();
     expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
   });
 
-  it("does not admit ordinary unpaid users", () => {
-    mocks.billing = { plan: "free" };
-    render(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
+  it("admits account-trial users without starting checkout", () => {
+    mocks.billing = { plan: "free", accessState: "account_trial", canUseApp: true, canUpload: true, trialUploadsRemaining: 2 };
+    renderGate();
+    expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
+    expect(mocks.checkout).not.toHaveBeenCalled();
+  });
+
+  it("initializes the trial via POST when not started", () => {
+    mocks.billing = { plan: "free", accessState: "not_started", canUseApp: false };
+    renderGate();
+    expect(mocks.startTrial).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Protected receipt library")).not.toBeInTheDocument();
+    expect(mocks.checkout).not.toHaveBeenCalled();
+  });
+
+  it("shows retry when trial initialization fails", () => {
+    mocks.billing = { plan: "free", accessState: "not_started", canUseApp: false };
+    mocks.startTrialError = true;
+    renderGate();
+    fireEvent.click(screen.getByTestId("button-billing-retry"));
+    expect(mocks.startTrial).toHaveBeenCalled();
+  });
+
+  it("fails closed with retry when billing cannot load", () => {
+    mocks.billing = undefined;
+    mocks.isError = true;
+    renderGate();
+    expect(screen.queryByText("Protected receipt library")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("button-billing-retry"));
+    expect(mocks.refetch).toHaveBeenCalled();
+  });
+
+  it("fails closed for unknown access data", () => {
+    mocks.billing = { plan: "free" };
+    renderGate();
+    expect(screen.queryByText("Protected receipt library")).not.toBeInTheDocument();
+  });
+
+  it("paywalls exhausted trials with explicit plans and no savings copy", () => {
+    mocks.billing = { plan: "free", accessState: "trial_exhausted", canUseApp: false, canUpload: false, reviewReceiptId: 42, foundingEligible: true };
+    renderGate();
+    expect(screen.getByTestId("text-paywall-title").textContent).toContain("3 trial uploads");
+    expect(screen.getByTestId("link-review-last-receipt").getAttribute("href")).toBe("/receipts/42");
+    expect(document.body.textContent).not.toMatch(/Save \d+%|\/mo billed/);
+    fireEvent.click(screen.getByTestId("button-subscribe-yearly"));
+    expect(mocks.checkout).toHaveBeenCalledWith("yearly");
+  });
+
+  it("allows the review receipt, settings and profile when exhausted", () => {
+    mocks.billing = { plan: "free", accessState: "trial_exhausted", canUseApp: false, reviewReceiptId: 42 };
+    for (const path of ["/receipts/42", "/settings", "/profile"]) {
+      mocks.location = path;
+      const { unmount } = renderGate();
+      expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
+      unmount();
+    }
+    mocks.location = "/receipts/41";
+    renderGate();
+    expect(screen.queryByText("Protected receipt library")).not.toBeInTheDocument();
+  });
+
+  it("keeps an in-progress scan review of the final upload open", () => {
+    mocks.billing = { plan: "free", accessState: "trial_exhausted", canUseApp: false, reviewReceiptId: 7 };
+    mocks.location = "/scan";
+    sessionStorage.setItem(ACTIVE_REVIEW_KEY, "7");
+    renderGate();
+    expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
+  });
+
+  it("paywalls expired trials", () => {
+    mocks.billing = { plan: "free", accessState: "trial_expired", canUseApp: false };
+    renderGate();
+    expect(screen.getByTestId("text-paywall-title").textContent).toContain("seven-day trial has ended");
   });
 });

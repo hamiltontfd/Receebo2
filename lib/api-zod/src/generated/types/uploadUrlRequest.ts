@@ -7,6 +7,8 @@
  */
 
 export interface UploadUrlRequest {
+  /** For supporting attachments only; binds the upload to an existing owned receipt. */
+  receiptId?: number;
   /**
      * Original file name.
      * @minLength 1

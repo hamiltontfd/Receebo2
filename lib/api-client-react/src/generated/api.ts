@@ -23,6 +23,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccountTrialStartResult,
   BillingAccessStatus,
   CheckSimilarReceiptParams,
   ErrorEnvelope,
@@ -37,6 +38,7 @@ import type {
   ReceiptStats,
   ReceiptUpdate,
   SimilarReceiptMatch,
+  UploadReservationRelease,
   UploadUrlRequest,
   UploadUrlResponse
 } from './api.schemas';
@@ -52,6 +54,147 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getStartAccountTrialUrl = () => {
+
+
+
+
+  return `/api/billing/start-trial`
+}
+
+/**
+ * @summary Start the seven-day no-card account trial once after legal consent
+ */
+export const startAccountTrial = async ( options?: RequestInit): Promise<AccountTrialStartResult> => {
+
+  return customFetch<AccountTrialStartResult>(getStartAccountTrialUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getStartAccountTrialMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startAccountTrial>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startAccountTrial>>, TError,void, TContext> => {
+
+const mutationKey = ['startAccountTrial'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startAccountTrial>>, void> = () => {
+
+
+          return  startAccountTrial(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartAccountTrialMutationResult = NonNullable<Awaited<ReturnType<typeof startAccountTrial>>>
+
+    export type StartAccountTrialMutationError = ErrorType<void>
+
+    /**
+ * @summary Start the seven-day no-card account trial once after legal consent
+ */
+export const useStartAccountTrial = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startAccountTrial>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startAccountTrial>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getStartAccountTrialMutationOptions(options));
+    }
+
+export const getReleaseUploadReservationUrl = () => {
+
+
+
+
+  return `/api/storage/uploads/release`
+}
+
+/**
+ * @summary Release an unconsumed failed upload transfer without restoring successful uses
+ */
+export const releaseUploadReservation = async (uploadReservationRelease: UploadReservationRelease, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getReleaseUploadReservationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      uploadReservationRelease,)
+  }
+);}
+
+
+
+
+export const getReleaseUploadReservationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof releaseUploadReservation>>, TError,{data: BodyType<UploadReservationRelease>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof releaseUploadReservation>>, TError,{data: BodyType<UploadReservationRelease>}, TContext> => {
+
+const mutationKey = ['releaseUploadReservation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof releaseUploadReservation>>, {data: BodyType<UploadReservationRelease>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  releaseUploadReservation(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReleaseUploadReservationMutationResult = NonNullable<Awaited<ReturnType<typeof releaseUploadReservation>>>
+    export type ReleaseUploadReservationMutationBody = BodyType<UploadReservationRelease>
+    export type ReleaseUploadReservationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Release an unconsumed failed upload transfer without restoring successful uses
+ */
+export const useReleaseUploadReservation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof releaseUploadReservation>>, TError,{data: BodyType<UploadReservationRelease>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof releaseUploadReservation>>,
+        TError,
+        {data: BodyType<UploadReservationRelease>},
+        TContext
+      > => {
+      return useMutation(getReleaseUploadReservationMutationOptions(options));
+    }
 
 export const getFetchBillingAccessStatusUrl = () => {
 

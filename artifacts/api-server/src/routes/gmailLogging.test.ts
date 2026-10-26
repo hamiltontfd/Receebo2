@@ -2,6 +2,9 @@ import express from "express";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("../lib/subscriptionStatus", () => ({
+  getSubscriptionStatus: async () => ({ canUseApp: true, canUpload: true }),
+}));
 
 const mocks = vi.hoisted(() => ({
   lines: [] as string[],

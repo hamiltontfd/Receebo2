@@ -31,7 +31,7 @@ const plans = [
     name: "Yearly",
     price: "€24.99",
     period: "/year",
-    badge: "Save 30%",
+    badge: null,
     highlight: true,
   },
 ];
@@ -61,7 +61,7 @@ export default function PricingSection() {
             Simple, transparent pricing.
           </motion.h2>
           <motion.p variants={fadeInUp} className="text-muted-foreground mt-3 text-lg">
-            7-day free trial. Cancel any time. No surprises.
+            Try it free for seven days with three receipt uploads, no card needed. Subscribe only if you want to keep going.
           </motion.p>
         </motion.div>
 
@@ -134,7 +134,7 @@ export default function PricingSection() {
                     highlight ? "text-white/50" : "text-muted-foreground",
                   )}
                 >
-                  7-day free trial included
+                  Founding price, charged when you subscribe
                 </p>
               </div>
 
@@ -166,10 +166,10 @@ export default function PricingSection() {
                       "border-white/30 text-white hover:bg-white/10 bg-white/10",
                   )}
                 >
-                  {checkout.isPending ? "Loading…" : "Start free trial"}
+                  {checkout.isPending ? "Loading…" : `Subscribe ${price}${period}`}
                 </Button>
               ) : (
-                <Link href={`/sign-up?plan=${key}`}>
+                <Link href="/sign-up">
                   <Button
                     variant={highlight ? "outline" : "default"}
                     className={cn(
@@ -178,7 +178,7 @@ export default function PricingSection() {
                         "border-white/30 text-white hover:bg-white/10 bg-white/10",
                     )}
                   >
-                    Start free trial
+                    Start free, no card needed
                   </Button>
                 </Link>
               )}
@@ -194,7 +194,7 @@ export default function PricingSection() {
           viewport={VIEWPORT}
           className="text-center text-sm text-muted-foreground mt-8"
         >
-          We'll remind you before your trial ends. Cancel anytime with one click.
+          Founding prices stay available for as long as your account exists, including if you cancel and resubscribe. Cancel renewal anytime.
         </motion.p>
       </div>
     </section>

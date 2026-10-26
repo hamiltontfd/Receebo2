@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accountTrialStartResult';
 export * from './billingAccessStatus';
+export * from './billingAccessStatusAccessState';
 export * from './billingAccessStatusPlan';
 export * from './checkSimilarReceiptParams';
 export * from './errorEnvelope';
@@ -23,5 +25,6 @@ export * from './receiptStats';
 export * from './receiptStatus';
 export * from './receiptUpdate';
 export * from './similarReceiptMatch';
+export * from './uploadReservationRelease';
 export * from './uploadUrlRequest';
 export * from './uploadUrlResponse';

@@ -816,7 +816,12 @@ async function syncUserGmailClaimed(
 export async function syncUserGmail(
   userId: string,
 ): Promise<{ checked: number; queued: number }> {
-  return withUserDataLock(userId, () => syncUserGmailClaimed(userId));
+  return withUserDataLock(userId, async () => {
+    const { getSubscriptionStatus } = await import("./subscriptionStatus");
+    const access = await getSubscriptionStatus(userId);
+    if (!access.canUpload) return { checked: 0, queued: 0 };
+    return syncUserGmailClaimed(userId);
+  });
 }
 
 /** Sweep all connected Gmail accounts. Called by the scheduler. */

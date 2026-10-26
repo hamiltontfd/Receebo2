@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, desc, eq, gt, ilike, lt, or, sql } from "drizzle-orm";
-import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable } from "@workspace/db";
+import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, trialUploadsTable } from "@workspace/db";
 import {
   CreateReceiptBody,
   ListReceiptsResponse,
@@ -23,6 +23,7 @@ import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 import { lockUserDataMutation } from "../lib/userDataLock";
+import { consumeTrialReservation, accountTrialStatus } from "../lib/accountTrial";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -104,10 +105,11 @@ router.post("/receipts", requireAuthOrGuest, lockUserDataMutation(async (req, re
 
   // Free users (no active subscription) cannot upload receipts at all
   const subscription = await getSubscriptionStatus(userId);
-  if (subscription.plan === "free") {
+  if (!subscription.canUseApp) {
     res.status(403).json({
       error: "subscription_required",
-      message: "An active subscription is required to upload receipts.",
+      code: subscription.accessState,
+      message: "Your trial has ended. Subscribe as a Founding Customer to upload more receipts.",
     });
     return;
   }
@@ -129,9 +131,9 @@ router.post("/receipts", requireAuthOrGuest, lockUserDataMutation(async (req, re
           gt(uploadIntentsTable.expiresAt, new Date()),
         ),
       )
-      .returning({ id: uploadIntentsTable.id });
+      .returning();
 
-    if (!intent) {
+    if (!intent || intent.attachmentReceiptId != null) {
       intentMissing = true;
       return;
     }
@@ -150,6 +152,9 @@ router.post("/receipts", requireAuthOrGuest, lockUserDataMutation(async (req, re
       .returning();
 
     receipt = inserted;
+    if (subscription.accessState === "account_trial") {
+      await consumeTrialReservation(tx, userId, inserted.objectPath, inserted.id);
+    }
   });
 
   if (intentMissing) {
@@ -360,10 +365,31 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
     return;
   }
 
-  const [receipt] = await db
+  const [existing] = await db.select().from(receiptsTable).where(and(
+    eq(receiptsTable.id, params.data.id), eq(receiptsTable.userId, req.userId!),
+  ));
+  if (!existing) { res.status(404).json({ error: "Receipt not found" }); return; }
+  const manualAcceptance = parsed.data.isDraft === false && existing.status !== "completed";
+  if (manualAcceptance && existing.status !== "failed") {
+    res.status(409).json({ error: "Only a completed receipt or manually reviewed failed extraction can be saved" });
+    return;
+  }
+  const access = await getSubscriptionStatus(req.userId!);
+  if (!access.canUseApp && access.reviewReceiptId !== existing.id) {
+    res.status(403).json({ error: "subscription_required", code: access.accessState }); return;
+  }
+  const trial = manualAcceptance && access.accessState === "account_trial"
+    ? await accountTrialStatus(req.userId!) : null;
+  if (trial && trial.remaining < 1) {
+    res.status(403).json({ error: "subscription_required", message: "No trial upload allowance remains for this manual receipt." });
+    return;
+  }
+  const receipt = await db.transaction(async tx => {
+  const [updated] = await tx
     .update(receiptsTable)
     .set({
       ...parsed.data,
+      ...(manualAcceptance ? { status: "completed" } : {}),
       ...(parsed.data.category !== undefined
         ? { category: normalizeCategory(parsed.data.category) }
         : {}),
@@ -375,6 +401,19 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
       ),
     )
     .returning();
+  if (trial) {
+    // Extraction failure released the slot. Explicit manual acceptance is a
+    // successful receipt and must re-acquire one under the same user lock.
+    await tx.insert(trialUploadsTable).values({
+      userId: req.userId!, objectPath: existing.objectPath,
+      state: "succeeded", receiptId: existing.id, expiresAt: trial.trial.endsAt,
+    }).onConflictDoUpdate({
+      target: trialUploadsTable.objectPath,
+      set: { state: "succeeded", receiptId: existing.id },
+    });
+  }
+  return updated;
+  });
 
   if (!receipt) {
     res.status(404).json({ error: "Receipt not found" });

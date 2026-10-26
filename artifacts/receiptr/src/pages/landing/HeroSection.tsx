@@ -2,22 +2,14 @@ import { Link } from "wouter";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/react";
-import { useCreateCheckout } from "@/hooks/useBilling";
 import { ArrowRight, Play } from "lucide-react";
 import { fadeInUp, slideInRight, stagger } from "./shared";
 import { marketingMedia } from "./MarketingMedia";
 
 export default function HeroSection() {
   const { isSignedIn } = useAuth();
-  const checkout = useCreateCheckout();
   const reduce = useReducedMotion();
   const entrance = reduce ? false : "hidden";
-
-  const handleTrial = () => {
-    if (isSignedIn) {
-      checkout.mutate("yearly");
-    }
-  };
 
   return (
     <section className="relative pt-28 pb-20 lg:pt-36 lg:pb-28 overflow-hidden">
@@ -59,31 +51,17 @@ export default function HeroSection() {
 
             {/* CTAs */}
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-3 pt-1">
-              {isSignedIn ? (
+              <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-hero-trial">
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
                     size="lg"
-                    onClick={handleTrial}
-                    disabled={checkout.isPending}
-                    className="rounded-full h-13 px-8 text-base font-semibold gap-2 shadow-sm"
+                    className="rounded-full h-13 px-8 text-base font-semibold gap-2 shadow-sm w-full"
                   >
-                    {checkout.isPending ? "Loading…" : "Start your 7-day free trial"}
+                    {isSignedIn ? "Open Receebo" : "Start free, no card needed"}
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </motion.div>
-              ) : (
-                <Link href="/sign-up?plan=yearly">
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button
-                      size="lg"
-                      className="rounded-full h-13 px-8 text-base font-semibold gap-2 shadow-sm w-full"
-                    >
-                      Start your 7-day free trial
-                      <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </motion.div>
-                </Link>
-              )}
+              </Link>
 
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto">
                 <Button
@@ -102,7 +80,7 @@ export default function HeroSection() {
 
             {/* Social proof line */}
             <motion.p variants={fadeInUp} className="text-xs text-muted-foreground">
-              7-day free trial. Cancel anytime. No hidden fees.
+              Seven days and three receipt uploads free. No card needed.
             </motion.p>
           </motion.div>
 

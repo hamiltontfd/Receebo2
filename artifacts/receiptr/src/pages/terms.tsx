@@ -31,7 +31,7 @@ export default function TermsOfService() {
         A visitor may be offered one temporary receipt upload to see an
         extraction result before creating an account. This is a limited product
         demonstration, not a permanent free plan. You must create an account,
-        accept these Terms, choose a paid plan, and start the trial to save that
+        accept these Terms, and start the free account trial to save that
         receipt and continue using Receebo. Unsaved demonstration data may be
         deleted after the onboarding session expires.
       </p>
@@ -57,10 +57,24 @@ export default function TermsOfService() {
           billing frequency, and included features are shown before checkout.
         </li>
         <li>
-          Eligible subscriptions begin with a seven-day trial. A payment method
-          is collected by Stripe, and the selected plan automatically becomes a
-          paid, recurring subscription when the trial ends unless you cancel
-          beforehand.
+          After you create an account and accept these Terms, you receive a
+          free account trial. No payment method is required. The trial lasts
+          seven days from its start and includes three successful receipt
+          uploads in total, whichever limit is reached first. The trial never
+          converts into a paid subscription automatically.
+        </li>
+        <li>
+          When the trial ends or its uploads are used, you can still access
+          Settings, your profile, these legal documents, billing, data export
+          and account deletion, and you can review the receipt from your final
+          trial upload. Other features require a paid subscription.
+        </li>
+        <li>
+          A paid subscription starts only when you explicitly choose a plan
+          and complete checkout. Founding prices are €2.99 per month or €24.99
+          per year, charged when you subscribe, with no separate paid-plan
+          trial. Founding prices remain available to you for as long as your
+          account exists, including if you cancel and resubscribe later.
         </li>
         <li>
           Subscriptions renew for the selected billing period until cancelled.

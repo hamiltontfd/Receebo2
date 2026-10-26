@@ -3,7 +3,16 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
-import { useBillingStatus, useCreateCheckout, useCreatePortal } from "@/hooks/useBilling";
+import {
+  useBillingStatus,
+  useCreatePortal,
+  resolveAccessState,
+  isPaidLike,
+  TRIAL_UPLOAD_LIMIT,
+  type AccessState,
+  type BillingStatus,
+} from "@/hooks/useBilling";
+import { PlanChoice, FoundingNote } from "@/components/PlanChoice";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -93,24 +102,32 @@ function useGmailStatus() {
 
 // ─── Plan badge ───────────────────────────────────────────────────────────────
 
-function PlanBadge({ plan }: { plan: "free" | "trialing" | "pro" }) {
-  if (plan === "pro") {
-    return (
-      <span className="inline-flex items-center rounded-full bg-foreground text-background text-xs font-semibold px-3 py-1">
-        Pro
-      </span>
-    );
-  }
-  if (plan === "trialing") {
-    return (
-      <span className="inline-flex items-center rounded-full border border-foreground text-foreground text-xs font-semibold px-3 py-1">
-        Pro Trial
-      </span>
-    );
-  }
+export function AccessBadge({ billing }: { billing: BillingStatus | undefined }) {
+  const state = resolveAccessState(billing);
+  const labels: Record<AccessState, string> = {
+    paid: "Pro",
+    owner: "Owner access",
+    legacy_stripe_trial: "Pro Trial",
+    account_trial: "Free trial",
+    not_started: "Setting up",
+    trial_exhausted: "Trial used",
+    trial_expired: "Trial ended",
+    subscription_required: "Inactive",
+  };
+  const strong = state === "paid" || state === "owner";
+  const outline = state === "legacy_stripe_trial" || state === "account_trial";
   return (
-    <span className="inline-flex items-center rounded-full bg-secondary text-muted-foreground text-xs font-semibold px-3 py-1">
-      Free
+    <span
+      data-testid="status-plan"
+      className={
+        strong
+          ? "inline-flex items-center rounded-full bg-foreground text-background text-xs font-semibold px-3 py-1"
+          : outline
+            ? "inline-flex items-center rounded-full border border-foreground text-foreground text-xs font-semibold px-3 py-1"
+            : "inline-flex items-center rounded-full bg-secondary text-muted-foreground text-xs font-semibold px-3 py-1"
+      }
+    >
+      {labels[state]}
     </span>
   );
 }
@@ -122,7 +139,6 @@ export default function Settings() {
   const [location] = useLocation();
   const queryClient = useQueryClient();
   const { data: billing, isLoading } = useBillingStatus();
-  const checkout = useCreateCheckout();
   const portal = useCreatePortal();
   const { toast } = useToast();
   const { query: notifQuery, mutation: notifMutation } = useNotificationPreferences();
@@ -206,7 +222,18 @@ export default function Settings() {
     }
   }, [location, toast, queryClient]);
 
-  const isPro = billing?.plan === "pro" || billing?.plan === "trialing";
+  const accessState = resolveAccessState(billing);
+  const isPro = isPaidLike(billing);
+  const isOwner = accessState === "owner";
+  const showPlans = !isLoading && !!billing && !isPro && !isOwner && accessState !== "not_started";
+  const founding = billing?.foundingEligible === true;
+
+  // Deep links like /settings#upgrade-plans (banner "Upgrade now").
+  useEffect(() => {
+    if (!showPlans || window.location.hash !== "#upgrade-plans") return;
+    const t = setTimeout(() => document.getElementById("upgrade-plans")?.scrollIntoView({ behavior: "smooth" }), 120);
+    return () => clearTimeout(t);
+  }, [showPlans, location]);
 
   const formatDate = (iso: string | null) => {
     if (!iso) return null;
@@ -359,14 +386,28 @@ export default function Settings() {
           <div className="border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Current plan</span>
-              {billing?.ownerAccess ? (
-                <span className="text-sm font-semibold">Owner access</span>
-              ) : (
-                <PlanBadge plan={billing?.plan ?? "free"} />
-              )}
+              <AccessBadge billing={billing} />
             </div>
 
-            {billing?.plan === "trialing" && billing.trialEndAt && (
+            {(accessState === "account_trial" || accessState === "trial_exhausted" || accessState === "trial_expired") && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Trial uploads used</span>
+                <span className="text-sm text-muted-foreground font-mono" data-testid="text-trial-uploads-used">
+                  {Math.min(billing?.trialUploadsUsed ?? 0, TRIAL_UPLOAD_LIMIT)} of {TRIAL_UPLOAD_LIMIT}
+                </span>
+              </div>
+            )}
+
+            {(accessState === "account_trial" || accessState === "trial_expired") && billing?.trialEndAt && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{accessState === "trial_expired" ? "Trial ended" : "Trial ends"}</span>
+                <span className="text-sm text-muted-foreground" data-testid="text-trial-end">
+                  {formatDateTime(billing.trialEndAt)}
+                </span>
+              </div>
+            )}
+
+            {accessState === "legacy_stripe_trial" && billing?.trialEndAt && (
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Trial ends</span>
                 <span className="text-sm text-muted-foreground">
@@ -375,7 +416,7 @@ export default function Settings() {
               </div>
             )}
 
-            {billing?.plan === "pro" && billing.currentPeriodEnd && (
+            {accessState === "paid" && billing?.currentPeriodEnd && (
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">
                   {billing.cancelAtPeriodEnd ? "Access until" : "Next billing date"}
@@ -390,7 +431,7 @@ export default function Settings() {
               <OwnerAccessNotice hasBillingAccount={billing.hasBillingAccount === true} />
             )}
 
-            {billing?.ownerAccess && !billing.hasBillingAccount ? null : isPro ? (
+            {isOwner && !billing?.hasBillingAccount ? null : isPro || isOwner ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -410,15 +451,18 @@ export default function Settings() {
                 {portal.isPending ? "Loading..." : "Manage subscription"}
               </Button>
             ) : (
-              <Button
-                size="sm"
-                className="rounded-full mt-2"
-                onClick={() => {
-                  document.getElementById("upgrade-plans")?.scrollIntoView({ behavior: "smooth" });
-                }}
-              >
-                Upgrade to Pro
-              </Button>
+              showPlans && (
+                <Button
+                  size="sm"
+                  className="rounded-full mt-2"
+                  data-testid="button-upgrade-early"
+                  onClick={() => {
+                    document.getElementById("upgrade-plans")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
+                  {accessState === "account_trial" ? "Upgrade now" : "Subscribe"}
+                </Button>
+              )
             )}
           </div>
         )}
@@ -478,13 +522,13 @@ export default function Settings() {
         <div className="border rounded-xl overflow-hidden">
           <div className="grid grid-cols-3 px-5 py-3 bg-secondary/50 text-xs font-semibold border-b">
             <span className="text-muted-foreground">Feature</span>
-            <span className="text-center text-muted-foreground">Free</span>
+            <span className="text-center text-muted-foreground">Free trial</span>
             <span className="text-center">Pro</span>
           </div>
           {[
-            { feature: "Daily uploads", free: "Unlimited", pro: "Unlimited", freeHighlight: false, proHighlight: false },
+            { feature: "Receipt uploads", free: `${TRIAL_UPLOAD_LIMIT} total`, pro: "Unlimited", freeHighlight: false, proHighlight: false },
             { feature: "AI receipt extraction", free: true, pro: true, freeHighlight: false, proHighlight: false },
-            { feature: "Attachment uploads", free: "Unlimited", pro: "Unlimited", freeHighlight: false, proHighlight: false },
+                        { feature: "Access period", free: "7 days", pro: "While subscribed", freeHighlight: false, proHighlight: false },
             { feature: "Natural-language search", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Warranty reminders", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Gmail auto-import", free: true, pro: true, freeHighlight: false, proHighlight: false },
@@ -522,68 +566,18 @@ export default function Settings() {
         </div>
       </section>
 
-      {!isPro && !isLoading && (
-        <section id="upgrade-plans">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-            Upgrade to Pro
+      {showPlans && (
+        <section id="upgrade-plans" className="scroll-mt-20">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+            {accessState === "account_trial" ? "Upgrade now" : "Subscribe"}
           </h2>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="border rounded-xl p-5 flex flex-col gap-4">
-              <div>
-                <p className="font-bold">Pro Monthly</p>
-                <p className="text-2xl font-extrabold mt-1">€2.99</p>
-                <p className="text-xs text-muted-foreground">per month</p>
-              </div>
-              <Button
-                size="sm"
-                className="rounded-full"
-                onClick={() =>
-                  checkout.mutate("monthly", {
-                    onError: () =>
-                      toast({
-                        title: "Something went wrong",
-                        description: "Could not start checkout. Please try again.",
-                        variant: "destructive",
-                      }),
-                  })
-                }
-                disabled={checkout.isPending}
-              >
-                {checkout.isPending ? "Loading..." : "Start 7-day free trial"}
-              </Button>
-            </div>
-            <div className="border rounded-xl p-5 flex flex-col gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-bold">Pro Yearly</p>
-                  <span className="text-xs bg-secondary rounded-full px-2 py-0.5 font-semibold">Save 30%</span>
-                </div>
-                <p className="text-2xl font-extrabold mt-1">€24.99</p>
-                <p className="text-xs text-muted-foreground">per year</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                onClick={() =>
-                  checkout.mutate("yearly", {
-                    onError: () =>
-                      toast({
-                        title: "Something went wrong",
-                        description: "Could not start checkout. Please try again.",
-                        variant: "destructive",
-                      }),
-                  })
-                }
-                disabled={checkout.isPending}
-              >
-                {checkout.isPending ? "Loading..." : "Start 7-day free trial"}
-              </Button>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-4">
-            7-day free trial. We'll remind you before your trial ends. Cancel anytime with one click.
+          <p className="text-sm text-muted-foreground mb-4">
+            {accessState === "account_trial"
+              ? "Subscribing ends your free trial and starts your paid plan today."
+              : "Pick a plan to keep scanning and searching your receipts."}
           </p>
+          <PlanChoice founding={founding} />
+          <FoundingNote founding={founding} className="mt-4 !text-left" />
         </section>
       )}
     </div>

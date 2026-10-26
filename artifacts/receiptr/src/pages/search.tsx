@@ -435,8 +435,8 @@ export default function SearchPage() {
     window.history.replaceState(null, "", newUrl);
 
     toast({
-      title: "Your 7-day trial has started — welcome to Receebo!",
-      description: "Scan your first receipt to get started.",
+      title: "Subscription active",
+      description: "Thanks for subscribing. Unlimited scans are now available.",
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

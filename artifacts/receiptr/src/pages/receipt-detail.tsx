@@ -187,7 +187,7 @@ export default function ReceiptDetail() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
+          body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || "application/octet-stream", receiptId: Number(receiptId) }),
         },
       );
       await fetch(uploadInfo.uploadURL, {

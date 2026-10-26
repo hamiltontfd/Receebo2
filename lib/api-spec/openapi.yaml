@@ -15,6 +15,32 @@ tags:
   - name: Storage
     description: Object storage upload and serving endpoints.
 paths:
+  /billing/start-trial:
+    post:
+      operationId: startAccountTrial
+      summary: Start the seven-day no-card account trial once after legal consent
+      responses:
+        "200":
+          description: Trial initialized or existing entitlement preserved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountTrialStartResult"
+        "428":
+          description: Legal acceptance required
+  /storage/uploads/release:
+    post:
+      operationId: releaseUploadReservation
+      summary: Release an unconsumed failed upload transfer without restoring successful uses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadReservationRelease"
+      responses:
+        "204":
+          description: Unconsumed reservation released
   /billing/subscription:
     get:
       operationId: fetchBillingAccessStatus
@@ -378,6 +404,19 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
+    AccountTrialStartResult:
+      type: object
+      required: [started]
+      properties:
+        started:
+          type: boolean
+    UploadReservationRelease:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath:
+          type: string
+          minLength: 1
     HealthStatus:
       type: object
       properties:
@@ -553,6 +592,9 @@ components:
       type: object
       required: [name, size, contentType]
       properties:
+        receiptId:
+          type: integer
+          description: For supporting attachments only; binds the upload to an existing owned receipt.
         name:
           type: string
           minLength: 1
@@ -611,6 +653,21 @@ components:
       type: object
       required: [plan, trialEndAt, currentPeriodEnd, cancelAtPeriodEnd]
       properties:
+        accessState:
+          type: string
+          enum: [not_started, account_trial, trial_exhausted, trial_expired, legacy_stripe_trial, paid, owner, subscription_required]
+        trialUploadsRemaining:
+          type: [integer, "null"]
+        trialUploadsUsed:
+          type: integer
+        foundingEligible:
+          type: boolean
+        canUpload:
+          type: boolean
+        canUseApp:
+          type: boolean
+        reviewReceiptId:
+          type: [integer, "null"]
         plan:
           type: string
           enum: [free, trialing, pro]

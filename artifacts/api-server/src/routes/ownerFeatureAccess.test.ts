@@ -52,6 +52,7 @@ vi.mock("../lib/userDataLock", () => ({
   lockUserDataMutation: (handler: any) => handler,
 }));
 vi.mock("../lib/extractionQueue", () => ({ enqueueExtraction: mocks.enqueue }));
+vi.mock("../lib/accountTrial", () => ({ accountTrialStatus: async () => null }));
 vi.mock("../stripeClient", () => ({ getUncachableStripeClient: mocks.stripe }));
 vi.mock("../lib/objectStorage", () => ({
   ObjectStorageService: class {},
