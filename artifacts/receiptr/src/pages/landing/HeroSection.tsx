@@ -45,8 +45,8 @@ export default function HeroSection() {
               variants={fadeInUp}
               className="text-lg text-muted-foreground leading-relaxed max-w-md"
             >
-              Scan, upload or import receipts from your inbox. Find any purchase in seconds with
-              AI-powered search.
+              Scan or import from Outlook. Find any purchase in seconds. Never miss a return or
+              warranty date.
             </motion.p>
 
             {/* CTAs */}

@@ -16,6 +16,11 @@ vi.mock("@/hooks/useBilling", () => ({ useCreateCheckout: () => ({ mutate: vi.fn
 import HeroSection from "./HeroSection";
 
 describe("HeroSection", () => {
+  it("shows the hero subtitle", () => {
+    render(<HeroSection />);
+    expect(screen.getByText("Scan or import from Outlook. Find any purchase in seconds. Never miss a return or warranty date.")).toBeTruthy();
+  });
+
   it("shows real phone captures in frames with sample-data disclosure", () => {
     render(<HeroSection />);
     expect(screen.getByTestId("img-hero-library-phone").getAttribute("src")).toContain("library-phone.webp");
