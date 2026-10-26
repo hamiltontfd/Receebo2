@@ -140,3 +140,15 @@ Technical details live in `docs/assistant-log.md`.
 - Done: removed old failed Resend domain kintrat.replit.app (Hamilton's request); added receebo.net in Resend (EU); added DKIM/SPF/MX/CNAME records in Replit Domains (DNS for Replit-bought domains); domain verified. Created send-only API key "Receebo production" restricted to receebo.net and stored it in Replit Secrets as RESEND_API_KEY (value never shown). Set RESEND_FROM="Receebo <hello@receebo.net>" and RESEND_REPLY_TO=contact@receebo.net in .replit (commit c1c3083). Test email from hello@receebo.net delivered.
 - Files: .replit
 - Outcome: ready once Hamilton publishes; old keys "Receiptr"/"Onboarding" to delete after production sends are confirmed.
+
+## 2026-10-26 — Session 15: P1 copy for the demo + Outlook dev connection test (Receebo Engineer)
+- Goal: P1 items approved by Hamilton ("vamos executar") before the 27 Oct presentation, plus a live Outlook test in dev.
+- Outlook (dev): Microsoft Entra app "Receebo" registered (Default Directory, personal + work accounts, delegated Mail.Read/User.Read/email/offline_access/openid); MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET saved in Replit Secrets (values never shown). API restarted; Hamilton's Hotmail connected in dev; first sync imported 9 receipts: most were supermarket (5x Continente), plus EDP Comercial, Everything is New, See Tickets, Ticketline. The EDP bill was dated 27 Oct (tomorrow), probably the due date read as the purchase date. Both follow-ups are P2.
+- P1 commits (copy only, no design changes):
+  - 346a7ea Hero subtitle: "Scan or import from Outlook. Find any purchase in seconds. Never miss a return or warranty date."
+  - d2ca5c8 Line under the hero CTA: "15 days free, up to 5 receipts." (button still says "Start free, no card needed").
+  - 3a6e796 Footer line on landing + legal pages: "Alternative dispute resolution: TRIAVE (see Terms)" / PT "Resolução alternativa de litígios: TRIAVE, ver Termos" (PT ready, site is English-only today).
+  - f7409df Social preview: og/twitter descriptions match the new subtitle; og:image size fixed to the real 1280x720; added og:site_name and og:image:alt.
+  - b8c36d6 Trial analytics: new receipt_limit_reached event at the 5th successful receipt (DB trigger, once per account); plan_selected now recorded only after checkout config is valid. Dev DB check constraint widened by the startup migration.
+- Tests: web 184 passed; API 219 passed, 2 skipped.
+- Outcome: on main in Replit, not pushed or published. Stripe untouched.
