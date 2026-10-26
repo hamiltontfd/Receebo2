@@ -1,0 +1,447 @@
+/**
+ * Provider-neutral email import pipeline (Gmail, Outlook, ...).
+ *
+ * For each candidate message (last 90 days, receipt-like):
+ *   - skip if already recorded in gmail_seen_messages for this provider;
+ *   - PDF attachments → upload, AI extraction, pending import (same as the
+ *     original Gmail logic);
+ *   - no PDF but the sender/subject look like an order or receipt → convert
+ *     the HTML body to text, AI extraction from text, render a text PDF as
+ *     proof of purchase, pending import;
+ *   - message IDs are marked seen only after every part reached a durable
+ *     outcome, so transient failures retry on the next sync.
+ *
+ * Dedupe key: (user, provider, message id, attachment id | "body:html").
+ */
+import { randomUUID } from "crypto";
+import { db } from "@workspace/db";
+import {
+  gmailSeenMessagesTable,
+  pendingImportsTable,
+  type PendingImportExtractionData,
+} from "@workspace/db";
+import { and, eq, lt } from "drizzle-orm";
+import {
+  ObjectNotFoundError,
+  ObjectStorageService,
+  objectStorageClient,
+} from "./objectStorage";
+import {
+  extractReceiptData,
+  extractReceiptDataFromText,
+  type ExtractedReceipt,
+} from "./receiptExtraction";
+import { isAccountDeletionInProgress } from "./accountDeletionState";
+import { withUserDataLock } from "./userDataLock";
+import { planMessageImport } from "./mailProviders/candidates";
+import { renderTextPdf } from "./textPdf";
+import type { MailMessage, MailProvider } from "./mailProviders/types";
+
+export const HTML_BODY_ATTACHMENT_ID = "body:html";
+/** Cost guard: max AI extractions of email bodies per mailbox per run. */
+export const MAX_BODY_EXTRACTIONS_PER_RUN = 25;
+
+const objectStorageService = new ObjectStorageService();
+
+export interface MailSyncResult {
+  checked: number;
+  queued: number;
+}
+
+async function cleanupSyncObject(
+  provider: MailProvider,
+  userId: string,
+  objectPath: string,
+  reason: string,
+): Promise<void> {
+  try {
+    await objectStorageService.deleteObject(objectPath);
+  } catch (err) {
+    if (!(err instanceof ObjectNotFoundError)) {
+      provider.logger.error(
+        { err, userId, objectPath, reason },
+        `${provider.label} sync could not clean an uploaded object`,
+      );
+    }
+  }
+}
+
+/**
+ * Upload a PDF buffer directly to GCS using the same path conventions as
+ * user-uploaded receipts. Returns the `/objects/uploads/{uuid}` path.
+ */
+export async function uploadPdfToStorage(buffer: Buffer): Promise<string> {
+  const privateDir = process.env.PRIVATE_OBJECT_DIR?.trim();
+  if (!privateDir) throw new Error("PRIVATE_OBJECT_DIR not set");
+
+  const parts = privateDir.replace(/^\//, "").split("/");
+  const bucketName = parts[0]!;
+  const dirPrefix = parts.slice(1).join("/");
+
+  const uuid = randomUUID();
+  const objectName =
+    (dirPrefix ? dirPrefix.replace(/\/$/, "") + "/" : "") +
+    "uploads/" +
+    uuid;
+
+  const bucket = objectStorageClient.bucket(bucketName);
+  await bucket.file(objectName).save(buffer, {
+    contentType: "application/pdf",
+    resumable: false,
+  });
+
+  return `/objects/uploads/${uuid}`;
+}
+
+function toPendingExtractionData(
+  extraction: ExtractedReceipt,
+): PendingImportExtractionData {
+  return {
+    merchant: extraction.merchant,
+    purchaseDate: extraction.purchaseDate,
+    total: extraction.total,
+    currency: extraction.currency,
+    category: extraction.category,
+    summary: extraction.summary,
+    ocrText: extraction.ocrText,
+    warranty: extraction.warranty,
+    transactionNumber: extraction.transactionNumber,
+    products: extraction.products,
+    notableItems: extraction.notableItems,
+    purchaseCountry: extraction.purchaseCountry,
+    isOnlinePurchase: extraction.isOnlinePurchase,
+  };
+}
+
+/** Plain-text proof-of-purchase document for HTML-body imports. */
+export function buildEmailProofText(message: MailMessage, bodyText: string): string {
+  return [
+    "Email receipt saved by Receebo",
+    message.from ? `From: ${message.from}` : null,
+    message.subject ? `Subject: ${message.subject}` : null,
+    message.receivedAt ? `Received: ${message.receivedAt}` : null,
+    "",
+    bodyText,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+}
+
+export function emailProofFileName(message: MailMessage): string {
+  const base = (message.subject ?? "email receipt")
+    .replace(/[^\p{L}\p{N} _.-]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  return `${base || "email receipt"}.pdf`;
+}
+
+async function markSeen(provider: MailProvider, userId: string, messageId: string) {
+  await db
+    .insert(gmailSeenMessagesTable)
+    .values({ userId, provider: provider.id, gmailMessageId: messageId })
+    .onConflictDoNothing();
+}
+
+type ClaimOutcome =
+  | { kind: "claimed"; id: number; claimToken: string }
+  | { kind: "busy"; retryable: boolean };
+
+async function claimImport(
+  provider: MailProvider,
+  userId: string,
+  messageId: string,
+  attachmentId: string,
+  filename: string,
+): Promise<ClaimOutcome> {
+  const claimToken = randomUUID();
+  let [claim] = await db
+    .insert(pendingImportsTable)
+    .values({
+      userId,
+      provider: provider.id,
+      gmailMessageId: messageId,
+      gmailAttachmentId: attachmentId,
+      claimToken,
+      objectPath: "",
+      originalFileName: filename,
+      status: "processing",
+    })
+    .onConflictDoNothing()
+    .returning({ id: pendingImportsTable.id });
+  if (!claim) {
+    const staleBefore = new Date(Date.now() - 60 * 60 * 1000);
+    [claim] = await db
+      .update(pendingImportsTable)
+      .set({ claimToken, updatedAt: new Date() })
+      .where(
+        and(
+          eq(pendingImportsTable.userId, userId),
+          eq(pendingImportsTable.provider, provider.id),
+          eq(pendingImportsTable.gmailMessageId, messageId),
+          eq(pendingImportsTable.gmailAttachmentId, attachmentId),
+          eq(pendingImportsTable.status, "processing"),
+          lt(pendingImportsTable.updatedAt, staleBefore),
+        ),
+      )
+      .returning({ id: pendingImportsTable.id });
+  }
+  if (claim) return { kind: "claimed", id: claim.id, claimToken };
+
+  const [existingClaim] = await db
+    .select({ status: pendingImportsTable.status })
+    .from(pendingImportsTable)
+    .where(
+      and(
+        eq(pendingImportsTable.userId, userId),
+        eq(pendingImportsTable.gmailMessageId, messageId),
+        eq(pendingImportsTable.gmailAttachmentId, attachmentId),
+      ),
+    )
+    .limit(1);
+  return {
+    kind: "busy",
+    retryable: !existingClaim || existingClaim.status === "processing",
+  };
+}
+
+/**
+ * Sync one user's mailbox for one provider. Caller must hold the user data
+ * lock (see syncUserMailbox).
+ */
+export async function syncMailboxClaimed(
+  userId: string,
+  provider: MailProvider,
+): Promise<MailSyncResult> {
+  const logger = provider.logger;
+  const label = provider.label;
+
+  if (await isAccountDeletionInProgress(userId)) {
+    logger.info(
+      { userId },
+      `${label} sync skipped because account deletion is in progress`,
+    );
+    return { checked: 0, queued: 0 };
+  }
+
+  const accessToken = await provider.getAccessToken(userId);
+  if (!accessToken) return { checked: 0, queued: 0 };
+
+  let messageIds: string[];
+  try {
+    messageIds = await provider.listCandidateMessageIds(accessToken);
+  } catch (err) {
+    logger.error({ err, userId }, `${label} sync: failed to list messages`);
+    throw new Error(`Failed to list ${label} messages`, { cause: err });
+  }
+
+  let checked = 0;
+  let queued = 0;
+  let bodyExtractions = 0;
+
+  for (const messageId of messageIds) {
+    const [alreadySeen] = await db
+      .select({ id: gmailSeenMessagesTable.id })
+      .from(gmailSeenMessagesTable)
+      .where(
+        and(
+          eq(gmailSeenMessagesTable.userId, userId),
+          eq(gmailSeenMessagesTable.provider, provider.id),
+          eq(gmailSeenMessagesTable.gmailMessageId, messageId),
+        ),
+      )
+      .limit(1);
+    if (alreadySeen) continue;
+
+    checked++;
+    let retryableFailure = false;
+
+    let message: MailMessage | null;
+    try {
+      message = await provider.getMessage(accessToken, messageId);
+    } catch (err) {
+      logger.warn({ err, messageId, userId }, `${label} sync: failed to fetch message`);
+      continue;
+    }
+
+    if (!message) {
+      await markSeen(provider, userId, messageId);
+      continue;
+    }
+
+    const plan = planMessageImport(message);
+    if (plan.kind === "skip") {
+      await markSeen(provider, userId, messageId);
+      continue;
+    }
+
+    // Each unit is one PDF attachment or the HTML body.
+    const units =
+      plan.kind === "pdf"
+        ? plan.attachments.map((a) => ({ kind: "pdf" as const, attachmentId: a.id, filename: a.filename || "receipt.pdf" }))
+        : [{ kind: "html" as const, attachmentId: HTML_BODY_ATTACHMENT_ID, filename: emailProofFileName(message), text: plan.text }];
+
+    for (const unit of units) {
+      if (await isAccountDeletionInProgress(userId)) {
+        return { checked, queued };
+      }
+
+      if (unit.kind === "html" && bodyExtractions >= MAX_BODY_EXTRACTIONS_PER_RUN) {
+        // Leave for the next run instead of spending more AI calls now.
+        retryableFailure = true;
+        continue;
+      }
+
+      const claim = await claimImport(provider, userId, messageId, unit.attachmentId, unit.filename);
+      if (claim.kind === "busy") {
+        if (claim.retryable) retryableFailure = true;
+        continue;
+      }
+      const ownedClaim = and(
+        eq(pendingImportsTable.id, claim.id),
+        eq(pendingImportsTable.claimToken, claim.claimToken),
+      );
+
+      let objectPath: string | null = null;
+      let extraction: ExtractedReceipt;
+
+      if (unit.kind === "pdf") {
+        let pdfBuffer: Buffer;
+        try {
+          pdfBuffer = await provider.downloadAttachment(accessToken, messageId, unit.attachmentId);
+        } catch (err) {
+          logger.warn(
+            { err, messageId, attachmentId: unit.attachmentId },
+            `${label} sync: attachment download failed`,
+          );
+          retryableFailure = true;
+          await db.delete(pendingImportsTable).where(ownedClaim);
+          continue;
+        }
+
+        try {
+          objectPath = await uploadPdfToStorage(pdfBuffer);
+        } catch (err) {
+          logger.error({ err, userId }, `${label} sync: storage upload failed`);
+          retryableFailure = true;
+          await db.delete(pendingImportsTable).where(ownedClaim);
+          continue;
+        }
+
+        if (await isAccountDeletionInProgress(userId)) {
+          await cleanupSyncObject(provider, userId, objectPath, "account deletion began");
+          return { checked, queued };
+        }
+
+        try {
+          extraction = await extractReceiptData(objectPath, "application/pdf");
+        } catch (err) {
+          logger.warn({ err, objectPath }, `${label} sync: extraction failed`);
+          retryableFailure = true;
+          await cleanupSyncObject(provider, userId, objectPath, "extraction failed");
+          await db.delete(pendingImportsTable).where(ownedClaim);
+          continue;
+        }
+      } else {
+        bodyExtractions++;
+        try {
+          extraction = await extractReceiptDataFromText(unit.text, {
+            subject: message.subject,
+            from: message.from,
+            receivedAt: message.receivedAt,
+          });
+        } catch (err) {
+          logger.warn({ err, messageId }, `${label} sync: body extraction failed`);
+          retryableFailure = true;
+          await db.delete(pendingImportsTable).where(ownedClaim);
+          continue;
+        }
+      }
+
+      if (!extraction.isReceipt) {
+        logger.info(
+          { messageId, source: unit.kind },
+          `${label} sync: ${unit.kind === "pdf" ? "PDF" : "email body"} is not a receipt, skipping`,
+        );
+        if (objectPath) await cleanupSyncObject(provider, userId, objectPath, "not a receipt");
+        const [deletedClaim] = await db
+          .delete(pendingImportsTable)
+          .where(ownedClaim)
+          .returning({ id: pendingImportsTable.id });
+        if (!deletedClaim) retryableFailure = true;
+        continue;
+      }
+
+      if (unit.kind === "html") {
+        try {
+          objectPath = await uploadPdfToStorage(
+            renderTextPdf(buildEmailProofText(message, unit.text)),
+          );
+        } catch (err) {
+          logger.error({ err, userId }, `${label} sync: storage upload failed`);
+          retryableFailure = true;
+          await db.delete(pendingImportsTable).where(ownedClaim);
+          continue;
+        }
+      }
+      const storedPath = objectPath!;
+
+      try {
+        if (await isAccountDeletionInProgress(userId)) {
+          await cleanupSyncObject(provider, userId, storedPath, "account deletion began");
+          await db.delete(pendingImportsTable).where(ownedClaim);
+          return { checked, queued };
+        }
+
+        const [queuedImport] = await db
+          .update(pendingImportsTable)
+          .set({
+            objectPath: storedPath,
+            status: "pending",
+            updatedAt: new Date(),
+            extractionData: toPendingExtractionData(extraction),
+          })
+          .where(ownedClaim)
+          .returning({ id: pendingImportsTable.id });
+        if (!queuedImport) {
+          retryableFailure = true;
+          await cleanupSyncObject(provider, userId, storedPath, "lost claim");
+          continue;
+        }
+        queued++;
+        logger.info(
+          { userId, messageId, source: unit.kind },
+          `${label} sync: receipt queued as pending import`,
+        );
+      } catch (err) {
+        logger.error({ err, userId }, `${label} sync: failed to store pending import`);
+        retryableFailure = true;
+        await cleanupSyncObject(provider, userId, storedPath, "database update failed");
+        await db.delete(pendingImportsTable).where(ownedClaim);
+      }
+    }
+
+    if (!retryableFailure) {
+      await markSeen(provider, userId, messageId);
+    } else {
+      logger.warn({ userId, messageId }, `${label} sync: message left retryable after transient failure`);
+    }
+  }
+
+  await provider.markSynced(userId);
+  logger.info({ userId, checked, queued }, `${label} sync complete`);
+  return { checked, queued };
+}
+
+/** Lock the user's data, check upload access, then sync one provider. */
+export async function syncUserMailbox(
+  userId: string,
+  provider: MailProvider,
+): Promise<MailSyncResult> {
+  return withUserDataLock(userId, async () => {
+    const { getSubscriptionStatus } = await import("./subscriptionStatus");
+    const access = await getSubscriptionStatus(userId);
+    if (!access.canUpload) return { checked: 0, queued: 0 };
+    return syncMailboxClaimed(userId, provider);
+  });
+}

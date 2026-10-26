@@ -1,5 +1,4 @@
 import { Router, type Request } from "express";
-import { randomBytes, createHmac, timingSafeEqual } from "crypto";
 import { db } from "@workspace/db";
 import {
   gmailConnectionsTable,
@@ -28,92 +27,28 @@ import { accountTrialStatus } from "../lib/accountTrial";
 import { trialUploadsTable } from "@workspace/db";
 import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
 import { gmailOrigin } from "../lib/gmailUrls";
+import { createOAuthState, verifyAndConsumeOAuthState } from "../lib/oauthState";
+import { isMailProviderEnabled } from "../lib/mailProviders/config";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
 
-// ---------------------------------------------------------------------------
-// OAuth state security
-//
-// Each /gmail/connect request generates a random nonce that is:
-//   1. Stored server-side with a 10-minute TTL (pendingOAuthNonces map)
-//   2. Included in a HMAC-SHA256-signed state token sent to Google
-//
-// The callback verifies the HMAC, then consumes the nonce (one-time use).
-// This prevents CSRF and state-tampering / account-linking attacks.
-// ---------------------------------------------------------------------------
-
-const NONCE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
-interface NonceEntry {
-  userId: string;
-  expiresAt: number;
-}
-// nonce → {userId, expiresAt}
-const pendingOAuthNonces = new Map<string, NonceEntry>();
-
-// Prune expired nonces every 5 minutes to avoid memory growth
-setInterval(() => {
-  const now = Date.now();
-  for (const [nonce, entry] of pendingOAuthNonces) {
-    if (entry.expiresAt <= now) pendingOAuthNonces.delete(nonce);
-  }
-}, 5 * 60 * 1000).unref();
-
-function getStateSecret(): Buffer {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret) throw new Error("SESSION_SECRET env var is not set");
-  return Buffer.from(secret, "utf8");
-}
-
-/** Build a signed state token: base64url(payload) + "." + HMAC hex */
-function buildSignedState(userId: string, nonce: string): string {
-  const payload = Buffer.from(JSON.stringify({ userId, nonce })).toString("base64url");
-  const sig = createHmac("sha256", getStateSecret()).update(payload).digest("hex");
-  return `${payload}.${sig}`;
+// OAuth state signing/nonces live in lib/oauthState.ts (shared with Outlook).
+function buildGmailState(userId: string): string {
+  return createOAuthState(userId, "gmail");
 }
 
 /**
- * Verify a signed state token, consume the nonce, and return userId.
- * Throws if the signature is invalid, the nonce is unknown/expired,
- * or the parsed userId does not match the stored entry.
+ * Gmail is hidden behind MAIL_PROVIDERS_ENABLED (default: outlook only).
+ * Connect, callback and sync answer 404 when disabled; status, disconnect
+ * and the shared pending-imports queue keep working.
  */
-function verifyAndConsumeState(state: string): string {
-  const dotIdx = state.lastIndexOf(".");
-  if (dotIdx < 0) throw new Error("Malformed state: no separator");
+function gmailEnabled(): boolean {
+  return isMailProviderEnabled("gmail");
+}
 
-  const payload = state.slice(0, dotIdx);
-  const receivedSig = state.slice(dotIdx + 1);
-
-  // Constant-time signature check
-  const expectedSig = createHmac("sha256", getStateSecret()).update(payload).digest("hex");
-  const expectedBuf = Buffer.from(expectedSig, "hex");
-  const receivedBuf = Buffer.from(receivedSig, "hex");
-  if (
-    expectedBuf.length !== receivedBuf.length ||
-    !timingSafeEqual(expectedBuf, receivedBuf)
-  ) {
-    throw new Error("Invalid state signature");
-  }
-
-  const parsed = JSON.parse(Buffer.from(payload, "base64url").toString()) as {
-    userId?: string;
-    nonce?: string;
-  };
-  if (!parsed.userId || !parsed.nonce) throw new Error("Incomplete state payload");
-
-  const entry = pendingOAuthNonces.get(parsed.nonce);
-  if (!entry) throw new Error("Unknown or already-used nonce");
-  if (entry.expiresAt <= Date.now()) {
-    pendingOAuthNonces.delete(parsed.nonce);
-    throw new Error("Expired nonce");
-  }
-  if (entry.userId !== parsed.userId) throw new Error("userId mismatch in state");
-
-  // Consume nonce — one-time use
-  pendingOAuthNonces.delete(parsed.nonce);
-
-  return parsed.userId;
+function notFound(res: import("express").Response): void {
+  res.status(404).json({ error: "Not found" });
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +72,7 @@ router.get("/gmail/status", requireAuth, async (req, res): Promise<void> => {
       .select({
         gmailEmail: gmailConnectionsTable.gmailEmail,
         lastSyncedAt: gmailConnectionsTable.lastSyncedAt,
+        status: gmailConnectionsTable.status,
       })
       .from(gmailConnectionsTable)
       .where(eq(gmailConnectionsTable.userId, req.userId!))
@@ -157,10 +93,13 @@ router.get("/gmail/status", requireAuth, async (req, res): Promise<void> => {
     }
 
     res.json({
+      enabled: gmailEnabled(),
       configured: isGmailConfigured(),
       connected: !!conn,
       gmailEmail: conn?.gmailEmail ?? null,
       lastSyncedAt: conn?.lastSyncedAt ?? null,
+      status: conn?.status ?? null,
+      needsReconnect: conn?.status === "needs_reconnect",
       pendingCount,
     });
   } catch (err) {
@@ -173,6 +112,10 @@ router.get("/gmail/status", requireAuth, async (req, res): Promise<void> => {
 // GET /gmail/connect  — redirect user to Google OAuth consent screen
 // ---------------------------------------------------------------------------
 router.get("/gmail/connect", requireAuth, requireCurrentLegalAcceptance, (req, res): void => {
+  if (!gmailEnabled()) {
+    notFound(res);
+    return;
+  }
   if (!isGmailConfigured()) {
     res.status(503).json({
       error:
@@ -182,14 +125,8 @@ router.get("/gmail/connect", requireAuth, requireCurrentLegalAcceptance, (req, r
   }
 
   try {
-    const nonce = randomBytes(32).toString("hex");
-    // Store nonce server-side — validated and consumed in the callback
-    pendingOAuthNonces.set(nonce, {
-      userId: req.userId!,
-      expiresAt: Date.now() + NONCE_TTL_MS,
-    });
-
-    const state = buildSignedState(req.userId!, nonce);
+    // Nonce stored server-side — validated and consumed in the callback
+    const state = buildGmailState(req.userId!);
     const url = buildGmailOAuthUrl(redirectUri(req), state);
     res.redirect(url);
   } catch (err) {
@@ -202,6 +139,10 @@ router.get("/gmail/connect", requireAuth, requireCurrentLegalAcceptance, (req, r
 // GET /gmail/callback  — OAuth callback (no auth middleware — Google redirects here)
 // ---------------------------------------------------------------------------
 router.get("/gmail/callback", async (req, res): Promise<void> => {
+  if (!gmailEnabled()) {
+    notFound(res);
+    return;
+  }
   const { code, state, error } = req.query as Record<string, string | undefined>;
 
   if (error || !code || !state) {
@@ -215,7 +156,7 @@ router.get("/gmail/callback", async (req, res): Promise<void> => {
 
   let userId: string;
   try {
-    userId = verifyAndConsumeState(state);
+    userId = verifyAndConsumeOAuthState(state, "gmail");
   } catch (err) {
     logger.warn({ err }, "Gmail callback: invalid or tampered state");
     res.redirect(appSettingsUrl(req, "?gmail=error"));
@@ -254,6 +195,7 @@ router.delete("/gmail/disconnect", requireAuth, lockUserDataMutation(async (req,
       .where(
         and(
           eq(pendingImportsTable.userId, req.userId!),
+          eq(pendingImportsTable.provider, "gmail"),
           ne(pendingImportsTable.status, "approved"),
         ),
       );
@@ -310,6 +252,7 @@ router.delete("/gmail/disconnect", requireAuth, lockUserDataMutation(async (req,
       .where(
         and(
           eq(pendingImportsTable.userId, req.userId!),
+          eq(pendingImportsTable.provider, "gmail"),
           ne(pendingImportsTable.status, "approved"),
         ),
       );
@@ -325,6 +268,10 @@ router.delete("/gmail/disconnect", requireAuth, lockUserDataMutation(async (req,
 // POST /gmail/sync  — manual trigger
 // ---------------------------------------------------------------------------
 router.post("/gmail/sync", requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
+  if (!gmailEnabled()) {
+    notFound(res);
+    return;
+  }
   try {
     const result = await syncUserGmail(req.userId!);
     res.json(result);
@@ -337,7 +284,9 @@ router.post("/gmail/sync", requireAuth, requireCurrentLegalAcceptance, async (re
 // ---------------------------------------------------------------------------
 // GET /gmail/pending  — list pending imports
 // ---------------------------------------------------------------------------
-router.get("/gmail/pending", requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
+// The pending-imports queue is shared by every mail provider. It is served
+// under both /gmail/pending (legacy, mobile app) and /mail/pending.
+router.get(["/gmail/pending", "/mail/pending"], requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
   try {
     const rows = await db
       .select()
@@ -353,6 +302,7 @@ router.get("/gmail/pending", requireAuth, requireCurrentLegalAcceptance, async (
     // Expose only the fields the UI needs (avoid sending full ocrText)
     const items = rows.map((r) => ({
       id: r.id,
+      provider: r.provider,
       gmailMessageId: r.gmailMessageId,
       originalFileName: r.originalFileName,
       merchant: r.extractionData?.merchant ?? null,
@@ -375,7 +325,7 @@ router.get("/gmail/pending", requireAuth, requireCurrentLegalAcceptance, async (
 // POST /gmail/pending/:id/approve  — move import to the receipts table
 // ---------------------------------------------------------------------------
 router.post(
-  "/gmail/pending/:id/approve",
+  ["/gmail/pending/:id/approve", "/mail/pending/:id/approve"],
   requireAuth,
   requireCurrentLegalAcceptance,
   lockUserDataMutation(async (req, res): Promise<void> => {
@@ -441,7 +391,7 @@ router.post(
           .where(eq(pendingImportsTable.id, imp.id));
         if (trial) {
           await tx.insert(trialUploadsTable).values({
-            userId: req.userId!, objectPath: `gmail:${imp.id}`,
+            userId: req.userId!, objectPath: `${imp.provider}:${imp.id}`,
             state: "succeeded", receiptId: created.id, expiresAt: trial.trial.endsAt,
           });
         }
@@ -488,7 +438,7 @@ router.post(
 // DELETE /gmail/pending/:id  — dismiss
 // ---------------------------------------------------------------------------
 router.delete(
-  "/gmail/pending/:id",
+  ["/gmail/pending/:id", "/mail/pending/:id"],
   requireAuth,
   requireCurrentLegalAcceptance,
   lockUserDataMutation(async (req, res): Promise<void> => {
@@ -563,17 +513,16 @@ router.delete(
 // endpoint returns the URL as JSON so the client can open it via Linking.
 // ---------------------------------------------------------------------------
 router.get("/gmail/connect-url", requireAuth, requireCurrentLegalAcceptance, (req, res): void => {
+  if (!gmailEnabled()) {
+    notFound(res);
+    return;
+  }
   if (!isGmailConfigured()) {
     res.status(503).json({ error: "Gmail integration not configured." });
     return;
   }
   try {
-    const nonce = randomBytes(32).toString("hex");
-    pendingOAuthNonces.set(nonce, {
-      userId: req.userId!,
-      expiresAt: Date.now() + NONCE_TTL_MS,
-    });
-    const state = buildSignedState(req.userId!, nonce);
+    const state = buildGmailState(req.userId!);
     const url = buildGmailOAuthUrl(redirectUri(req), state);
     res.json({ url });
   } catch (err) {

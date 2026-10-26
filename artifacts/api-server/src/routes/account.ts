@@ -4,6 +4,7 @@ import { clerkClient } from "@clerk/express";
 import {
   db,
   accountDeletionRequestsTable,
+  emailConnectionsTable,
   gmailConnectionsTable,
   gmailSeenMessagesTable,
   legalAcceptancesTable,
@@ -139,6 +140,16 @@ router.get("/account/export", requireAuth, async (req, res): Promise<void> => {
       .from(gmailConnectionsTable)
       .where(eq(gmailConnectionsTable.userId, userId))
       .limit(1);
+    const emailConnections = await db
+      .select({
+        provider: emailConnectionsTable.provider,
+        accountEmail: emailConnectionsTable.accountEmail,
+        status: emailConnectionsTable.status,
+        lastSyncedAt: emailConnectionsTable.lastSyncedAt,
+        connectedAt: emailConnectionsTable.createdAt,
+      })
+      .from(emailConnectionsTable)
+      .where(eq(emailConnectionsTable.userId, userId));
     const pendingImports = await db
       .select()
       .from(pendingImportsTable)
@@ -201,6 +212,7 @@ router.get("/account/export", requireAuth, async (req, res): Promise<void> => {
       attachments,
       gmail: {
         connection: gmailConnection ?? null,
+        otherEmailConnections: emailConnections,
         pendingImports,
         note:
           "OAuth access and refresh tokens are excluded from this portable copy for security.",
@@ -436,6 +448,11 @@ router.delete("/account", requireAuth, async (req, res): Promise<void> => {
       await tx
         .delete(gmailConnectionsTable)
         .where(eq(gmailConnectionsTable.userId, userId));
+      // Outlook (and future providers): Microsoft has no per-app token revoke,
+      // deleting the stored tokens ends access.
+      await tx
+        .delete(emailConnectionsTable)
+        .where(eq(emailConnectionsTable.userId, userId));
       await tx
         .delete(uploadIntentsTable)
         .where(eq(uploadIntentsTable.userId, userId));

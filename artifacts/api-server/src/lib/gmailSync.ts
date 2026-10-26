@@ -17,7 +17,15 @@ import { gmailLogger as logger } from "./logger";
 import { encryptToken, decryptToken } from "./tokenCrypto";
 import { isAccountDeletionInProgress } from "./accountDeletionState";
 import { withUserDataLock } from "./userDataLock";
-import { eq, and, lt } from "drizzle-orm";
+import { eq, and, lt, ne } from "drizzle-orm";
+import { syncMailboxClaimed } from "./mailSync";
+import { isMailProviderEnabled } from "./mailProviders/config";
+import {
+  MailReconnectRequiredError,
+  isReconnectRequiredError,
+  type MailMessage,
+  type MailProvider,
+} from "./mailProviders/types";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -159,6 +167,8 @@ export async function exchangeCodeAndStore(
       accessToken: encryptedAccessToken,
       refreshToken: encryptedRefreshToken,
       tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+      status: "active",
+      lastError: null,
     })
     .onConflictDoUpdate({
       target: gmailConnectionsTable.userId,
@@ -167,6 +177,8 @@ export async function exchangeCodeAndStore(
         accessToken: encryptedAccessToken,
         refreshToken: encryptedRefreshToken,
         tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+        status: "active",
+        lastError: null,
         updatedAt: new Date(),
       },
     });
@@ -201,6 +213,8 @@ async function getFreshAccessToken(
       tokenExpiry: credentials.expiry_date
         ? new Date(credentials.expiry_date)
         : null,
+      status: "active",
+      lastError: null,
       updatedAt: new Date(),
     })
     .where(eq(gmailConnectionsTable.userId, connection.userId));
@@ -262,7 +276,8 @@ async function gmailGet(accessToken: string, path: string): Promise<unknown> {
 interface GmailMessagePart {
   mimeType?: string;
   filename?: string;
-  body?: { attachmentId?: string; size?: number };
+  headers?: Array<{ name?: string; value?: string }>;
+  body?: { attachmentId?: string; size?: number; data?: string };
   parts?: GmailMessagePart[];
 }
 
@@ -492,65 +507,111 @@ async function syncUserGmailUnlocked(
   return { checked, queued };
 }
 
-/**
- * Sync one user's Gmail account:
- * 1. Search for emails with PDF attachments that look like receipts (last 90 days).
- * 2. Skip any message ID already in gmail_seen_messages.
- * 3. Download each PDF, upload to object storage, run through AI extraction.
- * 4. If isReceipt → insert a pending_imports row.
- *
-  * Message IDs are written only after every attachment has reached a durable
-  * outcome. Transient Gmail, storage, extraction, or database failures remain
-  * retryable on the next manual or scheduled sync.
- */
-async function syncUserGmailClaimed(
-  userId: string,
-): Promise<{ checked: number; queued: number }> {
-  if (await isAccountDeletionInProgress(userId)) {
-    logger.info(
-      { userId },
-      "Gmail sync skipped because account deletion is in progress",
-    );
-    return { checked: 0, queued: 0 };
+/** First inline (non-attachment) body part with the given MIME type. */
+function findBodyText(part: GmailMessagePart, mimeType: string): string | null {
+  if (part.mimeType === mimeType && !part.filename && part.body?.data) {
+    try {
+      return Buffer.from(part.body.data, "base64url").toString("utf8");
+    } catch {
+      return null;
+    }
   }
-
-  const [connection] = await db
-    .select()
-    .from(gmailConnectionsTable)
-    .where(eq(gmailConnectionsTable.userId, userId))
-    .limit(1);
-
-  if (!connection) return { checked: 0, queued: 0 };
-
-  // Decrypt stored tokens before use
-  let decryptedConnection: GmailConnection;
-  try {
-    decryptedConnection = decryptGmailConnection(connection);
-  } catch (err) {
-    logger.error({ err, userId }, "Gmail sync: token decryption failed");
-    throw new Error("Stored Gmail credentials could not be decrypted", { cause: err });
+  for (const child of part.parts ?? []) {
+    const found = findBodyText(child, mimeType);
+    if (found !== null) return found;
   }
+  return null;
+}
 
-  let accessToken: string;
-  try {
-    accessToken = await getFreshAccessToken(decryptedConnection);
-  } catch (err) {
-    logger.error({ err, userId }, "Gmail sync: token refresh failed");
-    throw new Error("Gmail authorization needs to be refreshed", { cause: err });
-  }
+function gmailHeader(part: GmailMessagePart, name: string): string | null {
+  const wanted = name.toLowerCase();
+  const header = part.headers?.find((h) => h.name?.toLowerCase() === wanted);
+  return header?.value ?? null;
+}
 
-  // Gmail search query — PDF attachments + receipt-like subjects, last 90 days
-  const afterEpoch = Math.floor(
-    (Date.now() - 90 * 24 * 60 * 60 * 1000) / 1000,
+/** Convert a Gmail `format=full` payload into the provider-neutral message. */
+export function gmailPayloadToMessage(
+  messageId: string,
+  payload: GmailMessagePart,
+): MailMessage {
+  return {
+    id: messageId,
+    subject: gmailHeader(payload, "Subject"),
+    from: gmailHeader(payload, "From"),
+    receivedAt: gmailHeader(payload, "Date"),
+    pdfAttachments: collectPdfParts(payload).map((part) => ({
+      id: part.body!.attachmentId!,
+      filename: part.filename || "receipt.pdf",
+    })),
+    html: findBodyText(payload, "text/html"),
+    text: findBodyText(payload, "text/plain"),
+  };
+}
+
+/** Max message IDs considered per Gmail run (seen ones are skipped cheaply). */
+const GMAIL_MAX_CANDIDATES_PER_RUN = 500;
+
+export function buildGmailSearchQuery(now = Date.now()): string {
+  const afterEpoch = Math.floor((now - 90 * 24 * 60 * 60 * 1000) / 1000);
+  // Receipt-like subjects (with or without PDF) plus well-known order
+  // senders. PDF attachments are imported as before; order emails without a
+  // PDF go through HTML-body extraction.
+  return (
+    `(subject:receipt OR subject:order OR subject:invoice OR subject:confirmation ` +
+    `OR subject:recibo OR subject:fatura OR subject:factura OR subject:encomenda ` +
+    `OR subject:pedido OR from:auto-confirm@amazon.com OR from:order-update@amazon.com ` +
+    `OR from:auto-confirm@amazon.es OR from:auto-confirm@amazon.de) ` +
+    `after:${afterEpoch}`
   );
-  const q = encodeURIComponent(
-    `has:attachment filename:pdf ` +
-      `(subject:receipt OR subject:order OR subject:invoice OR subject:confirmation) ` +
-      `after:${afterEpoch}`,
-  );
+}
 
-  const messageIds: string[] = [];
-  try {
+async function markGmailNeedsReconnect(userId: string, code: string): Promise<void> {
+  await db
+    .update(gmailConnectionsTable)
+    .set({ status: "needs_reconnect", lastError: code, updatedAt: new Date() })
+    .where(eq(gmailConnectionsTable.userId, userId));
+}
+
+/** Gmail adapter for the shared mail import pipeline (mailSync.ts). */
+export const gmailProvider: MailProvider = {
+  id: "gmail",
+  label: "Gmail",
+  logger,
+  isConfigured: isGmailConfigured,
+
+  async getAccessToken(userId) {
+    const [connection] = await db
+      .select()
+      .from(gmailConnectionsTable)
+      .where(eq(gmailConnectionsTable.userId, userId))
+      .limit(1);
+    if (!connection) return null;
+
+    let decryptedConnection: GmailConnection;
+    try {
+      decryptedConnection = decryptGmailConnection(connection);
+    } catch (err) {
+      logger.error({ err, userId }, "Gmail sync: token decryption failed");
+      throw new Error("Stored Gmail credentials could not be decrypted", { cause: err });
+    }
+
+    try {
+      return await getFreshAccessToken(decryptedConnection);
+    } catch (err) {
+      logger.error({ err, userId }, "Gmail sync: token refresh failed");
+      if (isReconnectRequiredError(err)) {
+        await markGmailNeedsReconnect(userId, "invalid_grant").catch((markErr) =>
+          logger.warn({ err: markErr, userId }, "Gmail sync: could not mark connection for reconnect"),
+        );
+        throw new MailReconnectRequiredError("gmail", { cause: err });
+      }
+      throw new Error("Gmail authorization needs to be refreshed", { cause: err });
+    }
+  },
+
+  async listCandidateMessageIds(accessToken) {
+    const q = encodeURIComponent(buildGmailSearchQuery());
+    const messageIds: string[] = [];
     let pageToken: string | undefined;
     do {
       const pageParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
@@ -563,254 +624,46 @@ async function syncUserGmailClaimed(
       };
       messageIds.push(...(data.messages ?? []).map((m) => m.id));
       pageToken = data.nextPageToken;
-    } while (pageToken);
-  } catch (err) {
-    logger.error({ err, userId }, "Gmail sync: failed to list messages");
-    throw new Error("Failed to list Gmail messages", { cause: err });
-  }
+    } while (pageToken && messageIds.length < GMAIL_MAX_CANDIDATES_PER_RUN);
+    return messageIds.slice(0, GMAIL_MAX_CANDIDATES_PER_RUN);
+  },
 
-  let checked = 0;
-  let queued = 0;
+  async getMessage(accessToken, messageId) {
+    const msg = (await gmailGet(
+      accessToken,
+      `messages/${messageId}?format=full`,
+    )) as { payload?: GmailMessagePart };
+    if (!msg.payload) return null;
+    return gmailPayloadToMessage(messageId, msg.payload);
+  },
 
-  for (const messageId of messageIds) {
-    const [alreadySeen] = await db
-      .select({ id: gmailSeenMessagesTable.id })
-      .from(gmailSeenMessagesTable)
-      .where(
-        and(
-          eq(gmailSeenMessagesTable.userId, userId),
-          eq(gmailSeenMessagesTable.gmailMessageId, messageId),
-        ),
-      )
-      .limit(1);
-    if (alreadySeen) continue;
+  async downloadAttachment(accessToken, messageId, attachmentId) {
+    const att = (await gmailGet(
+      accessToken,
+      `messages/${messageId}/attachments/${attachmentId}`,
+    )) as { data: string };
+    // Gmail returns base64url-encoded data
+    return Buffer.from(att.data, "base64url");
+  },
 
-    checked++;
-    let retryableFailure = false;
+  async markSynced(userId) {
+    await db
+      .update(gmailConnectionsTable)
+      .set({ lastSyncedAt: new Date(), updatedAt: new Date() })
+      .where(eq(gmailConnectionsTable.userId, userId));
+  },
+};
 
-    // Fetch full message to inspect MIME parts
-    let payload: GmailMessagePart | undefined;
-    try {
-      const msg = (await gmailGet(
-        accessToken,
-        `messages/${messageId}?format=full`,
-      )) as { payload?: GmailMessagePart };
-      payload = msg.payload;
-    } catch (err) {
-      logger.warn({ err, messageId, userId }, "Gmail sync: failed to fetch message");
-      retryableFailure = true;
-      continue;
-    }
-
-    if (!payload) {
-      await db
-        .insert(gmailSeenMessagesTable)
-        .values({ userId, gmailMessageId: messageId })
-        .onConflictDoNothing();
-      continue;
-    }
-    const pdfParts = collectPdfParts(payload);
-    if (pdfParts.length === 0) {
-      await db
-        .insert(gmailSeenMessagesTable)
-        .values({ userId, gmailMessageId: messageId })
-        .onConflictDoNothing();
-      continue;
-    }
-
-    for (const part of pdfParts) {
-      if (await isAccountDeletionInProgress(userId)) {
-        return { checked, queued };
-      }
-
-      const attachmentId = part.body!.attachmentId!;
-      const filename = part.filename || "receipt.pdf";
-
-      const claimToken = randomUUID();
-      let [claim] = await db
-        .insert(pendingImportsTable)
-        .values({
-          userId,
-          gmailMessageId: messageId,
-          gmailAttachmentId: attachmentId,
-          claimToken,
-          objectPath: "",
-          originalFileName: filename,
-          status: "processing",
-        })
-        .onConflictDoNothing()
-        .returning({ id: pendingImportsTable.id });
-      if (!claim) {
-        const staleBefore = new Date(Date.now() - 60 * 60 * 1000);
-        [claim] = await db
-          .update(pendingImportsTable)
-          .set({ claimToken, updatedAt: new Date() })
-          .where(
-            and(
-              eq(pendingImportsTable.userId, userId),
-              eq(pendingImportsTable.gmailMessageId, messageId),
-              eq(pendingImportsTable.gmailAttachmentId, attachmentId),
-              eq(pendingImportsTable.status, "processing"),
-              lt(pendingImportsTable.updatedAt, staleBefore),
-            ),
-          )
-          .returning({ id: pendingImportsTable.id });
-      }
-      if (!claim) {
-        const [existingClaim] = await db
-          .select({ status: pendingImportsTable.status })
-          .from(pendingImportsTable)
-          .where(
-            and(
-              eq(pendingImportsTable.userId, userId),
-              eq(pendingImportsTable.gmailMessageId, messageId),
-              eq(pendingImportsTable.gmailAttachmentId, attachmentId),
-            ),
-          )
-          .limit(1);
-        if (!existingClaim || existingClaim.status === "processing") retryableFailure = true;
-        continue;
-      }
-
-      const ownedClaim = and(
-        eq(pendingImportsTable.id, claim.id),
-        eq(pendingImportsTable.claimToken, claimToken),
-      );
-
-      // Download the attachment
-      let pdfBuffer: Buffer;
-      try {
-        const att = (await gmailGet(
-          accessToken,
-          `messages/${messageId}/attachments/${attachmentId}`,
-        )) as { data: string };
-        // Gmail returns base64url-encoded data
-        pdfBuffer = Buffer.from(att.data, "base64url");
-      } catch (err) {
-        logger.warn(
-          { err, messageId, attachmentId },
-          "Gmail sync: attachment download failed",
-        );
-        retryableFailure = true;
-        await db.delete(pendingImportsTable).where(ownedClaim);
-        continue;
-      }
-
-      // Upload to object storage
-      let objectPath: string;
-      try {
-        objectPath = await uploadPdfToStorage(pdfBuffer);
-      } catch (err) {
-        logger.error({ err, userId }, "Gmail sync: storage upload failed");
-        retryableFailure = true;
-        await db.delete(pendingImportsTable).where(ownedClaim);
-        continue;
-      }
-
-      if (await isAccountDeletionInProgress(userId)) {
-        await cleanupSyncObject(userId, objectPath, "account deletion began");
-        return { checked, queued };
-      }
-
-      // AI extraction
-      let extraction: Awaited<ReturnType<typeof extractReceiptData>>;
-      try {
-        extraction = await extractReceiptData(objectPath, "application/pdf");
-      } catch (err) {
-        logger.warn({ err, objectPath }, "Gmail sync: extraction failed");
-        retryableFailure = true;
-        await objectStorageService.deleteObject(objectPath).catch((deleteErr) =>
-          logger.warn({ err: deleteErr, objectPath }, "Gmail sync: failed to clean up extraction object"),
-        );
-        await db.delete(pendingImportsTable).where(ownedClaim);
-        continue;
-      }
-
-      if (!extraction.isReceipt) {
-        logger.info({ objectPath }, "Gmail sync: PDF is not a receipt, skipping");
-        await objectStorageService.deleteObject(objectPath).catch((deleteErr) =>
-          logger.warn({ err: deleteErr, objectPath }, "Gmail sync: failed to clean up non-receipt object"),
-        );
-        const [deletedClaim] = await db
-          .delete(pendingImportsTable)
-          .where(ownedClaim)
-          .returning({ id: pendingImportsTable.id });
-        if (!deletedClaim) retryableFailure = true;
-        continue;
-      }
-
-      // Store as pending import
-      try {
-        if (await isAccountDeletionInProgress(userId)) {
-          await cleanupSyncObject(userId, objectPath, "account deletion began");
-          await db.delete(pendingImportsTable).where(ownedClaim);
-          return { checked, queued };
-        }
-
-        const [queuedImport] = await db
-          .update(pendingImportsTable)
-          .set({
-            objectPath,
-            status: "pending",
-            updatedAt: new Date(),
-            extractionData: {
-            merchant: extraction.merchant,
-            purchaseDate: extraction.purchaseDate,
-            total: extraction.total,
-            currency: extraction.currency,
-            category: extraction.category,
-            summary: extraction.summary,
-            ocrText: extraction.ocrText,
-            warranty: extraction.warranty,
-            transactionNumber: extraction.transactionNumber,
-            products: extraction.products,
-            notableItems: extraction.notableItems,
-            purchaseCountry: extraction.purchaseCountry,
-            isOnlinePurchase: extraction.isOnlinePurchase,
-            },
-          })
-          .where(ownedClaim)
-          .returning({ id: pendingImportsTable.id });
-        if (!queuedImport) {
-          retryableFailure = true;
-          await objectStorageService.deleteObject(objectPath).catch((deleteErr) =>
-            logger.warn({ err: deleteErr, objectPath }, "Gmail sync: failed to clean up lost-claim object"),
-          );
-          continue;
-        }
-        queued++;
-        logger.info(
-          { userId, messageId },
-          "Gmail sync: receipt queued as pending import",
-        );
-      } catch (err) {
-        logger.error({ err, userId }, "Gmail sync: failed to store pending import");
-        retryableFailure = true;
-        await objectStorageService.deleteObject(objectPath).catch((deleteErr) =>
-          logger.warn({ err: deleteErr, objectPath }, "Gmail sync: failed to clean up unqueued object"),
-        );
-        await db.delete(pendingImportsTable).where(ownedClaim);
-      }
-    }
-
-    if (!retryableFailure) {
-      await db
-        .insert(gmailSeenMessagesTable)
-        .values({ userId, gmailMessageId: messageId })
-        .onConflictDoNothing();
-    } else {
-      logger.warn({ userId, messageId }, "Gmail sync: message left retryable after transient failure");
-    }
-  }
-
-  // Update last-synced timestamp
-  await db
-    .update(gmailConnectionsTable)
-    .set({ lastSyncedAt: new Date(), updatedAt: new Date() })
-    .where(eq(gmailConnectionsTable.userId, userId));
-
-  logger.info({ userId, checked, queued }, "Gmail sync complete");
-  return { checked, queued };
+/**
+ * Sync one user's Gmail account through the shared pipeline (PDF
+ * attachments plus HTML-body order emails). Message IDs are written only
+ * after every part has reached a durable outcome; transient failures remain
+ * retryable on the next manual or scheduled sync.
+ */
+async function syncUserGmailClaimed(
+  userId: string,
+): Promise<{ checked: number; queued: number }> {
+  return syncMailboxClaimed(userId, gmailProvider);
 }
 
 export async function syncUserGmail(
@@ -826,6 +679,10 @@ export async function syncUserGmail(
 
 /** Sweep all connected Gmail accounts. Called by the scheduler. */
 export async function syncAllGmailConnections(): Promise<void> {
+  if (!isMailProviderEnabled("gmail")) {
+    logger.info("Gmail sync: disabled by MAIL_PROVIDERS_ENABLED, skipping sweep");
+    return;
+  }
   if (gmailSweepRunning) {
     logger.warn("Gmail sync: previous sweep still running, skipping overlap");
     return;
@@ -834,7 +691,12 @@ export async function syncAllGmailConnections(): Promise<void> {
 
   let connections: GmailConnection[];
   try {
-    connections = await db.select().from(gmailConnectionsTable);
+    // Connections waiting for the user to reconnect are skipped by the
+    // scheduler (a manual sync still retries them).
+    connections = await db
+      .select()
+      .from(gmailConnectionsTable)
+      .where(ne(gmailConnectionsTable.status, "needs_reconnect"));
   } catch (err) {
     logger.error({ err }, "Gmail sync: failed to load connections");
     gmailSweepRunning = false;

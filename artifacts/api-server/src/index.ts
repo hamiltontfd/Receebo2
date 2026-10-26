@@ -3,6 +3,8 @@ import { logger, gmailLogger } from "./lib/logger";
 import { startExtractionWatchdog } from "./lib/extractionQueue";
 import { startOrphanCleanupScheduler } from "./lib/orphanCleanup";
 import { startGmailSyncScheduler } from "./lib/gmailSync";
+import { startOutlookSyncScheduler, isOutlookConfigured } from "./lib/outlookSync";
+import { isMailProviderEnabled } from "./lib/mailProviders/config";
 import { encryptToken, decryptToken } from "./lib/tokenCrypto";
 import { sql, eq } from "drizzle-orm";
 import { db, gmailConnectionsTable } from "@workspace/db";
@@ -191,6 +193,40 @@ async function runStartupMigrations(): Promise<void> {
       ON pending_imports (user_id, gmail_message_id, gmail_attachment_id)
     `);
 
+    // Multi-provider mail import (Outlook etc.). Additive and backward
+    // compatible: existing Gmail rows are back-filled via column defaults.
+    await db.execute(sql`
+      ALTER TABLE gmail_connections
+        ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active',
+        ADD COLUMN IF NOT EXISTS last_error text
+    `);
+    await db.execute(sql`
+      ALTER TABLE gmail_seen_messages
+        ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'gmail'
+    `);
+    await db.execute(sql`
+      ALTER TABLE pending_imports
+        ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'gmail'
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS email_connections (
+        id             serial PRIMARY KEY,
+        user_id        text NOT NULL,
+        provider       text NOT NULL,
+        account_email  text,
+        access_token   text,
+        refresh_token  text NOT NULL,
+        token_expiry   timestamptz,
+        status         text NOT NULL DEFAULT 'active',
+        last_error     text,
+        last_synced_at timestamptz,
+        delta_link     text,
+        created_at     timestamptz NOT NULL DEFAULT now(),
+        updated_at     timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT email_connections_user_provider_unique UNIQUE (user_id, provider)
+      )
+    `);
+
     // Upload intents — short-lived records binding a presigned URL to the user
     // who requested it, consumed when a receipt/attachment is created.
     await db.execute(sql`
@@ -364,7 +400,21 @@ async function start(): Promise<void> {
     logger.info({ port }, "Server listening");
     startExtractionWatchdog();
     startOrphanCleanupScheduler();
-    startGmailSyncScheduler();
+    // Mail import schedulers run only for providers enabled via
+    // MAIL_PROVIDERS_ENABLED (default: outlook). Gmail is off by default.
+    if (isMailProviderEnabled("gmail")) {
+      startGmailSyncScheduler();
+    } else {
+      gmailLogger.info("Gmail import disabled by MAIL_PROVIDERS_ENABLED; scheduler not started");
+    }
+    if (isMailProviderEnabled("outlook") && isOutlookConfigured()) {
+      startOutlookSyncScheduler();
+    } else {
+      logger.info(
+        { enabled: isMailProviderEnabled("outlook"), configured: isOutlookConfigured() },
+        "Outlook import inactive; scheduler not started",
+      );
+    }
     void initStripe();
   });
 }

@@ -22,6 +22,7 @@ export * from "./guestSessions";
 export * from "./userBilling";
 export * from "./userPreferences";
 export * from "./gmailConnections";
+export * from "./emailConnections";
 export * from "./uploadIntents";
 export * from "./pushSubscriptions";
 export * from "./legalAcceptances";

@@ -108,6 +108,8 @@ beforeAll(async () => {
   vi.stubEnv("GOOGLE_CLIENT_ID", "synthetic-client-id");
   vi.stubEnv("GOOGLE_CLIENT_SECRET", privateValues[0]!);
   vi.stubEnv("SESSION_SECRET", "synthetic-signing-key");
+  // Gmail is hidden by default; these tests exercise the Gmail routes.
+  vi.stubEnv("MAIL_PROVIDERS_ENABLED", "gmail");
   const app = express();
   app.use("/api", gmail);
   server = await new Promise<Server>((resolve) => {

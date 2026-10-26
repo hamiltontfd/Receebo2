@@ -6,6 +6,9 @@
  * and trigger an in-place migration on first read.
  *
  * Key: GMAIL_TOKEN_ENCRYPTION_KEY env var — 64-char hex string (32 raw bytes).
+ * MAIL_TOKEN_ENCRYPTION_KEY is accepted as a fallback name when the Gmail key
+ * is not set. GMAIL_TOKEN_ENCRYPTION_KEY wins when both exist so tokens that
+ * are already stored keep decrypting.
  * Generate with:  openssl rand -hex 32
  */
 
@@ -18,17 +21,19 @@ const TAG_BYTES = 16;
 const PREFIX = "enc:v1:";
 
 function getKey(): Buffer {
-  const hex = process.env.GMAIL_TOKEN_ENCRYPTION_KEY;
+  const hex =
+    process.env.GMAIL_TOKEN_ENCRYPTION_KEY?.trim() ||
+    process.env.MAIL_TOKEN_ENCRYPTION_KEY?.trim();
   if (!hex || hex.trim().length === 0) {
     throw new Error(
-      "GMAIL_TOKEN_ENCRYPTION_KEY is not set. " +
+      "GMAIL_TOKEN_ENCRYPTION_KEY (or MAIL_TOKEN_ENCRYPTION_KEY) is not set. " +
         "Generate one with `openssl rand -hex 32` and add it as a Replit Secret.",
     );
   }
   const trimmed = hex.trim();
   if (trimmed.length !== 64) {
     throw new Error(
-      `GMAIL_TOKEN_ENCRYPTION_KEY must be a 64-character hex string (32 bytes), ` +
+      `Mail token encryption key must be a 64-character hex string (32 bytes), ` +
         `got ${trimmed.length} characters.`,
     );
   }
@@ -128,4 +133,12 @@ export async function decryptNullableToken(
     logger.error({ err }, "tokenCrypto: decryption failed");
     throw err;
   }
+}
+
+/** True when a token encryption key is configured (value not validated). */
+export function hasTokenEncryptionKey(): boolean {
+  return !!(
+    process.env.GMAIL_TOKEN_ENCRYPTION_KEY?.trim() ||
+    process.env.MAIL_TOKEN_ENCRYPTION_KEY?.trim()
+  );
 }

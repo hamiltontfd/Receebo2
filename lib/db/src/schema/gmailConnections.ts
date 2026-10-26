@@ -30,10 +30,11 @@ export type PendingImportExtractionData = {
 };
 
 /**
- * Stores per-user Gmail OAuth refresh tokens.
- * Refresh tokens are stored in plaintext — the database connection itself is
- * secured; a separate encryption layer can be added later using a dedicated
- * key secret.
+ * Stores per-user Gmail OAuth tokens. Access and refresh tokens are encrypted
+ * at rest with AES-256-GCM (see api-server/src/lib/tokenCrypto.ts).
+ *
+ * `status` is "active" or "needs_reconnect" (set when Google rejects the
+ * refresh token, e.g. the 7-day expiry of apps in OAuth "Testing" mode).
  */
 export const gmailConnectionsTable = pgTable("gmail_connections", {
   userId: text("user_id").primaryKey(),
@@ -42,6 +43,9 @@ export const gmailConnectionsTable = pgTable("gmail_connections", {
   refreshToken: text("refresh_token").notNull(),
   tokenExpiry: timestamp("token_expiry", { withTimezone: true }),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  /** active | needs_reconnect */
+  status: text("status").notNull().default("active"),
+  lastError: text("last_error"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -52,7 +56,7 @@ export const gmailConnectionsTable = pgTable("gmail_connections", {
 });
 
 /**
- * Records every Gmail message ID that has been processed (successfully or not)
+ * Records every mailbox message ID (Gmail or Outlook, see `provider`) that has been processed (successfully or not)
  * to prevent re-processing the same email on subsequent sync runs.
  */
 export const gmailSeenMessagesTable = pgTable(
@@ -60,6 +64,9 @@ export const gmailSeenMessagesTable = pgTable(
   {
     id: serial("id").primaryKey(),
     userId: text("user_id").notNull(),
+    /** gmail | outlook. Legacy rows are back-filled to "gmail". */
+    provider: text("provider").notNull().default("gmail"),
+    /** Provider message ID (column name kept for backward compatibility). */
     gmailMessageId: text("gmail_message_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -69,7 +76,8 @@ export const gmailSeenMessagesTable = pgTable(
 );
 
 /**
- * Receipt candidates extracted from Gmail PDF attachments, waiting for
+ * Receipt candidates extracted from email (Gmail or Outlook) PDF attachments
+ * or, for order emails without a PDF, from the HTML body, waiting for
  * the user to approve or dismiss before landing in the main receipts table.
  */
 export const pendingImportsTable = pgTable(
@@ -77,7 +85,11 @@ export const pendingImportsTable = pgTable(
   {
     id: serial("id").primaryKey(),
     userId: text("user_id").notNull(),
+    /** gmail | outlook. Legacy rows are back-filled to "gmail". */
+    provider: text("provider").notNull().default("gmail"),
+    /** Provider message ID (column name kept for backward compatibility). */
     gmailMessageId: text("gmail_message_id").notNull(),
+    /** Provider attachment ID, or "body:html" for an HTML-body import. */
     gmailAttachmentId: text("gmail_attachment_id"),
     claimToken: text("claim_token"),
     objectPath: text("object_path").notNull(),

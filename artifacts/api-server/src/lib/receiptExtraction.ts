@@ -170,7 +170,10 @@ export async function extractReceiptData(
     ],
   });
 
-  const raw = completion.choices[0]?.message?.content ?? "{}";
+  return parseExtraction(completion.choices[0]?.message?.content ?? "{}");
+}
+
+function parseExtraction(raw: string): ExtractedReceipt {
   let parsed: Partial<ExtractedReceipt> = {};
   try {
     parsed = JSON.parse(raw);
@@ -250,4 +253,36 @@ export async function extractReceiptData(
     purchaseCountry,
     isOnlinePurchase,
   };
+}
+
+const TEXT_EMAIL_INSTRUCTIONS = `The input is the plain-text body of an email (converted from HTML), not an image. Treat it exactly like a receipt file: decide whether it is a purchase receipt, order confirmation with prices, or invoice. Marketing emails, newsletters, shipping updates without prices, account notices, or promotions are NOT receipts: set "isReceipt" to false. For "ocrText", copy the relevant order/receipt text from the email (not boilerplate footers).`;
+
+/**
+ * Extract receipt data from email text (HTML-body imports). Uses the same
+ * prompt, normalisation and non-receipt rejection as file extraction.
+ */
+export async function extractReceiptDataFromText(
+  text: string,
+  meta: { subject?: string | null; from?: string | null; receivedAt?: string | null } = {},
+): Promise<ExtractedReceipt> {
+  const header = [
+    meta.from ? `From: ${meta.from}` : null,
+    meta.subject ? `Subject: ${meta.subject}` : null,
+    meta.receivedAt ? `Received: ${meta.receivedAt}` : null,
+  ].filter(Boolean).join("\n");
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5.4",
+    max_completion_tokens: 8192,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: `${SYSTEM_PROMPT}\n\n${TEXT_EMAIL_INSTRUCTIONS}` },
+      {
+        role: "user",
+        content: `Extract the structured receipt data from this email.\n\n${header}\n\n${text}`,
+      },
+    ],
+  });
+
+  return parseExtraction(completion.choices[0]?.message?.content ?? "{}");
 }

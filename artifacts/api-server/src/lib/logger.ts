@@ -31,6 +31,11 @@ const safeGmailErrorCodes = new Set([
   "UNAUTHENTICATED", "PERMISSION_DENIED", "RESOURCE_EXHAUSTED",
   "NOT_FOUND", "INVALID_ARGUMENT", "INTERNAL", "UNAVAILABLE",
   "DEADLINE_EXCEEDED",
+  // Microsoft identity platform / Graph error codes
+  "interaction_required", "consent_required", "login_required",
+  "invalid_resource", "TooManyRequests", "ErrorAccessDenied",
+  "InvalidAuthenticationToken", "MailboxNotEnabledForRESTAPI",
+  "ErrorItemNotFound",
 ]);
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -47,7 +52,7 @@ export function serializeGmailError(error: unknown): {
   const response = asRecord(err.response);
   const data = asRecord(response.data);
   const apiError = asRecord(data.error);
-  const code = [data.error, apiError.status, err.code].find(
+  const code = [data.error, apiError.status, apiError.code, err.code].find(
     (value): value is string =>
       typeof value === "string" && safeGmailErrorCodes.has(value),
   ) ?? "unknown_error";
@@ -67,3 +72,20 @@ export function createGmailLogger(baseLogger: pino.Logger): pino.Logger {
 }
 
 export const gmailLogger = createGmailLogger(logger);
+
+/**
+ * Same credential-safe error serializer as Gmail, for other mail providers
+ * (Outlook / Microsoft Graph). Never logs message bodies or tokens.
+ */
+export function createMailLogger(
+  baseLogger: pino.Logger,
+  integration: string,
+): pino.Logger {
+  return baseLogger.child(
+    { integration },
+    { serializers: { err: serializeGmailError } },
+  );
+}
+
+export const outlookLogger = createMailLogger(logger, "outlook");
+export const mailLogger = createMailLogger(logger, "mail");
