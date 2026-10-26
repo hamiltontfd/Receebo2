@@ -53,6 +53,10 @@ Receipt keeper PWA for everyday shoppers (PT/EU focus): capture receipts (upload
 - [ ] Until `MICROSOFT_CLIENT_ID`/`SECRET` are set, `/api/mail/providers` is empty: the landing then says "connect your inbox" and Settings shows no inbox option. Do not publish the copy change before Outlook is configured and tested.
 - [ ] Publisher verification with Microsoft (free; Partner Program + DNS-verified receebo.net).
 - [ ] Client secret expires (max 24 months): set a renewal reminder.
+- [x] New free trial: 15 days, no card, up to 5 receipts, view-only at the cap, paywall on day 16 (commit `7c23732`, session 12).
+- [ ] Legal: the terms trial clause changed in session 12 (15 days / 5 receipts / view-only at cap). Decide with the Outlook change whether to bump `TERMS_VERSION`.
+- [ ] Trial funnel still has `third_receipt_succeeded` (3rd receipt); decide whether to add a 5th-receipt event. `paywall_viewed` with reason `trial_exhausted` will now rarely fire (the cap no longer shows the paywall).
+- [ ] Wire pt-PT / pt-BR for the cap notice when the app gets i18n (strings in `receiptr/src/lib/trialCopy.ts`).
 
 ## Decisions
 - 26 Oct 2026: Keep hosting on Replit; trial Cursor + Grok Bot for ~1 month via SSH. No Cursor cloud Project for now (would require a GitHub/Origin copy and two-way sync). Revisit at end of trial.
@@ -62,3 +66,5 @@ Receipt keeper PWA for everyday shoppers (PT/EU focus): capture receipts (upload
 - 26 Oct 2026: Critical business review done (see hackathon-log session 4). Leaning toward free tier + pivot exploration; no decision yet.
 
 - 26 Oct 2026 (session 11): Provider names in marketing copy come from public `GET /api/mail/providers` (same flag as Settings), never hard-coded. Legal pages stay static and describe Microsoft only, plus a legacy-Gmail note; if Gmail is re-enabled, the privacy policy must be updated again. Forwarding is not mentioned in marketing copy.
+
+- 26 Oct 2026 (session 12): Free trial = 15 days + 5 receipts, not "whichever comes first". At 5 receipts the account is view-only (view, search, files, export, alerts) until day 15, then the paywall. Existing trials extended to 15 days from their original start at server boot (also reopens recently expired 7-day trials). Attachments to an existing receipt stay allowed at the cap.
