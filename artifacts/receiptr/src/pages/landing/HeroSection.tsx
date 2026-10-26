@@ -78,9 +78,9 @@ export default function HeroSection() {
               </motion.div>
             </motion.div>
 
-            {/* Social proof line */}
+            {/* Trial line */}
             <motion.p variants={fadeInUp} className="text-xs text-muted-foreground">
-              15 days free, no card. Add up to 5 receipts.
+              15 days free, up to 5 receipts.
             </motion.p>
           </motion.div>
 
