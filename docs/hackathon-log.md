@@ -134,3 +134,9 @@ Technical details live in `docs/assistant-log.md`.
 - The privacy text changed again: decide on the legal version bump together with the earlier changes.
 - Legacy Gmail notes kept in privacy (section on earlier Gmail connections) and terms (Google listed as a provider "for earlier Gmail connections"), while old Gmail tokens may still exist in production.
 - Lifecycle emails (welcome, trial start/end, deletion after 60 days) not started.
+
+## 2026-10-26 — Session 14: Resend set up from scratch (Receebo Engineer)
+- Goal: real email delivery from receebo.net.
+- Done: removed old failed Resend domain kintrat.replit.app (Hamilton's request); added receebo.net in Resend (EU); added DKIM/SPF/MX/CNAME records in Replit Domains (DNS for Replit-bought domains); domain verified. Created send-only API key "Receebo production" restricted to receebo.net and stored it in Replit Secrets as RESEND_API_KEY (value never shown). Set RESEND_FROM="Receebo <hello@receebo.net>" and RESEND_REPLY_TO=contact@receebo.net in .replit (commit c1c3083). Test email from hello@receebo.net delivered.
+- Files: .replit
+- Outcome: ready once Hamilton publishes; old keys "Receiptr"/"Onboarding" to delete after production sends are confirmed.
