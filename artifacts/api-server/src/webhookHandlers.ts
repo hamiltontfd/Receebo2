@@ -4,6 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { logger } from "./lib/logger";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { sendTrialEndingEmail } from "./lib/emailService";
+import { confirmPaidFunnel, safeFunnel } from "./lib/trialFunnel";
 
 /**
  * Upsert the Stripe customer → user mapping and store the subscription ID.
@@ -273,6 +274,17 @@ export class WebhookHandlers {
 
       default:
         logger.info({ eventType: event.type }, "webhookHandlers: unhandled event type (ignored)");
+    }
+    if (["checkout.session.completed", "customer.subscription.created",
+      "customer.subscription.updated", "invoice.paid"].includes(event.type)) {
+      await safeFunnel(async () => {
+        const object = event.data.object as { customer?: string | { id: string } | null };
+        const customerId = typeof object.customer === "string" ? object.customer : object.customer?.id;
+        if (!customerId) return;
+        const [billing] = await db.select({ userId: userBillingTable.userId }).from(userBillingTable)
+          .where(eq(userBillingTable.stripeCustomerId, customerId));
+        if (billing) await confirmPaidFunnel(billing.userId);
+      });
     }
   }
 }

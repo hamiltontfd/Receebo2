@@ -9,8 +9,10 @@ const mocks = vi.hoisted(() => ({
   startTrialError: false,
   checkout: vi.fn(),
   refetch: vi.fn(),
+  funnelTrack: vi.fn(),
 }));
 
+vi.mock("@/lib/trialFunnel", () => ({ trackTrialInteraction: mocks.funnelTrack }));
 vi.mock("@/hooks/useBilling", async () => {
   const actual = await vi.importActual<typeof import("@/hooks/useBilling")>("@/hooks/useBilling");
   return {
@@ -46,6 +48,7 @@ beforeEach(() => {
   mocks.startTrial.mockReset();
   mocks.checkout.mockReset();
   mocks.startTrialError = false;
+  mocks.funnelTrack.mockReset().mockResolvedValue(true);
 });
 
 describe("PlanSelectionGate", () => {
@@ -59,6 +62,7 @@ describe("PlanSelectionGate", () => {
   it("retains paid-user access", () => {
     renderGate();
     expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
+    expect(mocks.funnelTrack).not.toHaveBeenCalled();
   });
 
   it("admits account-trial users without starting checkout", () => {
@@ -103,6 +107,7 @@ describe("PlanSelectionGate", () => {
     mocks.billing = { plan: "free", accessState: "trial_exhausted", canUseApp: false, canUpload: false, reviewReceiptId: 42, foundingEligible: true };
     renderGate();
     expect(screen.getByTestId("text-paywall-title").textContent).toContain("3 trial uploads");
+    expect(mocks.funnelTrack).toHaveBeenCalledWith({ event: "paywall_viewed", reason: "trial_exhausted" });
     expect(screen.getByTestId("link-review-last-receipt").getAttribute("href")).toBe("/receipts/42");
     expect(document.body.textContent).not.toMatch(/Save \d+%|\/mo billed/);
     fireEvent.click(screen.getByTestId("button-subscribe-yearly"));
@@ -115,6 +120,7 @@ describe("PlanSelectionGate", () => {
       mocks.location = path;
       const { unmount } = renderGate();
       expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
+      expect(mocks.funnelTrack).not.toHaveBeenCalled();
       unmount();
     }
     mocks.location = "/receipts/41";
@@ -134,5 +140,6 @@ describe("PlanSelectionGate", () => {
     mocks.billing = { plan: "free", accessState: "trial_expired", canUseApp: false };
     renderGate();
     expect(screen.getByTestId("text-paywall-title").textContent).toContain("seven-day trial has ended");
+    expect(mocks.funnelTrack).toHaveBeenCalledWith({ event: "paywall_viewed", reason: "trial_expired" });
   });
 });

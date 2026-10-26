@@ -9,6 +9,7 @@ import { db, gmailConnectionsTable } from "@workspace/db";
 import { spawn } from "child_process";
 import { fileURLToPath } from "node:url";
 import { billingOrigin } from "./lib/billingUrls";
+import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
 
 const rawPort = process.env["PORT"];
 
@@ -347,6 +348,7 @@ async function initStripe(): Promise<void> {
 async function start(): Promise<void> {
   // Apply schema migrations synchronously before accepting requests
   await runStartupMigrations();
+  await migrateTrialFunnel();
   // Encrypt any gmail_connections rows that still have plaintext tokens
   await migrateGmailTokenEncryption();
 

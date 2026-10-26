@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { db, userBillingTable, accountTrialsTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
+import { db, userBillingTable, accountTrialsTable, trialFunnelCheckoutsTable } from "@workspace/db";
+import { funnelSubject, recordFunnelEvent, paywallReason, safeFunnel, createFunnelCheckout, confirmPaidFunnel } from "../lib/trialFunnel";
 import { TRIAL_DURATION_MS } from "../lib/accountTrial";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
@@ -28,6 +29,9 @@ async function getUserEmail(userId: string): Promise<string | null> {
 router.get("/billing/subscription", requireAuth, async (req, res): Promise<void> => {
   try {
     const status = await getSubscriptionStatus(req.userId!);
+    if (status.accessState === "paid") {
+      await safeFunnel(() => confirmPaidFunnel(req.userId!));
+    }
     res.json({
       ...status,
       stripeSubscriptionId: undefined,
@@ -43,6 +47,39 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
     res.status(500).json({ error: "Failed to load subscription" });
   }
 });
+
+router.post("/billing/trial-funnel", requireAuth, requireCurrentLegalAcceptance,
+  lockUserDataMutation(async (req, res): Promise<void> => {
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body) ||
+      Object.keys(body).some(k => !["event", "reason", "attemptId"].includes(k)) ||
+      !["paywall_viewed", "checkout_canceled"].includes(body.event) ||
+      (body.event === "paywall_viewed" && (!paywallReason(body.reason) || body.attemptId !== undefined)) ||
+      (body.event === "checkout_canceled" && (body.reason !== undefined ||
+        typeof body.attemptId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.attemptId)))) {
+      res.status(400).json({ error: "Invalid funnel interaction" });
+      return;
+    }
+    const subjectId = await funnelSubject(req.userId!);
+    if (subjectId) {
+      if (body.event === "paywall_viewed") {
+        const status = await getSubscriptionStatus(req.userId!);
+        if (paywallReason(status.accessState) === body.reason) {
+          await recordFunnelEvent(subjectId, "paywall_viewed", body.reason, null, body.reason);
+        }
+      } else {
+        const [attempt] = await db.select().from(trialFunnelCheckoutsTable).where(and(
+          eq(trialFunnelCheckoutsTable.id, body.attemptId),
+          eq(trialFunnelCheckoutsTable.subjectId, subjectId),
+        ));
+        if (attempt) {
+          await recordFunnelEvent(subjectId, "checkout_canceled", attempt.id,
+            attempt.interval as "monthly" | "yearly", paywallReason(attempt.reason ?? undefined));
+        }
+      }
+    }
+    res.sendStatus(204);
+  }));
 
 router.post("/billing/start-trial", requireAuth, requireCurrentLegalAcceptance,
   lockUserDataMutation(async (req, res): Promise<void> => {
@@ -75,19 +112,22 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
     return;
   }
 
-  const priceId = billingPriceId(planType as "monthly" | "yearly");
-
-  if (!priceId) {
-    res.status(503).json({ error: "Stripe price IDs are not configured yet" });
-    return;
-  }
-
   const userId = req.userId!;
 
   try {
     const status = await getSubscriptionStatus(userId);
     if (status.plan === "pro" || status.accessState === "legacy_stripe_trial") {
       res.status(409).json({ error: "SUBSCRIPTION_ALREADY_ACTIVE", message: "Manage your existing subscription in billing." });
+      return;
+    }
+    const interval = planType as "monthly" | "yearly";
+    await safeFunnel(async () => {
+      const subjectId = await funnelSubject(userId);
+      if (subjectId) await recordFunnelEvent(subjectId, "plan_selected", interval, interval, paywallReason(status.accessState));
+    });
+    const priceId = billingPriceId(interval);
+    if (!priceId) {
+      res.status(503).json({ error: "Stripe price IDs are not configured yet" });
       return;
     }
     // Resolve configuration before creating customers or checkout sessions.
@@ -154,6 +194,10 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
     for (const open of openSessions.data) {
       await stripe.checkout.sessions.expire(open.id);
     }
+    let attemptId: string | null = null;
+    await safeFunnel(async () => {
+      attemptId = await createFunnelCheckout(userId, interval, paywallReason(status.accessState));
+    });
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ["card"],
@@ -161,7 +205,7 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
       mode: "subscription",
       subscription_data: { metadata: { userId, offer: "founding_customer" } },
       success_url: `${base}/search?checkout=success`,
-      cancel_url: `${base}/search?checkout=cancel`,
+      cancel_url: `${base}/search?checkout=cancel${attemptId ? `&attempt=${attemptId}` : ""}`,
     });
 
     res.json({ url: session.url });

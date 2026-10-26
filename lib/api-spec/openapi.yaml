@@ -15,6 +15,23 @@ tags:
   - name: Storage
     description: Object storage upload and serving endpoints.
 paths:
+  /billing/trial-funnel:
+    post:
+      operationId: recordTrialFunnelInteraction
+      summary: Record an authenticated paywall view or checkout cancellation, without user content
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrialFunnelInteraction"
+      responses:
+        "204":
+          description: Interaction handled idempotently, or account outside the no-card cohort
+        "400":
+          description: Invalid interaction
+        "401":
+          description: Authentication required
   /billing/start-trial:
     post:
       operationId: startAccountTrial
@@ -404,6 +421,20 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
+    TrialFunnelInteraction:
+      type: object
+      additionalProperties: false
+      required: [event]
+      properties:
+        event:
+          type: string
+          enum: [paywall_viewed, checkout_canceled]
+        reason:
+          type: string
+          enum: [trial_expired, trial_exhausted]
+        attemptId:
+          type: string
+          format: uuid
     AccountTrialStartResult:
       type: object
       required: [started]

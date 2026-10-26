@@ -38,6 +38,7 @@ import type {
   ReceiptStats,
   ReceiptUpdate,
   SimilarReceiptMatch,
+  TrialFunnelInteraction,
   UploadReservationRelease,
   UploadUrlRequest,
   UploadUrlResponse
@@ -54,6 +55,77 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getRecordTrialFunnelInteractionUrl = () => {
+
+
+
+
+  return `/api/billing/trial-funnel`
+}
+
+/**
+ * @summary Record an authenticated paywall view or checkout cancellation, without user content
+ */
+export const recordTrialFunnelInteraction = async (trialFunnelInteraction: TrialFunnelInteraction, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getRecordTrialFunnelInteractionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      trialFunnelInteraction,)
+  }
+);}
+
+
+
+
+export const getRecordTrialFunnelInteractionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordTrialFunnelInteraction>>, TError,{data: BodyType<TrialFunnelInteraction>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordTrialFunnelInteraction>>, TError,{data: BodyType<TrialFunnelInteraction>}, TContext> => {
+
+const mutationKey = ['recordTrialFunnelInteraction'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordTrialFunnelInteraction>>, {data: BodyType<TrialFunnelInteraction>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  recordTrialFunnelInteraction(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordTrialFunnelInteractionMutationResult = NonNullable<Awaited<ReturnType<typeof recordTrialFunnelInteraction>>>
+    export type RecordTrialFunnelInteractionMutationBody = BodyType<TrialFunnelInteraction>
+    export type RecordTrialFunnelInteractionMutationError = ErrorType<void>
+
+    /**
+ * @summary Record an authenticated paywall view or checkout cancellation, without user content
+ */
+export const useRecordTrialFunnelInteraction = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordTrialFunnelInteraction>>, TError,{data: BodyType<TrialFunnelInteraction>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordTrialFunnelInteraction>>,
+        TError,
+        {data: BodyType<TrialFunnelInteraction>},
+        TContext
+      > => {
+      return useMutation(getRecordTrialFunnelInteractionMutationOptions(options));
+    }
 
 export const getStartAccountTrialUrl = () => {
 

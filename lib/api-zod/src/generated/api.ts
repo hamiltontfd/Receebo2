@@ -9,6 +9,16 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Record an authenticated paywall view or checkout cancellation, without user content
+ */
+export const RecordTrialFunnelInteractionBody = zod.object({
+  "event": zod.enum(['paywall_viewed', 'checkout_canceled']),
+  "reason": zod.enum(['trial_expired', 'trial_exhausted']).optional(),
+  "attemptId": zod.string().uuid().optional()
+})
+
+
+/**
  * @summary Start the seven-day no-card account trial once after legal consent
  */
 export const StartAccountTrialResponse = zod.object({

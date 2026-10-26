@@ -125,9 +125,15 @@ export default function PrivacyPolicy() {
         </li>
       </ul>
       <p>
-        Receebo does not sell personal data. If analytics are introduced, the
-        provider and purpose will be disclosed and non-essential tracking will
-        not begin before any consent required by law.
+        Receebo does not sell personal data. To understand the no-card trial and
+        subscription process, Receebo records limited first-party milestones such
+        as trial start, successful-upload counts, paywall views, plan choice and
+        payment confirmation. These records contain a random internal identifier,
+        timestamps and fixed plan or paywall categories, not receipt contents,
+        email addresses or payment details. The separate account mapping and
+        milestone records are removed when your account is deleted. This
+        measurement does not use analytics cookies or third-party tracking scripts.
+        Non-essential tracking will not begin before any consent required by law.
       </p>
 
       <h2>5. Gmail access</h2>

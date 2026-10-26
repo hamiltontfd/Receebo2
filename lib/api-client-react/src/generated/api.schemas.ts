@@ -5,6 +5,28 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type TrialFunnelInteractionEvent = typeof TrialFunnelInteractionEvent[keyof typeof TrialFunnelInteractionEvent];
+
+
+export const TrialFunnelInteractionEvent = {
+  paywall_viewed: 'paywall_viewed',
+  checkout_canceled: 'checkout_canceled',
+} as const;
+
+export type TrialFunnelInteractionReason = typeof TrialFunnelInteractionReason[keyof typeof TrialFunnelInteractionReason];
+
+
+export const TrialFunnelInteractionReason = {
+  trial_expired: 'trial_expired',
+  trial_exhausted: 'trial_exhausted',
+} as const;
+
+export interface TrialFunnelInteraction {
+  event: TrialFunnelInteractionEvent;
+  reason?: TrialFunnelInteractionReason;
+  attemptId?: string;
+}
+
 export interface AccountTrialStartResult {
   started: boolean;
 }

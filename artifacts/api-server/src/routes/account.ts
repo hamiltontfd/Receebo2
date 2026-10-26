@@ -15,6 +15,7 @@ import {
   userBillingTable,
   accountTrialsTable,
   trialUploadsTable,
+  trialFunnelSubjectsTable,
   userPreferencesTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -447,6 +448,7 @@ router.delete("/account", requireAuth, async (req, res): Promise<void> => {
       await tx.delete(receiptsTable).where(eq(receiptsTable.userId, userId));
       await tx.delete(trialUploadsTable).where(eq(trialUploadsTable.userId, userId));
       await tx.delete(accountTrialsTable).where(eq(accountTrialsTable.userId, userId));
+      await tx.delete(trialFunnelSubjectsTable).where(eq(trialFunnelSubjectsTable.userId, userId));
       await tx
         .delete(userBillingTable)
         .where(eq(userBillingTable.userId, userId));

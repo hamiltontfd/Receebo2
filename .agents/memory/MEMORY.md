@@ -14,3 +14,4 @@
 - [Stripe environment isolation](stripe-environment-isolation.md) — connector test mode does not imply backend test mode; inspect effective credentials and price compatibility separately.
 - [Login navigation](login-navigation.md) — login must be a dismissible modal over the landing page, including in the installed web app.
 - [Founding customer offer](founding-trial-policy.md) — no-card account trials and legacy Stripe trials are distinct; founding eligibility lasts while the account exists.
+- [Stripe sync schema](stripe-sync-schema.md) — newer invoice fields may remain only in raw JSON; inspect projections and use raw-payload fixtures.

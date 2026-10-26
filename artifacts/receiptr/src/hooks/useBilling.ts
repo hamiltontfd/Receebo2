@@ -10,6 +10,7 @@ import {
   type SubscriptionStatus,
 } from "@workspace/api-client-react";
 import { toast } from "@/hooks/use-toast";
+import { recordCheckoutCancellation } from "@/lib/trialFunnel";
 
 const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
 
@@ -121,6 +122,9 @@ function isCheckoutSuccess() {
 export function useBillingStatus() {
   const { isSignedIn } = useAuth();
   const afterCheckout = isCheckoutSuccess();
+  useEffect(() => {
+    if (isSignedIn) void recordCheckoutCancellation();
+  }, [isSignedIn]);
 
   return useQuery<BillingStatus>({
     queryKey: BILLING_QUERY_KEY,

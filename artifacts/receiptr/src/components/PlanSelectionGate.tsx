@@ -16,6 +16,7 @@ import {
   type BillingStatus,
 } from "@/hooks/useBilling";
 import { PlanChoice, FoundingNote } from "@/components/PlanChoice";
+import { trackTrialInteraction } from "@/lib/trialFunnel";
 
 const ACTIVATING_TIMEOUT_MS = 10_000;
 export const ACTIVE_REVIEW_KEY = "receebo:activeReviewReceiptId";
@@ -152,6 +153,15 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
 
   const inActivatingState =
     !!billing && isCheckoutSuccess() && !isPaidLike(billing) && state !== "owner" && !activatingTimedOut;
+
+  const visiblePaywall = !!billing && !isLoading && !inActivatingState &&
+    !hasAppAccess(billing) && !isRouteAllowedWithoutAccess(location, billing) &&
+    (state === "trial_expired" || state === "trial_exhausted");
+  useEffect(() => {
+    if (visiblePaywall && (state === "trial_expired" || state === "trial_exhausted")) {
+      void trackTrialInteraction({ event: "paywall_viewed", reason: state });
+    }
+  }, [visiblePaywall, state]);
 
   useEffect(() => {
     if (!inActivatingState) return;

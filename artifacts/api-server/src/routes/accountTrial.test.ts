@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import {
   db, accountTrialsTable, trialUploadsTable, uploadIntentsTable, receiptsTable,
   pendingImportsTable, userBillingTable, guestSessionsTable,
+  trialFunnelSubjectsTable,
 } from "@workspace/db";
 
 const fixture = vi.hoisted(() => ({
@@ -106,6 +107,7 @@ afterAll(async () => {
     await db.delete(receiptsTable).where(eq(receiptsTable.userId, id));
     await db.delete(userBillingTable).where(eq(userBillingTable.userId, id));
     await db.delete(accountTrialsTable).where(eq(accountTrialsTable.userId, id));
+    await db.delete(trialFunnelSubjectsTable).where(eq(trialFunnelSubjectsTable.userId, id));
   }
   for (const token of guestTokens) await db.delete(guestSessionsTable).where(eq(guestSessionsTable.token, token));
 });
