@@ -33,9 +33,13 @@ Receipt keeper PWA for everyday shoppers (PT/EU focus): capture receipts (upload
 - [ ] Set `VITE_APP_URL` for the web build; Stripe migration "existing trigger" warning on boot.
 - [ ] Launch runbook checks plus privacy/terms approval (`docs/RECEEB0_LAUNCH_RUNBOOK.md`).
 - [ ] Fill in `replit.md` (still the template); old name "receiptr" remains in places.
-- [ ] Confirm the OpenAI model name in code ("gpt-5.4") is valid.
+- [x] Confirm the OpenAI model name in code ("gpt-5.4") is valid (it is).
 - [ ] Confirm whether the latest commit `7e1c0ac` (no-card trial) is live on receebo.net.
 - [ ] Decide on Replit Agent tasks #206 and #207.
+- [ ] Fix return window: count 14 days from delivery, not purchase date (Directive 2011\/83\/EU Art. 9).
+- [ ] Consider replacing Gmail OAuth with an inbound forwarding address (avoids yearly CASA assessment).
 
 ## Decisions
 - 26 Oct 2026: Keep hosting on Replit; trial Cursor + Grok Bot for ~1 month via SSH. No Cursor cloud Project for now (would require a GitHub/Origin copy and two-way sync). Revisit at end of trial.
+
+- 26 Oct 2026: Critical business review done (see hackathon-log session 4). Leaning toward free tier + pivot exploration; no decision yet.
