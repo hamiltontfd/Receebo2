@@ -104,3 +104,33 @@ Technical details live in `docs/assistant-log.md`.
 **Alerts:** confirmed warranty and return-window sweeps have no plan/trial check (only the email opt-out), so they keep running at the cap. New test runs the return-window sweep for a capped trial and sees email + push.
 
 **Outcome:** Commit `7c23732` on `main`, not pushed or published; no Stripe calls. Typecheck clean (5 projects); web tests 178 passed (25 files); API tests 199 passed, 2 skipped. `test:marketing` can't run here (Playwright browsers not installed). Open: decide whether the terms change needs a `TERMS_VERSION` bump (forces re-acceptance); funnel event `third_receipt_succeeded` still fires at the 3rd receipt; translations not wired (app is English-only).
+
+## 26 Oct 2026, session 13: email fixes, reminders only for users with access, Outlook-only copy
+**Goal (Hamilton):** Fix the problems from the Resend audit ("em que pé estão os envios de email pelo resend?"), without decisions still pending. Added during the session: drop the "receipt ready" email, send reminders only to users with current access, and state clearly that email import is Outlook only for now.
+
+**DNS:** receebo.net is registered at Name.com and its DNS is hosted there (nameservers `ns*.name.com`). Mail is Zoho (MX `mx.zoho.eu`), SPF only includes Zoho, DMARC `p=reject`. Resend records are not set up yet.
+
+**What Grok Bot did:**
+- **Links:** email links go to `https://receebo.net` in production (same rule as billing). The old `receebo.replit.app` returned 404.
+- **Error handling:** every Resend send now checks the returned error, logs `errorName`/`errorMessage` and returns false. Warranty, return and trial flags are reset, so the next daily run retries.
+- **Safety:** AI/user text is escaped in the email HTML. Subjects have control characters removed and are capped at 120 characters.
+- **Sender:** one config, `RESEND_FROM`, still defaulting to `onboarding@resend.dev`, plus optional `RESEND_REPLY_TO`. `RESEND_FROM` was removed from `.replit` because it had the same value as the code default. The switch steps are in `docs/email-sending.md`.
+- **Layout:** a shared `renderEmailLayout()` wrapper with the same design, ready for the lifecycle emails.
+- **Receipt ready:** the "receipt ready" email per receipt is removed.
+- **Warranty reminders:** deduplicated per expiry date (new column `receipts.warranty_reminder_sent_for`), sent 28–30 days before expiry, awaited and counted, with an unsubscribe link.
+- **Return reminders:** if the 7-day and 2-day reminders are both due, only the 2-day one is sent.
+- **Who gets reminders:** warranty and return reminders (email and push) go only to users with current access: an active trial (including at the 5-receipt cap), a paid plan, a legacy Stripe trial, or the owner.
+- **Daily job:** the server checks hourly, and a database lock (`scheduled_job_runs`) means the daily job runs at most once every 23 hours across restarts. Each sweep runs independently, so one failure doesn't stop the others.
+- **Unsubscribe:** one-click `List-Unsubscribe` + `List-Unsubscribe-Post`. Opening the link only shows a confirm button, so link scanners can't unsubscribe anyone.
+- **Formatting:** money and dates are en-GB ("€12.50", "26 Oct 2026").
+- **Site meta tags:** `VITE_APP_URL` now defaults to `https://receebo.net` (vite config + `.env.production`). A production build has no `%VITE_APP_URL%` left.
+- **Copy:** the Settings reminder label now covers warranty and return reminders. The privacy text no longer mentions receipt-processing emails and says reminders are sent while you have access.
+- **Outlook-only copy:** shown when Outlook is the only provider. Landing title "Import from Outlook" with the agreed body, a new FAQ item "Which email providers work?", and a note next to Connect Outlook (web + mobile). The multi-provider and neutral wording stays as before.
+
+**Outcome:** Commit `ec6b20d` on `main`, not pushed or published. No Stripe or Resend calls. The migration was applied to the dev DB. Typecheck clean (5 projects); web tests 181 passed; API tests 218 passed, 2 skipped.
+
+**Open:**
+- Verify receebo.net in Resend, then set `RESEND_FROM` (steps in `docs/email-sending.md`). Until then only the Resend account owner gets email.
+- The privacy text changed again: decide on the legal version bump together with the earlier changes.
+- Legacy Gmail notes kept in privacy (section on earlier Gmail connections) and terms (Google listed as a provider "for earlier Gmail connections"), while old Gmail tokens may still exist in production.
+- Lifecycle emails (welcome, trial start/end, deletion after 60 days) not started.

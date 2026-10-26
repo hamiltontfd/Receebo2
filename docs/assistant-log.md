@@ -57,6 +57,10 @@ Receipt keeper PWA for everyday shoppers (PT/EU focus): capture receipts (upload
 - [ ] Legal: the terms trial clause changed in session 12 (15 days / 5 receipts / view-only at cap). Decide with the Outlook change whether to bump `TERMS_VERSION`.
 - [ ] Trial funnel still has `third_receipt_succeeded` (3rd receipt); decide whether to add a 5th-receipt event. `paywall_viewed` with reason `trial_exhausted` will now rarely fire (the cap no longer shows the paywall).
 - [ ] Wire pt-PT / pt-BR for the cap notice when the app gets i18n (strings in `receiptr/src/lib/trialCopy.ts`).
+- [x] Email fixes from the Resend audit: links, error handling, escaping, unsubscribe, dedup, daily lock, reminders only for users with access, receipt-ready email removed, Outlook-only copy (commit `ec6b20d`, session 13).
+- [ ] Verify receebo.net in Resend (DNS at Name.com) and set `RESEND_FROM` / `RESEND_REPLY_TO` Secrets. Steps in `docs/email-sending.md`. Until then only the Resend account owner receives email.
+- [ ] Lifecycle emails (welcome, trial start/end, deletion after 60 days): copy and design with marketing first; build on `renderEmailLayout()`.
+- [ ] Remove the legacy Gmail notes in privacy/terms once no Gmail tokens remain in production.
 
 ## Decisions
 - 26 Oct 2026: Keep hosting on Replit; trial Cursor + Grok Bot for ~1 month via SSH. No Cursor cloud Project for now (would require a GitHub/Origin copy and two-way sync). Revisit at end of trial.
@@ -68,3 +72,5 @@ Receipt keeper PWA for everyday shoppers (PT/EU focus): capture receipts (upload
 - 26 Oct 2026 (session 11): Provider names in marketing copy come from public `GET /api/mail/providers` (same flag as Settings), never hard-coded. Legal pages stay static and describe Microsoft only, plus a legacy-Gmail note; if Gmail is re-enabled, the privacy policy must be updated again. Forwarding is not mentioned in marketing copy.
 
 - 26 Oct 2026 (session 12): Free trial = 15 days + 5 receipts, not "whichever comes first". At 5 receipts the account is view-only (view, search, files, export, alerts) until day 15, then the paywall. Existing trials extended to 15 days from their original start at server boot (also reopens recently expired 7-day trials). Attachments to an existing receipt stay allowed at the cap.
+
+- 26 Oct 2026 (session 13): No per-receipt "receipt ready" email. Warranty and return reminders (email + push) only for users with current access (active trial incl. at the cap, paid, legacy Stripe trial, owner). Sender stays the Resend test sender until receebo.net is verified. Email import copy says "Outlook only for now" while Outlook is the only provider.
