@@ -10,6 +10,8 @@ import {
   inboxPhrase,
   outlookAccountsNote,
   useAvailableMailProviders,
+  isOutlookOnly,
+  OUTLOOK_ONLY_FAQ,
   type AvailableMailProvider,
 } from "@/lib/availableMailProviders";
 
@@ -29,6 +31,7 @@ function buildFaqs(providers: AvailableMailProvider[]) {
     q: "Can I import email receipts?",
     a: `Yes. Connect ${inbox} and Receebo looks for order confirmations and PDF receipts from the last 90 days. Access is read-only, you review each import before it is saved, and you can disconnect at any time.${accountsNote ? ` ${accountsNote}` : ""}`,
   },
+  ...(isOutlookOnly(providers) ? [OUTLOOK_ONLY_FAQ] : []),
   {
     q: "Is my data private?",
     a: "Your receipts are private to your account and are shared only with the services needed to run Receebo, such as AI extraction. Inbox access is read-only and can be disconnected at any time. We never sell your data or use it for advertising, and you can delete everything at any time.",

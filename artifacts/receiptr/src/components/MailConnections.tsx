@@ -12,6 +12,7 @@ import {
   type MailProviderStatus,
   type MailStatus,
 } from "@/lib/mailConnection";
+import { isOutlookOnly, OUTLOOK_ONLY_CONNECT_NOTE } from "@/lib/availableMailProviders";
 
 const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
 
@@ -37,9 +38,11 @@ function formatDateTime(iso: string | null) {
 function ProviderCard({
   provider,
   pendingCount,
+  outlookOnly = false,
 }: {
   provider: MailProviderStatus;
   pendingCount: number;
+  outlookOnly?: boolean;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -193,6 +196,12 @@ function ProviderCard({
         </div>
       )}
 
+      {outlookOnly && provider.id === "outlook" && !provider.connected && (
+        <p className="text-xs text-muted-foreground mt-3 pt-3 border-t" data-testid="mail-outlook-only-note">
+          {OUTLOOK_ONLY_CONNECT_NOTE}
+        </p>
+      )}
+
       {retired && provider.connected && (
         <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
           {label} import is no longer available. Disconnect to remove Receebo's access to this inbox.
@@ -233,6 +242,7 @@ export function MailConnections() {
           key={provider.id}
           provider={provider}
           pendingCount={data?.pendingCount ?? 0}
+          outlookOnly={isOutlookOnly(providers)}
         />
       ))}
     </div>

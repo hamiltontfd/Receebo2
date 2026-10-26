@@ -30,3 +30,4 @@ export * from "./accountDeletionRequests";
 export * from "./accountTrials";
 export * from "./trialFunnel";
 export * from "./paymentNotices";
+export * from "./scheduledJobRuns";

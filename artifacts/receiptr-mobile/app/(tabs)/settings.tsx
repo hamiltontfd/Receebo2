@@ -24,6 +24,9 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
 
+const OUTLOOK_ONLY_CONNECT_NOTE =
+  'Email import works with Outlook for now. Using another email? Save the receipt as a PDF and upload it.';
+
 function formatDate(iso: string | null): string {
   if (!iso) return 'Never';
   const d = new Date(iso);
@@ -50,6 +53,11 @@ export default function SettingsScreen() {
   // Only providers enabled by MAIL_PROVIDERS_ENABLED (and configured), plus a
   // legacy connection the user can still disconnect.
   const providers = mailStatus?.providers ?? [];
+  // Matches the web copy: shown while Outlook is the only enabled provider.
+  const outlookOnly = (() => {
+    const ids = providers.filter((p) => p.enabled).map((p) => p.id);
+    return ids.length === 1 && ids[0] === 'outlook';
+  })();
 
   // Poll for connection status after opening the provider's sign-in page
   const [polling, setPolling] = useState<MailProviderStatus['id'] | null>(null);
@@ -315,6 +323,11 @@ export default function SettingsScreen() {
                       </>
                     )}
                   </Pressable>
+                  {provider.id === 'outlook' && outlookOnly && (
+                    <Text style={[styles.gmailDescription, { color: colors.mutedForeground, marginTop: 10 }]}>
+                      {OUTLOOK_ONLY_CONNECT_NOTE}
+                    </Text>
+                  )}
                   {polling === provider.id && (
                     <Pressable onPress={() => { stopPolling(); void refetchStatus(); }}>
                       <Text style={[styles.checkStatusLink, { color: colors.mutedForeground }]}>

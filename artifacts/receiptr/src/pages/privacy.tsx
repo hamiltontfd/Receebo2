@@ -82,8 +82,10 @@ export default function PrivacyPolicy() {
         </li>
         <li>
           <strong>Service communications:</strong> to send necessary account,
-          receipt-processing, trial, security, and subscription messages. Where
-          a message is optional, Receebo provides a separate preference control.
+          trial, security, and subscription messages, and warranty and
+          return-window reminders while your account has access. Reminders are
+          optional: you can turn them off in Settings or with the unsubscribe
+          link in each reminder email.
         </li>
       </ul>
 

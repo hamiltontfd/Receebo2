@@ -37,9 +37,24 @@ describe("landing inbox copy follows the enabled mail providers", () => {
       </>,
     );
     await waitFor(() => expect(screen.getByText("Connect Outlook")).toBeInTheDocument());
-    expect(container.textContent).toMatch(/your Outlook inbox/);
-    expect(container.textContent).toMatch(/Hotmail/);
+    // Outlook-only copy (marketing, 26 Oct 2026).
+    expect(screen.getByRole("heading", { name: "Import from Outlook" })).toBeInTheDocument();
+    expect(screen.getByTestId("text-email-section-body").textContent).toBe(
+      "Connect your Outlook inbox and Receebo finds your receipts for you. You approve each one before it's saved. Outlook only for now; more email providers are coming.",
+    );
+    expect(screen.getByText("Which email providers work?")).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/Gmail/);
+  });
+
+  it("puts the Outlook-only FAQ answer in the FAQ list", async () => {
+    const { OUTLOOK_ONLY_FAQ, isOutlookOnly } = await import("@/lib/availableMailProviders");
+    expect(OUTLOOK_ONLY_FAQ.a).toBe(
+      "For now, only Outlook (including Hotmail and Live accounts). For any other email, save the receipt or order confirmation as a PDF and upload it.",
+    );
+    expect(isOutlookOnly([{ id: "outlook" }])).toBe(true);
+    expect(isOutlookOnly([{ id: "outlook" }, { id: "gmail" }])).toBe(false);
+    expect(isOutlookOnly([{ id: "outlook" }, { id: "gmail", enabled: false }])).toBe(true);
+    expect(isOutlookOnly([])).toBe(false);
   });
 
   it("falls back to provider-neutral copy when nothing is connectable", async () => {
@@ -47,6 +62,7 @@ describe("landing inbox copy follows the enabled mail providers", () => {
     const { container } = render(<EmailReceiptsSection />);
     await waitFor(() => expect(screen.getByText("Connect your inbox")).toBeInTheDocument());
     expect(container.textContent).not.toMatch(/Gmail|Outlook/);
+    expect(container.textContent).toMatch(/Not every receipt/);
   });
 
   it("restores Gmail when the flag enables it again", async () => {
@@ -54,9 +70,11 @@ describe("landing inbox copy follows the enabled mail providers", () => {
       { id: "gmail", label: "Gmail" },
       { id: "outlook", label: "Outlook" },
     ]);
-    render(<EmailReceiptsSection />);
+    const { container } = render(<><EmailReceiptsSection /><FAQSection /></>);
     await waitFor(() =>
       expect(screen.getByText("Connect Gmail or Outlook")).toBeInTheDocument(),
     );
+    expect(container.textContent).not.toMatch(/Import from Outlook|Outlook only for now/);
+    expect(screen.queryByText("Which email providers work?")).toBeNull();
   });
 });

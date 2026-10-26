@@ -5,7 +5,7 @@ interface BillingEnvironment {
 
 // Verified published origin. Never derive payment redirects from request headers,
 // request bodies, or workspace domain variables in production.
-const PUBLISHED_ORIGIN = "https://receebo.net";
+export const PUBLISHED_ORIGIN = "https://receebo.net";
 
 export function billingOrigin(environment: BillingEnvironment = process.env): string {
   if (environment.NODE_ENV === "production") return PUBLISHED_ORIGIN;

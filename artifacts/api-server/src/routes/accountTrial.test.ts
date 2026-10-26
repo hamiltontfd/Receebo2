@@ -12,7 +12,7 @@ import {
 
 const fixture = vi.hoisted(() => ({
   extraction: vi.fn(), check: vi.fn(), checkout: vi.fn(),
-  returnEmail: vi.fn(), push: vi.fn(),
+  returnEmail: vi.fn(), push: vi.fn(), warrantyEmail: vi.fn(),
   liveSubscriptions: [] as Array<{ status: string }>,
 }));
 // Authentication only is replaced for this local HTTP harness. Entitlements,
@@ -38,8 +38,7 @@ vi.mock("@clerk/express", () => ({
   clerkClient: { users: { getUser: async () => ({ emailAddresses: [] }) } },
 }));
 vi.mock("../lib/emailService", () => ({
-  sendReceiptReadyEmail: async () => {},
-  sendWarrantyReminderEmail: async () => true,
+  sendWarrantyReminderEmail: fixture.warrantyEmail,
   sendTrialEndingEmail: async () => true,
   sendReturnWindowEmail: fixture.returnEmail,
 }));
@@ -83,7 +82,9 @@ import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 import {
   trialState, TRIAL_DURATION_MS, TRIAL_LIMIT, TRIAL_CAP_MESSAGE, extendTrialsToCurrentDuration,
 } from "../lib/accountTrial";
-import { runReturnWindowSweep } from "../lib/orphanCleanup";
+import { runReturnWindowSweep, runWarrantyReminderSweep } from "../lib/orphanCleanup";
+import { claimScheduledRun } from "../lib/scheduledJobLock";
+import { scheduledJobRunsTable } from "@workspace/db";
 import { calcReturnWindow } from "../lib/returnWindowCalc";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -301,7 +302,79 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
     await runReturnWindowSweep();
     expect(fixture.returnEmail).toHaveBeenCalledWith(userId, expect.objectContaining({ id: target }));
     expect(fixture.push).toHaveBeenCalledWith(userId, expect.objectContaining({ receiptId: target }));
+    // 7-day and 2-day both due in one run: only the 2-day email goes out, and both are marked.
+    const targetEmails = fixture.returnEmail.mock.calls.filter(([, r]) => r.id === target);
+    expect(targetEmails).toHaveLength(1);
+    expect(targetEmails[0][1].daysRemaining).toBeLessThanOrEqual(2);
+    const [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, target));
+    expect(row.returnReminderSent2dAt).not.toBeNull();
+    expect(row.returnReminderSent7dAt).not.toBeNull();
+    await runReturnWindowSweep();
+    expect(fixture.returnEmail.mock.calls.filter(([, r]) => r.id === target)).toHaveLength(1);
+
+    // Warranty reminders also reach a capped (still active) trial, once per expiry date.
+    const expiry = new Date(Date.now() + 29 * DAY_MS).toISOString().slice(0, 10);
+    await db.update(receiptsTable).set({ warranty: `Manufacturer warranty until ${expiry}` })
+      .where(eq(receiptsTable.id, receipts[1].id));
+    fixture.warrantyEmail.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    await runWarrantyReminderSweep();
+    await runWarrantyReminderSweep();
+    expect(fixture.warrantyEmail.mock.calls.filter(([uid, r]) => uid === userId && r.id === receipts[1].id)).toHaveLength(1);
+  }, 40000);
+  it("sends no warranty or return reminders to an expired trial (no current access)", async () => {
+    await start();
+    const receipt = await upload();
+    let purchaseDate = "";
+    for (let d = 0; d < 60 && !purchaseDate; d++) {
+      const iso = new Date(Date.now() - d * DAY_MS).toISOString().slice(0, 10);
+      const w = calcReturnWindow({ purchaseDate: iso, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", merchant: "Fixture store" });
+      if (w && w.daysRemaining >= 0 && w.daysRemaining <= 1) purchaseDate = iso;
+    }
+    const expiry = new Date(Date.now() + 29 * DAY_MS).toISOString().slice(0, 10);
+    await db.update(receiptsTable).set({ purchaseDate, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR",
+      isDraft: false, warranty: `Warranty until ${expiry}` }).where(eq(receiptsTable.id, receipt.id));
+    await db.update(accountTrialsTable).set({ endsAt: new Date(Date.now() - 1000) }).where(eq(accountTrialsTable.userId, userId));
+    expect((await getSubscriptionStatus(userId)).accessState).toBe("trial_expired");
+    fixture.returnEmail.mockReset().mockResolvedValue(false);
+    fixture.push.mockReset().mockResolvedValue(false);
+    fixture.warrantyEmail.mockReset().mockResolvedValue(false);
+    await runReturnWindowSweep();
+    await runWarrantyReminderSweep();
+    const mine = (calls: unknown[][]) => calls.filter(([uid]) => uid === userId);
+    expect(mine(fixture.returnEmail.mock.calls)).toHaveLength(0);
+    expect(mine(fixture.push.mock.calls)).toHaveLength(0);
+    expect(mine(fixture.warrantyEmail.mock.calls)).toHaveLength(0);
+    const [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+    expect(row.returnReminderSent2dAt).toBeNull();
+    expect(row.warrantyReminderSentFor).toBeNull();
   }, 30000);
+  it("retries a rejected warranty reminder on the next run instead of marking it sent", async () => {
+    await start();
+    const receipt = await upload();
+    const expiry = new Date(Date.now() + 28 * DAY_MS).toISOString().slice(0, 10);
+    await db.update(receiptsTable).set({ warranty: `Warranty until ${expiry}` }).where(eq(receiptsTable.id, receipt.id));
+    fixture.warrantyEmail.mockReset().mockResolvedValue(false);
+    await runWarrantyReminderSweep();
+    let [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+    expect(row.warrantyReminderSentFor).toBeNull();
+    fixture.warrantyEmail.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    await runWarrantyReminderSweep();
+    [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+    expect(row.warrantyReminderSentFor).toBe(expiry);
+    expect(fixture.warrantyEmail.mock.calls.filter(([uid]) => uid === userId)).toHaveLength(1);
+  }, 30000);
+  it("lets the daily sweep run only once per ~23h across restarts/instances", async () => {
+    const job = `test-job-${randomUUID()}`;
+    const t0 = new Date("2026-10-26T03:00:00Z");
+    try {
+      const first = await Promise.all([claimScheduledRun(job, 23 * 3600_000, t0), claimScheduledRun(job, 23 * 3600_000, t0)]);
+      expect(first.filter(Boolean)).toHaveLength(1);
+      expect(await claimScheduledRun(job, 23 * 3600_000, new Date(t0.getTime() + 3600_000))).toBe(false);
+      expect(await claimScheduledRun(job, 23 * 3600_000, new Date(t0.getTime() + 23 * 3600_000))).toBe(true);
+    } finally {
+      await db.delete(scheduledJobRunsTable).where(eq(scheduledJobRunsTable.job, job));
+    }
+  });
   it("extends existing 7-day trials to 15 days from their original start (idempotent)", async () => {
     await start();
     const startedAt = new Date(Date.now() - 10 * DAY_MS); // old 7-day trial already expired on day 7

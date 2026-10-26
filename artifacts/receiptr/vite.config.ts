@@ -19,6 +19,10 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+// Canonical/Open Graph URLs in index.html use %VITE_APP_URL%. Default it so the
+// literal placeholder never ships; override with VITE_APP_URL if needed.
+process.env.VITE_APP_URL ||= "https://receebo.net";
+
 const basePath = process.env.BASE_PATH;
 
 if (!basePath) {

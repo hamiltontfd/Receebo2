@@ -5,6 +5,9 @@ import {
   inboxPhrase,
   outlookAccountsNote,
   providerNames,
+  isOutlookOnly,
+  OUTLOOK_ONLY_TITLE,
+  OUTLOOK_ONLY_BODY,
   useAvailableMailProviders,
 } from "@/lib/availableMailProviders";
 
@@ -14,6 +17,7 @@ export default function EmailReceiptsSection() {
   const providers = useAvailableMailProviders();
   const names = providerNames(providers);
   const accountsNote = outlookAccountsNote(providers);
+  const outlookOnly = isOutlookOnly(providers);
 
   const methods = [
     { icon: Mail, label: names ? `Connect ${names}` : "Connect your inbox" },
@@ -92,15 +96,27 @@ export default function EmailReceiptsSection() {
                 variants={fadeInUp}
                 className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight mb-4"
               >
-                Not every receipt
-                <br />
-                is on paper.
+                {outlookOnly ? (
+                  OUTLOOK_ONLY_TITLE
+                ) : (
+                  <>
+                    Not every receipt
+                    <br />
+                    is on paper.
+                  </>
+                )}
               </motion.h2>
-              <motion.p variants={fadeInUp} className="text-lg text-muted-foreground leading-relaxed">
-                Connect {inboxPhrase(providers)} and Receebo finds your online
-                order confirmations and PDF receipts, so proof of purchase is
-                there when you need a return or a warranty claim.
-                {accountsNote ? ` ${accountsNote}` : ""}
+              <motion.p variants={fadeInUp} className="text-lg text-muted-foreground leading-relaxed" data-testid="text-email-section-body">
+                {outlookOnly ? (
+                  OUTLOOK_ONLY_BODY
+                ) : (
+                  <>
+                    Connect {inboxPhrase(providers)} and Receebo finds your online
+                    order confirmations and PDF receipts, so proof of purchase is
+                    there when you need a return or a warranty claim.
+                    {accountsNote ? ` ${accountsNote}` : ""}
+                  </>
+                )}
               </motion.p>
             </div>
 

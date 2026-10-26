@@ -5,10 +5,32 @@ import { sql } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
 import { logger } from "./logger";
 import { sendWarrantyReminderEmail, sendTrialEndingEmail, sendReturnWindowEmail } from "./emailService";
+import { claimScheduledRun } from "./scheduledJobLock";
+import { getSubscriptionStatus } from "./subscriptionStatus";
+
+/**
+ * Reminders (warranty + return window, email + push) go only to users who
+ * currently have access: an active no-card trial (including at the receipt
+ * cap), a paid plan, a legacy Stripe trial, or the owner. Expired or unpaid
+ * accounts are skipped. Cached per sweep.
+ */
+function reminderAccessChecker(): (userId: string) => Promise<boolean> {
+  const cache = new Map<string, boolean>();
+  return async (userId: string) => {
+    if (cache.has(userId)) return cache.get(userId)!;
+    let allowed = false;
+    try {
+      allowed = !userId.startsWith("guest_") && (await getSubscriptionStatus(userId)).canUseApp === true;
+    } catch (err) {
+      logger.warn({ err, userId }, "Reminder access check failed; skipping user this run");
+    }
+    cache.set(userId, allowed);
+    return allowed;
+  };
+}
 import { sendPushNotification } from "./pushNotifications";
 import { calcReturnWindow } from "./returnWindowCalc";
 
-const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const ORPHAN_AGE_THRESHOLD_DAYS = 7;
 const ORPHAN_AGE_THRESHOLD_MS = ORPHAN_AGE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
 
@@ -28,7 +50,7 @@ function objectNameToPath(objectName: string, dirPrefix: string): string | null 
   return `/objects/${entityId}`;
 }
 
-async function runOrphanCleanup(): Promise<void> {
+async function runOrphanFileCleanup(): Promise<void> {
   const privateDir = process.env.PRIVATE_OBJECT_DIR?.trim();
   if (!privateDir) {
     logger.warn("PRIVATE_OBJECT_DIR not set — skipping orphan cleanup");
@@ -119,88 +141,118 @@ async function runOrphanCleanup(): Promise<void> {
     "Orphan cleanup complete",
   );
 
-  // Warranty expiry reminders — send once when expiry is 28-30 days away
+}
+
+const MS_PER_DAY = 86_400_000;
+/** Warranty reminders go out once per expiry date, 28-30 days before it (tolerates missed days). */
+const WARRANTY_REMINDER_MIN_DAYS = 28;
+const WARRANTY_REMINDER_MAX_DAYS = 30;
+const ISO_DATE_RE = /(\d{4}-\d{2}-\d{2})/g;
+
+/** Exported for tests; runs daily from runDailyMaintenance. Users without current access are skipped. */
+export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent: number; failed: number; skippedOptOut: number; skippedNoAccess: number }> {
+  const warrantyReceipts = await db
+    .select({
+      id: receiptsTable.id,
+      userId: receiptsTable.userId,
+      merchant: receiptsTable.merchant,
+      warranty: receiptsTable.warranty,
+      originalFileName: receiptsTable.originalFileName,
+      warrantyReminderSentFor: receiptsTable.warrantyReminderSentFor,
+    })
+    .from(receiptsTable)
+    .where(and(eq(receiptsTable.status, "completed"), isNotNull(receiptsTable.warranty)));
+
+  const todayUtc = new Date(now);
+  todayUtc.setUTCHours(0, 0, 0, 0);
+  const minMs = todayUtc.getTime() + WARRANTY_REMINDER_MIN_DAYS * MS_PER_DAY;
+  const maxMs = todayUtc.getTime() + WARRANTY_REMINDER_MAX_DAYS * MS_PER_DAY;
+
+  const optOutCache = new Map<string, boolean>();
+  async function isOptedOut(userId: string): Promise<boolean> {
+    if (optOutCache.has(userId)) return optOutCache.get(userId)!;
+    const [row] = await db
+      .select({ notificationsOptOut: userPreferencesTable.notificationsOptOut })
+      .from(userPreferencesTable)
+      .where(eq(userPreferencesTable.userId, userId))
+      .limit(1);
+    const optOut = row?.notificationsOptOut ?? false;
+    optOutCache.set(userId, optOut);
+    return optOut;
+  }
+
+  const hasAccess = reminderAccessChecker();
+  let sent = 0;
+  let failed = 0;
+  let skippedOptOut = 0;
+  let skippedNoAccess = 0;
+  for (const r of warrantyReceipts) {
+    if (!r.warranty) continue;
+    const due = (r.warranty.match(ISO_DATE_RE) ?? []).find(dateStr => {
+      const expiryMs = new Date(`${dateStr}T00:00:00Z`).getTime();
+      return expiryMs >= minMs && expiryMs <= maxMs;
+    });
+    if (!due || r.warrantyReminderSentFor === due) continue;
+    if (!(await hasAccess(r.userId))) {
+      skippedNoAccess++;
+      continue;
+    }
+    if (await isOptedOut(r.userId)) {
+      skippedOptOut++;
+      continue;
+    }
+    // Claim before sending so concurrent sweeps never double-send.
+    const previous = r.warrantyReminderSentFor;
+    const claimed = await db
+      .update(receiptsTable)
+      .set({ warrantyReminderSentFor: due })
+      .where(and(
+        eq(receiptsTable.id, r.id),
+        previous === null
+          ? isNull(receiptsTable.warrantyReminderSentFor)
+          : eq(receiptsTable.warrantyReminderSentFor, previous),
+      ))
+      .returning({ id: receiptsTable.id });
+    if (claimed.length === 0) continue;
+    const ok = await sendWarrantyReminderEmail(r.userId, {
+      id: r.id,
+      merchant: r.merchant,
+      warranty: r.warranty,
+      originalFileName: r.originalFileName,
+    });
+    if (ok) {
+      sent++;
+    } else {
+      failed++;
+      // Release the claim so the next daily run retries.
+      await db.update(receiptsTable).set({ warrantyReminderSentFor: previous })
+        .where(and(eq(receiptsTable.id, r.id), eq(receiptsTable.warrantyReminderSentFor, due)));
+    }
+  }
+  if (sent || failed || skippedOptOut || skippedNoAccess) {
+    logger.info({ sent, failed, skippedOptOut, skippedNoAccess }, "Warranty reminder sweep complete");
+  }
+  return { sent, failed, skippedOptOut, skippedNoAccess };
+}
+
+/** Orphan files, then each reminder sweep independently (one failure never blocks the others). */
+async function runDailyMaintenance(): Promise<void> {
   try {
-    const warrantyReceipts = await db
-      .select({
-        id: receiptsTable.id,
-        userId: receiptsTable.userId,
-        merchant: receiptsTable.merchant,
-        warranty: receiptsTable.warranty,
-        originalFileName: receiptsTable.originalFileName,
-      })
-      .from(receiptsTable)
-      .where(
-        and(
-          eq(receiptsTable.status, "completed"),
-          isNotNull(receiptsTable.warranty),
-        ),
-      );
-
-    const MS_PER_DAY = 86_400_000;
-    const todayUtc = new Date();
-    todayUtc.setUTCHours(0, 0, 0, 0);
-    const targetMs = todayUtc.getTime() + 30 * MS_PER_DAY;
-
-    const ISO_DATE_RE = /(\d{4}-\d{2}-\d{2})/g;
-    let remindersSent = 0;
-    let remindersSkippedOptOut = 0;
-
-    // Cache opt-out status per user to avoid repeated lookups
-    const warrantyOptOutCache = new Map<string, boolean>();
-    async function isWarrantyOptedOut(userId: string): Promise<boolean> {
-      if (warrantyOptOutCache.has(userId)) return warrantyOptOutCache.get(userId)!;
-      const [row] = await db
-        .select({ notificationsOptOut: userPreferencesTable.notificationsOptOut })
-        .from(userPreferencesTable)
-        .where(eq(userPreferencesTable.userId, userId))
-        .limit(1);
-      const optOut = row?.notificationsOptOut ?? false;
-      warrantyOptOutCache.set(userId, optOut);
-      return optOut;
-    }
-
-    for (const r of warrantyReceipts) {
-      if (!r.warranty) continue;
-      const matches = r.warranty.match(ISO_DATE_RE);
-      if (!matches) continue;
-
-      for (const dateStr of matches) {
-        const expiryMs = new Date(`${dateStr}T00:00:00Z`).getTime();
-        if (expiryMs === targetMs) {
-          if (await isWarrantyOptedOut(r.userId)) {
-            remindersSkippedOptOut++;
-            break;
-          }
-          void sendWarrantyReminderEmail(r.userId, {
-            id: r.id,
-            merchant: r.merchant,
-            warranty: r.warranty,
-            originalFileName: r.originalFileName,
-          });
-          remindersSent++;
-          break;
-        }
-      }
-    }
-
-    if (remindersSent > 0) {
-      logger.info({ remindersSent }, "Warranty reminder emails dispatched");
-    }
-    if (remindersSkippedOptOut > 0) {
-      logger.info({ remindersSkippedOptOut }, "Warranty reminders skipped (opt-out)");
-    }
+    await runOrphanFileCleanup();
+  } catch (err) {
+    logger.error({ err }, "Orphan cleanup failed");
+  }
+  try {
+    await runWarrantyReminderSweep();
   } catch (err) {
     logger.error({ err }, "Warranty reminder sweep failed");
   }
-
-  // Trial ending reminders — send once when trial_end is within 3 days (once per subscription)
+  // Legacy Stripe-trial ending reminders — once per subscription
   try {
     await runTrialReminderSweep({ dryRun: false });
   } catch (err) {
     logger.error({ err }, "Trial reminder sweep failed");
   }
-
   // Return window reminders — 7-day and 2-day alerts for online purchases
   try {
     await runReturnWindowSweep();
@@ -324,8 +376,9 @@ export async function runTrialReminderSweep(options: { dryRun: boolean }): Promi
  * Nightly sweep: send return-window reminder emails at 7 days and 2 days before deadline.
  * Skips users who have opted out of notifications.
  * Uses optimistic atomic updates (claim-before-send) to prevent duplicate sends.
- * Not gated by plan/trial state: alerts keep going at the trial receipt cap.
- * Exported for tests; runs daily from runOrphanCleanup.
+ * Only for users with current access (see reminderAccessChecker); a trial at
+ * the receipt cap still gets alerts.
+ * Exported for tests; runs daily from runDailyMaintenance.
  */
 export async function runReturnWindowSweep(): Promise<void> {
   // Load all completed non-draft receipts that are online purchases and have
@@ -393,6 +446,8 @@ export async function runReturnWindowSweep(): Promise<void> {
   let sent2d = 0;
   let skippedExpired = 0;
   let skippedOptOut = 0;
+  let skippedNoAccess = 0;
+  const hasAccess = reminderAccessChecker();
 
   for (const r of receipts) {
     if (!r.purchaseDate) continue;
@@ -414,12 +469,18 @@ export async function runReturnWindowSweep(): Promise<void> {
       continue;
     }
 
-    const needs7d = r.returnReminderSent7dAt === null && daysRemaining <= 7;
     const needs2d = r.returnReminderSent2dAt === null && daysRemaining <= 2;
+    // If both are due in one run (receipt added late or a missed day), send
+    // only the more urgent 2-day email; the 2-day claim also marks the 7-day one.
+    const needs7d = r.returnReminderSent7dAt === null && daysRemaining <= 7 && !needs2d;
     const needsPush2d = r.returnPushSent2dAt === null && daysRemaining <= 2;
     const needsPush1d = r.returnPushSent1dAt === null && daysRemaining <= 1;
 
     if (!needs7d && !needs2d && !needsPush2d && !needsPush1d) continue;
+    if (!(await hasAccess(r.userId))) {
+      skippedNoAccess++;
+      continue;
+    }
 
     // Email reminders respect the existing email opt-out. Browser push is
     // managed independently by adding/removing the device subscription.
@@ -467,9 +528,10 @@ export async function runReturnWindowSweep(): Promise<void> {
 
     // --- 2-day alert ---
     if (needs2d && !optedOut) {
+      const claimedAt = new Date();
       const claimed = await db
         .update(receiptsTable)
-        .set({ returnReminderSent2dAt: new Date() })
+        .set({ returnReminderSent2dAt: claimedAt, returnReminderSent7dAt: r.returnReminderSent7dAt ?? claimedAt })
         .where(
           and(
             eq(receiptsTable.id, r.id),
@@ -492,7 +554,7 @@ export async function runReturnWindowSweep(): Promise<void> {
         } else {
           await db
             .update(receiptsTable)
-            .set({ returnReminderSent2dAt: null })
+            .set({ returnReminderSent2dAt: null, returnReminderSent7dAt: r.returnReminderSent7dAt })
             .where(eq(receiptsTable.id, r.id));
         }
       }
@@ -538,28 +600,48 @@ export async function runReturnWindowSweep(): Promise<void> {
   }
 
   logger.info(
-    { sent7d, sent2d, skippedExpired, skippedOptOut },
+    { sent7d, sent2d, skippedExpired, skippedOptOut, skippedNoAccess },
     "Return window sweep complete",
   );
 }
 
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
+export const DAILY_MAINTENANCE_JOB = "daily-maintenance";
+/** A little under 24h so the run time doesn't drift later every day. */
+export const DAILY_MAINTENANCE_MIN_INTERVAL_MS = 23 * 60 * 60 * 1000;
+const SCHEDULER_TICK_MS = 60 * 60 * 1000;
+
+/**
+ * Run daily maintenance only if no process started it in the last ~23h.
+ * Restarts and autoscale instances check hourly; the DB lock lets one win.
+ */
+export async function runDailyMaintenanceIfDue(now = new Date()): Promise<boolean> {
+  try {
+    if (!(await claimScheduledRun(DAILY_MAINTENANCE_JOB, DAILY_MAINTENANCE_MIN_INTERVAL_MS, now))) return false;
+  } catch (err) {
+    logger.error({ err }, "Daily maintenance: could not claim run lock; skipping");
+    return false;
+  }
+  await runDailyMaintenance();
+  return true;
+}
+
 export function startOrphanCleanupScheduler(): void {
   if (cleanupTimer) return;
 
-  void runOrphanCleanup();
+  void runDailyMaintenanceIfDue();
 
   cleanupTimer = setInterval(() => {
-    void runOrphanCleanup();
-  }, CLEANUP_INTERVAL_MS);
+    void runDailyMaintenanceIfDue();
+  }, SCHEDULER_TICK_MS);
 
   if (cleanupTimer.unref) {
     cleanupTimer.unref();
   }
 
   logger.info(
-    { intervalMs: CLEANUP_INTERVAL_MS, thresholdDays: ORPHAN_AGE_THRESHOLD_DAYS },
+    { tickMs: SCHEDULER_TICK_MS, minIntervalMs: DAILY_MAINTENANCE_MIN_INTERVAL_MS, thresholdDays: ORPHAN_AGE_THRESHOLD_DAYS },
     "Orphan cleanup scheduler started",
   );
 }

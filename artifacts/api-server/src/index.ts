@@ -95,6 +95,18 @@ async function runStartupMigrations(): Promise<void> {
       ALTER TABLE receipts
         ADD COLUMN IF NOT EXISTS return_push_sent_1d_at timestamptz
     `);
+    // Warranty reminder dedup (expiry date already reminded)
+    await db.execute(sql`
+      ALTER TABLE receipts
+        ADD COLUMN IF NOT EXISTS warranty_reminder_sent_for text
+    `);
+    // Daily job lock so restarts/extra instances don't rerun the sweep
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS scheduled_job_runs (
+        job             text PRIMARY KEY,
+        last_started_at timestamptz NOT NULL
+      )
+    `);
 
     // Dedicated user preferences table (notification opt-out, etc.)
     await db.execute(sql`

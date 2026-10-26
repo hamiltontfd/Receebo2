@@ -50,6 +50,8 @@ export const receiptsTable = pgTable("receipts", {
   returnReminderSent2dAt: timestamp("return_reminder_sent_2d_at", { withTimezone: true }),
   returnPushSent2dAt: timestamp("return_push_sent_2d_at", { withTimezone: true }),
   returnPushSent1dAt: timestamp("return_push_sent_1d_at", { withTimezone: true }),
+  /** ISO expiry date (YYYY-MM-DD) the warranty reminder was last sent for (dedup). */
+  warrantyReminderSentFor: text("warranty_reminder_sent_for"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

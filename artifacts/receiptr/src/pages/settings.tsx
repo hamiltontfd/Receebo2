@@ -323,7 +323,7 @@ export default function Settings() {
             <div>
               <p className="text-sm font-medium">Email reminders</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Receive an email before return windows expire (7 days and 2 days out).
+                Warranty reminders (about 30 days before expiry) and return-window reminders (7 and 2 days before the deadline).
               </p>
             </div>
             {notifQuery.isLoading || notifOptOut === null ? (

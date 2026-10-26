@@ -1,26 +1,136 @@
 import { Resend } from "resend";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { clerkClient } from "@clerk/express";
 import { logger } from "./logger";
-import { billingOrigin } from "./billingUrls";
+import { billingOrigin, PUBLISHED_ORIGIN } from "./billingUrls";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.RESEND_FROM ?? "onboarding@resend.dev";
 
-export async function sendPaymentAttentionEmail(
-  userId: string, invoiceId: string, accessMessage: string,
-): Promise<void> {
-  const email = await getUserEmail(userId);
-  if (!email) throw new Error("Payment notice recipient unavailable");
-  // A durable sign-in-protected link, not an expiring bearer portal session.
-  const settingsUrl = `${billingOrigin()}/settings`;
-  const text = `Your Receebo renewal payment failed. ${accessMessage} Open ${settingsUrl} and choose Update payment details to open Stripe's secure billing portal. Stripe may retry your payment.`;
-  const result = await resend.emails.send({
-    from: FROM, to: email, subject: "Action needed: update your Receebo payment details",
-    text,
-    html: `<h1>Your renewal payment failed</h1><p>${accessMessage}</p><p>Stripe may retry your payment. Open Settings and choose Update payment details to use Stripe's secure billing portal.</p><p><a href="${settingsUrl}">Update payment details in Receebo</a></p>`,
-  }, { idempotencyKey: `payment-attention/${invoiceId}` });
-  if (result.error) throw new Error(`Payment notice delivery failed: ${result.error.name}`);
+// ── Sender configuration ──────────────────────────────────────────────────────
+// Resend's shared test sender. It only delivers to the Resend account owner, so
+// it stays the default ONLY until receebo.net is verified in Resend (see
+// docs/email-sending.md). Switch by setting RESEND_FROM, not by editing code.
+export const DEFAULT_EMAIL_FROM = "onboarding@resend.dev";
+
+export interface EmailEnvironment {
+  NODE_ENV?: string;
+  REPLIT_DEV_DOMAIN?: string;
+  RESEND_FROM?: string;
+  RESEND_REPLY_TO?: string;
+}
+
+/** Single source of truth for From / Reply-To (Reply-To omitted when unset). */
+export function emailSender(env: EmailEnvironment = process.env): { from: string; replyTo?: string } {
+  const from = env.RESEND_FROM?.trim() || DEFAULT_EMAIL_FROM;
+  const replyTo = env.RESEND_REPLY_TO?.trim() || undefined;
+  return replyTo ? { from, replyTo } : { from };
+}
+
+/**
+ * Origin used for every link in an email. Production always uses the verified
+ * published origin (same rule as billing redirects); development uses the
+ * workspace dev domain.
+ */
+export function appUrl(env: EmailEnvironment = process.env): string {
+  if (env.NODE_ENV === "production") return PUBLISHED_ORIGIN;
+  try {
+    return billingOrigin(env);
+  } catch {
+    return PUBLISHED_ORIGIN;
+  }
+}
+
+// ── Formatting / escaping helpers ─────────────────────────────────────────────
+
+const HTML_ESCAPES: Record<string, string> = {
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+};
+
+/** Escape user/AI-derived text before it goes into email HTML. */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+}
+
+export const SUBJECT_MAX_LENGTH = 120;
+
+/** Strip control characters/newlines (header injection) and cap the length. */
+export function sanitizeSubject(subject: string): string {
+  const clean = subject.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  return clean.length > SUBJECT_MAX_LENGTH ? `${clean.slice(0, SUBJECT_MAX_LENGTH - 1).trimEnd()}…` : clean;
+}
+
+/** Shorten a single user/AI-derived value used inside a subject line. */
+function subjectPart(value: string, max = 60): string {
+  const clean = value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+}
+
+/** "€12.50", "£3.00", "US$9.99"; falls back to "12.50 XYZ" for unknown codes. */
+export function formatMoney(amount: number, currency?: string | null): string {
+  const code = (currency ?? "").trim().toUpperCase();
+  if (/^[A-Z]{3}$/.test(code)) {
+    try {
+      return new Intl.NumberFormat("en-GB", { style: "currency", currency: code }).format(amount);
+    } catch {
+      // Unknown ISO code: fall through.
+    }
+  }
+  const fixed = amount.toFixed(2);
+  return code ? `${fixed} ${code}` : fixed;
+}
+
+/** "26 Oct 2026" (en-GB, UTC). Accepts Date or "YYYY-MM-DD…" strings. */
+export function formatEmailDate(value: Date | string): string | null {
+  const date = typeof value === "string"
+    ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value)
+    : value;
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+// ── Delivery ──────────────────────────────────────────────────────────────────
+
+interface DeliverInput {
+  kind: string;
+  userId: string;
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  headers?: Record<string, string>;
+  idempotencyKey?: string;
+  context?: Record<string, unknown>;
+}
+
+/**
+ * Send through Resend and report whether the provider accepted the message.
+ * Resend's SDK returns `{ error }` instead of throwing for API rejections
+ * (e.g. the test sender writing to a non-owner), so both paths are handled.
+ */
+async function deliver(input: DeliverInput): Promise<boolean> {
+  const { kind, userId, context } = input;
+  try {
+    const result = await resend.emails.send({
+      ...emailSender(),
+      to: input.to,
+      subject: sanitizeSubject(input.subject),
+      html: input.html,
+      ...(input.text ? { text: input.text } : {}),
+      ...(input.headers ? { headers: input.headers } : {}),
+    }, input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined);
+    if (result?.error) {
+      logger.error(
+        { kind, userId, ...context, errorName: result.error.name, errorMessage: result.error.message },
+        "Email rejected by Resend",
+      );
+      return false;
+    }
+    logger.info({ kind, userId, ...context, emailId: result?.data?.id }, "Email accepted by Resend");
+    return true;
+  } catch (err) {
+    logger.error({ kind, userId, ...context, err }, "Email send failed");
+    return false;
+  }
 }
 
 async function getUserEmail(userId: string): Promise<string | null> {
@@ -37,115 +147,7 @@ async function getUserEmail(userId: string): Promise<string | null> {
   }
 }
 
-function appUrl(): string {
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-  }
-  return "https://receebo.replit.app";
-}
-
-export interface ReceiptSummary {
-  id: number;
-  merchant?: string | null;
-  total?: number | null;
-  currency?: string | null;
-  purchaseDate?: string | null;
-  originalFileName?: string;
-}
-
-export async function sendReceiptReadyEmail(
-  userId: string,
-  receipt: ReceiptSummary,
-): Promise<void> {
-  const email = await getUserEmail(userId);
-  if (!email) return;
-
-  const merchant = receipt.merchant || receipt.originalFileName || "Your receipt";
-  const subject = `Your ${merchant} receipt is ready`;
-
-  const totalStr =
-    receipt.total != null
-      ? `${receipt.currency ?? ""}${receipt.total.toFixed(2)}`
-      : null;
-
-  const dateStr = receipt.purchaseDate
-    ? new Date(receipt.purchaseDate).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : null;
-
-  const receiptUrl = `${appUrl()}/receipts/${receipt.id}`;
-
-  const html = `<!DOCTYPE html>
-<html>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;max-width:480px;margin:0 auto;padding:32px 24px;background:#fff;">
-  <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#888;margin:0 0 20px;">Receebo</p>
-  <h1 style="font-size:22px;font-weight:800;margin:0 0 6px;line-height:1.2;">${merchant}</h1>
-  ${totalStr ? `<p style="font-size:30px;font-weight:800;font-family:ui-monospace,monospace;margin:0 0 6px;">${totalStr}</p>` : ""}
-  ${dateStr ? `<p style="color:#666;font-size:14px;margin:0 0 28px;">${dateStr}</p>` : '<div style="margin-bottom:28px;"></div>'}
-  <a href="${receiptUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-weight:600;font-size:14px;">View Receipt</a>
-  <p style="color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;">Your receipt has been processed and is ready to view in Receebo.</p>
-</body>
-</html>`;
-
-  try {
-    await resend.emails.send({ from: FROM, to: email, subject, html });
-    logger.info({ receiptId: receipt.id, userId }, "Receipt ready email sent");
-  } catch (err) {
-    logger.error(
-      { err, receiptId: receipt.id, userId },
-      "Failed to send receipt ready email",
-    );
-  }
-}
-
-export interface WarrantyReceipt {
-  id: number;
-  merchant?: string | null;
-  warranty: string;
-  originalFileName?: string;
-}
-
-export async function sendWarrantyReminderEmail(
-  userId: string,
-  receipt: WarrantyReceipt,
-): Promise<void> {
-  const email = await getUserEmail(userId);
-  if (!email) return;
-
-  const merchant = receipt.merchant || receipt.originalFileName || "Your purchase";
-  const subject = `Warranty expiring soon — ${merchant}`;
-  const receiptUrl = `${appUrl()}/receipts/${receipt.id}`;
-
-  const html = `<!DOCTYPE html>
-<html>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;max-width:480px;margin:0 auto;padding:32px 24px;background:#fff;">
-  <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#888;margin:0 0 20px;">Receebo — Warranty Reminder</p>
-  <h1 style="font-size:22px;font-weight:800;margin:0 0 6px;line-height:1.2;">Warranty expiring soon</h1>
-  <p style="font-size:18px;font-weight:600;margin:0 0 8px;">${merchant}</p>
-  <p style="color:#444;font-size:14px;margin:0 0 28px;">${receipt.warranty}</p>
-  <a href="${receiptUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-weight:600;font-size:14px;">View Receipt</a>
-  <p style="color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;">Your warranty is expiring within 30 days. Open the receipt to review your coverage.</p>
-</body>
-</html>`;
-
-  try {
-    await resend.emails.send({ from: FROM, to: email, subject, html });
-    logger.info(
-      { receiptId: receipt.id, userId },
-      "Warranty reminder email sent",
-    );
-  } catch (err) {
-    logger.error(
-      { err, receiptId: receipt.id, userId },
-      "Failed to send warranty reminder email",
-    );
-  }
-}
-
-// ── Unsubscribe token helpers ─────────────────────────────────────────────────
+// ── Unsubscribe ───────────────────────────────────────────────────────────────
 
 /**
  * Generate a self-contained unsubscribe token: base64url(userId).hmac(userId).
@@ -175,17 +177,131 @@ export function parseUnsubscribeToken(token: string): string | null {
   const providedHmac = token.slice(dotIdx + 1);
   try {
     const userId = Buffer.from(encodedId, "base64url").toString("utf8");
-    const expectedHmac = createHmac("sha256", secret)
-      .update(userId)
-      .digest("base64url");
-    if (providedHmac !== expectedHmac) return null;
+    const expectedHmac = createHmac("sha256", secret).update(userId).digest("base64url");
+    const a = Buffer.from(providedHmac);
+    const b = Buffer.from(expectedHmac);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
     return userId;
   } catch {
     return null;
   }
 }
 
-// ── Return window reminder email ──────────────────────────────────────────────
+/** Unsubscribe URL plus RFC 8058 one-click headers for reminder emails. */
+export function unsubscribeLinks(userId: string): { url: string; headers: Record<string, string> } {
+  const url = `${appUrl()}/api/notifications/unsubscribe?token=${encodeURIComponent(generateUnsubscribeToken(userId))}`;
+  return {
+    url,
+    headers: {
+      "List-Unsubscribe": `<${url}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  };
+}
+
+// ── Shared layout ─────────────────────────────────────────────────────────────
+// Every HTML email uses this wrapper so new (e.g. lifecycle) templates only
+// supply content. The markup reproduces the existing design exactly.
+
+const BODY_STYLE = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;max-width:480px;margin:0 auto;padding:32px 24px;background:#fff;";
+const EYEBROW_STYLE = "font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#888;margin:0 0 20px;";
+const BUTTON_STYLE = "display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-weight:600;font-size:14px;";
+const FOOTER_STYLE = "color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;";
+
+export interface EmailLayout {
+  /** Small uppercase header line, plain text (escaped). */
+  eyebrow: string;
+  /** Pre-escaped HTML for the main content. */
+  bodyHtml: string;
+  /** Optional call-to-action button. */
+  cta?: { label: string; href: string };
+  /** Pre-escaped HTML for the footer note (e.g. why they got it). */
+  footerHtml?: string;
+  /** Adds the warranty/return unsubscribe + settings line to the footer. */
+  unsubscribeUrl?: string;
+}
+
+export function emailButton(label: string, href: string): string {
+  return `<a href="${escapeHtml(href)}" style="${BUTTON_STYLE}">${escapeHtml(label)}</a>`;
+}
+
+export function renderEmailLayout(layout: EmailLayout): string {
+  const unsub = layout.unsubscribeUrl
+    ? `\n    <a href="${escapeHtml(layout.unsubscribeUrl)}" style="color:#999;">Unsubscribe</a> from warranty and return reminders, or manage preferences in your <a href="${escapeHtml(`${appUrl()}/settings`)}" style="color:#999;">settings</a>.`
+    : "";
+  const footer = layout.footerHtml || unsub
+    ? `\n  <p style="${FOOTER_STYLE}">${layout.footerHtml ?? ""}${unsub}</p>`
+    : "";
+  return `<!DOCTYPE html>
+<html>
+<body style="${BODY_STYLE}">
+  <p style="${EYEBROW_STYLE}">${escapeHtml(layout.eyebrow)}</p>
+  ${layout.bodyHtml}${layout.cta ? `\n  ${emailButton(layout.cta.label, layout.cta.href)}` : ""}${footer}
+</body>
+</html>`;
+}
+
+// ── Payment attention (paid renewals) ─────────────────────────────────────────
+
+export async function sendPaymentAttentionEmail(
+  userId: string, invoiceId: string, accessMessage: string,
+): Promise<void> {
+  const email = await getUserEmail(userId);
+  if (!email) throw new Error("Payment notice recipient unavailable");
+  // A durable sign-in-protected link, not an expiring bearer portal session.
+  const settingsUrl = `${billingOrigin()}/settings`;
+  const text = `Your Receebo renewal payment failed. ${accessMessage} Open ${settingsUrl} and choose Update payment details to open Stripe's secure billing portal. Stripe may retry your payment.`;
+  const result = await resend.emails.send({
+    ...emailSender(),
+    to: email, subject: "Action needed: update your Receebo payment details",
+    text,
+    html: `<h1>Your renewal payment failed</h1><p>${escapeHtml(accessMessage)}</p><p>Stripe may retry your payment. Open Settings and choose Update payment details to use Stripe's secure billing portal.</p><p><a href="${escapeHtml(settingsUrl)}">Update payment details in Receebo</a></p>`,
+  }, { idempotencyKey: `payment-attention/${invoiceId}` });
+  if (result.error) {
+    logger.error({ kind: "payment_attention", userId, invoiceId, errorName: result.error.name,
+      errorMessage: result.error.message }, "Email rejected by Resend");
+    throw new Error(`Payment notice delivery failed: ${result.error.name}`);
+  }
+}
+
+// ── Warranty reminder ─────────────────────────────────────────────────────────
+
+export interface WarrantyReceipt {
+  id: number;
+  merchant?: string | null;
+  warranty: string;
+  originalFileName?: string;
+}
+
+export async function sendWarrantyReminderEmail(
+  userId: string,
+  receipt: WarrantyReceipt,
+): Promise<boolean> {
+  const email = await getUserEmail(userId);
+  if (!email) return false;
+
+  const merchant = receipt.merchant || receipt.originalFileName || "Your purchase";
+  const subject = `Warranty expiring soon — ${subjectPart(merchant)}`;
+  const receiptUrl = `${appUrl()}/receipts/${receipt.id}`;
+  const unsub = unsubscribeLinks(userId);
+
+  const html = renderEmailLayout({
+    eyebrow: "Receebo — Warranty Reminder",
+    bodyHtml: `<h1 style="font-size:22px;font-weight:800;margin:0 0 6px;line-height:1.2;">Warranty expiring soon</h1>
+  <p style="font-size:18px;font-weight:600;margin:0 0 8px;">${escapeHtml(merchant)}</p>
+  <p style="color:#444;font-size:14px;margin:0 0 28px;">${escapeHtml(receipt.warranty)}</p>`,
+    cta: { label: "View Receipt", href: receiptUrl },
+    footerHtml: "Your warranty is expiring within 30 days. Open the receipt to review your coverage.",
+    unsubscribeUrl: unsub.url,
+  });
+
+  return deliver({
+    kind: "warranty_reminder", userId, to: email, subject, html,
+    headers: unsub.headers, context: { receiptId: receipt.id },
+  });
+}
+
+// ── Return window reminder ────────────────────────────────────────────────────
 
 export interface ReturnWindowReceipt {
   id: number;
@@ -212,53 +328,34 @@ export async function sendReturnWindowEmail(
 
   const daysLabel =
     receipt.daysRemaining === 1 ? "1 day" : `${receipt.daysRemaining} days`;
-  const subject = `Your ${itemName} return window closes in ${daysLabel} — still time to act`;
+  const subject = `Your ${subjectPart(itemName)} return window closes in ${daysLabel} — still time to act`;
   const receiptUrl = `${appUrl()}/receipts/${receipt.id}`;
+  const unsub = unsubscribeLinks(userId);
+  const deadlineStr = formatEmailDate(receipt.deadlineDate) ?? "";
 
-  const unsubToken = generateUnsubscribeToken(userId);
-  const unsubUrl = `${appUrl()}/api/notifications/unsubscribe?token=${unsubToken}`;
-
-  const deadlineStr = receipt.deadlineDate.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-
-  const html = `<!DOCTYPE html>
-<html>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;max-width:480px;margin:0 auto;padding:32px 24px;background:#fff;">
-  <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#888;margin:0 0 20px;">Receebo — Return Reminder</p>
-  <h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Still happy with ${itemName}?</h1>
+  const html = renderEmailLayout({
+    eyebrow: "Receebo — Return Reminder",
+    bodyHtml: `<h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Still happy with ${escapeHtml(itemName)}?</h1>
   <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 6px;">
-    Your return window closes in <strong>${daysLabel}</strong> — on <strong>${deadlineStr}</strong>.
+    Your return window closes in <strong>${escapeHtml(daysLabel)}</strong> — on <strong>${escapeHtml(deadlineStr)}</strong>.
   </p>
   <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 24px;">
     If you're not completely satisfied, now is the time to act. Open your receipt to check the return details and start a return if needed.
-  </p>
-  <a href="${receiptUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-weight:600;font-size:14px;">View Receipt</a>
-  <p style="color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;">
-    You received this because return reminders are enabled for your Receebo account.
-    <a href="${unsubUrl}" style="color:#999;">Unsubscribe</a> to stop these emails, or manage preferences in your <a href="${appUrl()}/settings" style="color:#999;">settings</a>.
-  </p>
-</body>
-</html>`;
+  </p>`,
+    cta: { label: "View Receipt", href: receiptUrl },
+    footerHtml: "You received this because warranty and return reminders are enabled for your Receebo account.",
+    unsubscribeUrl: unsub.url,
+  });
 
-  try {
-    await resend.emails.send({ from: FROM, to: email, subject, html });
-    logger.info(
-      { receiptId: receipt.id, userId, daysRemaining: receipt.daysRemaining },
-      "Return window reminder email sent",
-    );
-    return true;
-  } catch (err) {
-    logger.error(
-      { err, receiptId: receipt.id, userId },
-      "Failed to send return window reminder email",
-    );
-    return false;
-  }
+  return deliver({
+    kind: "return_window", userId, to: email, subject, html, headers: unsub.headers,
+    context: { receiptId: receipt.id, daysRemaining: receipt.daysRemaining },
+  });
 }
+
+// ── Legacy Stripe-trial ending reminder ───────────────────────────────────────
+// Only for old Stripe subscriptions that still have a Stripe trial. The no-card
+// account trial never uses this email.
 
 export interface TrialPlanInfo {
   planName?: string;
@@ -285,12 +382,7 @@ export async function sendTrialEndingEmail(
         ? "tomorrow"
         : `in ${daysRemaining} days`;
 
-  const dateStr = trialEndAt.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+  const dateStr = formatEmailDate(trialEndAt) ?? "";
 
   const subject =
     daysRemaining === 0
@@ -303,44 +395,29 @@ export async function sendTrialEndingEmail(
 
   // Format plan name and charge amount for the email body
   const planLabel = planInfo?.planName ?? "Receebo Pro";
-  let chargeStr: string | null = null;
-  if (planInfo?.planAmount != null && planInfo?.planCurrency) {
-    const currency = planInfo.planCurrency.toUpperCase();
-    const symbol = currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : `${currency} `;
-    chargeStr = `${symbol}${(planInfo.planAmount / 100).toFixed(2)}`;
-  }
+  const chargeStr = planInfo?.planAmount != null && planInfo?.planCurrency
+    ? formatMoney(planInfo.planAmount / 100, planInfo.planCurrency)
+    : null;
 
   const chargeLine = chargeStr
-    ? `After that, you'll be automatically charged <strong>${chargeStr}</strong> for <strong>${planLabel}</strong> unless you cancel before then.`
-    : `After that, you'll be charged automatically for <strong>${planLabel}</strong> unless you cancel before then.`;
+    ? `After that, you'll be automatically charged <strong>${escapeHtml(chargeStr)}</strong> for <strong>${escapeHtml(planLabel)}</strong> unless you cancel before then.`
+    : `After that, you'll be charged automatically for <strong>${escapeHtml(planLabel)}</strong> unless you cancel before then.`;
 
-  const html = `<!DOCTYPE html>
-<html>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;max-width:480px;margin:0 auto;padding:32px 24px;background:#fff;">
-  <p style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#888;margin:0 0 20px;">Receebo</p>
-  <h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Your free trial ends ${daysLabel}</h1>
+  const html = renderEmailLayout({
+    eyebrow: "Receebo",
+    bodyHtml: `<h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Your free trial ends ${escapeHtml(daysLabel)}</h1>
   <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 8px;">
-    Your <strong>${planLabel}</strong> trial expires on <strong>${dateStr}</strong>. ${chargeLine}
+    Your <strong>${escapeHtml(planLabel)}</strong> trial expires on <strong>${escapeHtml(dateStr)}</strong>. ${chargeLine}
   </p>
   <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 24px;">
     To avoid being charged, cancel your subscription before the trial ends — it only takes one click.
-  </p>
-  <a href="${settingsUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 28px;border-radius:999px;font-weight:600;font-size:14px;">Cancel or Manage Subscription</a>
-  <p style="color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;">You received this because you signed up for a Receebo Pro trial. Visit your subscription settings to cancel anytime before <strong>${dateStr}</strong>.</p>
-</body>
-</html>`;
+  </p>`,
+    cta: { label: "Cancel or Manage Subscription", href: settingsUrl },
+    footerHtml: `You received this because you signed up for a Receebo Pro trial. Visit your subscription settings to cancel anytime before <strong>${escapeHtml(dateStr)}</strong>.`,
+  });
 
-  try {
-    await resend.emails.send({
-      from: FROM,
-      to: email,
-      subject,
-      html,
-    });
-    logger.info({ userId, daysRemaining, planLabel, chargeStr }, "Trial ending email sent");
-    return true;
-  } catch (err) {
-    logger.error({ err, userId }, "Failed to send trial ending email");
-    return false;
-  }
+  return deliver({
+    kind: "legacy_trial_ending", userId, to: email, subject, html,
+    context: { daysRemaining, planLabel, chargeStr },
+  });
 }

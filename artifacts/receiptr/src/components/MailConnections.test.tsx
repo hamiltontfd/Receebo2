@@ -40,6 +40,19 @@ describe("MailConnections", () => {
     expect(await screen.findByRole("button", { name: /Connect Outlook/ })).toBeInTheDocument();
   });
 
+  it("explains Outlook-only import next to Connect Outlook", async () => {
+    showWith({ providers: [provider({})], pendingCount: 0 });
+    expect(await screen.findByTestId("mail-outlook-only-note")).toHaveTextContent(
+      "Email import works with Outlook for now. Using another email? Save the receipt as a PDF and upload it.",
+    );
+  });
+
+  it("hides the Outlook-only note when Gmail is enabled too", async () => {
+    showWith({ providers: [provider({}), provider({ id: "gmail", label: "Gmail" })], pendingCount: 0 });
+    await screen.findByText("Connect Gmail");
+    expect(screen.queryByTestId("mail-outlook-only-note")).toBeNull();
+  });
+
   it("shows a Reconnect banner when the connection expired", async () => {
     const fetchMock = showWith({
       providers: [provider({ connected: true, accountEmail: "me@outlook.com", needsReconnect: true })],
