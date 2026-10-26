@@ -73,6 +73,8 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
+RESEND_FROM = "Receebo <hello@receebo.net>"
+RESEND_REPLY_TO = "contact@receebo.net"
 STRIPE_MONTHLY_PRICE_ID = "price_1Tx40jPNRVgRaJxMuAGxqGbK"
 STRIPE_YEARLY_PRICE_ID = "price_1Tx40jPNRVgRaJxM0Rz7cxq6"
 
