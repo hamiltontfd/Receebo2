@@ -9,15 +9,9 @@ import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 import { clerkClient } from "@clerk/express";
 import { logger } from "../lib/logger";
 import { hasOwnerAccess } from "../lib/ownerAccess";
+import { billingOrigin } from "../lib/billingUrls";
 
 const router: IRouter = Router();
-
-function appBaseUrl(req: { protocol: string; get: (h: string) => string | undefined }): string {
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-  }
-  return "https://receebo.replit.app";
-}
 
 async function getUserEmail(userId: string): Promise<string | null> {
   try {
@@ -74,6 +68,8 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
   const userId = req.userId!;
 
   try {
+    // Resolve configuration before creating customers or checkout sessions.
+    const base = billingOrigin();
     const stripe = await getUncachableStripeClient();
 
     const [existingBilling] = await db
@@ -106,7 +102,6 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
       customerId = upserted?.stripeCustomerId ?? customerId;
     }
 
-    const base = appBaseUrl(req);
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ["card"],
@@ -139,8 +134,8 @@ router.post("/billing/create-portal-session", requireAuth, async (req, res): Pro
       return;
     }
 
+    const base = billingOrigin();
     const stripe = await getUncachableStripeClient();
-    const base = appBaseUrl(req);
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: billing.stripeCustomerId,
       return_url: `${base}/settings`,

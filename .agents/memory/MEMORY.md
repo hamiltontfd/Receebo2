@@ -11,3 +11,4 @@
 - [Marketing media review](marketing-media-review.md) — capture success is not visual approval; preserve runtime cache paths when isolating capture environments.
 - [OAuth workspace validation](oauth-workspace-browser-validation.md) — connected browsers can show the main preview while assigned work runs on a different host; verify the emitted callback.
 - [Brand icons](brand-icons.md) — favicon and installed-app icons use the original SVG symbol without the wordmark, on a white background.
+- [Stripe environment isolation](stripe-environment-isolation.md) — connector test mode does not imply backend test mode; inspect effective credentials and price compatibility separately.
