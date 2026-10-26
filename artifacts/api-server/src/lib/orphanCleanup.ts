@@ -324,8 +324,10 @@ export async function runTrialReminderSweep(options: { dryRun: boolean }): Promi
  * Nightly sweep: send return-window reminder emails at 7 days and 2 days before deadline.
  * Skips users who have opted out of notifications.
  * Uses optimistic atomic updates (claim-before-send) to prevent duplicate sends.
+ * Not gated by plan/trial state: alerts keep going at the trial receipt cap.
+ * Exported for tests; runs daily from runOrphanCleanup.
  */
-async function runReturnWindowSweep(): Promise<void> {
+export async function runReturnWindowSweep(): Promise<void> {
   // Load all completed non-draft receipts that are online purchases and have
   // at least one reminder not yet sent.
   let receipts: Array<{

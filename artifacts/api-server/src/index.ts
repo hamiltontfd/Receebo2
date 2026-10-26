@@ -12,6 +12,7 @@ import { spawn } from "child_process";
 import { fileURLToPath } from "node:url";
 import { billingOrigin } from "./lib/billingUrls";
 import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
+import { extendTrialsToCurrentDuration } from "./lib/accountTrial";
 
 const rawPort = process.env["PORT"];
 
@@ -393,6 +394,14 @@ async function start(): Promise<void> {
   // Apply schema migrations synchronously before accepting requests
   await runStartupMigrations();
   await migrateTrialFunnel();
+  // Trials started under the old 7-day rule get the full 15 days from their
+  // original start (idempotent; also reopens 7-day trials that ended < 15 days ago).
+  try {
+    const extended = await extendTrialsToCurrentDuration();
+    if (extended > 0) logger.info({ extended }, "Extended account trials to current duration");
+  } catch (err) {
+    logger.error({ err }, "Failed to extend account trials to current duration");
+  }
   // Encrypt any gmail_connections rows that still have plaintext tokens
   await migrateGmailTokenEncryption();
 

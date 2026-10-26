@@ -61,7 +61,7 @@ export default function PricingSection() {
             Simple, transparent pricing.
           </motion.h2>
           <motion.p variants={fadeInUp} className="text-muted-foreground mt-3 text-lg">
-            Try it free for seven days with three receipt uploads, no card needed. Subscribe only if you want to keep going.
+            15 days free, no card. Add up to 5 receipts. Subscribe only if you want to keep going.
           </motion.p>
         </motion.div>
 

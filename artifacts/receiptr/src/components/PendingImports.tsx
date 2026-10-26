@@ -1,11 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, X, Mail, RefreshCw, Loader2, AlertTriangle } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { useMailStatus } from "@/components/MailConnections";
 import { MAIL_PROVIDER_LABELS, syncMail, type MailProviderId } from "@/lib/mailConnection";
+import { BILLING_QUERY_KEY, isAtTrialCap, type BillingStatus } from "@/hooks/useBilling";
+import { subscribeToastAction } from "@/components/SubscribeToastAction";
+import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON, SUBSCRIBE_HREF } from "@/lib/trialCopy";
+
+/** The server refused the approval because the free-trial receipt cap is reached. */
+export class TrialCapError extends Error {
+  constructor() { super(TRIAL_CAP_MESSAGE); }
+}
 
 const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
 
@@ -34,7 +42,13 @@ async function approvePending(id: number): Promise<{ approved: boolean; receiptI
     method: "POST",
     credentials: "include",
   });
-  if (!res.ok) throw new Error("Failed to approve");
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { code?: string } | null;
+    if (res.status === 403 && (body?.code === "trial_exhausted" || body?.code === "TRIAL_UPLOAD_LIMIT")) {
+      throw new TrialCapError();
+    }
+    throw new Error("Failed to approve");
+  }
   return res.json() as Promise<{ approved: boolean; receiptId: number }>;
 }
 
@@ -78,6 +92,10 @@ export function usePendingImportCount() {
 export default function PendingImports() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  // Read the billing status from the shared cache (fetched by the app shell).
+  const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, enabled: false });
+  const atCap = isAtTrialCap(billing);
 
   const { data: items = [], isLoading } = useQuery<PendingImportItem[]>({
     queryKey: ["mail", "pending"],
@@ -93,12 +111,23 @@ export default function PendingImports() {
       void queryClient.invalidateQueries({ queryKey: ["receipts"] });
       toast({ title: "Receipt added to your library" });
     },
-    onError: () =>
+    onError: (err) => {
+      if (err instanceof TrialCapError) {
+        void queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY });
+        toast({
+          title: "Receipt not added",
+          description: TRIAL_CAP_MESSAGE,
+          variant: "destructive",
+          action: subscribeToastAction(setLocation),
+        });
+        return;
+      }
       toast({
         title: "Something went wrong",
         description: "Could not approve receipt. Please try again.",
         variant: "destructive",
-      }),
+      });
+    },
   });
 
   const dismiss = useMutation({
@@ -204,6 +233,15 @@ export default function PendingImports() {
         </Button>
       </div>
 
+      {atCap && (
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950" data-testid="pending-trial-cap">
+          <span>{TRIAL_CAP_MESSAGE}</span>
+          <Link href={SUBSCRIBE_HREF} className="font-semibold underline" data-testid="link-pending-subscribe">
+            {TRIAL_CAP_BUTTON}
+          </Link>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         {items.map((item) => (
           <div
@@ -253,9 +291,9 @@ export default function PendingImports() {
               <Button
                 size="icon"
                 className="w-8 h-8 rounded-full"
-                disabled={dismiss.isPending || approve.isPending}
+                disabled={atCap || dismiss.isPending || approve.isPending}
                 onClick={() => approve.mutate(item.id)}
-                title="Add to library"
+                title={atCap ? TRIAL_CAP_MESSAGE : "Add to library"}
               >
                 <Check className="w-4 h-4" />
               </Button>

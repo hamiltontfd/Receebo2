@@ -7,8 +7,8 @@ import { guestSessionRateLimiter } from "../middlewares/guestSessionRateLimiter"
 import { requireAuth } from "../middlewares/requireAuth";
 import { lockUserDataMutation, withUserDataLock } from "../lib/userDataLock";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
-import { getSubscriptionStatus } from "../lib/subscriptionStatus";
-import { accountTrialStatus } from "../lib/accountTrial";
+import { getSubscriptionStatus, receiptCapReached } from "../lib/subscriptionStatus";
+import { accountTrialStatus, TRIAL_CAP_ERROR } from "../lib/accountTrial";
 import { trialUploadsTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -67,7 +67,12 @@ router.post("/guest-session/claim", requireAuth, requireCurrentLegalAcceptance, 
       .where(eq(receiptsTable.userId, guestToken));
     const count = guestReceipts.filter(r => ["completed", "processing"].includes(r.status)).length;
     const trial = access.accessState === "account_trial" ? await accountTrialStatus(clerkUserId) : null;
-    if (!access.canUseApp || (trial && trial.remaining < count)) {
+    if (count > 0 && (receiptCapReached(access) || (trial && trial.remaining < count))) {
+      res.status(403).json({ ...TRIAL_CAP_ERROR,
+        message: `${TRIAL_CAP_ERROR.message} Your guest data has not been deleted.` });
+      return;
+    }
+    if (!access.canUseApp) {
       res.status(403).json({ error: "subscription_required", message: "Upgrade to claim these receipts. Your guest data has not been deleted." });
       return;
     }

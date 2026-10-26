@@ -103,10 +103,23 @@ describe("PlanSelectionGate", () => {
     expect(screen.queryByText("Protected receipt library")).not.toBeInTheDocument();
   });
 
-  it("paywalls exhausted trials with explicit plans and no savings copy", () => {
+  it("keeps the app viewable at the 5-receipt cap (no paywall before day 15)", () => {
+    mocks.billing = { plan: "free", accessState: "trial_exhausted", canUseApp: true, canUpload: false, trialUploadsUsed: 5,
+      trialEndAt: new Date(Date.now() + 5 * 86_400_000).toISOString(), foundingEligible: true };
+    for (const path of ["/search", "/receipts/41", "/scan"]) {
+      mocks.location = path;
+      const { unmount } = renderGate();
+      expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
+      expect(screen.queryByTestId("text-paywall-title")).toBeNull();
+      unmount();
+    }
+    expect(mocks.funnelTrack).not.toHaveBeenCalled();
+  });
+
+  it("paywalls a capped trial from an older server (canUseApp false) with explicit plans and no savings copy", () => {
     mocks.billing = { plan: "free", accessState: "trial_exhausted", canUseApp: false, canUpload: false, reviewReceiptId: 42, foundingEligible: true };
     renderGate();
-    expect(screen.getByTestId("text-paywall-title").textContent).toContain("3 trial uploads");
+    expect(screen.getByTestId("text-paywall-title").textContent).toContain("5 free receipts");
     expect(mocks.funnelTrack).toHaveBeenCalledWith({ event: "paywall_viewed", reason: "trial_exhausted" });
     expect(screen.getByTestId("link-review-last-receipt").getAttribute("href")).toBe("/receipts/42");
     expect(document.body.textContent).not.toMatch(/Save \d+%|\/mo billed/);
@@ -136,10 +149,12 @@ describe("PlanSelectionGate", () => {
     expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
   });
 
-  it("paywalls expired trials", () => {
-    mocks.billing = { plan: "free", accessState: "trial_expired", canUseApp: false };
+  it("paywalls expired trials (day 16)", () => {
+    mocks.billing = { plan: "free", accessState: "trial_expired", canUseApp: false, canUpload: false, trialUploadsUsed: 5,
+      trialEndAt: new Date(Date.now() - 86_400_000).toISOString() };
     renderGate();
-    expect(screen.getByTestId("text-paywall-title").textContent).toContain("seven-day trial has ended");
+    expect(screen.getByTestId("text-paywall-title").textContent).toContain("15-day free trial has ended");
+    expect(screen.queryByText("Protected receipt library")).not.toBeInTheDocument();
     expect(mocks.funnelTrack).toHaveBeenCalledWith({ event: "paywall_viewed", reason: "trial_expired" });
   });
 });

@@ -48,7 +48,7 @@ export function GuestProvider({ children }: { children: React.ReactNode }) {
   const [guestUser, setGuestUser] = useState<GuestUser | null>(null);
   const isGuest = guestUser !== null;
 
-  // Guest mode entry disabled — app uses 7-day trial instead.
+  // Guest mode entry disabled — app uses the 15-day account trial instead.
   // Auto-restore from localStorage is intentionally suppressed.
   // useEffect(() => {
   //   const stored = localStorage.getItem(GUEST_TOKEN_KEY);

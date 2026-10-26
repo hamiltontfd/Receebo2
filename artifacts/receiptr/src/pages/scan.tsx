@@ -32,9 +32,12 @@ import {
   quotaErrorMessage,
   resolveAccessState,
   TRIAL_UPLOAD_LIMIT,
+  isAtTrialCap,
   type BillingStatus,
 } from "@/hooks/useBilling";
 import { ACTIVE_REVIEW_KEY } from "@/components/PlanSelectionGate";
+import { subscribeToastAction } from "@/components/SubscribeToastAction";
+import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON } from "@/lib/trialCopy";
 
 function setActiveReview(id: number | null) {
   try {
@@ -146,7 +149,8 @@ export default function Scan() {
   const preflightUpload = (): boolean => {
     const reason = billing ? uploadBlockedReason(billing) : "We couldn't confirm your plan. Check your connection and try again.";
     if (reason) {
-      toast({ title: "Upload not available", description: reason, variant: "destructive" });
+      toast({ title: "Upload not available", description: reason, variant: "destructive",
+        ...(reason === TRIAL_CAP_MESSAGE ? { action: subscribeToastAction(setLocation) } : {}) });
       void billingQuery.refetch();
       return false;
     }
@@ -401,7 +405,8 @@ export default function Scan() {
           ? "We couldn't confirm your plan. Check your connection and try again. Nothing was uploaded."
           : uploadBlockedReason(latest);
         if (reason) {
-          toast({ title: "Upload not available", description: reason, variant: "destructive" });
+          toast({ title: "Upload not available", description: reason, variant: "destructive",
+            ...(reason === TRIAL_CAP_MESSAGE ? { action: subscribeToastAction(setLocation) } : {}) });
           return;
         }
         const { uploadURL, objectPath } = await customFetch<{
@@ -442,7 +447,8 @@ export default function Scan() {
         const quota = quotaErrorMessage(err);
         if (quota) {
           void refreshBilling();
-          toast({ title: "Upload limit reached", description: quota, variant: "destructive" });
+          toast({ title: "Upload limit reached", description: quota, variant: "destructive",
+            ...(quota === TRIAL_CAP_MESSAGE ? { action: subscribeToastAction(setLocation) } : {}) });
           return;
         }
         toast({
@@ -584,7 +590,7 @@ export default function Scan() {
           <h1 className="text-2xl font-extrabold tracking-tight">No uploads left</h1>
           <p className="text-sm text-muted-foreground max-w-xs" data-testid="text-upload-blocked">{blockedReason}</p>
           <Link href="/settings#upgrade-plans" className="inline-flex h-11 items-center rounded-full bg-foreground px-6 text-sm font-semibold text-background" data-testid="link-scan-subscribe">
-            See plans
+            {isAtTrialCap(billing) ? TRIAL_CAP_BUTTON : "See plans"}
           </Link>
         </div>
       )}
@@ -599,7 +605,7 @@ export default function Scan() {
                 </p>
                 {trialUploadsLeft != null && (
                   <p className="text-xs font-semibold text-muted-foreground mt-2" data-testid="text-scan-trial-left">
-                    {trialUploadsLeft} of {TRIAL_UPLOAD_LIMIT} trial uploads left
+                    {trialUploadsLeft} of {TRIAL_UPLOAD_LIMIT} free receipts left
                   </p>
                 )}
               </div>

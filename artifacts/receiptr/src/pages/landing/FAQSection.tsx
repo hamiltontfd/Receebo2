@@ -39,7 +39,7 @@ function buildFaqs(providers: AvailableMailProvider[]) {
   },
   {
     q: "How does the free trial work?",
-    a: "Create an account and accept the Terms, and your trial starts. No card is needed. It lasts seven days and includes three successful receipt uploads, whichever runs out first. Nothing is charged automatically. To keep going, choose €2.99/month or €24.99/year; you're charged when you subscribe. You can also upgrade early from Settings.",
+    a: "Create an account and accept the Terms, and your trial starts. No card is needed. It lasts 15 days and you can add up to 5 receipts, by upload or email import. After your 5th receipt you can still view, search and export everything, and get warranty and return alerts, until day 15. Nothing is charged automatically. To keep going, choose €2.99/month or €24.99/year; you're charged when you subscribe. You can also upgrade early from Settings.",
   },
   {
     q: "What are founding prices?",

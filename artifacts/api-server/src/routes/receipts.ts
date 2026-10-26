@@ -21,9 +21,9 @@ import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { enqueueExtraction } from "../lib/extractionQueue";
 import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
-import { getSubscriptionStatus } from "../lib/subscriptionStatus";
+import { getSubscriptionStatus, receiptCapReached } from "../lib/subscriptionStatus";
 import { lockUserDataMutation } from "../lib/userDataLock";
-import { consumeTrialReservation, accountTrialStatus } from "../lib/accountTrial";
+import { consumeTrialReservation, accountTrialStatus, TRIAL_CAP_ERROR } from "../lib/accountTrial";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -111,6 +111,12 @@ router.post("/receipts", requireAuthOrGuest, lockUserDataMutation(async (req, re
       code: subscription.accessState,
       message: "Your trial has ended. Subscribe as a Founding Customer to upload more receipts.",
     });
+    return;
+  }
+  // At the trial receipt cap the user can still view everything, but no
+  // further receipt may be created (and no extraction/AI run is started).
+  if (receiptCapReached(subscription)) {
+    res.status(403).json(TRIAL_CAP_ERROR);
     return;
   }
 
@@ -378,10 +384,13 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   if (!access.canUseApp && access.reviewReceiptId !== existing.id) {
     res.status(403).json({ error: "subscription_required", code: access.accessState }); return;
   }
+  if (manualAcceptance && receiptCapReached(access)) {
+    res.status(403).json(TRIAL_CAP_ERROR); return;
+  }
   const trial = manualAcceptance && access.accessState === "account_trial"
     ? await accountTrialStatus(req.userId!) : null;
   if (trial && trial.remaining < 1) {
-    res.status(403).json({ error: "subscription_required", message: "No trial upload allowance remains for this manual receipt." });
+    res.status(403).json({ ...TRIAL_CAP_ERROR, code: "TRIAL_UPLOAD_LIMIT" });
     return;
   }
   const receipt = await db.transaction(async tx => {

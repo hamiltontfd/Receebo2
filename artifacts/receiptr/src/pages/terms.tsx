@@ -60,12 +60,15 @@ export default function TermsOfService() {
         <li>
           After you create an account and accept these Terms, you receive a
           free account trial. No payment method is required. The trial lasts
-          seven days from its start and includes three successful receipt
-          uploads in total, whichever limit is reached first. The trial never
-          converts into a paid subscription automatically.
+          15 days from its start. During the trial you can add up to five
+          receipts in total, counting both uploads and approved email
+          imports. After the fifth receipt you cannot add more, but you keep
+          access to view, search, open, and export your receipts and to
+          receive warranty and return alerts until the trial ends. The trial
+          never converts into a paid subscription automatically.
         </li>
         <li>
-          When the trial ends or its uploads are used, you can still access
+          When the trial ends, you can still access
           Settings, your profile, these legal documents, billing, data export
           and account deletion, and you can review the receipt from your final
           trial upload. Other features require a paid subscription.

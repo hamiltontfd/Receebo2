@@ -53,7 +53,7 @@ export default function FinalCTASection() {
           </motion.div>
 
           <motion.p variants={fadeInUp} className="text-sm text-background/40">
-            7 days · 3 receipt uploads · No card needed
+            15 days free · Up to 5 receipts · No card needed
           </motion.p>
         </motion.div>
       </div>

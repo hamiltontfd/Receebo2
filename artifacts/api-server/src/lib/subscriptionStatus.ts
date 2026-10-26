@@ -38,10 +38,13 @@ export async function getSubscriptionStatus(userId: string): Promise<Subscriptio
   const accessState: NonNullable<SubscriptionStatus["accessState"]> = ownerAccess ? "owner" : status.plan === "pro" ? "paid" :
     status.plan === "trialing" ? "legacy_stripe_trial" : trial?.state ??
       (status.stripeSubscriptionId ? "subscription_required" : "not_started");
-  const canUseApp = ["owner", "paid", "legacy_stripe_trial", "account_trial"].includes(accessState);
+  // "Can view" and "can add" are separate: a trial at its receipt cap keeps
+  // full read access (view/search/files/export/alerts) until the trial ends.
+  const canUseApp = ["owner", "paid", "legacy_stripe_trial", "account_trial", "trial_exhausted"].includes(accessState);
   const enriched = {
     ...status, accessState, canUseApp,
-    canUpload: canUseApp && (accessState !== "account_trial" || (trial?.remaining ?? 0) > 0),
+    canUpload: canUseApp && accessState !== "trial_exhausted" &&
+      (accessState !== "account_trial" || (trial?.remaining ?? 0) > 0),
     trialUploadsRemaining: trial ? trial.remaining : null,
     trialUploadsUsed: trial?.used ?? 0,
     foundingEligible: Boolean(trial),
@@ -135,4 +138,9 @@ async function getPaidSubscriptionStatus(userId: string): Promise<SubscriptionSt
 
   return { plan, trialEndAt, currentPeriodEnd, cancelAtPeriodEnd, stripeSubscriptionId: sub.id, hasBillingAccount: true,
     paymentAttention: sub.status === "past_due" || sub.status === "unpaid" };
+}
+
+/** True when the user may view the app but must not add any more receipts. */
+export function receiptCapReached(status: Pick<SubscriptionStatus, "accessState">): boolean {
+  return status.accessState === "trial_exhausted";
 }

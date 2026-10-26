@@ -68,10 +68,10 @@ export default function GetStarted() {
             Start your free trial
           </p>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-            7 days free.<br />No card needed.
+            15 days free.<br />No card needed.
           </h1>
           <p className="mt-3 text-muted-foreground text-sm leading-relaxed">
-            Create an account and try Receebo with up to {TRIAL_UPLOAD_LIMIT} receipt uploads over seven days.
+            Create an account and try Receebo for 15 days. Add up to {TRIAL_UPLOAD_LIMIT} receipts.
             Nothing is charged unless you choose a plan.
           </p>
           <Link href="/sign-up" className="inline-flex mt-6 h-11 items-center rounded-full bg-foreground px-7 text-sm font-semibold text-background" data-testid="link-get-started-signup">

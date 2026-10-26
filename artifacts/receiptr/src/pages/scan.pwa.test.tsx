@@ -112,12 +112,14 @@ describe("upload paths with PWA safeguards", () => {
   });
   it("shows trial uploads left", () => {
     mount();
-    expect(screen.getByTestId("text-scan-trial-left").textContent).toBe("2 of 3 trial uploads left");
+    expect(screen.getByTestId("text-scan-trial-left").textContent).toBe("2 of 5 free receipts left");
   });
   it("blocks file and camera before any request when uploads are used up", () => {
-    mocks.billing = { plan: "free", accessState: "trial_exhausted", canUseApp: false, canUpload: false };
+    mocks.billing = { plan: "free", accessState: "trial_exhausted", canUseApp: true, canUpload: false, trialUploadsUsed: 5 };
     mount();
-    expect(screen.getByTestId("text-upload-blocked").textContent).toContain("all 3 trial uploads");
+    expect(screen.getByTestId("text-upload-blocked").textContent).toBe("You've used your 5 free receipts. Subscribe to add more.");
+    expect(screen.getByTestId("link-scan-subscribe").textContent).toBe("Subscribe");
+    expect(screen.getByTestId("link-scan-subscribe").getAttribute("href")).toBe("/settings#upgrade-plans");
     expect(screen.queryByRole("button", { name: /camera/i })).toBeNull();
     expect(mocks.getUserMedia).not.toHaveBeenCalled();
   });

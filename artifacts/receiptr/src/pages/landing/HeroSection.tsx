@@ -80,7 +80,7 @@ export default function HeroSection() {
 
             {/* Social proof line */}
             <motion.p variants={fadeInUp} className="text-xs text-muted-foreground">
-              Seven days and three receipt uploads free. No card needed.
+              15 days free, no card. Add up to 5 receipts.
             </motion.p>
           </motion.div>
 

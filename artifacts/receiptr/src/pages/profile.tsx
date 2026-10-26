@@ -149,7 +149,7 @@ export default function ProfilePage() {
 
           {!billingLoading && (accessState === "account_trial" || accessState === "trial_exhausted" || accessState === "trial_expired") && (
             <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-sm font-medium">Trial uploads used</span>
+              <span className="text-sm font-medium">Free receipts used</span>
               <span className="text-sm text-muted-foreground font-mono" data-testid="text-profile-trial-uploads">
                 {Math.min(billing?.trialUploadsUsed ?? 0, TRIAL_UPLOAD_LIMIT)} of {TRIAL_UPLOAD_LIMIT}
               </span>
@@ -157,7 +157,7 @@ export default function ProfilePage() {
           )}
 
           {/* Trial end date */}
-          {!billingLoading && (accessState === "legacy_stripe_trial" || accessState === "account_trial") && billing?.trialEndAt && (
+          {!billingLoading && (accessState === "legacy_stripe_trial" || accessState === "account_trial" || accessState === "trial_exhausted") && billing?.trialEndAt && (
             <div className="flex items-center justify-between px-4 py-3.5">
               <span className="text-sm font-medium">Trial ends</span>
               <span className="text-sm text-muted-foreground">

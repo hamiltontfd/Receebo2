@@ -12,6 +12,7 @@ import {
   hasAppAccess,
   isPaidLike,
   TRIAL_UPLOAD_LIMIT,
+  TRIAL_DAYS,
   type AccessState,
   type BillingStatus,
 } from "@/hooks/useBilling";
@@ -109,13 +110,14 @@ function ErrorScreen({ title, body, onRetry, retrying }: { title: string; body: 
 
 const PAYWALL_COPY: Partial<Record<AccessState, { eyebrow: string; title: string; body: string }>> = {
   trial_exhausted: {
+    // Not normally shown: at the cap the app stays viewable until day 15.
     eyebrow: "Trial complete",
-    title: `You've used all ${TRIAL_UPLOAD_LIMIT} trial uploads.`,
+    title: `You've used your ${TRIAL_UPLOAD_LIMIT} free receipts.`,
     body: "Your receipts are kept safe. Subscribe to keep scanning and searching them.",
   },
   trial_expired: {
     eyebrow: "Trial ended",
-    title: "Your seven-day trial has ended.",
+    title: `Your ${TRIAL_DAYS}-day free trial has ended.`,
     body: "Your receipts are kept safe. Subscribe to keep scanning and searching them.",
   },
   subscription_required: {
@@ -197,7 +199,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
         />
       );
     }
-    return <FullScreenSkeleton label="Setting up your seven-day trial" />;
+    return <FullScreenSkeleton label={`Setting up your ${TRIAL_DAYS}-day free trial`} />;
   }
 
   if (hasAppAccess(billing)) return <>{children}</>;

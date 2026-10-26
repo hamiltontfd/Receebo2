@@ -9,6 +9,7 @@ import {
   resolveAccessState,
   isPaidLike,
   TRIAL_UPLOAD_LIMIT,
+  TRIAL_DAYS,
   type AccessState,
   type BillingStatus,
 } from "@/hooks/useBilling";
@@ -235,14 +236,14 @@ export default function Settings() {
 
             {(accessState === "account_trial" || accessState === "trial_exhausted" || accessState === "trial_expired") && (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Trial uploads used</span>
+                <span className="text-sm font-medium">Free receipts used</span>
                 <span className="text-sm text-muted-foreground font-mono" data-testid="text-trial-uploads-used">
                   {Math.min(billing?.trialUploadsUsed ?? 0, TRIAL_UPLOAD_LIMIT)} of {TRIAL_UPLOAD_LIMIT}
                 </span>
               </div>
             )}
 
-            {(accessState === "account_trial" || accessState === "trial_expired") && billing?.trialEndAt && (
+            {(accessState === "account_trial" || accessState === "trial_exhausted" || accessState === "trial_expired") && billing?.trialEndAt && (
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">{accessState === "trial_expired" ? "Trial ended" : "Trial ends"}</span>
                 <span className="text-sm text-muted-foreground" data-testid="text-trial-end">
@@ -370,9 +371,9 @@ export default function Settings() {
             <span className="text-center">Pro</span>
           </div>
           {[
-            { feature: "Receipt uploads", free: `${TRIAL_UPLOAD_LIMIT} total`, pro: "Unlimited", freeHighlight: false, proHighlight: false },
+            { feature: "Receipt uploads", free: `Up to ${TRIAL_UPLOAD_LIMIT}`, pro: "Unlimited", freeHighlight: false, proHighlight: false },
             { feature: "AI receipt extraction", free: true, pro: true, freeHighlight: false, proHighlight: false },
-                        { feature: "Access period", free: "7 days", pro: "While subscribed", freeHighlight: false, proHighlight: false },
+                        { feature: "Access period", free: `${TRIAL_DAYS} days`, pro: "While subscribed", freeHighlight: false, proHighlight: false },
             { feature: "Natural-language search", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Warranty reminders", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Email auto-import", free: true, pro: true, freeHighlight: false, proHighlight: false },

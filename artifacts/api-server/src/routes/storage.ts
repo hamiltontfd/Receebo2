@@ -9,8 +9,8 @@ import {
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { lockUserDataMutation } from "../lib/userDataLock";
-import { getSubscriptionStatus } from "../lib/subscriptionStatus";
-import { reserveTrialUpload } from "../lib/accountTrial";
+import { getSubscriptionStatus, receiptCapReached } from "../lib/subscriptionStatus";
+import { reserveTrialUpload, TRIAL_CAP_ERROR } from "../lib/accountTrial";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
 
 const router: IRouter = Router();
@@ -43,9 +43,15 @@ router.post("/storage/uploads/request-url", requireAuthOrGuest, requireCurrentLe
     const { name, size, contentType } = parsed.data;
     const subscription = await getSubscriptionStatus(req.userId!);
     const attachmentReceiptId = req.body.receiptId;
+    // At the receipt cap, new receipts are refused. Extra pages/attachments
+    // for an existing receipt (receiptId) neither count nor run extraction.
+    if (attachmentReceiptId === undefined && receiptCapReached(subscription)) {
+      res.status(403).json(TRIAL_CAP_ERROR);
+      return;
+    }
     if (!subscription.canUseApp || (attachmentReceiptId === undefined && !subscription.canUpload)) {
       res.status(403).json({ error: "subscription_required", code: subscription.accessState,
-        message: subscription.canUseApp ? "All remaining trial uploads are processing. Please wait or upgrade." :
+        message: subscription.canUseApp ? "Your remaining free receipts are still processing. Try again in a moment, or subscribe to add more." :
           "Your trial has ended. Subscribe as a Founding Customer to continue." });
       return;
     }
@@ -87,7 +93,7 @@ router.post("/storage/uploads/request-url", requireAuthOrGuest, requireCurrentLe
   } catch (error) {
     if (error instanceof Error && error.message === "TRIAL_UPLOAD_LIMIT") {
       res.status(403).json({ error: "subscription_required", code: "TRIAL_UPLOAD_LIMIT",
-        message: "Your trial has ended or all remaining uploads are reserved. Check your plan." });
+        message: TRIAL_CAP_ERROR.message });
       return;
     }
     req.log.error({ err: error }, "Error generating upload URL");

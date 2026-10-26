@@ -11,13 +11,16 @@ import {
 } from "@workspace/api-client-react";
 import { toast } from "@/hooks/use-toast";
 import { recordCheckoutCancellation } from "@/lib/trialFunnel";
+import {
+  TRIAL_RECEIPT_LIMIT, TRIAL_LENGTH_DAYS, TRIAL_CAP_MESSAGE, TRIAL_EXPIRED_MESSAGE,
+} from "@/lib/trialCopy";
 
 const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
 
 export const BILLING_QUERY_KEY = ["billing", "subscription"] as const;
 export const BILLING_POLL_MS = 10_000;
-export const TRIAL_UPLOAD_LIMIT = 3;
-export const TRIAL_DAYS = 7;
+export const TRIAL_UPLOAD_LIMIT = TRIAL_RECEIPT_LIMIT;
+export const TRIAL_DAYS = TRIAL_LENGTH_DAYS;
 export const MONTHLY_PRICE = "€2.99";
 export const YEARLY_PRICE = "€24.99";
 
@@ -66,7 +69,8 @@ export function resolveAccessState(b: BillingStatus | undefined | null): AccessS
   return "subscription_required";
 }
 
-const FULL_ACCESS: AccessState[] = ["account_trial", "legacy_stripe_trial", "paid", "owner"];
+// trial_exhausted can still view everything (it just cannot add receipts).
+const FULL_ACCESS: AccessState[] = ["account_trial", "trial_exhausted", "legacy_stripe_trial", "paid", "owner"];
 
 /** True only when the server explicitly allows app use (or a known full-access state without the flag). */
 export function hasAppAccess(b: BillingStatus | undefined | null): boolean {
@@ -83,6 +87,11 @@ export function canUploadReceipts(b: BillingStatus | undefined | null): boolean 
   return state === "paid" || state === "owner" || state === "legacy_stripe_trial";
 }
 
+/** True when a trial user has used every free receipt (can view, cannot add). */
+export function isAtTrialCap(b: BillingStatus | undefined | null): boolean {
+  return !!b && resolveAccessState(b) === "trial_exhausted";
+}
+
 export function isPaidLike(b: BillingStatus | undefined | null): boolean {
   const s = resolveAccessState(b);
   return s === "paid" || s === "legacy_stripe_trial";
@@ -92,10 +101,10 @@ export function isPaidLike(b: BillingStatus | undefined | null): boolean {
 export function uploadBlockedReason(b: BillingStatus | undefined | null): string | null {
   if (canUploadReceipts(b)) return null;
   const state = resolveAccessState(b);
-  if (state === "trial_exhausted")
-    return `You've used all ${TRIAL_UPLOAD_LIMIT} trial uploads. Subscribe to keep adding receipts.`;
-  if (state === "trial_expired")
-    return "Your seven-day trial has ended. Subscribe to keep adding receipts.";
+  if (state === "trial_exhausted") return TRIAL_CAP_MESSAGE;
+  if (state === "trial_expired") return TRIAL_EXPIRED_MESSAGE;
+  if (state === "account_trial")
+    return "Your remaining free receipts are still processing. Try again in a moment, or subscribe to add more.";
   if (state === "not_started") return "Your trial is still being set up. Try again in a moment.";
   return "An active subscription is needed to add receipts.";
 }
@@ -107,9 +116,8 @@ export function quotaErrorMessage(err: unknown): string | null {
   const data = err.data as { error?: string; code?: string; message?: string } | null;
   const code = `${data?.code ?? ""} ${data?.error ?? ""}`.toLowerCase();
   if (code.includes("exhaust") || code.includes("quota") || code.includes("upload"))
-    return `You've used all ${TRIAL_UPLOAD_LIMIT} trial uploads. Subscribe to keep adding receipts. Nothing was uploaded.`;
-  if (code.includes("expire"))
-    return "Your seven-day trial has ended. Subscribe to keep adding receipts. Nothing was uploaded.";
+    return TRIAL_CAP_MESSAGE;
+  if (code.includes("expire")) return TRIAL_EXPIRED_MESSAGE;
   if (err.status === 429) return null;
   return "Your plan doesn't allow more uploads right now. Check your plan in Settings. Nothing was uploaded.";
 }
@@ -148,12 +156,12 @@ export function useBillingStatus() {
 export function useTrialExpiryTimer(billing: BillingStatus | undefined) {
   const queryClient = useQueryClient();
   const state = resolveAccessState(billing);
-  const endAt = state === "account_trial" ? billing?.trialEndAt ?? null : null;
+  const endAt = state === "account_trial" || state === "trial_exhausted" ? billing?.trialEndAt ?? null : null;
   useEffect(() => {
     if (!endAt) return;
     const ms = new Date(endAt).getTime() - Date.now();
     if (!Number.isFinite(ms)) return;
-    // setTimeout caps at ~24.8 days; trials are 7 days.
+    // setTimeout caps at ~24.8 days; trials are 15 days.
     const timer = setTimeout(
       () => void queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY }),
       Math.max(0, ms) + 250,

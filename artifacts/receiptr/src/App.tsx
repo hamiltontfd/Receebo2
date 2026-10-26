@@ -168,7 +168,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
         </LegalConsentGate>
       </Show>
       <Show when="signed-out">
-        {/* Guest bypass disabled. Accounts get a seven-day, three-upload trial instead. */}
+        {/* Guest bypass disabled. Accounts get a 15-day, five-receipt trial instead. */}
         <Redirect to="/" />
       </Show>
     </>

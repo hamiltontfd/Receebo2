@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Clock, AlertTriangle } from "lucide-react";
 import { useBillingStatus, resolveAccessState, TRIAL_UPLOAD_LIMIT } from "@/hooks/useBilling";
+import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON, SUBSCRIBE_HREF } from "@/lib/trialCopy";
 
 export function formatTimeLeft(isoDate: string, now: number): string {
   const ms = new Date(isoDate).getTime() - now;
@@ -47,7 +48,7 @@ export default function TrialBanner() {
       <div className="bg-amber-50 border-b border-amber-200 text-amber-900 text-sm px-4 py-2.5 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-center" data-testid="banner-trial">
         <Clock className="w-3.5 h-3.5 shrink-0 opacity-70" />
         <span data-testid="text-trial-status">
-          Free trial: {remaining} of {TRIAL_UPLOAD_LIMIT} uploads left{time ? ` · ${time}` : ""}.
+          Free trial: {remaining} of {TRIAL_UPLOAD_LIMIT} receipts left{time ? ` · ${time}` : ""}.
         </span>
         <Link href="/settings#upgrade-plans" className="underline font-semibold hover:opacity-75 transition-opacity whitespace-nowrap" data-testid="link-upgrade-early">
           Upgrade now
@@ -56,11 +57,21 @@ export default function TrialBanner() {
     );
   }
 
-  if (state === "trial_exhausted" || state === "trial_expired" || state === "subscription_required") {
+  if (state === "trial_exhausted") {
+    // One-line notice on every app page until they subscribe or day 15 (then the paywall).
+    return (
+      <div className="bg-amber-50 border-b border-amber-200 text-amber-950 text-sm px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center" role="status" data-testid="banner-trial-cap">
+        <span data-testid="text-trial-cap">{TRIAL_CAP_MESSAGE}</span>
+        <Link href={SUBSCRIBE_HREF} className="inline-flex h-7 items-center rounded-full bg-foreground px-3 text-xs font-semibold text-background hover:opacity-90 whitespace-nowrap" data-testid="link-trial-cap-subscribe">
+          {TRIAL_CAP_BUTTON}
+        </Link>
+      </div>
+    );
+  }
+
+  if (state === "trial_expired" || state === "subscription_required") {
     const label =
-      state === "trial_exhausted"
-        ? `You've used all ${TRIAL_UPLOAD_LIMIT} trial uploads.`
-        : state === "trial_expired"
+      state === "trial_expired"
           ? "Your free trial has ended."
           : "Your subscription is inactive.";
     return (
