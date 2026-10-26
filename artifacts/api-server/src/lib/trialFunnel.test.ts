@@ -103,6 +103,18 @@ describe("privacy-safe no-card funnel", () => {
     expect(Object.keys(milestones[0]).sort()).toEqual(["dimension", "event", "interval", "occurredAt", "reason", "subjectId"]);
     expect(JSON.stringify(milestones)).not.toContain(userId);
   });
+  it("records receipt_limit_reached once when the 5th trial receipt succeeds", async () => {
+    await start();
+    const paths = Array.from({ length: 5 }, () => `funnel/${randomUUID()}`);
+    for (const path of paths) await db.insert(trialUploadsTable).values({
+      userId, objectPath: path, state: "processing", expiresAt: new Date(),
+    });
+    for (const path of paths.slice(0, 4)) await db.update(trialUploadsTable).set({ state: "succeeded" })
+      .where(eq(trialUploadsTable.objectPath, path));
+    expect((await events()).some(e => e.event === "receipt_limit_reached")).toBe(false);
+    await db.update(trialUploadsTable).set({ state: "succeeded" }).where(eq(trialUploadsTable.userId, userId));
+    expect((await events()).filter(e => e.event === "receipt_limit_reached")).toHaveLength(1);
+  });
   it("validates paywall state, rejects arbitrary properties and server event spoofing, and deduplicates tabs", async () => {
     await start();
     expect((await post({ event: "paid_activation_confirmed" })).status).toBe(400);

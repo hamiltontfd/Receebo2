@@ -121,15 +121,16 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
       return;
     }
     const interval = planType as "monthly" | "yearly";
-    await safeFunnel(async () => {
-      const subjectId = await funnelSubject(userId);
-      if (subjectId) await recordFunnelEvent(subjectId, "plan_selected", interval, interval, paywallReason(status.accessState));
-    });
     const priceId = billingPriceId(interval);
     if (!priceId) {
       res.status(503).json({ error: "Stripe price IDs are not configured yet" });
       return;
     }
+    // Count checkout starts only once checkout can actually be created.
+    await safeFunnel(async () => {
+      const subjectId = await funnelSubject(userId);
+      if (subjectId) await recordFunnelEvent(subjectId, "plan_selected", interval, interval, paywallReason(status.accessState));
+    });
     // Resolve configuration before creating customers or checkout sessions.
     const base = billingOrigin();
     const stripe = await getUncachableStripeClient();

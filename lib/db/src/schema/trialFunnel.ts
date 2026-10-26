@@ -20,7 +20,7 @@ export const trialFunnelEventsTable = pgTable("trial_funnel_events", {
   primaryKey({ name: "trial_funnel_events_pkey", columns: [t.subjectId, t.event, t.dimension] }),
   index("trial_funnel_events_time").on(t.occurredAt),
   check("trial_funnel_events_event_check", sql`${t.event} IN ('consent_accepted','account_trial_started',
-    'first_receipt_succeeded','third_receipt_succeeded','paywall_viewed',
+    'first_receipt_succeeded','third_receipt_succeeded','receipt_limit_reached','paywall_viewed',
     'plan_selected','checkout_canceled','paid_activation_confirmed')`),
   check("trial_funnel_events_interval_check", sql`${t.interval} IN ('monthly','yearly')`),
   check("trial_funnel_events_reason_check", sql`${t.reason} IN ('trial_expired','trial_exhausted')`),

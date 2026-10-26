@@ -10,7 +10,7 @@ export async function migrateTrialFunnel() {
     CREATE TABLE IF NOT EXISTS trial_funnel_events (
       subject_id uuid NOT NULL REFERENCES trial_funnel_subjects(id) ON DELETE CASCADE,
       event text NOT NULL CHECK (event IN ('consent_accepted','account_trial_started',
-        'first_receipt_succeeded','third_receipt_succeeded','paywall_viewed',
+        'first_receipt_succeeded','third_receipt_succeeded','receipt_limit_reached','paywall_viewed',
         'plan_selected','checkout_canceled','paid_activation_confirmed')),
       dimension text NOT NULL DEFAULT 'none',
       interval text CHECK (interval IN ('monthly','yearly')),
@@ -19,6 +19,11 @@ export async function migrateTrialFunnel() {
       PRIMARY KEY(subject_id,event,dimension)
     );
     CREATE INDEX IF NOT EXISTS trial_funnel_events_time ON trial_funnel_events(occurred_at);
+    -- Existing tables: widen the event check to include receipt_limit_reached.
+    ALTER TABLE trial_funnel_events DROP CONSTRAINT IF EXISTS trial_funnel_events_event_check;
+    ALTER TABLE trial_funnel_events ADD CONSTRAINT trial_funnel_events_event_check CHECK (event IN ('consent_accepted','account_trial_started',
+      'first_receipt_succeeded','third_receipt_succeeded','receipt_limit_reached','paywall_viewed',
+      'plan_selected','checkout_canceled','paid_activation_confirmed'));
     CREATE TABLE IF NOT EXISTS trial_funnel_checkouts (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       subject_id uuid NOT NULL REFERENCES trial_funnel_subjects(id) ON DELETE CASCADE,
@@ -57,6 +62,10 @@ export async function migrateTrialFunnel() {
         END IF;
         IF uses >= 3 THEN
           INSERT INTO trial_funnel_events(subject_id,event) VALUES(sid,'third_receipt_succeeded') ON CONFLICT DO NOTHING;
+        END IF;
+        -- Trial cap (TRIAL_LIMIT = 5): adding is blocked from here, viewing continues.
+        IF uses >= 5 THEN
+          INSERT INTO trial_funnel_events(subject_id,event) VALUES(sid,'receipt_limit_reached') ON CONFLICT DO NOTHING;
         END IF;
       END IF;
       RETURN NEW;
