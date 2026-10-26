@@ -68,7 +68,7 @@ export function PrivacyAndDataSettings() {
       toast({
         title: "Data export downloaded",
         description:
-          "Your JSON export contains your account, receipt, Gmail, preference, and subscription records.",
+          "Your JSON export contains your account, receipt, email connection, preference, and subscription records.",
       });
     } catch (error) {
       toast({
@@ -188,7 +188,7 @@ export function PrivacyAndDataSettings() {
             <p className="text-sm font-medium text-destructive">Delete account</p>
             <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
               Permanently remove your Receebo account, receipts, attachments,
-              Gmail connection, and notification subscriptions.
+              email connections, and notification subscriptions.
             </p>
           </div>
           <AlertDialog
@@ -216,7 +216,7 @@ export function PrivacyAndDataSettings() {
                 <AlertDialogDescription className="space-y-2">
                   <span className="block">
                     This permanently deletes your receipts, extracted data,
-                    uploaded files, Gmail connection, and preferences. Any known
+                    uploaded files, email connections, and preferences. Any known
                     active Stripe subscription is cancelled first.
                   </span>
                   <span className="block">

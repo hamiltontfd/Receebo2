@@ -6,7 +6,7 @@ import { AppCapture } from "./MarketingMedia";
 const FEATURES = [
   {
     title: "Capture",
-    items: ["Scan paper receipts", "Upload PDF, JPG or PNG", "Forward email receipts"],
+    items: ["Scan paper receipts", "Upload PDF, JPG or PNG", "Import receipts from your inbox"],
     image: "capture-poster.webp",
     alt: "Receebo's real review form displaying Northline Audio, 20 October 2026 and a €189 total from a fictional receipt.",
   },

@@ -146,6 +146,27 @@ describe("Gmail hidden by default (MAIL_PROVIDERS_ENABLED unset)", () => {
   });
 });
 
+describe("GET /mail/providers (public copy source)", () => {
+  it("lists only enabled and configured providers, without user data", async () => {
+    let res = await fetch(`${base}/mail/providers`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ providers: [] }); // Outlook enabled but not configured
+
+    configureOutlook();
+    res = await fetch(`${base}/mail/providers`);
+    expect(await res.json()).toEqual({ providers: [{ id: "outlook", label: "Outlook" }] });
+
+    vi.stubEnv("MAIL_PROVIDERS_ENABLED", "gmail,outlook");
+    res = await fetch(`${base}/mail/providers`);
+    expect(await res.json()).toEqual({
+      providers: [
+        { id: "gmail", label: "Gmail" },
+        { id: "outlook", label: "Outlook" },
+      ],
+    });
+  });
+});
+
 describe("Outlook routes", () => {
   it("are inert when Microsoft credentials are missing", async () => {
     expect((await fetch(`${base}/outlook/connect-url`)).status).toBe(503);

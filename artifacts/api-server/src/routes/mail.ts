@@ -65,6 +65,33 @@ async function providerStatuses(userId: string): Promise<MailProviderStatus[]> {
   return all.filter((p) => (p.enabled && p.configured) || p.connected);
 }
 
+const PROVIDER_LABELS: Record<MailProviderId, string> = {
+  outlook: "Outlook",
+  gmail: "Gmail",
+};
+
+const PROVIDER_CONFIGURED: Record<MailProviderId, () => boolean> = {
+  outlook: isOutlookConfigured,
+  gmail: isGmailConfigured,
+};
+
+/**
+ * Providers a new user can actually connect right now: enabled by
+ * MAIL_PROVIDERS_ENABLED and configured with OAuth credentials.
+ */
+export function availableMailProviders(): { id: MailProviderId; label: string }[] {
+  return enabledMailProviders()
+    .filter((id) => PROVIDER_CONFIGURED[id]())
+    .map((id) => ({ id, label: PROVIDER_LABELS[id] }));
+}
+
+// GET /mail/providers — public, no user data. Lets the website and apps word
+// their copy from the same flag that controls Settings.
+router.get("/mail/providers", (_req, res): void => {
+  res.set("Cache-Control", "public, max-age=300");
+  res.json({ providers: availableMailProviders() });
+});
+
 // GET /mail/status — every visible mail provider + shared pending count
 router.get("/mail/status", requireAuth, async (req, res): Promise<void> => {
   try {

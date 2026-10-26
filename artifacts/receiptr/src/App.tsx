@@ -135,7 +135,7 @@ function SignUpPage() {
           <Link href="/privacy" className="underline underline-offset-4">
             Privacy Policy
           </Link>
-          . Optional Gmail and notification permissions are separate.
+          . Optional inbox and notification permissions are separate.
         </p>
       </div>
     </AuthModal>

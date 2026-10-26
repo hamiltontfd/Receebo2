@@ -13,10 +13,11 @@ import {
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useColors } from '@/hooks/useColors';
 import {
-  useDisconnectGmail,
-  useGmailConnectUrl,
-  useGmailStatus,
-  useSyncGmail,
+  useDisconnectMailProvider,
+  useMailConnectUrl,
+  useMailStatus,
+  useSyncMail,
+  type MailProviderStatus,
 } from '@/hooks/useGmail';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -42,13 +43,16 @@ export default function SettingsScreen() {
   const { user } = useUser();
   const qc = useQueryClient();
 
-  const { data: gmailStatus, isLoading: statusLoading, refetch: refetchStatus } = useGmailStatus();
-  const connectUrl = useGmailConnectUrl();
-  const disconnect = useDisconnectGmail();
-  const sync = useSyncGmail();
+  const { data: mailStatus, isLoading: statusLoading, refetch: refetchStatus } = useMailStatus();
+  const connectUrl = useMailConnectUrl();
+  const disconnect = useDisconnectMailProvider();
+  const sync = useSyncMail();
+  // Only providers enabled by MAIL_PROVIDERS_ENABLED (and configured), plus a
+  // legacy connection the user can still disconnect.
+  const providers = mailStatus?.providers ?? [];
 
-  // Poll for gmail status after opening connect URL
-  const [polling, setPolling] = useState(false);
+  // Poll for connection status after opening the provider's sign-in page
+  const [polling, setPolling] = useState<MailProviderStatus['id'] | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = () => {
@@ -56,26 +60,27 @@ export default function SettingsScreen() {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
-    setPolling(false);
+    setPolling(null);
   };
 
   // Stop polling when connected
+  const pollingConnected = !!polling && providers.some((p) => p.id === polling && p.connected && !p.needsReconnect);
   useEffect(() => {
-    if (gmailStatus?.connected && polling) {
+    if (pollingConnected) {
       stopPolling();
     }
-  }, [gmailStatus?.connected, polling]);
+  }, [pollingConnected]);
 
   useEffect(() => {
     return () => stopPolling();
   }, []);
 
-  const onConnectGmail = async () => {
+  const onConnect = async (provider: MailProviderStatus) => {
     try {
-      const url = await connectUrl.mutateAsync();
+      const url = await connectUrl.mutateAsync(provider.id);
       await Linking.openURL(url);
       // Start polling for status changes after user opens OAuth
-      setPolling(true);
+      setPolling(provider.id);
       let attempts = 0;
       pollRef.current = setInterval(async () => {
         attempts++;
@@ -83,15 +88,15 @@ export default function SettingsScreen() {
         if (attempts >= 15) stopPolling(); // give up after ~30s
       }, 2000);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Could not open Gmail connect';
+      const msg = e instanceof Error ? e.message : `Could not open ${provider.label} connect`;
       Alert.alert('Error', msg);
     }
   };
 
-  const onDisconnect = () => {
+  const onDisconnect = (provider: MailProviderStatus) => {
     Alert.alert(
-      'Disconnect Gmail',
-      'This will stop auto-importing receipts from Gmail. Are you sure?',
+      `Disconnect ${provider.label}`,
+      `This will stop auto-importing receipts from ${provider.label}. Are you sure?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -99,7 +104,7 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            disconnect.mutate();
+            disconnect.mutate(provider.id);
           },
         },
       ],
@@ -157,128 +162,171 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Gmail */}
+      {/* Email import — providers come from /mail/status (MAIL_PROVIDERS_ENABLED) */}
       <View style={styles.section}>
-        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>GMAIL IMPORT</Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
-          {statusLoading ? (
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>EMAIL IMPORT</Text>
+        {statusLoading ? (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
             <ActivityIndicator color={colors.foreground} style={{ paddingVertical: 12 }} />
-          ) : gmailStatus?.connected ? (
-            <>
-              {/* Connected state */}
-              <View style={styles.gmailConnected}>
-                <View style={[styles.connectedDot, { backgroundColor: '#22c55e' }]} />
-                <Text style={[styles.gmailEmail, { color: colors.foreground }]} numberOfLines={1}>
-                  {gmailStatus.gmailEmail ?? 'Connected'}
-                </Text>
-              </View>
-
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-              <View style={styles.metaRow}>
-                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Last synced</Text>
-                <Text style={[styles.metaValue, { color: colors.foreground }]}>
-                  {formatDate(gmailStatus.lastSyncedAt)}
-                </Text>
-              </View>
-
-              {gmailStatus.pendingCount > 0 && (
-                <View style={styles.metaRow}>
-                  <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Pending imports</Text>
-                  <Text style={[styles.metaValue, { color: colors.foreground }]}>
-                    {gmailStatus.pendingCount}
-                  </Text>
-                </View>
-              )}
-
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-              {/* Actions */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.rowBtn,
-                  { opacity: pressed || sync.isPending ? 0.6 : 1 },
-                ]}
-                onPress={onSync}
-                disabled={sync.isPending}
-              >
-                {sync.isPending ? (
-                  <ActivityIndicator size="small" color={colors.foreground} />
-                ) : (
-                  <Feather name="refresh-cw" size={16} color={colors.foreground} />
-                )}
-                <Text style={[styles.rowBtnText, { color: colors.foreground }]}>
-                  {sync.isPending ? 'Syncing…' : 'Sync now'}
-                </Text>
-              </Pressable>
-
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-              <Pressable
-                style={({ pressed }) => [
-                  styles.rowBtn,
-                  { opacity: pressed || disconnect.isPending ? 0.6 : 1 },
-                ]}
-                onPress={onDisconnect}
-                disabled={disconnect.isPending}
-              >
-                {disconnect.isPending ? (
-                  <ActivityIndicator size="small" color={colors.destructive} />
-                ) : (
-                  <Feather name="x-circle" size={16} color={colors.destructive} />
-                )}
-                <Text style={[styles.rowBtnText, { color: colors.destructive }]}>
-                  Disconnect Gmail
-                </Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              {/* Not connected state */}
-              <Text style={[styles.gmailDescription, { color: colors.mutedForeground }]}>
-                Connect Gmail to automatically import receipt emails. Receebo detects receipts and adds them to your library for review.
-              </Text>
-              {polling && (
-                <View style={styles.waitingRow}>
-                  <ActivityIndicator size="small" color={colors.mutedForeground} />
-                  <Text style={[styles.waitingText, { color: colors.mutedForeground }]}>
-                    Waiting for connection…
-                  </Text>
-                </View>
-              )}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.connectBtn,
-                  {
-                    backgroundColor: pressed ? '#333' : colors.foreground,
-                    borderRadius: colors.radius,
-                    opacity: connectUrl.isPending || polling ? 0.6 : 1,
-                  },
-                ]}
-                onPress={onConnectGmail}
-                disabled={connectUrl.isPending || polling}
-              >
-                {connectUrl.isPending ? (
-                  <ActivityIndicator size="small" color={colors.primaryForeground} />
-                ) : (
-                  <>
-                    <Feather name="mail" size={16} color={colors.primaryForeground} />
-                    <Text style={[styles.connectBtnText, { color: colors.primaryForeground }]}>
-                      Connect Gmail
+          </View>
+        ) : providers.length === 0 ? (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+            <Text style={[styles.gmailDescription, { color: colors.mutedForeground }]}>
+              Inbox import isn't available right now. You can still scan or upload receipts.
+            </Text>
+          </View>
+        ) : (
+          providers.map((provider) => (
+            <View
+              key={provider.id}
+              style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius, marginBottom: 12 }]}
+            >
+              {provider.connected ? (
+                <>
+                  {/* Connected state */}
+                  <View style={styles.gmailConnected}>
+                    <View style={[styles.connectedDot, { backgroundColor: provider.needsReconnect ? '#f59e0b' : '#22c55e' }]} />
+                    <Text style={[styles.gmailEmail, { color: colors.foreground }]} numberOfLines={1}>
+                      {provider.label} · {provider.accountEmail ?? 'Connected'}
                     </Text>
-                  </>
-                )}
-              </Pressable>
-              {polling && (
-                <Pressable onPress={() => { stopPolling(); void refetchStatus(); }}>
-                  <Text style={[styles.checkStatusLink, { color: colors.mutedForeground }]}>
-                    Tap to check connection status
+                  </View>
+
+                  {!provider.enabled ? (
+                    <Text style={[styles.gmailDescription, { color: colors.mutedForeground }]}>
+                      {provider.label} import is no longer available. Disconnect to remove Receebo's access to this inbox.
+                    </Text>
+                  ) : provider.needsReconnect ? (
+                    <Text style={[styles.gmailDescription, { color: colors.mutedForeground }]}>
+                      {provider.label} needs you to sign in again before new receipts can be imported.
+                    </Text>
+                  ) : null}
+
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                  <View style={styles.metaRow}>
+                    <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Last synced</Text>
+                    <Text style={[styles.metaValue, { color: colors.foreground }]}>
+                      {formatDate(provider.lastSyncedAt)}
+                    </Text>
+                  </View>
+
+                  {(mailStatus?.pendingCount ?? 0) > 0 && (
+                    <View style={styles.metaRow}>
+                      <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Pending imports</Text>
+                      <Text style={[styles.metaValue, { color: colors.foreground }]}>
+                        {mailStatus?.pendingCount}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                  {/* Actions */}
+                  {provider.enabled && provider.needsReconnect ? (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.rowBtn,
+                        { opacity: pressed || connectUrl.isPending || !!polling ? 0.6 : 1 },
+                      ]}
+                      onPress={() => void onConnect(provider)}
+                      disabled={connectUrl.isPending || !!polling}
+                    >
+                      <Feather name="log-in" size={16} color={colors.foreground} />
+                      <Text style={[styles.rowBtnText, { color: colors.foreground }]}>
+                        {polling === provider.id ? 'Waiting for connection…' : `Reconnect ${provider.label}`}
+                      </Text>
+                    </Pressable>
+                  ) : provider.enabled ? (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.rowBtn,
+                        { opacity: pressed || sync.isPending ? 0.6 : 1 },
+                      ]}
+                      onPress={onSync}
+                      disabled={sync.isPending}
+                    >
+                      {sync.isPending ? (
+                        <ActivityIndicator size="small" color={colors.foreground} />
+                      ) : (
+                        <Feather name="refresh-cw" size={16} color={colors.foreground} />
+                      )}
+                      <Text style={[styles.rowBtnText, { color: colors.foreground }]}>
+                        {sync.isPending ? 'Syncing…' : 'Sync now'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {provider.enabled && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.rowBtn,
+                      { opacity: pressed || disconnect.isPending ? 0.6 : 1 },
+                    ]}
+                    onPress={() => onDisconnect(provider)}
+                    disabled={disconnect.isPending}
+                  >
+                    {disconnect.isPending ? (
+                      <ActivityIndicator size="small" color={colors.destructive} />
+                    ) : (
+                      <Feather name="x-circle" size={16} color={colors.destructive} />
+                    )}
+                    <Text style={[styles.rowBtnText, { color: colors.destructive }]}>
+                      Disconnect {provider.label}
+                    </Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  {/* Not connected state */}
+                  <Text style={[styles.gmailDescription, { color: colors.mutedForeground }]}>
+                    {provider.id === 'outlook'
+                      ? 'Connect Outlook (Outlook.com, Hotmail, Live or Microsoft 365) to import order emails and PDF receipts automatically. Read-only; you review every import.'
+                      : `Connect ${provider.label} to import order emails and PDF receipts automatically. Read-only; you review every import.`}
                   </Text>
-                </Pressable>
+                  {polling === provider.id && (
+                    <View style={styles.waitingRow}>
+                      <ActivityIndicator size="small" color={colors.mutedForeground} />
+                      <Text style={[styles.waitingText, { color: colors.mutedForeground }]}>
+                        Waiting for connection…
+                      </Text>
+                    </View>
+                  )}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.connectBtn,
+                      {
+                        backgroundColor: pressed ? '#333' : colors.foreground,
+                        borderRadius: colors.radius,
+                        opacity: connectUrl.isPending || !!polling ? 0.6 : 1,
+                      },
+                    ]}
+                    onPress={() => void onConnect(provider)}
+                    disabled={connectUrl.isPending || !!polling}
+                  >
+                    {connectUrl.isPending && connectUrl.variables === provider.id ? (
+                      <ActivityIndicator size="small" color={colors.primaryForeground} />
+                    ) : (
+                      <>
+                        <Feather name="mail" size={16} color={colors.primaryForeground} />
+                        <Text style={[styles.connectBtnText, { color: colors.primaryForeground }]}>
+                          Connect {provider.label}
+                        </Text>
+                      </>
+                    )}
+                  </Pressable>
+                  {polling === provider.id && (
+                    <Pressable onPress={() => { stopPolling(); void refetchStatus(); }}>
+                      <Text style={[styles.checkStatusLink, { color: colors.mutedForeground }]}>
+                        Tap to check connection status
+                      </Text>
+                    </Pressable>
+                  )}
+                </>
               )}
-            </>
-          )}
-        </View>
+            </View>
+          ))
+        )}
       </View>
 
       {/* Sign out */}

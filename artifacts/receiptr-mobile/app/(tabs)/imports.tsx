@@ -215,7 +215,7 @@ export default function ImportsScreen() {
             No pending imports
           </Text>
           <Text style={[styles.emptyBody, { color: colors.mutedForeground }]}>
-            Gmail receipts awaiting review will appear here.
+            Receipts imported from your inbox will appear here for review.
           </Text>
         </View>
       }

@@ -8,7 +8,7 @@ import DemoVideoModal from "./DemoVideoModal";
 const demos = [
   {
     title: "Capture",
-    body: "Scan, upload or forward receipts in seconds.",
+    body: "Scan, upload or import receipts in seconds.",
     clip: "capture",
     description: "A sample receipt image is selected, its extracted merchant, date and €189 total are reviewed, and the purchase is saved. Extraction responses are simulated for this recording.",
   },

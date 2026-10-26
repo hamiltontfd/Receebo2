@@ -45,7 +45,7 @@ export default function HeroSection() {
               variants={fadeInUp}
               className="text-lg text-muted-foreground leading-relaxed max-w-md"
             >
-              Scan, upload or forward receipts. Find any purchase in seconds with
+              Scan, upload or import receipts from your inbox. Find any purchase in seconds with
               AI-powered search.
             </motion.p>
 

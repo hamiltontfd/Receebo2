@@ -31,11 +31,13 @@ export default function PrivacyPolicy() {
           and any documents you attach.
         </li>
         <li>
-          <strong>Gmail connection data:</strong> your connected Gmail address,
-          encrypted OAuth credentials, message identifiers used to prevent
-          duplicates, sync timestamps, and receipt PDF candidates. Receebo
-          requests read-only Gmail access and uses it only to find and process
-          likely receipts and invoices for the feature you enable.
+          <strong>Email connection data:</strong> when you connect a Microsoft
+          (Outlook) mailbox, your connected email address, encrypted OAuth
+          credentials, message identifiers used to prevent duplicates, sync
+          timestamps and connection status, and receipt candidates found in
+          your email. Receebo requests read-only mailbox access and uses it only
+          to find and process likely receipts, invoices and order confirmations
+          for the feature you enable.
         </li>
         <li>
           <strong>Billing data:</strong> plan, subscription status, trial and
@@ -63,8 +65,8 @@ export default function PrivacyPolicy() {
           of our contract with you.
         </li>
         <li>
-          <strong>Optional Gmail and push features:</strong> to access your Gmail
-          account on a read-only basis or send browser notifications after you
+          <strong>Optional email import and push features:</strong> to access
+          your mailbox on a read-only basis or send browser notifications after you
           choose to enable those features. The lawful basis is your consent,
           which you can withdraw at any time.
         </li>
@@ -114,8 +116,9 @@ export default function PrivacyPolicy() {
         </li>
         <li><strong>Stripe:</strong> checkout, trials, subscriptions, invoices, and payments.</li>
         <li>
-          <strong>Google:</strong> optional Gmail OAuth and read-only receipt
-          retrieval when you connect Gmail.
+          <strong>Microsoft:</strong> optional Microsoft account sign-in (OAuth)
+          and read-only receipt retrieval through Microsoft Graph when you
+          connect an Outlook mailbox.
         </li>
         <li><strong>Resend:</strong> transactional and reminder email delivery.</li>
         <li>
@@ -136,16 +139,40 @@ export default function PrivacyPolicy() {
         Non-essential tracking will not begin before any consent required by law.
       </p>
 
-      <h2>5. Gmail access</h2>
+      <h2>5. Email inbox access (Microsoft Outlook)</h2>
       <p>
-        Connecting Gmail is optional and separate from creating an account.
-        Receebo asks for read-only access, searches for likely receipt or invoice
-        messages, downloads relevant PDF attachments, and presents extracted
-        candidates for your review. Receebo does not send, edit, or delete your
-        email. You can disconnect Gmail in Settings and can also revoke access
-        from your Google Account. Disconnecting removes stored OAuth credentials
-        and pending imports; receipts you previously approved remain in your
-        Receebo library until you delete them.
+        Connecting a mailbox is optional and separate from creating an account.
+        Receebo currently supports Microsoft mailboxes (Outlook.com, Hotmail,
+        Live and Microsoft 365) through Microsoft Graph. Receebo requests only
+        these delegated permissions: <strong>Mail.Read</strong> (read-only
+        access to your mail), <strong>offline_access</strong> (so imports can
+        continue without signing in each time), <strong>User.Read</strong>,{" "}
+        <strong>openid</strong> and <strong>email</strong> (to identify the
+        connected account).
+      </p>
+      <p>
+        Receebo looks at messages received in the last 90 days, uses the sender
+        and subject to identify likely receipts, invoices and order
+        confirmations, and then reads only those messages: their PDF
+        attachments and, for order emails without a PDF, the message body.
+        Extracted candidates are presented for your review before anything is
+        saved to your library. Receebo does not send, edit, move or delete your
+        email, does not use your email content for advertising, and does not
+        sell it.
+      </p>
+      <p>
+        OAuth credentials are stored encrypted. You can disconnect at any time
+        in Settings, and you can also remove Receebo’s access from your
+        Microsoft account’s app permissions. Disconnecting removes the stored
+        credentials and pending imports; receipts you previously approved
+        remain in your Receebo library until you delete them.
+      </p>
+      <p>
+        <strong>Earlier Gmail connections:</strong> Receebo previously offered a
+        read-only Gmail connection. New Gmail connections are not currently
+        offered and existing ones are no longer synced. If you connected Gmail
+        before, you can disconnect it in Settings or revoke access from your
+        Google Account; disconnecting removes the stored credentials.
       </p>
 
       <h2>6. Retention and deletion</h2>
@@ -160,7 +187,8 @@ export default function PrivacyPolicy() {
           you create an account and start a trial to save it.
         </li>
         <li>
-          Gmail credentials are kept only while Gmail remains connected; pending
+          Email connection credentials are kept only while the mailbox remains
+          connected; pending
           imports are removed when dismissed, disconnected, or deleted with the
           account.
         </li>
@@ -208,7 +236,8 @@ export default function PrivacyPolicy() {
       <h2>9. Security</h2>
       <p>
         Receebo uses authentication, user-scoped access checks, encrypted
-        transport, private object storage, encrypted Gmail credentials, limited
+        transport, private object storage, encrypted email-connection
+        credentials, limited
         OAuth scopes, and operational controls designed to protect personal
         data. No online service can guarantee absolute security. Please use a
         secure account and notify Receebo if you suspect unauthorised access.

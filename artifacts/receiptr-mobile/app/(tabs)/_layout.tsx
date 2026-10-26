@@ -7,13 +7,13 @@ import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Tabs } from 'expo-router';
 import { Badge, Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import { SymbolView } from 'expo-symbols';
-import { useGmailStatus } from '@/hooks/useGmail';
+import { useMailStatus } from '@/hooks/useGmail';
 import { useAuth } from '@clerk/clerk-expo';
 
 function NativeTabLayout() {
   const { isSignedIn } = useAuth();
-  const { data: gmailStatus } = useGmailStatus();
-  const pendingCount = gmailStatus?.pendingCount ?? 0;
+  const { data: mailStatus } = useMailStatus();
+  const pendingCount = mailStatus?.pendingCount ?? 0;
 
   return (
     <NativeTabs>
@@ -41,8 +41,8 @@ function ClassicTabLayout() {
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
 
-  const { data: gmailStatus } = useGmailStatus();
-  const pendingCount = gmailStatus?.pendingCount ?? 0;
+  const { data: mailStatus } = useMailStatus();
+  const pendingCount = mailStatus?.pendingCount ?? 0;
 
   return (
     <Tabs

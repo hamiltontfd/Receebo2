@@ -6,11 +6,20 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
+import {
+  inboxPhrase,
+  outlookAccountsNote,
+  useAvailableMailProviders,
+  type AvailableMailProvider,
+} from "@/lib/availableMailProviders";
 
-const faqs = [
+function buildFaqs(providers: AvailableMailProvider[]) {
+  const inbox = inboxPhrase(providers);
+  const accountsNote = outlookAccountsNote(providers);
+  return [
   {
     q: "How does Receebo work?",
-    a: "Scan any paper receipt with your phone camera, upload a PDF or image, or connect your Gmail inbox. Our AI reads and indexes every detail — merchant, products, prices, warranties — in under 10 seconds. Everything becomes searchable in plain English.",
+    a: `Scan any paper receipt with your phone camera, upload a PDF or image, or connect ${inbox}. Our AI reads and indexes every detail — merchant, products, prices, warranties — in under 10 seconds. Everything becomes searchable in plain English.`,
   },
   {
     q: "Can I upload PDFs?",
@@ -18,11 +27,11 @@ const faqs = [
   },
   {
     q: "Can I import email receipts?",
-    a: "Yes. Connect your Gmail account and Receebo will automatically detect and import receipts from your inbox. You can also manually forward receipts to your personal Receebo import address.",
+    a: `Yes. Connect ${inbox} and Receebo looks for order confirmations and PDF receipts from the last 90 days. Access is read-only, you review each import before it is saved, and you can disconnect at any time.${accountsNote ? ` ${accountsNote}` : ""}`,
   },
   {
     q: "Is my data private?",
-    a: "Completely. Your purchase history is encrypted and stored securely. We never share, sell, or use your data for advertising. You can delete everything at any time.",
+    a: "Your receipts are private to your account and are shared only with the services needed to run Receebo, such as AI extraction. Inbox access is read-only and can be disconnected at any time. We never sell your data or use it for advertising, and you can delete everything at any time.",
   },
   {
     q: "Can I cancel anytime?",
@@ -37,8 +46,10 @@ const faqs = [
     a: "€2.99/month and €24.99/year are founding prices. They stay available to you for as long as your account exists, including if you cancel and subscribe again later.",
   },
 ];
+}
 
 export default function FAQSection() {
+  const faqs = buildFaqs(useAvailableMailProviders());
   return (
     <section className="py-24 lg:py-32">
       <div className="max-w-3xl mx-auto px-6">

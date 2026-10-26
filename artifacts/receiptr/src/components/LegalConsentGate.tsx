@@ -75,7 +75,7 @@ export function LegalConsentGate({ children }: { children: React.ReactNode }) {
           Before you continue
         </h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Please review Receebo’s legal terms. Optional Gmail access, email
+          Please review Receebo’s legal terms. Optional inbox access, email
           reminders, and push notifications are controlled separately in
           Settings.
         </p>

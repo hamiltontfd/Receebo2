@@ -8,13 +8,13 @@ export default function TermsOfService() {
     >
       <p>
         These Terms govern your use of Receebo’s website, installable web app,
-        receipt-processing features, Gmail integration, notifications, and paid
+        receipt-processing features, email inbox import, notifications, and paid
         subscription service. The service provider is{" "}
         <strong>Receebo, Portugal</strong>.
       </p>
       <p>
         By accepting these Terms, you confirm that you are at least 18 years old
-        and agree to the accompanying Privacy Policy. Optional Gmail access,
+        and agree to the accompanying Privacy Policy. Optional inbox access,
         email reminders, and push notifications are controlled separately.
       </p>
 
@@ -22,8 +22,9 @@ export default function TermsOfService() {
       <p>
         Receebo helps you upload, extract, organise, search, and manage receipts
         and related documents. It may provide estimates of warranty or consumer
-        return periods and can retrieve likely receipt PDFs from Gmail after you
-        grant read-only access. Features may change as the service develops.
+        return periods and can retrieve likely receipts and order confirmations
+        from a connected Microsoft (Outlook) mailbox after you grant read-only
+        access. Features may change as the service develops.
       </p>
 
       <h2>2. One-receipt onboarding test</h2>
@@ -105,14 +106,17 @@ export default function TermsOfService() {
         that doing so does not unlawfully disclose another person’s data.
       </p>
 
-      <h2>6. Gmail, notifications, and third-party services</h2>
+      <h2>6. Email import, notifications, and third-party services</h2>
       <p>
-        Gmail connection is optional and uses read-only access for receipt
-        retrieval. You can disconnect it at any time. Email and browser
+        Connecting a mailbox is optional and uses read-only access for receipt
+        retrieval. You can disconnect it at any time. Microsoft may require
+        you to reconnect periodically; until you do, new receipts are not
+        imported. Email and browser
         notifications are conveniences and may be delayed, blocked, or
         unavailable because of device, provider, or network settings. Receebo
         also depends on third-party services including Clerk, Replit, OpenAI,
-        Stripe, Google, Resend, and browser push providers. Their availability
+        Stripe, Microsoft, Resend, browser push providers and, for earlier
+        Gmail connections, Google. Their availability
         and separate terms may affect features.
       </p>
 

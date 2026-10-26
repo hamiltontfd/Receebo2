@@ -221,7 +221,7 @@ export default function LibraryScreen() {
               <Text style={[styles.emptyBody, { color: colors.mutedForeground }]}>
                 {debouncedSearch
                   ? `No receipts match "${debouncedSearch}"`
-                  : 'Connect Gmail in Settings to start importing receipts automatically.'}
+                  : 'Connect your inbox in Settings to start importing receipts automatically.'}
               </Text>
             </View>
           }

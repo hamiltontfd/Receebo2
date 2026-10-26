@@ -575,7 +575,7 @@ export default function SearchPage() {
         ))}
       </div>
 
-      {/* Pending Gmail imports — signed-in users only */}
+      {/* Pending email imports — signed-in users only */}
       {isSignedIn && !isGuest && <PendingImports />}
 
       {/* Content — animates between idle and search states */}

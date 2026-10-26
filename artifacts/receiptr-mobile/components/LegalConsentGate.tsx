@@ -102,7 +102,7 @@ export function LegalConsentGate({ children }: { children: React.ReactNode }) {
       </View>
       <Text style={[styles.title, { color: colors.foreground }]}>Before you continue</Text>
       <Text style={[styles.body, { color: colors.mutedForeground }]}>
-        Please review Receebo’s legal terms. Gmail access and notifications remain optional
+        Please review Receebo’s legal terms. Inbox access and notifications remain optional
         and can be controlled separately in Settings.
       </Text>
 
