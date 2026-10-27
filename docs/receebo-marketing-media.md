@@ -8,16 +8,19 @@ pricing flows, or product capabilities have been added.
 
 | Landing slot | Export | Actual product surface |
 | --- | --- | --- |
-| Hero | `hero-{600,1200}.webp` | Phone library + desktop receipt sheet |
-| Capture video / feature | `capture.mp4`, `capture-poster.webp` | File selection → existing review form → save → receipt detail |
-| Find video / feature | `find.mp4`, `find-poster.webp` | Type “headphones” → matching receipt → open sheet |
-| Protect video | `protect.mp4`, `protect-poster.webp` | Open receipt → scroll to warranty/consumer rights |
-| Protect feature / protection section | `protection.webp` | Existing consumer-rights panel and legal citations |
+| Hero (two phones) | `library-phone.webp`, `receipt-phone.webp` | Phone library (no category pill on rows) + phone receipt sheet |
+| Capture video / feature | `capture.mp4`, `capture.webm`, `capture-poster.webp` | File selection → existing review form → save → receipt detail |
+| Find video / feature | `find.mp4`, `find.webm`, `find-poster.webp` | Type “TV” → matching receipt → open sheet |
+| Protect video | `protect.mp4`, `protect.webm`, `protect-poster.webp` | Open receipt → scroll to warranty/consumer rights |
+| Protect feature / protection section | `protection.webp` | Consumer-rights panel: legal + manufacturer warranty side by side |
 | Prove feature | `original-receipt.webp` | Existing original-receipt viewer |
-| Email section | `email-settings.webp` | Actual disconnected Gmail settings card; never connected |
+
+`library-desktop.webp` and `receipt-desktop.webp` are captured as reference stills only.
+Since v2 the unused Gmail `email-settings` still and the composed `hero-*.webp` are no
+longer produced.
 
 Exports and the source archive live in existing App Storage, under
-`marketing/receebo-real-app/v1/`, served through the existing public-objects route:
+`marketing/receebo-real-app/v2/` (v1 stays for the currently published release), served through the existing public-objects route:
 
 `/api/storage/public-objects/marketing/receebo-real-app/v1/<filename>`
 
@@ -31,18 +34,19 @@ from Git and deployment. Tooling is committed under
 
 ## Fictional collection and disclosure
 
-Capture clock: **25 October 2026, noon UTC**, timezone Europe/Lisbon, locale en-GB.
-Every amount is EUR, including applicable tax (no additional tax line):
+Capture clock: **27 October 2026, noon UTC**, timezone Europe/Lisbon, locale en-GB.
+The collection matches the dev demo account, the promo video and the Taikai banner.
+Every amount is EUR, including applicable tax, all bought in store in Portugal:
 
-* Northline Audio, online, Portugal, 20 October: headphones €169 + case €20 = **€189**.
-  Fictional manufacturer warranty: two years on headphones, subject to terms.
-  The real app independently computes its Portugal legal-warranty guidance and
-  3 November return date. Manufacturer and statutory rights are distinct.
-* Field & Form, online, Portugal, 17 October: lamp €59 + bulbs €15 = **€74**.
-* Everyday Market, in-store, Portugal, 15 October: oil €12 + coffee €8 + bread €3.50
-  = **€23.50**. No online cooling-off claim or manufacturer warranty.
+* Casa Lumen Electrónica, 23 October: 55" 4K Smart TV **€649.00**. Receipt text:
+  "2-year manufacturer warranty" (until 23 Oct 2028). The real app independently
+  computes the Portugal 3-year legal warranty (until 23 Oct 2029). The two are shown
+  side by side, never added. In store, so no online withdrawal countdown.
+* Casa & Jardim Braga, 12 October: cordless vacuum **€229.00**, 2-year manufacturer warranty.
+* Mercado Verde, 19 October: groceries **€38.47**.
+* Atelier Norte, 4 October: cotton shirt €35 + wool scarf €24.90 = **€59.90**.
 
-Total collection: **€286.50**. Sample extraction is deterministic interception,
+Total collection: **€976.37**. Sample extraction is deterministic interception,
 **not a live AI service or a measured speed claim**. The capture banner, captions,
 hero caption, and visible demo disclosure identify fictional/simulated content.
 Email imagery shows only the disconnected state, with no email address.

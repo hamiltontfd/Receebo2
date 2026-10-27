@@ -6,7 +6,7 @@ import { requireApprovedCapture } from "./freshness.mjs";
 
 // Uses the app's existing sidecar-authenticated storage client. No credentials,
 // signed URLs, or environment contents are logged or written to the manifest.
-const prefix = "marketing/receebo-real-app/v1";
+const prefix = "marketing/receebo-real-app/v2";
 const approvedExports = await requireApprovedCapture();
 const root = path.resolve("generated-artifacts/receebo-marketing");
 const service = new ObjectStorageService();

@@ -47,13 +47,12 @@ describe("real-app marketing media", () => {
     const img = screen.getByRole("img");
     expect(img).toHaveAttribute("loading", "lazy");
     expect(img).toHaveAttribute("width", "686");
-    expect(img).toHaveAttribute("height", "312");
+    expect(img).toHaveAttribute("height", "360");
     expect(screen.getByText(/fictional sample data/)).toBeInTheDocument();
     cleanup();
   });
 
   it.each([
-    ["email-settings.webp", "Gmail connection settings", "380"],
     ["protection.webp", "Consumer rights panel", "420"],
     ["original-receipt.webp", "Full original receipt", "420"],
   ])("gives %s outer spacing and an inset image surface without cropping", (file, alt, height) => {

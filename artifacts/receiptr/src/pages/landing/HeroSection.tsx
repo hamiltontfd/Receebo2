@@ -96,7 +96,7 @@ export default function HeroSection() {
                 <PhoneFrame
                   file="library-phone.webp"
                   testId="img-hero-library-phone"
-                  alt="Actual Receebo library screen on a phone, listing a fictional Northline Audio purchase."
+                  alt="Actual Receebo library screen on a phone, listing fictional purchases led by a €649 Casa Lumen Electrónica TV."
                   className="w-[46%] max-w-[260px] z-10 -mr-[8%]"
                   float={reduce ? undefined : [0, -10, 0]}
                   duration={7}
@@ -105,7 +105,7 @@ export default function HeroSection() {
                 <PhoneFrame
                   file="receipt-phone.webp"
                   testId="img-hero-receipt-phone"
-                  alt="Actual Receebo receipt detail screen on a phone for the fictional Northline Audio purchase: €169 headphones and a €20 travel case."
+                  alt="Actual Receebo receipt detail screen on a phone for the fictional Casa Lumen Electrónica purchase: a €649 55-inch 4K Smart TV."
                   className="w-[46%] max-w-[260px] z-20 mt-[12%]"
                   float={reduce ? undefined : [0, 8, 0]}
                   duration={8}

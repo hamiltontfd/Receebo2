@@ -10,19 +10,19 @@ const demos = [
     title: "Capture",
     body: "Scan, upload or import receipts in seconds.",
     clip: "capture",
-    description: "A sample receipt image is selected, its extracted merchant, date and €189 total are reviewed, and the purchase is saved. Extraction responses are simulated for this recording.",
+    description: "A sample receipt image is selected, its extracted merchant, date and €649 total are reviewed, and the purchase is saved. Extraction responses are simulated for this recording.",
   },
   {
     title: "Find",
     body: "Search products, stores or brands and instantly find the receipt you need.",
     clip: "find",
-    description: "Typing “headphones” filters the sample library to Northline Audio. Opening the result shows the purchased items and the original receipt.",
+    description: "Typing “TV” filters the sample library to Casa Lumen Electrónica. Opening the result shows the purchased item and the original receipt.",
   },
   {
     title: "Protect",
     body: "View available warranty and return information.",
     clip: "protect",
-    description: "The sample online purchase shows its manufacturer warranty and Portugal-specific return and legal warranty information. Dates depend on purchase details; eligibility and exclusions must be checked with the seller.",
+    description: "The sample in-store TV purchase shows the Portugal 3-year legal warranty and the 2-year manufacturer warranty side by side, each with its own end date. Dates depend on purchase details; eligibility and exclusions must be checked with the seller.",
   },
 ];
 

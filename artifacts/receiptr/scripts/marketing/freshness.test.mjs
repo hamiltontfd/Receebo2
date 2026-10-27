@@ -84,12 +84,12 @@ test("fixture requests never reach account services; unknown calls fail closed",
     return result;
   }
   const origin = "http://127.0.0.1:5199";
-  assert.equal((await request(`${origin}/api/receipts`)).json.items.length, 3);
+  assert.equal((await request(`${origin}/api/receipts`)).json.items.length, receipts.length);
   assert.equal((await request(`${origin}/api/storage/uploads/request-url`, "POST")).json.uploadURL, `${origin}/api/capture-upload`);
   assert.equal((await request(`${origin}/api/capture-upload`, "PUT")).status, 200);
   assert.equal((await request(`${origin}/api/receipts`, "POST")).json.id, receipts[0].id);
-  assert.equal((await request(`${origin}/api/receipts/901`, "PATCH", { merchant: "Fictional" })).json.merchant, "Fictional");
-  assert.equal((await request(`${origin}/api/gmail/status`)).json.connected, false);
+  assert.equal((await request(`${origin}/api/receipts/${receipts[0].id}`, "PATCH", { merchant: "Fictional" })).json.merchant, "Fictional");
+  assert.deepEqual((await request(`${origin}/api/mail/status`)).json.providers, []);
   for (const endpoint of ["/api/billing/checkout", "/api/gmail/connect", "/api/unmapped"]) {
     assert.equal((await request(`${origin}${endpoint}`, "POST")).status, 403);
   }
@@ -119,20 +119,20 @@ test("CLI rejects unreviewed/missing/stale evidence and accepts explicit review 
     assert.equal(cli("status").status, 1);
     assert.match(cli("approve").stderr, /requires --visual-approved/);
     assert.match(cli("approve", "--visual-approved").stderr, /No successful capture/);
-    const screens = ["library-desktop", "receipt-desktop", "protection", "original-receipt", "email-settings",
+    const screens = ["library-desktop", "receipt-desktop", "protection", "original-receipt",
       "library-phone", "receipt-phone", "capture-poster", "find-poster", "protect-poster"];
     const clips = { capture: {}, find: {}, protect: {} };
     await save(`${out}/manifest.json`, { sampleData: true, errors: [], unexpected: [], screens, clips });
     for (const name of [
       ...screens.map(name => `web/${name}.webp`),
       ...Object.keys(clips).flatMap(name => [`web/${name}.mp4`, `web/${name}.webm`]),
-      "web/hero-600.webp", "web/hero-1200.webp", "source-captures.tar.gz",
+      "source-captures.tar.gz",
     ]) await writeFile(`${out}/${name}`, "synthetic unit-test evidence, not actual media");
     const report = { capturePassed: true, inputs: await fingerprint(root), exports: await exportHashes(out) };
     await save(reportPath, report);
     assert.equal(cli("approve", "--visual-approved").status, 0);
     assert.equal(cli("status").status, 0);
-    await writeFile(`${out}/web/hero-600.webp`, "modified after capture");
+    await writeFile(`${out}/web/library-phone.webp`, "modified after capture");
     assert.match(cli("approve", "--visual-approved").stderr, /Exports changed/);
     await writeFile(`${root}/artifacts/receiptr/src/changed-page.tsx`, "UI changed");
     const stale = cli("status");

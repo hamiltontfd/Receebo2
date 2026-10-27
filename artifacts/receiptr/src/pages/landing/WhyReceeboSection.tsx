@@ -8,25 +8,25 @@ const FEATURES = [
     title: "Capture",
     items: ["Scan paper receipts", "Upload PDF, JPG or PNG", "Import receipts from your inbox"],
     image: "capture-poster.webp",
-    alt: "Receebo's real review form displaying Northline Audio, 20 October 2026 and a €189 total from a fictional receipt.",
+    alt: "Receebo's real review form displaying Casa Lumen Electrónica, 23 October 2026 and a €649 total from a fictional receipt.",
   },
   {
     title: "Find",
     items: ["Search by product", "Search by merchant", "Search by brand or category"],
     image: "find-poster.webp",
-    alt: "A search for headphones in the real Receebo interface finds the fictional Northline Audio purchase.",
+    alt: "A search for TV in the real Receebo interface finds the fictional Casa Lumen Electrónica purchase.",
   },
   {
     title: "Protect",
     items: ["Warranty reminders", "Return window alerts", "Consumer rights info"],
     image: "protection.webp",
-    alt: "Actual consumer-rights information for the sample Portugal purchase, including return and legal warranty dates.",
+    alt: "Actual consumer-rights information for the sample Portugal purchase: the 3-year legal warranty and the 2-year manufacturer warranty, each with its own end date.",
   },
   {
     title: "Prove",
     items: ["Fullscreen receipt view", "Download as PDF", "Share proof of purchase"],
     image: "original-receipt.webp",
-    alt: "Receebo's original receipt viewer showing the fictional Northline Audio receipt, with €169 headphones and a €20 case.",
+    alt: "Receebo's original receipt viewer showing the fictional Casa Lumen Electrónica receipt for a €649 55-inch 4K Smart TV.",
   },
 ];
 

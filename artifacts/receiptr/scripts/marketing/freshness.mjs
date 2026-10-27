@@ -61,17 +61,17 @@ export async function exportHashes(root = output) {
   }
   const screens = [
     "library-desktop", "receipt-desktop", "protection", "original-receipt",
-    "email-settings", "library-phone", "receipt-phone",
+    "library-phone", "receipt-phone",
     "capture-poster", "find-poster", "protect-poster",
   ];
   if (JSON.stringify([...manifest.screens].sort()) !== JSON.stringify(screens.sort()) ||
       JSON.stringify(Object.keys(manifest.clips).sort()) !== JSON.stringify(["capture", "find", "protect"])) {
-    throw new Error("Capture is incomplete; all ten stills and three interactions are required.");
+    throw new Error("Capture is incomplete; all nine stills and three interactions are required.");
   }
   const names = [
     ...screens.map(name => `web/${name}.webp`),
     ...["capture", "find", "protect"].flatMap(name => [`web/${name}.mp4`, `web/${name}.webm`]),
-    "web/hero-600.webp", "web/hero-1200.webp", "source-captures.tar.gz", "manifest.json",
+    "source-captures.tar.gz", "manifest.json",
   ];
   return Object.fromEntries(await Promise.all(names.map(async name => [name, digest(await readFile(path.join(root, name)))])));
 }

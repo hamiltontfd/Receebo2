@@ -87,8 +87,8 @@ export default function ConsumerProtectionSection() {
           >
             <AppCapture
               file="protection.webp"
-              alt="Real Receebo consumer-rights panel for a fictional online purchase in Portugal, displaying a 3 November 2026 return date and a three-year legal warranty with legal citations."
-              caption="Fictional Portugal example, captured 25 Oct 2026. General guidance, not a guarantee of eligibility."
+              alt="Real Receebo consumer-rights panel for a fictional in-store TV purchase in Portugal, showing a three-year legal warranty until 23 October 2029 with its legal citation and a two-year manufacturer warranty until 23 October 2028."
+              caption="Fictional Portugal example, captured 27 Oct 2026. General guidance, not a guarantee of eligibility."
               className="w-full h-[420px] lg:h-[500px]"
             />
           </motion.div>

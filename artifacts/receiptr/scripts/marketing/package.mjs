@@ -7,13 +7,12 @@ const manifest = JSON.parse(await readFile(`${root}/manifest.json`, "utf8"));
 const sources = [
   ...manifest.screens.map(name => `sources/${name}.png`),
   ...Object.values(manifest.clips).map(clip => `sources/${clip.source}`),
-  "sources/sample-receipt.png", "sources/fixtures.json", "sources/hero.png",
+  "sources/sample-receipt.png", "sources/fixtures.json",
 ];
 const exports = [
   ...Object.values(manifest.clips).map(clip => `web/${clip.file}`),
   ...Object.keys(manifest.clips).map(clip => `web/${clip}.webm`),
   ...manifest.screens.map(name => `web/${name}.webp`),
-  "web/hero-600.webp", "web/hero-1200.webp",
 ];
 manifest.sha256 = {};
 for (const file of [...sources, ...exports]) {

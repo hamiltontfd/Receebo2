@@ -52,7 +52,7 @@ if (mode === "status") {
       server.once("error", error => { clearTimeout(timer); reject(error); });
       server.once("exit", code => { clearTimeout(timer); reject(new Error(`Capture server exited (${code}); port 5199 must be free.`)); });
     });
-    for (const script of ["record.mjs", "compose.mjs", "package.mjs"]) {
+    for (const script of ["record.mjs", "package.mjs"]) {
       const child = spawn(process.execPath, [new URL(script, import.meta.url).pathname], { cwd: workspace, env, stdio: "inherit" });
       const timer = setTimeout(() => child.kill("SIGKILL"), 300000);
       try {
@@ -64,7 +64,7 @@ if (mode === "status") {
     await saveJson(reportPath, { capturePassed: true, checkedAt: new Date().toISOString(), inputs: current, exports: await exportHashes() });
     console.log(`Capture passed with fictional fixtures and no unexpected requests. Review exports in ${output}/web.`);
     if (!approved?.visuallyApproved || changed.length) {
-      console.error("MEDIA REVIEW REQUIRED: inspect all stills, hero, and all three clips in BOTH formats before running marketing:approve --visual-approved. See docs/receebo-marketing-media.md.");
+      console.error("MEDIA REVIEW REQUIRED: inspect all stills and all three clips in BOTH formats before running marketing:approve --visual-approved. See docs/receebo-marketing-media.md.");
       process.exitCode = 1;
     } else console.log("Marketing inputs match the visually approved baseline. No public assets were changed.");
   } finally {

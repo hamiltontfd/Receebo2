@@ -23,9 +23,9 @@ try {
   const input = await browser.newPage({ viewport: { width: 720, height: 900 }, deviceScaleFactor: 1 });
   await input.setContent(`<html><body style="margin:0;padding:65px;background:#fff;font:22px monospace;color:#171717">
     <p style="font-size:15px">FICTIONAL SAMPLE · NOT VALID FOR PURCHASE</p>
-    <h1>Northline Audio</h1><p>Online purchase · Portugal<br>20 October 2026</p><hr>
-    <p>Studio wireless headphones<br>1 × €169.00</p><p>Travel case<br>1 × €20.00</p><hr>
-    <h2>Total €189.00</h2><p style="font-size:17px;line-height:1.6">Prices include applicable tax.<br>2-year manufacturer warranty on headphones.<br>Terms and exclusions apply.<br>Check with the seller.</p>
+    <h1>Casa Lumen Electrónica</h1><p>In-store purchase · Braga, Portugal<br>23 October 2026</p><hr>
+    <p>55" 4K Smart TV<br>1 × €649.00</p><hr>
+    <h2>Total €649.00</h2><p style="font-size:17px;line-height:1.6">Prices include applicable tax.<br>2-year manufacturer warranty.<br>Terms and exclusions apply.<br>Check with the seller.</p>
     <p style="font-size:16px">Sample data for Receebo demonstration.<br>No payment or account information.</p></body></html>`);
   const receiptImage = `${out}/sources/sample-receipt.png`;
   await input.screenshot({ path: receiptImage });
@@ -70,9 +70,9 @@ try {
   }
   const desk = await context();
   await ready(desk.page);
-  await desk.page.getByRole("button", { name: /Northline Audio.*Oct/ }).waitFor();
+  await desk.page.getByRole("button", { name: /Casa Lumen Electrónica.*Oct/ }).waitFor();
   await still(desk.page, "library-desktop");
-  await desk.page.getByRole("button", { name: /Northline Audio.*Oct/ }).click();
+  await desk.page.getByRole("button", { name: /Casa Lumen Electrónica.*Oct/ }).click();
   await desk.page.getByRole("dialog").waitFor();
   await desk.page.waitForTimeout(500);
   await still(desk.page, "receipt-desktop", desk.page.getByRole("dialog"));
@@ -81,16 +81,12 @@ try {
   await still(desk.page, "protection", desk.page.getByText("Consumer Rights · Portugal", { exact: true }).locator(".."));
   await desk.page.getByText("Original Receipt", { exact: true }).scrollIntoViewIfNeeded();
   await still(desk.page, "original-receipt", desk.page.getByText("Original Receipt", { exact: true }).locator(".."));
-  await ready(desk.page, "/settings");
-  await desk.page.getByText("Connect Gmail", { exact: true }).waitFor();
-  await desk.page.getByText("Connect Gmail", { exact: true }).scrollIntoViewIfNeeded();
-  await still(desk.page, "email-settings", desk.page.locator("section").filter({ hasText: "Connected accounts" }));
   await close(desk);
 
   const phone = await context({ width: 390, height: 844 });
   await ready(phone.page);
   await still(phone.page, "library-phone");
-  await phone.page.getByRole("button", { name: /Northline Audio.*Oct/ }).click();
+  await phone.page.getByRole("button", { name: /Casa Lumen Electrónica.*Oct/ }).click();
   await phone.page.waitForTimeout(600);
   await still(phone.page, "receipt-phone");
   await close(phone);
@@ -110,18 +106,18 @@ try {
       await c.page.getByRole("button", { name: "Save Purchase", exact: true }).scrollIntoViewIfNeeded();
       await c.page.waitForTimeout(1200);
       await c.page.getByRole("button", { name: "Save Purchase", exact: true }).click();
-      await c.page.getByRole("heading", { name: "Northline Audio" }).waitFor();
+      await c.page.getByRole("heading", { name: "Casa Lumen Electrónica" }).waitFor();
       await c.page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
       await c.page.waitForTimeout(1800);
     } else {
       const search = c.page.getByPlaceholder(/Search/).first();
       if (clip === "find") {
         await search.click();
-        await search.pressSequentially("headphones", { delay: 140 });
+        await search.pressSequentially("TV", { delay: 140 });
         await c.page.waitForTimeout(1300);
         await still(c.page, "find-poster");
       }
-      await c.page.getByRole("button", { name: /Northline Audio.*Oct/ }).click();
+      await c.page.getByRole("button", { name: /Casa Lumen Electrónica.*Oct/ }).click();
       await c.page.waitForTimeout(1300);
       if (clip === "protect") {
         await c.page.getByText("Consumer Rights · Portugal", { exact: true }).evaluate(el => el.scrollIntoView({ block: "center" }));
