@@ -277,9 +277,6 @@ function DemoView({ onScan }: { onScan: () => void }) {
                         <p className="font-semibold truncate">{r.merchant}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="text-xs text-muted-foreground">{r.date}</span>
-                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
-                            {r.category}
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -371,11 +368,6 @@ function ReceiptRow({ r, onOpen, query }: { r: Receipt; onOpen: (id: number) => 
               <span className="text-xs text-muted-foreground">
                 {format(new Date(r.purchaseDate || r.createdAt), "MMM d, yyyy")}
               </span>
-              {r.category && (
-                <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${categoryStyle(r.category)}`}>
-                  {r.category}
-                </span>
-              )}
             </div>
           </div>
         </div>
