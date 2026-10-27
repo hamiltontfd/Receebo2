@@ -271,6 +271,51 @@ export function parseExtraction(raw: string): ExtractedReceipt {
 const TEXT_EMAIL_INSTRUCTIONS = `The input is the plain-text body of an email (converted from HTML), not an image. Treat it exactly like a receipt file: decide whether it is a purchase receipt, order confirmation with prices, or invoice. Marketing emails, newsletters, shipping updates without prices, account notices, or promotions are NOT receipts: set "isReceipt" to false. For "ocrText", copy the relevant order/receipt text from the email (not boilerplate footers).`;
 
 /**
+ * Cheap yes/no screen for email bodies before the full extraction. Replit AI
+ * Integrations does not serve gpt-5.4-nano; gpt-5.4-mini is the cheapest model
+ * that answered reliably in tests (gpt-5-nano with minimal reasoning called a
+ * clear order "not a receipt").
+ */
+export const EMAIL_PRECHECK_MODEL = "gpt-5.4-mini";
+/** Body characters sent to the pre-check (the full extraction gets up to 20,000). */
+export const EMAIL_PRECHECK_MAX_CHARS = 3_000;
+
+const EMAIL_PRECHECK_PROMPT = `You screen emails for a receipt-keeping app. Respond ONLY with a JSON object {"isReceipt":true} or {"isReceipt":false}.
+Answer true when the email confirms something the recipient bought or paid for: an order confirmation, a receipt, an invoice, a purchase summary or event tickets, usually with an order number, items or a price. When unsure, answer true.
+Answer false for: marketing, promotions, newsletters and news; delivery or shipping updates without the order's items and prices; review or survey requests; account, login and security messages; loyalty points; payment reminders, overdue bills, debt collection or customs/tax fee notices (often phishing); refunds and returns.`;
+
+/**
+ * Returns false only when the model explicitly says the email is not a
+ * receipt; any error or unclear answer returns true (the full extraction then
+ * decides), so a flaky pre-check never drops a real receipt.
+ */
+export async function precheckEmailIsReceipt(
+  text: string,
+  meta: { subject?: string | null; from?: string | null } = {},
+): Promise<boolean> {
+  const header = [
+    meta.from ? `From: ${meta.from}` : null,
+    meta.subject ? `Subject: ${meta.subject}` : null,
+  ].filter(Boolean).join("\n");
+  try {
+    const completion = await openai.chat.completions.create({
+      model: EMAIL_PRECHECK_MODEL,
+      max_completion_tokens: 30,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: EMAIL_PRECHECK_PROMPT },
+        { role: "user", content: `${header}\n\n${text.slice(0, EMAIL_PRECHECK_MAX_CHARS)}` },
+      ],
+    });
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}") as { isReceipt?: unknown };
+    return parsed.isReceipt !== false;
+  } catch (error) {
+    logger.warn({ error }, "Email pre-check failed, falling through to full extraction");
+    return true;
+  }
+}
+
+/**
  * Extract receipt data from email text (HTML-body imports). Uses the same
  * prompt, normalisation and non-receipt rejection as file extraction.
  */

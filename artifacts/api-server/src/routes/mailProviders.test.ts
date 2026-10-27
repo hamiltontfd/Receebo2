@@ -52,6 +52,7 @@ vi.mock("../lib/objectStorage", () => ({
 }));
 vi.mock("../lib/receiptExtraction", () => ({
   extractReceiptData: vi.fn(), extractReceiptDataFromText: vi.fn(),
+  precheckEmailIsReceipt: vi.fn(async () => true),
 }));
 vi.mock("../lib/accountDeletionState", () => ({
   isAccountDeletionInProgress: async () => false,

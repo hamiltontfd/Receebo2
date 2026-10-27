@@ -1,13 +1,14 @@
 import { randomUUID } from "crypto";
 import pino from "pino";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, gmailSeenMessagesTable, mailImportFailuresTable, pendingImportsTable, trialAiReadsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 
-const extraction = vi.hoisted(() => ({ text: vi.fn(), file: vi.fn() }));
+const extraction = vi.hoisted(() => ({ text: vi.fn(), file: vi.fn(), precheck: vi.fn() }));
 vi.mock("./receiptExtraction", () => ({
   extractReceiptDataFromText: extraction.text,
   extractReceiptData: extraction.file,
+  precheckEmailIsReceipt: extraction.precheck,
 }));
 
 import { syncMailboxClaimed } from "./mailSync";
@@ -22,7 +23,12 @@ function newUser() {
   return id;
 }
 
+beforeEach(() => {
+  extraction.precheck.mockResolvedValue(true);
+});
+
 afterEach(async () => {
+  extraction.precheck.mockReset();
   extraction.text.mockReset();
   extraction.file.mockReset();
   for (const userId of users.splice(0)) {
@@ -107,6 +113,30 @@ describe("email import retry cap", () => {
     expect(await recordMailImportFailure(userId, "outlook", "m", "e2")).toEqual({ attempts: 2, failed: false });
     expect(await recordMailImportFailure(userId, "outlook", "m", "e3")).toEqual({ attempts: 3, failed: true });
     expect(await recordMailImportFailure(userId, "outlook", "other", "e")).toEqual({ attempts: 1, failed: false });
+  });
+});
+
+describe("email pre-check", () => {
+  it("skips a body the pre-check rejects without a full extraction or a trial read", async () => {
+    const userId = newUser();
+    extraction.precheck.mockResolvedValue(false);
+    await syncMailboxClaimed(userId, fakeProvider("msg-pre"), { aiReadCap: true });
+    expect(extraction.precheck).toHaveBeenCalledTimes(1);
+    expect(extraction.text).not.toHaveBeenCalled();
+    expect(await countTrialAiReads(userId)).toBe(0);
+    expect(await isSeen(userId, "msg-pre")).toBe(true);
+    expect(await failureRow(userId)).toBeUndefined();
+    const pending = await db.select().from(pendingImportsTable).where(eq(pendingImportsTable.userId, userId));
+    expect(pending).toHaveLength(0);
+  });
+
+  it("runs the full extraction (one trial read) when the pre-check passes", async () => {
+    const userId = newUser();
+    extraction.text.mockResolvedValue({ isReceipt: false });
+    await syncMailboxClaimed(userId, fakeProvider("msg-pass"), { aiReadCap: true });
+    expect(extraction.precheck).toHaveBeenCalledTimes(1);
+    expect(extraction.text).toHaveBeenCalledTimes(1);
+    expect(await countTrialAiReads(userId)).toBe(1);
   });
 });
 

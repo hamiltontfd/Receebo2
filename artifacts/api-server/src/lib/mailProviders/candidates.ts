@@ -7,38 +7,50 @@ import { merchantTier, type MerchantTier } from "./merchants";
  * cost and noise down.
  */
 
-// Subject keywords (EN, PT, ES, FR, DE, IT) for orders, receipts and invoices.
-const SUBJECT_PATTERN = new RegExp(
-  [
-    "receipt", "invoice", "order", "your purchase", "purchase confirmation",
-    "payment confirmation", "payment received", "confirmation", "shipped", "dispatched",
-    "recibo", "fatura", "factura", "encomenda", "pedido", "compra",
-    "comprovativo", "confirmação", "confirmacao", "confirmación",
-    "commande", "facture", "reçu",
-    "rechnung", "bestellung", "quittung", "beleg",
-    "ordine", "ricevuta", "fattura",
-  ]
-    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .join("|"),
-  "i",
-);
+// Subject keywords (EN, PT, ES, FR, DE, IT) for orders, receipts, invoices and
+// tickets. Word boundaries keep "compras"/"comprar" and "your purchases"
+// (marketing) out while "compra", "Ordered:" and "Order #1" still match.
+const SUBJECT_PATTERN =
+  /(receipt|invoice|\border(ed)?\b|your purchase\b|purchase confirmation|payment confirmation|payment received|confirmation|shipped|dispatched|recibo|fatura|factura|encomenda|pedido|\bcompra\b|comprovativo|confirma[cç][aã]o|confirmaci[oó]n|commande|facture|reçu|rechnung|bestellung|quittung|beleg|ordine|ricevuta|fattura|bilhetes?|e-?tickets?|ingressos?)/i;
 
-// Sender local-parts / domains that typically send orders and receipts.
-const SENDER_PATTERN =
-  /(auto-confirm|order-update|orders?|receipts?|invoices?|billing|faturas?|faturacao|encomendas?|pedidos?|shipment-tracking|confirm(ation)?|purchases?)@|@(.+\.)?(amazon\.[a-z.]+|apple\.com|paypal\.[a-z.]+|aliexpress\.com|ebay\.[a-z.]+|zalando\.[a-z.]+|ikea\.com|fnac\.pt|worten\.pt|pccomponentes\.(pt|com)|decathlon\.[a-z.]+|leroymerlin\.pt|temu\.com|shein\.com|ticketline\.pt|seetickets\.com|everythingisnew\.pt|blueticket\.pt|eventbrite\.com|ticketmaster\.[a-z.]+)\b/i;
+// Sender local-parts that send orders and receipts (strong on their own).
+const SENDER_LOCAL_PATTERN =
+  /(auto-confirm|order-update|orders?|receipts?|invoices?|billing|faturas?|faturacao|encomendas?|pedidos?|shipment-tracking|confirm(ation)?|purchases?)@/i;
+// Store domains: on their own they also send marketing, so a domain match only
+// counts with an attachment (a subject keyword or order sender is needed otherwise).
+const SENDER_DOMAIN_PATTERN =
+  /@(.+\.)?(amazon\.[a-z.]+|apple\.com|paypal\.[a-z.]+|aliexpress\.com|ebay\.[a-z.]+|zalando\.[a-z.]+|ikea\.com|fnac\.pt|worten\.pt|pccomponentes\.(pt|com)|decathlon\.[a-z.]+|leroymerlin\.pt|temu\.com|shein\.com|ticketline\.pt|seetickets\.com|everythingisnew\.pt|blueticket\.pt|eventbrite\.com|ticketmaster\.[a-z.]+)\b/i;
 
-// Things that look like receipts by keyword but are almost never purchases.
-const EXCLUDE_SUBJECT_PATTERN =
-  /(newsletter|unsubscribe|webinar|password reset|verify your (email|account)|security alert|sign-?in|log-?in attempt|meeting|calendar|invitation)/i;
+// Things that look like receipts by keyword but are almost never purchases:
+// newsletters, account/security mail, review requests, debt-collection and
+// customs-fee messages (often phishing), loyalty points.
+const EXCLUDE_SUBJECT_PATTERN = new RegExp([
+  "newsletter|unsubscribe|webinar|password reset|verify your (email|account)|security alert|sign-?in|log-?in attempt|meeting|calendar|invitation",
+  "em atraso|vencid[ao]|em aberto|pagamento pendente|pendente de pagamento|aguardando pagamento|regulari[zs]|cobran[cç]a|suspens[aã]o|renegocia|desenrola|quitar|pague online|prazo encerrando|comunicado urgente|\\bpending\\b|^re:",
+  "tribut|aduaneir|alf[aâ]ndega|taxad[ao]|retid[ao]|receita federal|minhas importa",
+  "classificar|expectativas|satisfeit|avali(e|a[cç][aã]o)|rate your|review your|how did we do|feedback|inqu[eé]rito|enquiry",
+  "c[oó]digo [uú]nico|c[oó]digo de (acesso|verifica)|novo acesso|acesso [àa] (sua )?conta|protect your .*account|vinculad[ao]|som foi reproduzido|pontos a expirar|points? (are )?expir",
+].join("|"), "i");
+
+// Parcel carriers only report deliveries; the store sends the receipt.
+const CARRIER_SENDER_PATTERN =
+  /@(.+\.)?(cttexpress\.com|ctt\.pt|paack\.co|dhl\.[a-z.]+|ups\.com|dpd\.[a-z.]+|gls-?[a-z]*\.[a-z.]+|seur\.com|nacex\.[a-z.]+|mrw\.[a-z.]+|correos\.[a-z.]+|chronopost\.[a-z.]+)\b/i;
+// Mailing subdomains/addresses that only send marketing.
+const MARKETING_SENDER_PATTERN =
+  /(@(.+\.)?(marketing|newsletters?|news|promo(tions)?|insideapple|comunicaciones|loyalty|mail1)\.|@(.+\.)?temuemail\.com\b)/i;
+// Emoji-heavy subjects are campaigns, not receipts.
+const EMOJI_PATTERN = /\p{Extended_Pictographic}/u;
 
 export function looksLikeReceiptEmail(input: {
   subject: string | null;
   from: string | null;
+  hasAttachments?: boolean;
 }): boolean {
   const subject = input.subject ?? "";
   const from = input.from ?? "";
   if (subject && EXCLUDE_SUBJECT_PATTERN.test(subject)) return false;
-  return SUBJECT_PATTERN.test(subject) || SENDER_PATTERN.test(from);
+  return SUBJECT_PATTERN.test(subject) || SENDER_LOCAL_PATTERN.test(from) ||
+    (Boolean(input.hasAttachments) && SENDER_DOMAIN_PATTERN.test(from));
 }
 
 // Recurring bills (utilities, telecoms, subscriptions) are not purchases we import.
@@ -50,9 +62,12 @@ const STRONG_SUBJECT_PATTERN =
 const DURABLE_KEYWORD_PATTERN =
   /(port[aá]til|laptop|iphone|ipad|macbook|smartphone|telem[oó]vel|\btv\b|televis|frigor[ií]fico|m[aá]quina de lavar|aspirador|headphones|auscultadores|monitor|consola|playstation|xbox|nintendo|c[aâ]mara|camera|forno|micro-?ondas|bicicleta|smartwatch)/i;
 const SHIPPING_ONLY_PATTERN =
-  /(enviad[oa]|em tr[aâ]nsito|entregue|a caminho|shipped|shipping|shipment|dispatched|out for delivery|delivered|delivery update|tracking|track your|envio|expedi[cç][aã]o)/i;
+  /(enviad[oa]|em tr[aâ]nsito|entregue|a caminho|chegou|a chegar|on the way|shipped|shipping|shipment|dispatched|out for delivery|delivered|delivery update|tracking|track your|envio|expedi[cç][aã]o|ponto de recolha|entrega em loja)/i;
 const INVOICE_PATTERN = /(fatura|factura|invoice|recibo|receipt)/i;
-const MARKETING_PATTERN = /(promo|desconto|% off|\bsale\b|saldos|black friday|newsletter|oferta|cup[aã]o|coupon)/i;
+const MARKETING_PATTERN = /(promo|desconto|% off|\bsale\b|saldos|black friday|newsletter|oferta|cup[aã]o|cup[oõ]es|coupon|b[oó]nus|pre-?order|rewards?|bring you credits|\bdeals?\b|\bvale\b)/i;
+
+/** Minimum listing score sent to the AI. */
+export const MIN_LISTING_SCORE = 20;
 
 const TIER_SCORE: Record<Exclude<MerchantTier, "everyday">, number> = {
   durable: 40,
@@ -64,7 +79,7 @@ export interface ListingScore {
   /** false = never sent to the AI (not receipt-like, everyday/utility, marketing, shipping-only). */
   include: boolean;
   score: number;
-  reason: "not_receipt_like" | "everyday_sender" | "utility_bill" | "low_score" | "ok";
+  reason: "not_receipt_like" | "everyday_sender" | "utility_bill" | "carrier" | "low_score" | "ok";
 }
 
 /**
@@ -82,6 +97,7 @@ export function scoreReceiptListing(input: {
   if (tier === "everyday") return { include: false, score: 0, reason: "everyday_sender" };
   const subject = input.subject ?? "";
   if (UTILITY_SUBJECT_PATTERN.test(subject)) return { include: false, score: 0, reason: "utility_bill" };
+  if (CARRIER_SENDER_PATTERN.test(input.from ?? "")) return { include: false, score: 0, reason: "carrier" };
   let score = 10;
   if (tier) score += TIER_SCORE[tier];
   if (STRONG_SUBJECT_PATTERN.test(subject)) score += 20;
@@ -89,7 +105,12 @@ export function scoreReceiptListing(input: {
   if (DURABLE_KEYWORD_PATTERN.test(subject)) score += 15;
   if (SHIPPING_ONLY_PATTERN.test(subject) && !INVOICE_PATTERN.test(subject)) score -= 20;
   if (MARKETING_PATTERN.test(subject)) score -= 40;
-  return score >= 10 ? { include: true, score, reason: "ok" } : { include: false, score, reason: "low_score" };
+  const invoiceLike = INVOICE_PATTERN.test(subject);
+  if (EMOJI_PATTERN.test(subject) && !invoiceLike) score -= 40;
+  if (MARKETING_SENDER_PATTERN.test(input.from ?? "") && !invoiceLike && !input.hasAttachments) score -= 40;
+  // A keyword alone (score 10) is not enough: it needs a store, a strong
+  // purchase subject or an attachment (dev data: base-score emails were news).
+  return score >= MIN_LISTING_SCORE ? { include: true, score, reason: "ok" } : { include: false, score, reason: "low_score" };
 }
 
 /** Cheap pre-filter on list results (subject + sender only). */
@@ -104,7 +125,7 @@ export function isLikelyReceiptListing(input: {
 export type MessageImportPlan =
   | { kind: "pdf"; attachments: MailMessage["pdfAttachments"] }
   | { kind: "html"; text: string }
-  | { kind: "skip"; reason: "no_content" | "not_receipt_like" | "everyday_sender" | "utility_bill" | "low_score" };
+  | { kind: "skip"; reason: "no_content" | "not_receipt_like" | "everyday_sender" | "utility_bill" | "carrier" | "low_score" };
 
 /** Minimum body length worth sending to the AI. */
 const MIN_BODY_TEXT_LENGTH = 80;
@@ -128,8 +149,9 @@ export function planMessageImport(message: MailMessage): MessageImportPlan {
   if (message.pdfAttachments.length > 0) {
     return { kind: "pdf", attachments: message.pdfAttachments };
   }
-  if (!looksLikeReceiptEmail(message)) {
-    return { kind: "skip", reason: "not_receipt_like" };
+  if (!listing.include) {
+    // No PDF: the email body only goes to the AI when the listing rules pass.
+    return { kind: "skip", reason: listing.reason === "ok" ? "low_score" : listing.reason };
   }
   const bodyText = message.html
     ? htmlToText(message.html)

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_BODY_TEXT_LENGTH,
+  MIN_LISTING_SCORE,
   htmlToText,
   looksLikeReceiptEmail,
   planMessageImport,
@@ -157,5 +158,50 @@ describe("pre-AI ranking: only clear purchases, groceries and utilities skipped"
     expect(merchantTier("friend@example.com")).toBeNull();
     expect(isEverydayMerchantName("Continente Bom Dia")).toBe(true);
     expect(isEverydayMerchantName("Worten")).toBe(false);
+  });
+});
+
+describe("stricter listing filter", () => {
+  it("requires a higher listing score", () => {
+    expect(MIN_LISTING_SCORE).toBe(20);
+  });
+
+  it.each([
+    ["Fatura em atraso: regularize já", "Vivo <cobranca@vivo.example>"],
+    ["Pagamento pendente da sua encomenda", "shop@shop.example"],
+    ["A sua encomenda está retida: pague a taxa aduaneira", "alerts@desk.example"],
+    ["Como classificaria a sua encomenda?", "Amazon <review@amazon.es>"],
+    ["Re: your order", "someone@example.com"],
+    ["Código único de acesso à conta", "Amazon <account-update@amazon.es>"],
+  ])("excludes collections, customs, review and account mail: %s", (subject, from) => {
+    expect(scoreReceiptListing({ subject, from }).include).toBe(false);
+  });
+
+  it("excludes carrier notifications", () => {
+    const r = scoreReceiptListing({ subject: "A sua encomenda foi enviada", from: "CTT Expresso <noreply@cttexpress.com>" });
+    expect(r.include).toBe(false);
+    expect(r.reason).toBe("carrier");
+  });
+
+  it("penalises marketing senders and emoji subjects", () => {
+    expect(scoreReceiptListing({ subject: "🎁 Your order of deals is waiting", from: "Shop <promo@shop.example>" }).include).toBe(false);
+    expect(scoreReceiptListing({ subject: "Confirmação de pedido", from: "Loja <info@newsletter.loja.example>" }).include).toBe(false);
+    expect(scoreReceiptListing({ subject: "Confirmação de pedido", from: "Loja <info@loja.example>" }).include).toBe(true);
+  });
+
+  it("keeps real receipts and tickets", () => {
+    for (const [subject, from] of [
+      ["Fatura da Apple", "Apple <no_reply@email.apple.com>"],
+      ["Pedido efetuado: \u201cRØDE NT1\u201d", "Amazon.es <auto-confirm@amazon.es>"],
+      ["Order #40566 confirmed", "Lackto <shop@lackto.example>"],
+      ["Os seus bilhetes para o concerto", "Ticketline <info@ticketline.example>"],
+    ]) {
+      expect(scoreReceiptListing({ subject, from }).include, subject).toBe(true);
+    }
+  });
+
+  it("no longer treats a bare store domain as a receipt without an attachment", () => {
+    expect(looksLikeReceiptEmail({ subject: "Novidades da semana", from: "Amazon <store-news@amazon.es>" })).toBe(false);
+    expect(looksLikeReceiptEmail({ subject: "Novidades da semana", from: "Amazon <store-news@amazon.es>", hasAttachments: true })).toBe(true);
   });
 });

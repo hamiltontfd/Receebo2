@@ -29,6 +29,7 @@ import {
 import {
   extractReceiptData,
   extractReceiptDataFromText,
+  precheckEmailIsReceipt,
   type ExtractedReceipt,
 } from "./receiptExtraction";
 import { isAccountDeletionInProgress } from "./accountDeletionState";
@@ -43,6 +44,8 @@ import type { MailMessage, MailProvider } from "./mailProviders/types";
 export const HTML_BODY_ATTACHMENT_ID = "body:html";
 /** Cost guard: max AI extractions of email bodies per mailbox per run. */
 export const MAX_BODY_EXTRACTIONS_PER_RUN = 25;
+/** Cheap pre-checks per run; past this, remaining email bodies wait for the next run. */
+export const MAX_PRECHECKS_PER_RUN = 100;
 
 const objectStorageService = new ObjectStorageService();
 
@@ -282,6 +285,7 @@ export async function syncMailboxClaimed(
   let checked = 0;
   let queued = 0;
   let bodyExtractions = 0;
+  let prechecks = 0;
 
   for (const messageId of messageIds) {
     const [alreadySeen] = await db
@@ -344,6 +348,24 @@ export async function syncMailboxClaimed(
         // Leave for the next run instead of spending more AI calls now.
         retryableFailure = true;
         continue;
+      }
+
+      if (unit.kind === "html") {
+        // Cheap yes/no screen before the full extraction. It is not a trial AI
+        // read (about 50x cheaper); the full extraction below still is.
+        if (prechecks >= MAX_PRECHECKS_PER_RUN) {
+          retryableFailure = true;
+          continue;
+        }
+        prechecks++;
+        const likely = await precheckEmailIsReceipt(unit.text, {
+          subject: message.subject,
+          from: message.from,
+        });
+        if (!likely) {
+          logger.info({ messageId }, `${label} sync: pre-check says email body is not a receipt, skipping`);
+          continue;
+        }
       }
 
       const claim = await claimImport(provider, userId, messageId, unit.attachmentId, unit.filename);
