@@ -152,3 +152,17 @@ Technical details live in `docs/assistant-log.md`.
   - b8c36d6 Trial analytics: new receipt_limit_reached event at the 5th successful receipt (DB trigger, once per account); plan_selected now recorded only after checkout config is valid. Dev DB check constraint widened by the startup migration.
 - Tests: web 184 passed; API 219 passed, 2 skipped.
 - Outcome: on main in Replit, not pushed or published. Stripe untouched.
+
+## 2026-10-27 — Session 16: P2 (Grok Bot, Hamilton: "Pode começar o P2 agora, não vou publicar antes")
+- Goal: P2 items from the dev Outlook test and the account lifecycle plan. One commit per item on main; not pushed or published; Stripe untouched; no secrets shown.
+- Commits:
+  - fdc56ea Outlook/email import: trial capped at 10 AI reads; grocery/utility senders (Continente, EDP…) skipped before the AI and filtered after it; only clear purchases imported; bills use the issue date, never the due date (date clamped to the email date).
+  - 025907e Trial: an upload counts toward the 5 receipts only once saved; unsaved drafts held 24 h then released; old unsaved drafts uncounted by a startup migration.
+  - 51b4e94 Accounts: frozen at trial end or plan lapse; deleted 60 days later (except billing records Stripe must keep); subscribing cancels it; 30- and 7-day warnings plus a confirmation email (placeholder copy, [ADDRESS] footer); in-app export only while the account has access, otherwise by email to contact@receebo.net. Deletion only runs with DATA_DELETION_ENABLED=true (default off: dry-run log, no emails). Spec in docs/account-lifecycle.md; terms/privacy marked [LEGAL REVIEW NEEDED].
+  - a478b49 Account deletion confirmed with a 6-digit emailed code (hashed, 15 min, single use, 5 attempts, rate limited); placeholder copy from deletion-code.txt; web dialog; terms/privacy wording marked.
+  - 3948660 Returns: the window counts from the delivery date when known, else the purchase date (new receipts.delivery_date, AI extraction, editable "Delivered on" field, API spec).
+  - 6ad9f5b Locales: en/pt-PT/pt-BR scaffolding; Brazil CDC panel (legal deadline from delivery and manufacturer warranty side by side, never added); US structure only; per-market legal document placeholders. Notes in docs/locales-and-rights.md.
+- Dev DB: new tables trial_ai_reads, account_lifecycle, account_deletion_codes and column receipts.delivery_date (startup migrations).
+- Tests: typecheck clean (5 projects); web 204 passed; API 263 passed, 2 skipped.
+- Outcome: on main in Replit, not pushed or published.
+- Open for Hamilton: postal address for [ADDRESS]; confirm the 7-day final warning; legal review of the [LEGAL REVIEW NEEDED] clauses and the terms/privacy version bump; when to set DATA_DELETION_ENABLED=true in production; grace period after a failed payment; "paused", welcome and trial-ending emails not built; BR/US legal texts and full app translation not started.
