@@ -166,3 +166,10 @@ Technical details live in `docs/assistant-log.md`.
 - Tests: typecheck clean (5 projects); web 204 passed; API 263 passed, 2 skipped.
 - Outcome: on main in Replit, not pushed or published.
 - Open for Hamilton: postal address for [ADDRESS]; confirm the 7-day final warning; legal review of the [LEGAL REVIEW NEEDED] clauses and the terms/privacy version bump; when to set DATA_DELETION_ENABLED=true in production; grace period after a failed payment; "paused", welcome and trial-ending emails not built; BR/US legal texts and full app translation not started.
+
+## 2026-10-27 — Session 17: promo video on the landing page (Grok Bot, Hamilton: "Yes, but make it a muted autoplay loop")
+- Goal: add the 30 s marketing promo right under the hero as a muted autoplay loop; hero and CTA unchanged.
+- Media (artifacts/receiptr/public/media): re-encoded from the 1920x1080 master and the 9:16 cut. 16:9 1280x720 MP4 2.26 MB / WebM (VP9+Opus) 1.72 MB; 9:16 720x1280 MP4 2.63 MB / WebM 2.05 MB; WebP posters (warranty side-by-side frame) 26 KB / 38 KB. Audio kept for the sound toggle. Captions are burned into the video, so no text track.
+- Component: src/pages/landing/PromoVideoSection.tsx. One muted, looping, inline video (preload=metadata, poster, aria-label "Receebo in 30 seconds"); 9:16 below 768 px and 16:9 from 768 px up, picked by matchMedia so only one file downloads; aspect ratio reserved (no layout shift); plays only while on screen (IntersectionObserver); pause and sound on/off buttons with aria-labels; with prefers-reduced-motion it never autoplays and shows the poster with a play button.
+- Tests: typecheck clean; web 208 passed (4 new). Dev URL serves all six files with 206 range responses and the right content types; headless Chrome confirmed only the matching cut loads on desktop and mobile.
+- Outcome: on main in Replit, not pushed or published.

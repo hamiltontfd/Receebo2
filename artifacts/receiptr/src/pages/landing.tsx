@@ -7,6 +7,7 @@ import { useAuth } from "@clerk/react";
 
 // Sections
 import HeroSection from "./landing/HeroSection";
+import PromoVideoSection from "./landing/PromoVideoSection";
 import DemoSection from "./landing/DemoSection";
 import WhyReceeboSection from "./landing/WhyReceeboSection";
 import EmailReceiptsSection from "./landing/EmailReceiptsSection";
@@ -88,6 +89,7 @@ export default function Landing() {
         {/* ── Page Sections ───────────────────────────────────────────── */}
         <main>
           <HeroSection />
+          <PromoVideoSection />
           <DemoSection />
           <WhyReceeboSection />
           <EmailReceiptsSection />
