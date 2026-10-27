@@ -11,7 +11,7 @@
 import { detectCountry } from "./returnWindowCalc";
 
 /** Bump when the rules change so the startup backfill recomputes stored dates. */
-export const WARRANTY_CALC_VERSION = 1;
+export const WARRANTY_CALC_VERSION = 2;
 
 const LEGAL_WARRANTY_YEARS: Record<string, number> = { PT: 3, EU: 2 };
 const DURABLE_CATEGORIES = new Set(["Electronics", "Home", "Clothing & Apparel", "Other"]);

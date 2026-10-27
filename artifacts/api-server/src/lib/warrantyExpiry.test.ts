@@ -30,4 +30,12 @@ describe("server warranty expiry", () => {
     expect(addMonthsClamped("2027-08-31", 6)).toBe("2028-02-29");
     expect(addMonthsClamped("2026-05-31", -1)).toBe("2026-04-30");
   });
+  it("applies the EU minimum to other EU/EEA countries, not to GB or CH", () => {
+    for (const c of ["DE", "ES", "FR", "IT", "NO"]) {
+      expect(computeWarrantyExpiries({ purchaseCountry: c, currency: "EUR", category: "Electronics", purchaseDate: "2026-03-10" }).legal)
+        .toBe("2028-03-10");
+    }
+    expect(computeWarrantyExpiries({ purchaseCountry: "GB", currency: "GBP", category: "Electronics", purchaseDate: "2026-03-10" }).legal).toBeNull();
+    expect(computeWarrantyExpiries({ purchaseCountry: "CH", currency: "CHF", category: "Electronics", purchaseDate: "2026-03-10" }).legal).toBeNull();
+  });
 });

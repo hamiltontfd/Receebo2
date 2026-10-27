@@ -61,3 +61,14 @@ describe("delivery date extraction", () => {
     expect(deliveredByReceived(null, "2026-10-05T10:00:00Z")).toBeNull();
   });
 });
+
+describe("EU/EEA countries other than PT", () => {
+  it("get the 14-day online withdrawal window", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    for (const c of ["DE", "ES", "FR", "NL", "NO"]) {
+      const w = calcReturnWindow({ purchaseDate: today, purchaseCountry: c, isOnlinePurchase: true, currency: "EUR", merchant: "Some shop" });
+      expect(w?.daysRemaining).toBe(14);
+    }
+    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "GB", isOnlinePurchase: true, currency: "GBP", merchant: "Some shop" })).toBeNull();
+  });
+});

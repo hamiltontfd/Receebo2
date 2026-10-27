@@ -106,6 +106,12 @@ const RETAILER_RETURN_DAYS: Array<{ match: string; days: number }> = [
 
 // ── Country detection ────────────────────────────────────────────────────────
 
+/** EU member states + EEA (IS, LI, NO), excluding PT (own rule). "EL" is the EU code for Greece. */
+const EU_EEA_COUNTRIES = new Set([
+  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "EL", "HU", "IE", "IT",
+  "LV", "LT", "LU", "MT", "NL", "PL", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO",
+]);
+
 /** Merchants whose name strongly suggests Portugal as country */
 const PT_MERCHANT_HINTS = [
   "continente", "pingo doce", "worten", "sport zone", "fnac pt",
@@ -122,7 +128,9 @@ function detectCountry(params: {
 
   // Prefer AI-extracted country
   if (purchaseCountry && purchaseCountry.length === 2) {
-    return purchaseCountry.toUpperCase();
+    const code = purchaseCountry.toUpperCase();
+    // Other EU/EEA countries share the EU minimum rules (2-year warranty, 14-day withdrawal).
+    return EU_EEA_COUNTRIES.has(code) ? "EU" : code;
   }
 
   if (!currency) return null;

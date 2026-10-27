@@ -34,6 +34,12 @@ const RETAILER_RETURN_DAYS: Array<{ match: string; days: number }> = [
   { match: "fnac", days: 30 },
 ];
 
+/** EU member states + EEA (IS, LI, NO), excluding PT (own rule). "EL" is the EU code for Greece. */
+const EU_EEA_COUNTRIES = new Set([
+  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "EL", "HU", "IE", "IT",
+  "LV", "LT", "LU", "MT", "NL", "PL", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO",
+]);
+
 const PT_MERCHANT_HINTS = [
   "continente", "pingo doce", "worten", "sport zone", "fnac pt",
   "minipreço", "minipreco", "wells", "nos ", "meo ", "vodafone pt",
@@ -46,7 +52,11 @@ export function detectCountry(params: {
   merchant?: string | null;
 }): string | null {
   const { currency, purchaseCountry, merchant } = params;
-  if (purchaseCountry && purchaseCountry.length === 2) return purchaseCountry.toUpperCase();
+  if (purchaseCountry && purchaseCountry.length === 2) {
+    const code = purchaseCountry.toUpperCase();
+    // Other EU/EEA countries share the EU minimum rules.
+    return EU_EEA_COUNTRIES.has(code) ? "EU" : code;
+  }
   if (!currency) return null;
   const cur = currency.toUpperCase();
   if (cur === "BRL") return "BR";

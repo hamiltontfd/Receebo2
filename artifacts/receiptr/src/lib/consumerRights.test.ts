@@ -89,3 +89,19 @@ describe("manufacturer warranty parsing", () => {
     expect(rights.legalReviewPending).toBe(false);
   });
 });
+
+describe("EU/EEA countries other than PT", () => {
+  it("get the EU 2-year legal warranty and 14-day online withdrawal", () => {
+    for (const c of ["DE", "ES", "FR", "NO"]) {
+      const r = deriveConsumerRights({ purchaseCountry: c, currency: "EUR", merchant: "Shop", category: "Electronics", isOnlinePurchase: true, purchaseDate: "2026-03-10" });
+      expect(r.countryLabel).toBe("EU");
+      expect(r.warranty?.citation).toBe("EU Directive 2019/771");
+      expect(r.returnWindow?.source).toBe("EU Directive 2011/83/EU");
+    }
+  });
+  it("leaves GB without EU rules", () => {
+    const r = deriveConsumerRights({ purchaseCountry: "GB", currency: "GBP", merchant: "Shop", category: "Electronics", isOnlinePurchase: true, purchaseDate: "2026-03-10" });
+    expect(r.warranty).toBeNull();
+    expect(r.returnWindow).toBeNull();
+  });
+});
