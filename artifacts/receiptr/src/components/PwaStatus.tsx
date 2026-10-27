@@ -3,20 +3,13 @@ import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
-  getWaitingWorker, hasPwaWork, isInstalled, isIosSafari, isIosChrome, requestUpdate,
-  subscribePwaWork, subscribeUpdate,
+  getWaitingWorker, hasPwaWork, requestUpdate, subscribePwaWork, subscribeUpdate,
 } from "@/lib/pwa";
 
-interface InstallEvent extends Event {
-  prompt(): Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
+// Install guidance lives in InstallBar (signed-in app only), not here.
 
 export default function PwaStatus() {
   const [online, setOnline] = useState(navigator.onLine);
-  const [installed, setInstalled] = useState(isInstalled);
-  const [installEvent, setInstallEvent] = useState<InstallEvent | null>(null);
-  const [dismissed, setDismissed] = useState(false);
   const [applying, setApplying] = useState(false);
   const [reloadReady, setReloadReady] = useState(false);
   const [message, setMessage] = useState("");
@@ -27,30 +20,15 @@ export default function PwaStatus() {
   const waiting = useSyncExternalStore(subscribeUpdate, getWaitingWorker);
   // Authentication and its callbacks should not be interrupted either.
   const blocked = work || mutations > 0 || /^\/sign-(in|up)/.test(location);
-  const chromeIos = isIosChrome();
-  const ios = (isIosSafari() || chromeIos) && "serviceWorker" in navigator && window.isSecureContext;
 
   useEffect(() => {
     const onOnline = () => setOnline(true);
     const onOffline = () => setOnline(false);
-    const onInstall = (event: Event) => {
-      event.preventDefault();
-      setInstallEvent(event as InstallEvent);
-    };
-    const onInstalled = () => { setInstalled(true); setInstallEvent(null); };
-    const display = window.matchMedia("(display-mode: standalone)");
-    const onDisplay = () => setInstalled(isInstalled());
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
-    window.addEventListener("beforeinstallprompt", onInstall);
-    window.addEventListener("appinstalled", onInstalled);
-    display.addEventListener("change", onDisplay);
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
-      window.removeEventListener("beforeinstallprompt", onInstall);
-      window.removeEventListener("appinstalled", onInstalled);
-      display.removeEventListener("change", onDisplay);
     };
   }, []);
 
@@ -119,29 +97,6 @@ export default function PwaStatus() {
         onKeyDown={(event) => event.preventDefault()} tabIndex={0} ref={(element) => element?.focus()}>
         Applying update. Please keep Receebo open…
       </div>}
-      {!installed && !dismissed && online && !blocked && (installEvent || ios) && (
-        <div className={`border-b px-4 py-3 text-sm flex flex-wrap items-center gap-3 ${ios ? "fixed bottom-0 inset-x-0 z-[60] border-t bg-background shadow-lg pb-[max(0.75rem,env(safe-area-inset-bottom))]" : ""}`}>
-          <p className="flex-1 min-w-0">
-            {ios
-              ? chromeIos
-                ? "Install Receebo: in Chrome, tap Share beside the address bar, then Add to Home Screen, then Add. Launch Receebo from its new home screen icon. If the option is missing, open this page in Safari and use Share → Add to Home Screen."
-                : "Install Receebo: in Safari, tap Share, then Add to Home Screen, then Add."
-              : "Install Receebo for quick access from your home screen or desktop."}
-          </p>
-          {installEvent && <Button size="sm" onClick={async () => {
-            try {
-              await installEvent.prompt();
-              await installEvent.userChoice;
-            } catch {
-              setMessage("Installation could not start. You can try again after reloading, or use your browser’s install menu.");
-            } finally {
-              setInstallEvent(null);
-              setDismissed(true);
-            }
-          }}>Install</Button>}
-          <Button size="sm" variant="ghost" onClick={() => setDismissed(true)}>Not now</Button>
-        </div>
-      )}
     </aside>
   );
 }

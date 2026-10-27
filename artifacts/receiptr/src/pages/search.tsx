@@ -764,7 +764,7 @@ export default function SearchPage() {
           onClick={() => setLocation("/scan")}
           aria-label="Scan receipt"
           className="md:hidden fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-foreground text-background flex items-center justify-center shadow-xl"
-          style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+          style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom) + var(--install-bar-h, 0px))" }}
         >
           <Camera className="w-6 h-6" />
         </motion.button>

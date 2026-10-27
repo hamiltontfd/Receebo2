@@ -83,3 +83,47 @@ export async function requestUpdate(worker: ServiceWorker): Promise<boolean> {
     worker.postMessage({ type: "APPLY_UPDATE" }, [channel.port2]);
   });
 }
+
+/** Chromium's deferred install prompt (beforeinstallprompt). */
+export interface InstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
+// Captured from page load (main.tsx) so the prompt is not lost before the
+// signed-in app mounts the install bar.
+let installEvent: InstallPromptEvent | null = null;
+let appInstalled = false;
+let capturing = false;
+const installListeners = new Set<() => void>();
+const notifyInstall = () => installListeners.forEach((listener) => listener());
+export const getInstallEvent = () => installEvent;
+export const wasAppInstalled = () => appInstalled;
+export const subscribeInstall = (listener: () => void) => {
+  installListeners.add(listener);
+  return () => { installListeners.delete(listener); };
+};
+export function clearInstallEvent() {
+  installEvent = null;
+  notifyInstall();
+}
+export function startInstallCapture() {
+  if (capturing || typeof window === "undefined") return;
+  capturing = true;
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    installEvent = event as InstallPromptEvent;
+    notifyInstall();
+  });
+  window.addEventListener("appinstalled", () => {
+    appInstalled = true;
+    installEvent = null;
+    notifyInstall();
+  });
+}
+/** Test-only: forget captured install state between cases. */
+export function resetInstallStateForTests() {
+  installEvent = null;
+  appInstalled = false;
+  notifyInstall();
+}

@@ -20,6 +20,7 @@ import TermsOfService from "@/pages/terms";
 import AppShell from "@/components/AppShell";
 import AuthModal from "@/components/AuthModal";
 import PwaStatus from "@/components/PwaStatus";
+import InstallBar from "@/components/InstallBar";
 import { PlanSelectionGate } from "@/components/PlanSelectionGate";
 import { LEGAL_ACCEPTED_EVENT, LegalConsentGate } from "@/components/LegalConsentGate";
 import { useBillingStatus, resolveAccessState } from "@/hooks/useBilling";
@@ -164,6 +165,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
         <LegalConsentGate key={userId}>
           <PlanSelectionGate>
             <AppShell>{children}</AppShell>
+            <InstallBar />
           </PlanSelectionGate>
         </LegalConsentGate>
       </Show>
