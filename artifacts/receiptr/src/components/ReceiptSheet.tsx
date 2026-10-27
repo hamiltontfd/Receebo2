@@ -772,9 +772,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       </p>
                       <ReceiptPreview
                         fileUrl={fileUrl}
-                        contentType={receipt.contentType}
                         fileName={receipt.originalFileName}
-                        defaultExpanded
                       />
                       {isImage && (
                         <Button

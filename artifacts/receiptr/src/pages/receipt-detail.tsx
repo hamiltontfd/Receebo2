@@ -509,10 +509,9 @@ export default function ReceiptDetail() {
           </div>
         )}
 
-        {/* Original receipt — inline preview with collapsible wrapper on mobile */}
+        {/* Original receipt — compact row; "Open" shows the file in a new tab */}
         <ReceiptPreview
           fileUrl={fileUrl}
-          contentType={receipt.contentType}
           fileName={receipt.originalFileName}
         />
 
