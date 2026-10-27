@@ -50,6 +50,7 @@ vi.mock("../lib/legalAcceptance", () => ({
 }));
 vi.mock("../lib/userDataLock", () => ({
   lockUserDataMutation: (handler: any) => handler,
+  tryLockUserDataMutation: (handler: any) => handler,
 }));
 vi.mock("../lib/extractionQueue", () => ({ enqueueExtraction: mocks.enqueue }));
 vi.mock("../lib/accountTrial", () => ({ accountTrialStatus: async () => null }));

@@ -9,10 +9,22 @@ import { MAIL_PROVIDER_LABELS, syncMail, type MailProviderId } from "@/lib/mailC
 import { BILLING_QUERY_KEY, isAtTrialCap, type BillingStatus } from "@/hooks/useBilling";
 import { subscribeToastAction } from "@/components/SubscribeToastAction";
 import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON, SUBSCRIBE_HREF } from "@/lib/trialCopy";
+import { SYNC_IN_PROGRESS_CODE, SYNC_IN_PROGRESS_COPY } from "@/lib/mailImportCopy";
+import { getAppLocale } from "@/lib/locale";
 
 /** The server refused the approval because the free-trial receipt cap is reached. */
 export class TrialCapError extends Error {
   constructor() { super(TRIAL_CAP_MESSAGE); }
+}
+
+/** A mailbox sync holds the user's data lock; the item stays and can be retried shortly. */
+export class SyncInProgressError extends Error {
+  constructor() { super(SYNC_IN_PROGRESS_COPY.en); }
+}
+
+/** The import was already approved or dismissed (e.g. a retry after a dropped response). */
+export class AlreadyHandledError extends Error {
+  constructor() { super("Pending import was already handled"); }
 }
 
 const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
@@ -47,6 +59,9 @@ async function approvePending(id: number): Promise<{ approved: boolean; receiptI
     if (res.status === 403 && (body?.code === "trial_exhausted" || body?.code === "TRIAL_UPLOAD_LIMIT")) {
       throw new TrialCapError();
     }
+    if (res.status === 409) {
+      throw body?.code === SYNC_IN_PROGRESS_CODE ? new SyncInProgressError() : new AlreadyHandledError();
+    }
     throw new Error("Failed to approve");
   }
   return res.json() as Promise<{ approved: boolean; receiptId: number }>;
@@ -57,7 +72,13 @@ async function dismissPending(id: number): Promise<void> {
     method: "DELETE",
     credentials: "include",
   });
-  if (!res.ok) throw new Error("Failed to dismiss");
+  if (!res.ok) {
+    if (res.status === 409) {
+      const body = (await res.json().catch(() => null)) as { code?: string } | null;
+      if (body?.code === SYNC_IN_PROGRESS_CODE) throw new SyncInProgressError();
+    }
+    throw new Error("Failed to dismiss");
+  }
 }
 
 function triggerSync() {
@@ -122,6 +143,15 @@ export default function PendingImports() {
         });
         return;
       }
+      if (err instanceof SyncInProgressError) {
+        toast({ title: SYNC_IN_PROGRESS_COPY[getAppLocale()] });
+        return;
+      }
+      if (err instanceof AlreadyHandledError) {
+        void queryClient.invalidateQueries({ queryKey: ["mail", "pending"] });
+        void queryClient.invalidateQueries({ queryKey: ["receipts"] });
+        return;
+      }
       toast({
         title: "Something went wrong",
         description: "Could not approve receipt. Please try again.",
@@ -135,12 +165,14 @@ export default function PendingImports() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["mail", "pending"] });
     },
-    onError: () =>
-      toast({
-        title: "Something went wrong",
-        description: "Could not dismiss import.",
-        variant: "destructive",
-      }),
+    onError: (err) =>
+      err instanceof SyncInProgressError
+        ? toast({ title: SYNC_IN_PROGRESS_COPY[getAppLocale()] })
+        : toast({
+          title: "Something went wrong",
+          description: "Could not dismiss import.",
+          variant: "destructive",
+        }),
   });
 
   const { data: mailStatus } = useMailStatus();

@@ -5,7 +5,13 @@ import { eq, sql } from "drizzle-orm";
 import type { NextFunction, Request, Response } from "express";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isAccountDeletionInProgress } from "./accountDeletionState";
-import { lockUserDataMutation, withUserDataLock } from "./userDataLock";
+import {
+  lockUserDataMutation,
+  tryLockUserDataMutation,
+  tryWithUserDataLock,
+  UserDataLockBusyError,
+  withUserDataLock,
+} from "./userDataLock";
 
 const createdUserIds: string[] = [];
 
@@ -108,5 +114,78 @@ describe("user data operation lock", () => {
     releaseDeletion();
     await deletion;
     await expect(sync).resolves.toBe(true);
+  });
+});
+describe("try user data lock (email import actions)", () => {
+  function fakeResponse() {
+    const response = new EventEmitter() as Response;
+    response.status = vi.fn(() => response);
+    response.json = vi.fn(() => response);
+    return response;
+  }
+
+  it("runs the operation when the lock is free and releases it afterwards", async () => {
+    const userId = `try-free-${randomUUID()}`;
+    await expect(tryWithUserDataLock(userId, async () => "done")).resolves.toBe("done");
+    // Released: a blocking lock gets in at once.
+    await expect(
+      Promise.race([
+        withUserDataLock(userId, async () => "next"),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("lock not released")), 1_000)),
+      ]),
+    ).resolves.toBe("next");
+  });
+
+  it("releases the lock when the operation throws", async () => {
+    const userId = `try-throw-${randomUUID()}`;
+    await expect(tryWithUserDataLock(userId, async () => { throw new Error("boom"); })).rejects.toThrow("boom");
+    await expect(tryWithUserDataLock(userId, async () => "ok", { timeoutMs: 0 })).resolves.toBe("ok");
+  });
+
+  it("gives up with UserDataLockBusyError while another holder keeps the lock", async () => {
+    const userId = `try-busy-${randomUUID()}`;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let acquired!: () => void;
+    const holding = new Promise<void>((resolve) => { acquired = resolve; });
+    const sync = withUserDataLock(userId, async () => { acquired(); await held; });
+    await holding;
+
+    const started = Date.now();
+    const op = vi.fn(async () => "never");
+    await expect(tryWithUserDataLock(userId, op, { timeoutMs: 300, retryMs: 50 }))
+      .rejects.toBeInstanceOf(UserDataLockBusyError);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(250);
+    expect(op).not.toHaveBeenCalled();
+
+    release();
+    await sync;
+    await expect(tryWithUserDataLock(userId, async () => "after", { timeoutMs: 0 })).resolves.toBe("after");
+  });
+
+  it("answers 409 SYNC_IN_PROGRESS from the route wrapper without running the handler", async () => {
+    const userId = `try-route-${randomUUID()}`;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let acquired!: () => void;
+    const holding = new Promise<void>((resolve) => { acquired = resolve; });
+    const sync = withUserDataLock(userId, async () => { acquired(); await held; });
+    await holding;
+
+    const handler = vi.fn(async () => undefined);
+    const response = fakeResponse();
+    await tryLockUserDataMutation(handler, { timeoutMs: 100, retryMs: 25 })(
+      { userId } as Request, response, vi.fn() as NextFunction,
+    );
+    expect(handler).not.toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledWith(409);
+    expect(response.json).toHaveBeenCalledWith(expect.objectContaining({ code: "SYNC_IN_PROGRESS" }));
+
+    release();
+    await sync;
+    const free = fakeResponse();
+    await tryLockUserDataMutation(handler)({ userId } as Request, free, vi.fn() as NextFunction);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(free.status).not.toHaveBeenCalledWith(409);
   });
 });

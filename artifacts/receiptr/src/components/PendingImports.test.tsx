@@ -62,3 +62,25 @@ describe("PendingImports at the free-trial cap", () => {
     })));
   });
 });
+
+describe("PendingImports while a mailbox sync holds the lock", () => {
+  const billing = { plan: "pro", accessState: "active", canUseApp: true, canUpload: true };
+
+  it("shows a neutral 'still syncing' toast and keeps the item", async () => {
+    mount(billing, { ok: false, status: 409, body: { error: "busy", code: "SYNC_IN_PROGRESS" } });
+    fireEvent.click(await screen.findByTitle("Add to library"));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Still syncing your email — try again in a minute",
+    }));
+    expect(mocks.toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
+    expect(screen.getByText("Worten")).toBeInTheDocument();
+  });
+
+  it("refreshes the list instead of showing an error when the import was already handled", async () => {
+    const fetchMock = mount(billing, { ok: false, status: 409, body: { error: "Pending import was already handled" } });
+    fireEvent.click(await screen.findByTitle("Add to library"));
+    const pendingCalls = () => fetchMock.mock.calls.filter(([url]) => String(url).endsWith("api/mail/pending")).length;
+    await waitFor(() => expect(pendingCalls()).toBeGreaterThanOrEqual(2));
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+});

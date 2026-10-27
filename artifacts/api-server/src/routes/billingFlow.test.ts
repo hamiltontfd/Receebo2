@@ -35,7 +35,7 @@ vi.mock("../lib/legalAcceptance", () => ({
   requireCurrentLegalAcceptance: (req: any, res: any, next: any) =>
     req.headers["x-test-consent"] === "accepted" ? next() : res.sendStatus(428),
 }));
-vi.mock("../lib/userDataLock", () => ({ lockUserDataMutation: (handler: any) => handler }));
+vi.mock("../lib/userDataLock", () => ({ lockUserDataMutation: (handler: any) => handler, tryLockUserDataMutation: (handler: any) => handler }));
 vi.mock("../lib/accountTrial", () => ({ accountTrialStatus: async () => null }));
 vi.mock("../lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },

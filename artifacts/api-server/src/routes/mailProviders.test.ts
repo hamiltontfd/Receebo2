@@ -59,6 +59,7 @@ vi.mock("../lib/accountDeletionState", () => ({
 vi.mock("../lib/userDataLock", () => ({
   withUserDataLock: (_user: string, action: () => unknown) => action(),
   lockUserDataMutation: (handler: unknown) => handler,
+  tryLockUserDataMutation: (handler: unknown) => handler,
 }));
 vi.mock("../middlewares/requireAuth", () => ({
   requireAuth: (req: any, _res: any, next: () => void) => {

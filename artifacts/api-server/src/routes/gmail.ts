@@ -21,7 +21,7 @@ import {
 } from "../lib/objectStorage";
 import { deletePendingImportObjects } from "../lib/gmailCleanup";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
-import { lockUserDataMutation, withUserDataLock } from "../lib/userDataLock";
+import { lockUserDataMutation, withUserDataLock, tryLockUserDataMutation } from "../lib/userDataLock";
 import { getSubscriptionStatus, receiptCapReached } from "../lib/subscriptionStatus";
 import { accountTrialStatus, TRIAL_CAP_ERROR } from "../lib/accountTrial";
 import { trialUploadsTable } from "@workspace/db";
@@ -328,7 +328,7 @@ router.post(
   ["/gmail/pending/:id/approve", "/mail/pending/:id/approve"],
   requireAuth,
   requireCurrentLegalAcceptance,
-  lockUserDataMutation(async (req, res): Promise<void> => {
+  tryLockUserDataMutation(async (req, res): Promise<void> => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) {
       res.status(400).json({ error: "Invalid id" });
@@ -401,7 +401,7 @@ router.post(
             state: "succeeded", receiptId: created.id, expiresAt: trial.trial.endsAt,
           });
         }
-        return created;
+        return { ...created, provider: imp.provider };
       });
 
       if (!receipt) {
@@ -429,8 +429,8 @@ router.post(
       }
 
       logger.info(
-        { userId: req.userId, importId: id, receiptId: receipt.id },
-        "Gmail import approved",
+        { userId: req.userId, importId: id, receiptId: receipt.id, provider: receipt.provider },
+        `${receipt.provider === "outlook" ? "Outlook" : "Gmail"} import approved`,
       );
       res.json({ approved: true, receiptId: receipt.id });
     } catch (err) {
@@ -447,7 +447,7 @@ router.delete(
   ["/gmail/pending/:id", "/mail/pending/:id"],
   requireAuth,
   requireCurrentLegalAcceptance,
-  lockUserDataMutation(async (req, res): Promise<void> => {
+  tryLockUserDataMutation(async (req, res): Promise<void> => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) {
       res.status(400).json({ error: "Invalid id" });
