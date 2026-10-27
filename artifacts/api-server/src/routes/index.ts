@@ -12,12 +12,14 @@ import outlookRouter from "./outlook";
 import mailRouter from "./mail";
 import pushRouter from "./push";
 import accountRouter from "./account";
+import cronRouter from "./cron";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { requireProductAccess } from "../middlewares/productAccess";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(cronRouter);
 router.use(
   ["/receipts", "/gmail/sync", "/gmail/pending", "/outlook/sync", "/mail/sync", "/mail/pending", "/storage/objects"],
   requireAuthOrGuest,
