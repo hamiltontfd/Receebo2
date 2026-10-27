@@ -8,10 +8,10 @@
  * never added together. Brazil (CDC art. 26) is a complaint deadline, not a
  * warranty, and is left out until legal review.
  */
-import { detectCountry } from "./returnWindowCalc";
+import { detectCountry, returnWindowStart } from "./returnWindowCalc";
 
 /** Bump when the rules change so the startup backfill recomputes stored dates. */
-export const WARRANTY_CALC_VERSION = 2;
+export const WARRANTY_CALC_VERSION = 3;
 
 const LEGAL_WARRANTY_YEARS: Record<string, number> = { PT: 3, EU: 2 };
 const DURABLE_CATEGORIES = new Set(["Electronics", "Home", "Clothing & Apparel", "Other"]);
@@ -77,9 +77,9 @@ export interface WarrantyExpiries {
   manufacturer: string | null;
 }
 
-/** Legal warranty start: the purchase date. */
+/** Legal warranty start: delivery of the goods (DL 84/2021) when known, else the purchase date. */
 function legalStart(input: WarrantyExpiryInput): string | null {
-  return isIsoDate(input.purchaseDate) ? input.purchaseDate : null;
+  return isIsoDate(input.purchaseDate) ? returnWindowStart(input.purchaseDate, input.deliveryDate).date : null;
 }
 
 export function computeWarrantyExpiries(input: WarrantyExpiryInput): WarrantyExpiries {

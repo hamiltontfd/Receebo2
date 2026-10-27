@@ -38,4 +38,9 @@ describe("server warranty expiry", () => {
     expect(computeWarrantyExpiries({ purchaseCountry: "GB", currency: "GBP", category: "Electronics", purchaseDate: "2026-03-10" }).legal).toBeNull();
     expect(computeWarrantyExpiries({ purchaseCountry: "CH", currency: "CHF", category: "Electronics", purchaseDate: "2026-03-10" }).legal).toBeNull();
   });
+  it("counts the legal warranty from delivery when known; the manufacturer one stays from purchase", () => {
+    const e = computeWarrantyExpiries({ ...pt, purchaseDate: "2026-03-10", deliveryDate: "2026-03-15", warranty: "2-year manufacturer warranty" });
+    expect(e).toEqual({ legal: "2029-03-15", manufacturer: "2028-03-10" });
+    expect(computeWarrantyExpiries({ ...pt, purchaseDate: "2026-03-10", deliveryDate: "2026-03-01" }).legal).toBe("2029-03-10");
+  });
 });

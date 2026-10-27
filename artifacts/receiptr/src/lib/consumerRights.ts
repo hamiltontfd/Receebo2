@@ -29,7 +29,8 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
     code: "PT",
     label: "Portugal",
     // Decree-Law 84/2021 (in force 1 Jan 2022) implementing EU Directive 2019/771
-    // 3 years for new goods, 2 years for second-hand (using 3 as conservative default)
+    // 3 years for new goods, counted from delivery. For second-hand goods the
+    // parties may agree to cut it to 18 months; we use 3 as the default.
     warrantyYears: 3,
     durableCategories: ["Electronics", "Home", "Clothing & Apparel", "Other"],
     // EU Consumer Rights Directive 2011/83/EU, transposed via DL 24/2014
@@ -385,7 +386,9 @@ export function deriveConsumerRights(params: {
       };
     }
   } else if (rule?.warrantyYears != null && isDurable && cat !== "Groceries") {
-    const expiry = addYears(purchaseDateObj, rule.warrantyYears);
+    // Counted from delivery of the goods when known (DL 84/2021), else the purchase date.
+    const start = returnWindowStartDate(purchaseDate, params.deliveryDate);
+    const expiry = addYears(new Date(start.date + "T00:00:00"), rule.warrantyYears);
     const daysUntilExpiry = daysFromNow(expiry);
     warranty = {
       kind: "warranty",

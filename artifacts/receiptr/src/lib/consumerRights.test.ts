@@ -16,11 +16,12 @@ describe("return window start (web)", () => {
     const notDelivered = deriveConsumerRights({ ...base, purchaseDate: local(-20) });
     expect(notDelivered.returnWindow).toMatchObject({ startsFrom: "purchase", isExpired: true });
   });
-  it("does not move the legal warranty (still from purchase)", () => {
+  it("counts the PT legal warranty from delivery when known, else from purchase", () => {
     const base = { purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", merchant: "Shop", category: "Electronics" };
     const a = deriveConsumerRights({ ...base, purchaseDate: "2026-01-10", deliveryDate: "2026-01-20" });
     const b = deriveConsumerRights({ ...base, purchaseDate: "2026-01-10" });
-    expect(a.warranty?.expiry.getTime()).toBe(b.warranty?.expiry.getTime());
+    expect(a.warranty?.expiry.getTime()).toBe(new Date("2029-01-20T00:00:00").getTime());
+    expect(b.warranty?.expiry.getTime()).toBe(new Date("2029-01-10T00:00:00").getTime());
   });
   it("ignores an impossible delivery date", () => {
     expect(returnWindowStartDate("2026-10-10", "2026-10-01")).toEqual({ date: "2026-10-10", from: "purchase" });
