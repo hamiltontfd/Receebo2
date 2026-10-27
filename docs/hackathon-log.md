@@ -192,3 +192,12 @@ Technical details live in `docs/assistant-log.md`.
 - Tests: typecheck clean; web 215 passed; API 282 passed, 2 skipped.
 - Not done: the running dev API was not restarted, so it still serves the old build until the next restart; the expiry backfill runs then. Mobile (Expo) list row left as is (plain grey category text, no colored icon).
 - Open for Hamilton: create CRON_SECRET (dev + production) and a daily caller; Brazil CDC art. 26 reminders after legal review; expect a one-off batch of warranty reminders after publishing; approve the block B scope.
+
+## 2026-10-27 — Session 19: landing media from the Casa Lumen demo story (Grok Bot, Hamilton: "Sim, regrava com a Casa Lumen")
+- Goal: the landing, demo account, promo video and Taikai banner tell the same story, and no landing image shows the removed category pill. Not pushed or published; Stripe untouched; dev API not restarted.
+- Commits:
+  - 5155be3 Landing marketing media v2. The capture fixtures (scripts/marketing) now use the demo data: Casa Lumen Electrónica 55" 4K Smart TV €649 (23 Oct, in store, PT, 2-year manufacturer warranty), Casa & Jardim Braga €229, Mercado Verde €38.47 and Atelier Norte €59.90; capture clock 27 Oct 2026 12:00 UTC. Same framing as before. The Find clip searches "TV"; the Protect clip shows the 3-year legal warranty and the 2-year manufacturer warranty side by side. Fixtures map /api/mail/status and /api/mail/pending. The unused Gmail still and hero composites were dropped. marketing:check passed, the frames were reviewed, and approval was recorded. The media went create-only to App Storage marketing/receebo-real-app/v2/ (v1 untouched, so production keeps it until publish). MarketingMedia.tsx and upload.ts now point at v2; protection.webp is 686x360. Alt text, captions and demo descriptions were updated.
+  - d7f8323 Promo video. It was rebuilt on the agents' computer from the demo-account screens (SKIP_TAG_MASK=1), with copy and timing unchanged. Re-encoded at the same names and sizes in public/media.
+- Dev landing: pointed back at v1 during the upload, and switched to v2 only after every v2 URL returned 200 and matched byte for byte.
+- Tests: typecheck clean; web 214 passed (the email-settings case was removed); marketing freshness 6/6.
+- Notes: marketing:status lists MarketingMedia.tsx as changed since approval (the v1/v2 switch above). The promo's 22 s notification ("Return window closes in 3 days… Cordless vacuum… Return by 29 Oct") was not changed; the landing treats the vacuum as an in-store purchase.
