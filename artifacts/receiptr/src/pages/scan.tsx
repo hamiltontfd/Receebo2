@@ -37,7 +37,7 @@ import {
 } from "@/hooks/useBilling";
 import { ACTIVE_REVIEW_KEY } from "@/components/PlanSelectionGate";
 import { subscribeToastAction } from "@/components/SubscribeToastAction";
-import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON } from "@/lib/trialCopy";
+import { TRIAL_CAP_BUTTON, isTrialLimitMessage } from "@/lib/trialCopy";
 
 function setActiveReview(id: number | null) {
   try {
@@ -150,7 +150,7 @@ export default function Scan() {
     const reason = billing ? uploadBlockedReason(billing) : "We couldn't confirm your plan. Check your connection and try again.";
     if (reason) {
       toast({ title: "Upload not available", description: reason, variant: "destructive",
-        ...(reason === TRIAL_CAP_MESSAGE ? { action: subscribeToastAction(setLocation) } : {}) });
+        ...(isTrialLimitMessage(reason) ? { action: subscribeToastAction(setLocation) } : {}) });
       void billingQuery.refetch();
       return false;
     }
@@ -406,7 +406,7 @@ export default function Scan() {
           : uploadBlockedReason(latest);
         if (reason) {
           toast({ title: "Upload not available", description: reason, variant: "destructive",
-            ...(reason === TRIAL_CAP_MESSAGE ? { action: subscribeToastAction(setLocation) } : {}) });
+            ...(isTrialLimitMessage(reason) ? { action: subscribeToastAction(setLocation) } : {}) });
           return;
         }
         const { uploadURL, objectPath } = await customFetch<{
@@ -448,7 +448,7 @@ export default function Scan() {
         if (quota) {
           void refreshBilling();
           toast({ title: "Upload limit reached", description: quota, variant: "destructive",
-            ...(quota === TRIAL_CAP_MESSAGE ? { action: subscribeToastAction(setLocation) } : {}) });
+            ...(isTrialLimitMessage(quota) ? { action: subscribeToastAction(setLocation) } : {}) });
           return;
         }
         toast({

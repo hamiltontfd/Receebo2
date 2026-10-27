@@ -1,4 +1,5 @@
 import type { MailMessage } from "./types";
+import { merchantTier, type MerchantTier } from "./merchants";
 
 /**
  * Heuristics that decide which emails are worth sending to the AI extractor.
@@ -24,7 +25,7 @@ const SUBJECT_PATTERN = new RegExp(
 
 // Sender local-parts / domains that typically send orders and receipts.
 const SENDER_PATTERN =
-  /(auto-confirm|order-update|orders?|receipts?|invoices?|billing|faturas?|faturacao|encomendas?|pedidos?|shipment-tracking|confirm(ation)?|purchases?)@|@(.+\.)?(amazon\.[a-z.]+|apple\.com|paypal\.[a-z.]+|aliexpress\.com|ebay\.[a-z.]+|zalando\.[a-z.]+|ikea\.com|fnac\.pt|worten\.pt|continente\.pt|pccomponentes\.(pt|com)|decathlon\.[a-z.]+|leroymerlin\.pt|temu\.com|shein\.com)\b/i;
+  /(auto-confirm|order-update|orders?|receipts?|invoices?|billing|faturas?|faturacao|encomendas?|pedidos?|shipment-tracking|confirm(ation)?|purchases?)@|@(.+\.)?(amazon\.[a-z.]+|apple\.com|paypal\.[a-z.]+|aliexpress\.com|ebay\.[a-z.]+|zalando\.[a-z.]+|ikea\.com|fnac\.pt|worten\.pt|pccomponentes\.(pt|com)|decathlon\.[a-z.]+|leroymerlin\.pt|temu\.com|shein\.com|ticketline\.pt|seetickets\.com|everythingisnew\.pt|blueticket\.pt|eventbrite\.com|ticketmaster\.[a-z.]+)\b/i;
 
 // Things that look like receipts by keyword but are almost never purchases.
 const EXCLUDE_SUBJECT_PATTERN =
@@ -40,19 +41,70 @@ export function looksLikeReceiptEmail(input: {
   return SUBJECT_PATTERN.test(subject) || SENDER_PATTERN.test(from);
 }
 
+// Recurring bills (utilities, telecoms, subscriptions) are not purchases we import.
+const UTILITY_SUBJECT_PATTERN =
+  /(fatura|factura|conta) (de |da |do )?(eletricidade|electricidade|luz|g[aá]s|[aá]gua|telecomunica[cç][oõ]es|internet|telem[oó]vel)|electricity bill|utility bill|gas bill|water bill|phone bill|d[eé]bito direto|direct debit|aviso de pagamento|payment reminder|fatura mensal|monthly (bill|statement)|extrato/i;
+// Strong purchase signals in the subject.
+const STRONG_SUBJECT_PATTERN =
+  /(fatura|factura|invoice|recibo|receipt|order confirm|confirma[cç][aã]o (da |de )?(encomenda|compra|pedido)|encomenda confirmada|pedido confirmado|your order|\border\b|a sua encomenda|\bencomenda\b|\bpedido\b|bilhete|e-?ticket|tickets?\b|ingressos?)/i;
+const DURABLE_KEYWORD_PATTERN =
+  /(port[aá]til|laptop|iphone|ipad|macbook|smartphone|telem[oó]vel|\btv\b|televis|frigor[ií]fico|m[aá]quina de lavar|aspirador|headphones|auscultadores|monitor|consola|playstation|xbox|nintendo|c[aâ]mara|camera|forno|micro-?ondas|bicicleta|smartwatch)/i;
+const SHIPPING_ONLY_PATTERN =
+  /(enviad[oa]|em tr[aâ]nsito|entregue|a caminho|shipped|shipping|shipment|dispatched|out for delivery|delivered|delivery update|tracking|track your|envio|expedi[cç][aã]o)/i;
+const INVOICE_PATTERN = /(fatura|factura|invoice|recibo|receipt)/i;
+const MARKETING_PATTERN = /(promo|desconto|% off|\bsale\b|saldos|black friday|newsletter|oferta|cup[aã]o|coupon)/i;
+
+const TIER_SCORE: Record<Exclude<MerchantTier, "everyday">, number> = {
+  durable: 40,
+  tickets: 30,
+  marketplace: 15,
+};
+
+export interface ListingScore {
+  /** false = never sent to the AI (not receipt-like, everyday/utility, marketing, shipping-only). */
+  include: boolean;
+  score: number;
+  reason: "not_receipt_like" | "everyday_sender" | "utility_bill" | "low_score" | "ok";
+}
+
+/**
+ * Rank a listing (subject + sender + attachment flag) before any AI call.
+ * Only clear purchase emails are included; the highest scores are read first
+ * so the per-trial AI read cap goes to likely warranty/return items.
+ */
+export function scoreReceiptListing(input: {
+  subject: string | null;
+  from: string | null;
+  hasAttachments?: boolean;
+}): ListingScore {
+  if (!looksLikeReceiptEmail(input)) return { include: false, score: 0, reason: "not_receipt_like" };
+  const tier = merchantTier(input.from);
+  if (tier === "everyday") return { include: false, score: 0, reason: "everyday_sender" };
+  const subject = input.subject ?? "";
+  if (UTILITY_SUBJECT_PATTERN.test(subject)) return { include: false, score: 0, reason: "utility_bill" };
+  let score = 10;
+  if (tier) score += TIER_SCORE[tier];
+  if (STRONG_SUBJECT_PATTERN.test(subject)) score += 20;
+  if (input.hasAttachments) score += 10;
+  if (DURABLE_KEYWORD_PATTERN.test(subject)) score += 15;
+  if (SHIPPING_ONLY_PATTERN.test(subject) && !INVOICE_PATTERN.test(subject)) score -= 20;
+  if (MARKETING_PATTERN.test(subject)) score -= 40;
+  return score >= 10 ? { include: true, score, reason: "ok" } : { include: false, score, reason: "low_score" };
+}
+
 /** Cheap pre-filter on list results (subject + sender only). */
 export function isLikelyReceiptListing(input: {
   subject: string | null;
   from: string | null;
   hasAttachments?: boolean;
 }): boolean {
-  return looksLikeReceiptEmail(input);
+  return scoreReceiptListing(input).include;
 }
 
 export type MessageImportPlan =
   | { kind: "pdf"; attachments: MailMessage["pdfAttachments"] }
   | { kind: "html"; text: string }
-  | { kind: "skip"; reason: "no_content" | "not_receipt_like" };
+  | { kind: "skip"; reason: "no_content" | "not_receipt_like" | "everyday_sender" | "utility_bill" | "low_score" };
 
 /** Minimum body length worth sending to the AI. */
 const MIN_BODY_TEXT_LENGTH = 80;
@@ -67,6 +119,12 @@ export const MAX_BODY_TEXT_LENGTH = 20_000;
  * - otherwise skip.
  */
 export function planMessageImport(message: MailMessage): MessageImportPlan {
+  // Groceries, utilities, telecoms and other recurring bills never reach the
+  // AI, even with a PDF attached (e.g. an EDP or Continente invoice).
+  const listing = scoreReceiptListing({ ...message, hasAttachments: message.pdfAttachments.length > 0 });
+  if (listing.reason === "everyday_sender" || listing.reason === "utility_bill") {
+    return { kind: "skip", reason: listing.reason };
+  }
   if (message.pdfAttachments.length > 0) {
     return { kind: "pdf", attachments: message.pdfAttachments };
   }

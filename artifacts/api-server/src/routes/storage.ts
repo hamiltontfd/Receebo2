@@ -11,6 +11,7 @@ import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { lockUserDataMutation } from "../lib/userDataLock";
 import { getSubscriptionStatus, receiptCapReached } from "../lib/subscriptionStatus";
 import { reserveTrialUpload, TRIAL_CAP_ERROR } from "../lib/accountTrial";
+import { aiReadCapApplies, trialAiReadsRemaining, TRIAL_AI_READS_ERROR } from "../lib/trialAiReads";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
 
 const router: IRouter = Router();
@@ -53,6 +54,12 @@ router.post("/storage/uploads/request-url", requireAuthOrGuest, requireCurrentLe
       res.status(403).json({ error: "subscription_required", code: subscription.accessState,
         message: subscription.canUseApp ? "Your remaining free receipts are still processing. Try again in a moment, or subscribe to add more." :
           "Your trial has ended. Subscribe as a Founding Customer to continue." });
+      return;
+    }
+    // Each new receipt costs one AI read; extra pages for an existing receipt don't.
+    if (attachmentReceiptId === undefined && aiReadCapApplies(subscription.accessState) &&
+      (await trialAiReadsRemaining(req.userId!)) < 1) {
+      res.status(403).json(TRIAL_AI_READS_ERROR);
       return;
     }
     if (attachmentReceiptId !== undefined) {

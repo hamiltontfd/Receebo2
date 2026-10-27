@@ -86,6 +86,8 @@ import { runReturnWindowSweep, runWarrantyReminderSweep } from "../lib/orphanCle
 import { claimScheduledRun } from "../lib/scheduledJobLock";
 import { scheduledJobRunsTable } from "@workspace/db";
 import { calcReturnWindow } from "../lib/returnWindowCalc";
+import { migrateTrialAiReads, TRIAL_AI_READ_LIMIT, TRIAL_AI_READS_MESSAGE, claimTrialAiRead, countTrialAiReads } from "../lib/trialAiReads";
+import { sql } from "drizzle-orm";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -102,6 +104,7 @@ const extractionData = {
 };
 
 beforeAll(async () => {
+  await migrateTrialAiReads();
   const app = express();
   app.use(express.json(), (req, _res, next) => {
     req.log = { error() {}, warn() {}, info() {} } as any;
@@ -123,6 +126,7 @@ afterAll(async () => {
     await db.delete(userBillingTable).where(eq(userBillingTable.userId, id));
     await db.delete(accountTrialsTable).where(eq(accountTrialsTable.userId, id));
     await db.delete(trialFunnelSubjectsTable).where(eq(trialFunnelSubjectsTable.userId, id));
+    await db.execute(sql`DELETE FROM trial_ai_reads WHERE user_id = ${id}`);
   }
   for (const token of guestTokens) await db.delete(guestSessionsTable).where(eq(guestSessionsTable.token, token));
 });
@@ -387,6 +391,34 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
     expect(row.endsAt.getTime() - row.startedAt.getTime()).toBe(TRIAL_DURATION_MS);
     expect(await getSubscriptionStatus(userId)).toMatchObject({ accessState: "account_trial", canUseApp: true, canUpload: true });
   });
+  it("caps AI reads at 10 per trial (uploads + email), counting discarded reads, never for paid users", async () => {
+    expect(TRIAL_AI_READ_LIMIT).toBe(10);
+    await start();
+    fixture.check.mockResolvedValueOnce(false);
+    await upload(); // not a receipt: slot released, but the AI read is used
+    expect(await countTrialAiReads(userId)).toBe(1);
+    expect((await getSubscriptionStatus(userId)).trialUploadsUsed).toBe(0);
+    // Email imports share the same budget.
+    for (let i = 1; i < TRIAL_AI_READ_LIMIT; i++) expect(await claimTrialAiRead(userId, "email", `m${i}`)).toBe(true);
+    expect(await claimTrialAiRead(userId, "email", "one-too-many")).toBe(false);
+    expect(await countTrialAiReads(userId)).toBe(TRIAL_AI_READ_LIMIT);
+    const refused = await url();
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ code: "trial_ai_reads_exhausted", message: TRIAL_AI_READS_MESSAGE });
+    const calls = fixture.extraction.mock.calls.length + fixture.check.mock.calls.length;
+    // A raced upload past the cap is not sent to the AI.
+    await db.execute(sql`DELETE FROM trial_ai_reads WHERE user_id = ${userId} AND ref = 'm9'`);
+    const issuance = await url();
+    expect(issuance.status).toBe(200);
+    const { objectPath } = await issuance.json();
+    await claimTrialAiRead(userId, "email", "raced");
+    const created = await request("/receipts", { objectPath, originalFileName: "late.pdf", contentType: "application/pdf" });
+    expect(created.status).toBe(201);
+    const { id } = await created.json();
+    await expect.poll(async () => (await db.select().from(receiptsTable).where(eq(receiptsTable.id, id)))[0].status,
+      { timeout: 8000 }).toBe("failed");
+    expect(fixture.extraction.mock.calls.length + fixture.check.mock.calls.length).toBe(calls);
+  }, 20000);
   it("reserves at most five slots with concurrent requests from multiple devices", async () => {
     await start();
     const responses = await Promise.all(Array.from({ length: 8 }, () => url()));

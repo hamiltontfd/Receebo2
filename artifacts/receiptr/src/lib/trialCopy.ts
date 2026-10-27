@@ -13,6 +13,21 @@ export const TRIAL_LENGTH_DAYS = 15;
 /** One-line notice + server error message once the 5 free receipts are used. */
 export const TRIAL_CAP_MESSAGE = "You've used your 5 free receipts. Subscribe to add more.";
 export const TRIAL_CAP_BUTTON = "Subscribe";
+
+/**
+ * Free reads by the AI per trial (uploads + Outlook imports, saved or not).
+ * Keep in sync with api-server/src/lib/trialAiReads.ts.
+ *   pt-PT: "Já usou as 10 leituras grátis do seu período experimental. Subscreva para adicionar mais."
+ *   pt-BR: "Você já usou as 10 leituras grátis do seu teste. Assine para adicionar mais."
+ */
+export const TRIAL_AI_READ_LIMIT = 10;
+export const TRIAL_AI_READS_MESSAGE =
+  "You've used the 10 free receipt reads in your trial. Subscribe to add more.";
+
+/** Messages that get a Subscribe action next to them. */
+export function isTrialLimitMessage(message: string | null | undefined): boolean {
+  return message === TRIAL_CAP_MESSAGE || message === TRIAL_AI_READS_MESSAGE;
+}
 /** Existing paywall / Stripe Checkout plan picker. */
 export const SUBSCRIBE_HREF = "/settings#upgrade-plans";
 

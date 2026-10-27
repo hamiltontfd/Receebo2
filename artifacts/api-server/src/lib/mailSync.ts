@@ -34,6 +34,8 @@ import {
 import { isAccountDeletionInProgress } from "./accountDeletionState";
 import { withUserDataLock } from "./userDataLock";
 import { planMessageImport } from "./mailProviders/candidates";
+import { isEverydayMerchantName } from "./mailProviders/merchants";
+import { aiReadCapApplies, claimTrialAiRead, trialAiReadsRemaining } from "./trialAiReads";
 import { renderTextPdf } from "./textPdf";
 import type { MailMessage, MailProvider } from "./mailProviders/types";
 
@@ -111,6 +113,30 @@ function toPendingExtractionData(
     purchaseCountry: extraction.purchaseCountry,
     isOnlinePurchase: extraction.isOnlinePurchase,
   };
+}
+
+/**
+ * Groceries, utilities and other everyday bills are not imported even when
+ * the AI says they are receipts (the sender filter catches most before AI).
+ */
+export function isEverydayExtraction(extraction: Pick<ExtractedReceipt, "category" | "merchant">): boolean {
+  return extraction.category === "Groceries" || isEverydayMerchantName(extraction.merchant);
+}
+
+/**
+ * A purchase can't happen after the email that reports it was received. When
+ * the AI returns a later date (typically a bill's due date), use the date the
+ * email was received instead (close to the issue date).
+ */
+export function clampPurchaseDateToReceived(
+  purchaseDate: string | null,
+  receivedAt: string | null,
+): string | null {
+  if (!purchaseDate || !receivedAt) return purchaseDate;
+  const received = new Date(receivedAt);
+  if (Number.isNaN(received.getTime())) return purchaseDate;
+  const receivedDay = received.toISOString().slice(0, 10);
+  return purchaseDate > receivedDay ? receivedDay : purchaseDate;
 }
 
 /** Plain-text proof-of-purchase document for HTML-body imports. */
@@ -212,9 +238,14 @@ async function claimImport(
 export async function syncMailboxClaimed(
   userId: string,
   provider: MailProvider,
+  options: { aiReadCap?: boolean } = {},
 ): Promise<MailSyncResult> {
   const logger = provider.logger;
   const label = provider.label;
+  // No-card trials have a fixed AI read budget shared with uploads.
+  const aiReadCap = options.aiReadCap ?? aiReadCapApplies(
+    (await (await import("./subscriptionStatus")).getSubscriptionStatus(userId)).accessState,
+  );
 
   if (await isAccountDeletionInProgress(userId)) {
     logger.info(
@@ -286,6 +317,14 @@ export async function syncMailboxClaimed(
         return { checked, queued };
       }
 
+      if (aiReadCap && (await trialAiReadsRemaining(userId)) < 1) {
+        // Trial AI budget used up: stop before spending anything else. The
+        // message stays unseen so it can be imported after subscribing.
+        logger.info({ userId }, `${label} sync: trial AI read limit reached, stopping`);
+        await provider.markSynced(userId);
+        return { checked, queued };
+      }
+
       if (unit.kind === "html" && bodyExtractions >= MAX_BODY_EXTRACTIONS_PER_RUN) {
         // Leave for the next run instead of spending more AI calls now.
         retryableFailure = true;
@@ -333,6 +372,12 @@ export async function syncMailboxClaimed(
           return { checked, queued };
         }
 
+        if (aiReadCap && !(await claimTrialAiRead(userId, "email", messageId))) {
+          await cleanupSyncObject(provider, userId, objectPath, "trial AI read limit");
+          await db.delete(pendingImportsTable).where(ownedClaim);
+          await provider.markSynced(userId);
+          return { checked, queued };
+        }
         try {
           extraction = await extractReceiptData(objectPath, "application/pdf");
         } catch (err) {
@@ -343,6 +388,11 @@ export async function syncMailboxClaimed(
           continue;
         }
       } else {
+        if (aiReadCap && !(await claimTrialAiRead(userId, "email", messageId))) {
+          await db.delete(pendingImportsTable).where(ownedClaim);
+          await provider.markSynced(userId);
+          return { checked, queued };
+        }
         bodyExtractions++;
         try {
           extraction = await extractReceiptDataFromText(unit.text, {
@@ -358,10 +408,11 @@ export async function syncMailboxClaimed(
         }
       }
 
-      if (!extraction.isReceipt) {
+      const everyday = extraction.isReceipt && isEverydayExtraction(extraction);
+      if (!extraction.isReceipt || everyday) {
         logger.info(
-          { messageId, source: unit.kind },
-          `${label} sync: ${unit.kind === "pdf" ? "PDF" : "email body"} is not a receipt, skipping`,
+          { messageId, source: unit.kind, everyday },
+          `${label} sync: ${unit.kind === "pdf" ? "PDF" : "email body"} is ${everyday ? "a grocery/utility bill" : "not a receipt"}, skipping`,
         );
         if (objectPath) await cleanupSyncObject(provider, userId, objectPath, "not a receipt");
         const [deletedClaim] = await db
@@ -371,6 +422,11 @@ export async function syncMailboxClaimed(
         if (!deletedClaim) retryableFailure = true;
         continue;
       }
+
+      extraction = {
+        ...extraction,
+        purchaseDate: clampPurchaseDateToReceived(extraction.purchaseDate, message.receivedAt),
+      };
 
       if (unit.kind === "html") {
         try {
@@ -442,6 +498,6 @@ export async function syncUserMailbox(
     const { getSubscriptionStatus } = await import("./subscriptionStatus");
     const access = await getSubscriptionStatus(userId);
     if (!access.canUpload) return { checked: 0, queued: 0 };
-    return syncMailboxClaimed(userId, provider);
+    return syncMailboxClaimed(userId, provider, { aiReadCap: aiReadCapApplies(access.accessState) });
   });
 }

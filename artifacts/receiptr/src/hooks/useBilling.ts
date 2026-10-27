@@ -12,7 +12,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { recordCheckoutCancellation } from "@/lib/trialFunnel";
 import {
-  TRIAL_RECEIPT_LIMIT, TRIAL_LENGTH_DAYS, TRIAL_CAP_MESSAGE, TRIAL_EXPIRED_MESSAGE,
+  TRIAL_RECEIPT_LIMIT, TRIAL_LENGTH_DAYS, TRIAL_CAP_MESSAGE, TRIAL_EXPIRED_MESSAGE, TRIAL_AI_READS_MESSAGE,
 } from "@/lib/trialCopy";
 
 const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
@@ -115,6 +115,7 @@ export function quotaErrorMessage(err: unknown): string | null {
   if (err.status !== 402 && err.status !== 403 && err.status !== 429) return null;
   const data = err.data as { error?: string; code?: string; message?: string } | null;
   const code = `${data?.code ?? ""} ${data?.error ?? ""}`.toLowerCase();
+  if (code.includes("ai_reads")) return TRIAL_AI_READS_MESSAGE;
   if (code.includes("exhaust") || code.includes("quota") || code.includes("upload"))
     return TRIAL_CAP_MESSAGE;
   if (code.includes("expire")) return TRIAL_EXPIRED_MESSAGE;

@@ -5,6 +5,7 @@ import { logger } from "./logger";
 import { isAccountDeletionInProgress } from "./accountDeletionState";
 import { withUserDataLock } from "./userDataLock";
 import { finishTrialUpload } from "./accountTrial";
+import { aiReadCapApplies, claimTrialAiRead } from "./trialAiReads";
 
 function deduplicateProducts(products: ExtractedProduct[]): ExtractedProduct[] {
   const seen = new Map<string, ExtractedProduct>();
@@ -59,6 +60,20 @@ async function sleep(ms: number): Promise<void> {
 async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<void> {
   const { receiptId, objectPath, contentType } = job;
   logger.info({ receiptId, attempt }, "Extraction job starting");
+
+  if (attempt === 0) {
+    // No-card trials have a fixed AI read budget (uploads + email imports).
+    // Retries of the same upload are not counted again.
+    const { getSubscriptionStatus } = await import("./subscriptionStatus");
+    const access = await getSubscriptionStatus(job.userId);
+    if (aiReadCapApplies(access.accessState) &&
+      !(await claimTrialAiRead(job.userId, "upload", String(receiptId)))) {
+      logger.info({ receiptId }, "Trial AI read limit reached; extraction not run");
+      await rejectReceipt(receiptId, objectPath, "failed");
+      activeJobs.delete(receiptId);
+      return;
+    }
+  }
 
   try {
     // Fast pre-check: cheap AI call that only answers "is this a receipt?"

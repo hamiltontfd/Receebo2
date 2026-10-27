@@ -31,3 +31,4 @@ export * from "./accountTrials";
 export * from "./trialFunnel";
 export * from "./paymentNotices";
 export * from "./scheduledJobRuns";
+export * from "./trialAiReads";

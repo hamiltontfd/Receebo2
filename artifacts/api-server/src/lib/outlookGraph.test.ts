@@ -154,6 +154,19 @@ describe("Microsoft Graph client", () => {
     expect(fetchImpl.mock.calls[0]![1].headers.Authorization).toBe("Bearer AT");
   });
 
+  it("returns the best purchase candidates first and never lists grocery/utility senders", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse(200, {
+      value: [
+        { id: "unknown", subject: "Fatura n.º 12", from: { emailAddress: { address: "billing@shop.pt" } } },
+        { id: "edp", subject: "Fatura", from: { emailAddress: { name: "EDP Comercial", address: "faturas@edp.pt" } } },
+        { id: "worten", subject: "Fatura da encomenda", hasAttachments: true, from: { emailAddress: { address: "faturas@worten.pt" } } },
+        { id: "continente", subject: "Recibo", from: { emailAddress: { address: "recibos@continente.pt" } } },
+        { id: "amazon", subject: "Your Amazon.es order", from: { emailAddress: { address: "auto-confirm@amazon.es" } } },
+      ],
+    }));
+    expect(await listOutlookCandidateIds("AT", { fetchImpl })).toEqual(["worten", "amazon", "unknown"]);
+  });
+
   it("stops at the per-run candidate cap", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, {
       value: Array.from({ length: 50 }, (_, i) => ({ id: `m${i}`, subject: "Your order" })),

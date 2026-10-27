@@ -12,7 +12,7 @@
  * Errors never include response bodies, tokens or email content; only an
  * HTTP status and (for OAuth) the standard error code.
  */
-import { isLikelyReceiptListing } from "./mailProviders/candidates";
+import { scoreReceiptListing } from "./mailProviders/candidates";
 import type { MailMessage } from "./mailProviders/types";
 
 export const OUTLOOK_SCOPES = ["openid", "email", "offline_access", "User.Read", "Mail.Read"];
@@ -262,27 +262,30 @@ export async function listOutlookCandidateIds(
     `&$orderby=${encodeURIComponent("receivedDateTime desc")}` +
     `&$select=id,subject,from,receivedDateTime,hasAttachments&$top=50`;
 
-  const ids: string[] = [];
+  const candidates: Array<{ id: string; score: number; order: number }> = [];
   let scanned = 0;
-  while (url && scanned < maxScanned && ids.length < maxCandidates) {
+  while (url && scanned < maxScanned && candidates.length < maxCandidates) {
     const page: { value?: GraphMessageListing[]; "@odata.nextLink"?: string } =
       await graphGet(accessToken, url, options);
     for (const message of page.value ?? []) {
       scanned++;
-      if (
-        isLikelyReceiptListing({
-          subject: message.subject ?? null,
-          from: formatGraphSender(message.from),
-          hasAttachments: message.hasAttachments,
-        })
-      ) {
-        ids.push(message.id);
-        if (ids.length >= maxCandidates) break;
+      const listing = scoreReceiptListing({
+        subject: message.subject ?? null,
+        from: formatGraphSender(message.from),
+        hasAttachments: message.hasAttachments,
+      });
+      if (listing.include) {
+        candidates.push({ id: message.id, score: listing.score, order: candidates.length });
+        if (candidates.length >= maxCandidates) break;
       }
     }
     url = page["@odata.nextLink"];
   }
-  return ids;
+  // Highest score first (clear purchases from durable/ticket stores), then
+  // newest first, so a capped AI budget is spent on the best candidates.
+  return candidates
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .map((c) => c.id);
 }
 
 interface GraphMessage extends GraphMessageListing {

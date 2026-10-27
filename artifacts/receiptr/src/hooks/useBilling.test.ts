@@ -12,7 +12,7 @@ import {
   TRIAL_DAYS,
   type BillingStatus,
 } from "./useBilling";
-import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON } from "@/lib/trialCopy";
+import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON, TRIAL_AI_READS_MESSAGE, isTrialLimitMessage } from "@/lib/trialCopy";
 
 const b = (x: Partial<BillingStatus>) => ({ plan: "free", trialEndAt: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, ...x }) as BillingStatus;
 
@@ -62,5 +62,13 @@ describe("billing access helpers", () => {
     const server = new ApiError(new Response(null, { status: 403 }), { error: "subscription_required", code: "trial_exhausted" }, { method: "POST", url: "/x" });
     expect(quotaErrorMessage(server)).toBe(TRIAL_CAP_MESSAGE);
     expect(quotaErrorMessage(new Error("x"))).toBeNull();
+  });
+  it("maps the trial AI read cap to its own copy with a Subscribe action", () => {
+    const server = new ApiError(new Response(null, { status: 403 }), { error: "subscription_required", code: "trial_ai_reads_exhausted" }, { method: "POST", url: "/x" });
+    expect(quotaErrorMessage(server)).toBe(TRIAL_AI_READS_MESSAGE);
+    expect(TRIAL_AI_READS_MESSAGE).toBe("You've used the 10 free receipt reads in your trial. Subscribe to add more.");
+    expect(isTrialLimitMessage(TRIAL_AI_READS_MESSAGE)).toBe(true);
+    expect(isTrialLimitMessage(TRIAL_CAP_MESSAGE)).toBe(true);
+    expect(isTrialLimitMessage("Upload failed")).toBe(false);
   });
 });

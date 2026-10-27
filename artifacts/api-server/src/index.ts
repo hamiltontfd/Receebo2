@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { billingOrigin } from "./lib/billingUrls";
 import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
 import { extendTrialsToCurrentDuration } from "./lib/accountTrial";
+import { migrateTrialAiReads } from "./lib/trialAiReads";
 
 const rawPort = process.env["PORT"];
 
@@ -406,6 +407,11 @@ async function start(): Promise<void> {
   // Apply schema migrations synchronously before accepting requests
   await runStartupMigrations();
   await migrateTrialFunnel();
+  try {
+    await migrateTrialAiReads();
+  } catch (err) {
+    logger.warn({ err }, "Trial AI reads migration warning (non-fatal) — continuing");
+  }
   // Trials started under the old 7-day rule get the full 15 days from their
   // original start (idempotent; also reopens 7-day trials that ended < 15 days ago).
   try {

@@ -4,7 +4,9 @@ import {
   htmlToText,
   looksLikeReceiptEmail,
   planMessageImport,
+  scoreReceiptListing,
 } from "./candidates";
+import { merchantTier, isEverydayMerchantName } from "./merchants";
 import type { MailMessage } from "./types";
 
 function message(overrides: Partial<MailMessage> = {}): MailMessage {
@@ -108,5 +110,52 @@ describe("htmlToText", () => {
     expect(htmlToText("<table><tr><td>A</td><td>1</td></tr><tr><td>B</td><td>2</td></tr></table>"))
       .toBe("A 1\nB 2");
     expect(htmlToText("Line 1<br>Line 2")).toBe("Line 1\nLine 2");
+  });
+});
+
+describe("pre-AI ranking: only clear purchases, groceries and utilities skipped", () => {
+  it.each([
+    ["Fatura EDP Comercial", "EDP Comercial <faturas@edp.pt>"],
+    ["A sua fatura", "Continente <noreply@continente.pt>"],
+    ["Recibo da sua compra", "Pingo Doce <recibos@pingodoce.pt>"],
+    ["Your receipt", "Uber Receipts <noreply@uber.com>"],
+    ["Fatura de eletricidade outubro", "billing@energia.example"],
+    ["Fatura", "MEO <faturas@telecom.pt>"],
+  ])("skips subject=%s from=%s before any AI read", (subject, from) => {
+    const result = scoreReceiptListing({ subject, from, hasAttachments: true });
+    expect(result.include).toBe(false);
+    expect(["everyday_sender", "utility_bill"]).toContain(result.reason);
+  });
+
+  it("ranks durable stores and tickets above marketplaces and unknown senders", () => {
+    const worten = scoreReceiptListing({ subject: "Fatura da sua encomenda", from: "Worten <faturas@mail.worten.pt>", hasAttachments: true });
+    const tickets = scoreReceiptListing({ subject: "Os seus bilhetes", from: "Ticketline <noreply@ticketline.pt>" });
+    const amazon = scoreReceiptListing({ subject: "Your Amazon.es order", from: "auto-confirm@amazon.es" });
+    const unknown = scoreReceiptListing({ subject: "Fatura n.º 12", from: "billing@shop.pt" });
+    for (const r of [worten, tickets, amazon, unknown]) expect(r.include).toBe(true);
+    expect(worten.score).toBeGreaterThan(tickets.score);
+    expect(tickets.score).toBeGreaterThan(amazon.score);
+    expect(amazon.score).toBeGreaterThan(unknown.score);
+  });
+
+  it("drops shipping-only updates and marketing", () => {
+    expect(scoreReceiptListing({ subject: "Shipping update", from: "orders@shop.example" }).include).toBe(false);
+    expect(scoreReceiptListing({ subject: "Desconto de 20% na sua próxima compra", from: "orders@shop.example" }).include).toBe(false);
+  });
+
+  it("never sends an everyday sender's PDF to the AI", () => {
+    const plan = planMessageImport(message({
+      subject: "Fatura", from: "EDP Comercial <faturas@edp.pt>",
+      pdfAttachments: [{ id: "a1", filename: "fatura.pdf" }],
+    }));
+    expect(plan).toEqual({ kind: "skip", reason: "everyday_sender" });
+  });
+
+  it("matches mailing subdomains and display names", () => {
+    expect(merchantTier("FNAC <news@em.fnac.pt>")).toBe("durable");
+    expect(merchantTier("EDP Comercial <no-reply@invoicing.example>")).toBe("everyday");
+    expect(merchantTier("friend@example.com")).toBeNull();
+    expect(isEverydayMerchantName("Continente Bom Dia")).toBe(true);
+    expect(isEverydayMerchantName("Worten")).toBe(false);
   });
 });
