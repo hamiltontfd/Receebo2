@@ -20,6 +20,21 @@ import { migrateAccountDeletionCodes } from "./lib/accountDeletionCode";
 import { migrateReceiptDeliveryDate, migrateReceiptWarrantyColumns } from "./lib/receiptColumns";
 import { backfillWarrantyExpiries } from "./lib/warrantyExpiryStore";
 
+// Log-only: a stray rejected promise must not take the whole API down. Only the
+// error name, code and stack frames are logged (messages from provider SDKs can
+// carry credentials). uncaughtException keeps the default Node crash.
+process.on("unhandledRejection", (reason) => {
+  const e = reason as { name?: unknown; code?: unknown; stack?: unknown } | null | undefined;
+  logger.error(
+    {
+      name: typeof e?.name === "string" ? e.name : typeof reason,
+      ...(typeof e?.code === "string" ? { code: e.code } : {}),
+      frames: typeof e?.stack === "string" ? e.stack.split("\n").slice(1, 6).map((l) => l.trim()) : undefined,
+    },
+    "Unhandled promise rejection",
+  );
+});
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {

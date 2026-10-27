@@ -1,5 +1,7 @@
 import Stripe from "stripe";
 import { StripeSync } from "stripe-replit-sync";
+import { guardPoolErrors } from "@workspace/db";
+import { logger } from "./lib/logger";
 
 async function resolveStripeSecretKey(): Promise<string> {
   const production = process.env.NODE_ENV === "production";
@@ -84,9 +86,21 @@ export async function getStripeSync(): Promise<StripeSync> {
   //
   // Passing STRIPE_WEBHOOK_SECRET here would break production if the shared
   // secret corresponds to the dev webhook endpoint (different signing key).
-  return new StripeSync({
+  const sync = new StripeSync({
     poolConfig: { connectionString: databaseUrl },
     stripeSecretKey: secretKey,
     stripeWebhookSecret: "",
   });
+  guardStripeSyncPool(sync);
+  return sync;
+}
+
+/** StripeSync owns its own pg Pool; without an error listener an idle-connection drop crashes the API. */
+export function guardStripeSyncPool(sync: StripeSync): void {
+  const pool = sync.postgresClient?.pool;
+  if (pool && typeof pool.on === "function") {
+    guardPoolErrors(pool, "stripe-sync", (message, details) => logger.error(details, message));
+  } else {
+    logger.warn("StripeSync pool not found; its idle connection errors are unguarded");
+  }
 }

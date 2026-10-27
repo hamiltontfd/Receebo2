@@ -5,7 +5,7 @@
  * routes report "not configured". Background sync runs once a day from the
  * cron endpoint (routes/cron.ts); there is no in-process timer.
  */
-import { advisoryLockPool, db, emailConnectionsTable, type EmailConnection } from "@workspace/db";
+import { db, emailConnectionsTable, type EmailConnection } from "@workspace/db";
 import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { outlookLogger as logger } from "./logger";
 import { decryptToken, encryptToken, hasTokenEncryptionKey } from "./tokenCrypto";
@@ -21,6 +21,7 @@ import {
 } from "./outlookGraph";
 import { syncUserMailbox, type MailSyncResult } from "./mailSync";
 import { isMailProviderEnabled } from "./mailProviders/config";
+import { connectLockClient, unlockAndRelease } from "./userDataLock";
 import {
   MailReconnectRequiredError,
   isReconnectRequiredError,
@@ -243,7 +244,8 @@ export async function runOutlookDailySweep(options: {
   const syncUser = options.syncUser ?? syncUserOutlook;
   const started = now();
 
-  const lockClient = await advisoryLockPool.connect();
+  const lease = await connectLockClient();
+  const lockClient = lease.client;
   let locked = false;
   try {
     const lock = await lockClient.query<{ locked: boolean }>(
@@ -287,10 +289,6 @@ export async function runOutlookDailySweep(options: {
     logger.info({ ...result, elapsedMs: now() - started }, "Outlook sync: daily sweep finished");
     return result;
   } finally {
-    try {
-      if (locked) await lockClient.query("SELECT pg_advisory_unlock(hashtext($1))", [SWEEP_LOCK_KEY]);
-    } finally {
-      lockClient.release();
-    }
+    await unlockAndRelease(lease, SWEEP_LOCK_KEY, locked);
   }
 }
