@@ -118,3 +118,22 @@ describe("unknown purchase channel", () => {
     expect(r.returnWindow?.source).toBe("EU CRD / DL 24/2014");
   });
 });
+
+import { addMonthsClamped } from "./consumerRights";
+
+describe("date edge cases", () => {
+  const day = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  it("clamps to the last day of the month", () => {
+    expect(day(addMonthsClamped(new Date(2026, 0, 31), 1))).toBe("2026-02-28");
+    expect(day(addMonthsClamped(new Date(2027, 7, 31), 6))).toBe("2028-02-29");
+    expect(day(addMonthsClamped(new Date(2028, 1, 29), 12))).toBe("2029-02-28");
+  });
+  it("legal warranty from 29 Feb ends on 28 Feb, not 1 Mar", () => {
+    const r = deriveConsumerRights({ purchaseCountry: "PT", currency: "EUR", merchant: "Shop", category: "Electronics", isOnlinePurchase: false, purchaseDate: "2028-02-29" });
+    expect(day(r.warranty!.expiry)).toBe("2031-02-28");
+  });
+  it("a 1-month manufacturer warranty from 31 Jan ends on 28 Feb", () => {
+    const r = deriveConsumerRights({ purchaseCountry: "PT", currency: "EUR", merchant: "Shop", category: "Electronics", isOnlinePurchase: false, purchaseDate: "2026-01-31", warrantyText: "Garantia do fabricante: 1 mês" });
+    expect(day(r.manufacturerWarranty!.expiry)).toBe("2026-02-28");
+  });
+});

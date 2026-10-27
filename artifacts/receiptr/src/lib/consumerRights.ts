@@ -171,10 +171,17 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
+/** Add whole months, clamped to the last day of the target month (31 Jan + 1 month = 28/29 Feb). */
+export function addMonthsClamped(date: Date, months: number): Date {
+  const y = date.getFullYear();
+  const m = date.getMonth() + months;
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  return new Date(y, m, Math.min(date.getDate(), lastDay));
+}
+
+/** Add whole years, clamped (29 Feb + 1 year = 28 Feb). */
 function addYears(date: Date, years: number): Date {
-  const d = new Date(date);
-  d.setFullYear(d.getFullYear() + years);
-  return d;
+  return addMonthsClamped(date, years * 12);
 }
 
 function daysFromNow(target: Date): number {
@@ -405,8 +412,7 @@ export function deriveConsumerRights(params: {
   let manufacturerWarranty: ManufacturerWarrantyInfo | null = null;
   const months = parseManufacturerWarrantyMonths(params.warrantyText);
   if (months != null) {
-    const expiry = new Date(purchaseDateObj);
-    expiry.setMonth(expiry.getMonth() + months);
+    const expiry = addMonthsClamped(purchaseDateObj, months);
     const daysUntilExpiry = daysFromNow(expiry);
     manufacturerWarranty = {
       label: copy.manufacturerWarranty(months),
