@@ -80,7 +80,7 @@ import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { requireProductAccess } from "../middlewares/productAccess";
 import { getSubscriptionStatus } from "../lib/subscriptionStatus";
 import {
-  trialState, TRIAL_DURATION_MS, TRIAL_LIMIT, TRIAL_CAP_MESSAGE, extendTrialsToCurrentDuration,
+  trialState, TRIAL_DURATION_MS, TRIAL_LIMIT, TRIAL_CAP_MESSAGE, extendTrialsToCurrentDuration, uncountUnsavedTrialDrafts,
 } from "../lib/accountTrial";
 import { runReturnWindowSweep, runWarrantyReminderSweep } from "../lib/orphanCleanup";
 import { claimScheduledRun } from "../lib/scheduledJobLock";
@@ -157,7 +157,8 @@ async function start() {
 async function url() {
   return request("/storage/uploads/request-url", { name: "receipt.pdf", size: 100, contentType: "application/pdf" });
 }
-async function upload() {
+/** Upload + extraction, leaving the receipt as an unsaved draft. */
+async function uploadDraft() {
   const issuance = await url();
   expect(issuance.status).toBe(200);
   const { objectPath } = await issuance.json();
@@ -168,6 +169,15 @@ async function upload() {
     const [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
     return row.status;
   }, { timeout: 8000 }).not.toBe("processing");
+  return receipt;
+}
+/** Upload, extraction and the user's Save after review (what counts toward the cap). */
+async function upload() {
+  const receipt = await uploadDraft();
+  const [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+  if (row.status === "completed") {
+    expect((await request(`/receipts/${receipt.id}`, { isDraft: false }, "PATCH")).status).toBe(200);
+  }
   return receipt;
 }
 
@@ -419,6 +429,45 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
       { timeout: 8000 }).toBe("failed");
     expect(fixture.extraction.mock.calls.length + fixture.check.mock.calls.length).toBe(calls);
   }, 20000);
+  it("counts an upload only once it is saved; discarded drafts and scan attempts never count", async () => {
+    await start();
+    const draft = await uploadDraft();
+    // Extracted but not saved: holds a slot, does not count as used.
+    expect(await getSubscriptionStatus(userId)).toMatchObject({ trialUploadsUsed: 0, trialUploadsRemaining: TRIAL_LIMIT - 1 });
+    // Retake/discard frees the slot.
+    expect((await request(`/receipts/${draft.id}`, undefined, "DELETE")).status).toBe(204);
+    expect(await getSubscriptionStatus(userId)).toMatchObject({ trialUploadsUsed: 0, trialUploadsRemaining: TRIAL_LIMIT });
+    // Saving makes it count; deleting a saved receipt never restores the use.
+    const saved = await uploadDraft();
+    expect((await request(`/receipts/${saved.id}`, { isDraft: false, merchant: "Saved" }, "PATCH")).status).toBe(200);
+    expect((await getSubscriptionStatus(userId)).trialUploadsUsed).toBe(1);
+    expect((await request(`/receipts/${saved.id}`, { isDraft: false, merchant: "Edited again" }, "PATCH")).status).toBe(200);
+    expect((await getSubscriptionStatus(userId)).trialUploadsUsed).toBe(1);
+    expect((await request(`/receipts/${saved.id}`, undefined, "DELETE")).status).toBe(204);
+    expect((await getSubscriptionStatus(userId)).trialUploadsUsed).toBe(1);
+    // An abandoned draft stops holding its slot after 24 h, and saving it later
+    // is refused once the other slots were used.
+    const stale = await uploadDraft();
+    await db.update(trialUploadsTable).set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(trialUploadsTable.objectPath, stale.objectPath));
+    for (let i = 1; i < TRIAL_LIMIT; i++) await upload();
+    expect((await getSubscriptionStatus(userId)).accessState).toBe("trial_exhausted");
+    const late = await request(`/receipts/${stale.id}`, { isDraft: false }, "PATCH");
+    expect(late.status).toBe(403);
+    expect((await late.json()).message).toBe(TRIAL_CAP_MESSAGE);
+    expect((await getSubscriptionStatus(userId)).trialUploadsUsed).toBe(TRIAL_LIMIT);
+  }, 30000);
+  it("migrates drafts counted under the old rule so they count only when saved", async () => {
+    await start();
+    const draft = await uploadDraft();
+    await db.update(trialUploadsTable).set({ state: "succeeded" }).where(eq(trialUploadsTable.objectPath, draft.objectPath));
+    expect((await getSubscriptionStatus(userId)).trialUploadsUsed).toBe(1);
+    await uncountUnsavedTrialDrafts();
+    await uncountUnsavedTrialDrafts();
+    expect((await getSubscriptionStatus(userId)).trialUploadsUsed).toBe(0);
+    expect((await request(`/receipts/${draft.id}`, { isDraft: false }, "PATCH")).status).toBe(200);
+    expect((await getSubscriptionStatus(userId)).trialUploadsUsed).toBe(1);
+  });
   it("reserves at most five slots with concurrent requests from multiple devices", async () => {
     await start();
     const responses = await Promise.all(Array.from({ length: 8 }, () => url()));

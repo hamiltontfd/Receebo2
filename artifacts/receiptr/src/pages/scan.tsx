@@ -524,11 +524,15 @@ export default function Scan() {
       setActiveReview(null);
       void refreshBilling();
       setLocation(`/receipts/${receiptId}`);
-    } catch {
+    } catch (err) {
+      // A receipt counts toward the trial when saved, so the cap can apply here.
+      const quota = quotaErrorMessage(err);
+      if (quota) void refreshBilling();
       toast({
-        title: "Error",
-        description: "Failed to save the purchase.",
+        title: quota ? "Upload limit reached" : "Error",
+        description: quota ?? "Failed to save the purchase.",
         variant: "destructive",
+        ...(isTrialLimitMessage(quota) ? { action: subscribeToastAction(setLocation) } : {}),
       });
     }
   };

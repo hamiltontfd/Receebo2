@@ -12,7 +12,7 @@ import { spawn } from "child_process";
 import { fileURLToPath } from "node:url";
 import { billingOrigin } from "./lib/billingUrls";
 import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
-import { extendTrialsToCurrentDuration } from "./lib/accountTrial";
+import { extendTrialsToCurrentDuration, uncountUnsavedTrialDrafts } from "./lib/accountTrial";
 import { migrateTrialAiReads } from "./lib/trialAiReads";
 
 const rawPort = process.env["PORT"];
@@ -407,6 +407,13 @@ async function start(): Promise<void> {
   // Apply schema migrations synchronously before accepting requests
   await runStartupMigrations();
   await migrateTrialFunnel();
+  try {
+    // Uploads count only once saved: unsaved drafts counted under the old rule stop counting.
+    const uncounted = await uncountUnsavedTrialDrafts();
+    if (uncounted > 0) logger.info({ uncounted }, "Unsaved trial drafts no longer count toward the receipt cap");
+  } catch (err) {
+    logger.warn({ err }, "Trial draft migration warning (non-fatal) — continuing");
+  }
   try {
     await migrateTrialAiReads();
   } catch (err) {

@@ -23,7 +23,9 @@ import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { getSubscriptionStatus, receiptCapReached } from "../lib/subscriptionStatus";
 import { lockUserDataMutation } from "../lib/userDataLock";
-import { consumeTrialReservation, accountTrialStatus, TRIAL_CAP_ERROR } from "../lib/accountTrial";
+import {
+  consumeTrialReservation, accountTrialStatus, confirmTrialReceiptSaved, releaseTrialDraft, TRIAL_CAP_ERROR,
+} from "../lib/accountTrial";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -393,7 +395,14 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
     res.status(403).json({ ...TRIAL_CAP_ERROR, code: "TRIAL_UPLOAD_LIMIT" });
     return;
   }
+  // Saving a reviewed draft is the moment a trial upload counts.
+  const savingDraft = parsed.data.isDraft === false && existing.isDraft && !manualAcceptance;
+  let overCap = false;
   const receipt = await db.transaction(async tx => {
+  if (savingDraft && !(await confirmTrialReceiptSaved(tx, req.userId!, existing.objectPath))) {
+    overCap = true;
+    return undefined;
+  }
   const [updated] = await tx
     .update(receiptsTable)
     .set({
@@ -424,6 +433,10 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   return updated;
   });
 
+  if (overCap) {
+    res.status(403).json(TRIAL_CAP_ERROR);
+    return;
+  }
   if (!receipt) {
     res.status(404).json({ error: "Receipt not found" });
     return;
@@ -480,9 +493,12 @@ router.delete("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (r
     );
   }
 
-  await db
-    .delete(receiptsTable)
-    .where(eq(receiptsTable.id, existing.id));
+  await db.transaction(async tx => {
+    await tx.delete(receiptsTable).where(eq(receiptsTable.id, existing.id));
+    // Discarding an unsaved draft (e.g. Retake) frees its trial slot; deleting
+    // a saved receipt never restores a use.
+    if (existing.isDraft) await releaseTrialDraft(req.userId!, existing.objectPath, tx);
+  });
 
   res.sendStatus(204);
 }));
