@@ -27,6 +27,8 @@ export type PendingImportExtractionData = {
   }>;
   purchaseCountry: string | null;
   isOnlinePurchase: boolean | null;
+  /** Absent on imports stored before delivery dates were extracted. */
+  deliveryDate?: string | null;
 };
 
 /**

@@ -124,6 +124,7 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
         notableItems: data.notableItems,
         purchaseCountry: data.purchaseCountry,
         isOnlinePurchase: data.isOnlinePurchase,
+        deliveryDate: data.deliveryDate,
       })
       .where(eq(receiptsTable.id, receiptId));
     await finishTrialUpload(objectPath, true, receiptId, tx);

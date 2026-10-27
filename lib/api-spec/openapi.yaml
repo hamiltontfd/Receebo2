@@ -490,6 +490,9 @@ components:
         purchaseDate:
           type: ["string", "null"]
           description: Purchase date in ISO format (YYYY-MM-DD).
+        deliveryDate:
+          type: ["string", "null"]
+          description: Date the goods were delivered (YYYY-MM-DD), if known. Return windows count from it, else from the purchase date.
         total:
           type: ["number", "null"]
         currency:
@@ -569,10 +572,15 @@ components:
     ReceiptUpdate:
       type: object
       properties:
+        isOnlinePurchase:
+          type: ["boolean", "null"]
         merchant:
           type: string
         purchaseDate:
           type: string
+        deliveryDate:
+          type: ["string", "null"]
+          description: Delivery date (YYYY-MM-DD); null clears it.
         total:
           type: number
         currency:

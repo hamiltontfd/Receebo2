@@ -36,6 +36,8 @@ export const receiptsTable = pgTable("receipts", {
   warranty: text("warranty"),
   merchant: text("merchant"),
   purchaseDate: date("purchase_date", { mode: "string" }),
+  /** When the goods were delivered (online orders), if known. Return windows count from it. */
+  deliveryDate: date("delivery_date", { mode: "string" }),
   total: doublePrecision("total"),
   currency: text("currency"),
   category: text("category"),

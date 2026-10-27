@@ -112,6 +112,7 @@ function toPendingExtractionData(
     notableItems: extraction.notableItems,
     purchaseCountry: extraction.purchaseCountry,
     isOnlinePurchase: extraction.isOnlinePurchase,
+    deliveryDate: extraction.deliveryDate,
   };
 }
 
@@ -137,6 +138,17 @@ export function clampPurchaseDateToReceived(
   if (Number.isNaN(received.getTime())) return purchaseDate;
   const receivedDay = received.toISOString().slice(0, 10);
   return purchaseDate > receivedDay ? receivedDay : purchaseDate;
+}
+
+/**
+ * A delivery date later than the email is only an estimate ("arrives by…"),
+ * so it is dropped; the return window then counts from the purchase date.
+ */
+export function deliveredByReceived(deliveryDate: string | null, receivedAt: string | null): string | null {
+  if (!deliveryDate || !receivedAt) return deliveryDate;
+  const received = new Date(receivedAt);
+  if (Number.isNaN(received.getTime())) return deliveryDate;
+  return deliveryDate > received.toISOString().slice(0, 10) ? null : deliveryDate;
 }
 
 /** Plain-text proof-of-purchase document for HTML-body imports. */
@@ -426,6 +438,7 @@ export async function syncMailboxClaimed(
       extraction = {
         ...extraction,
         purchaseDate: clampPurchaseDateToReceived(extraction.purchaseDate, message.receivedAt),
+        deliveryDate: deliveredByReceived(extraction.deliveryDate, message.receivedAt),
       };
 
       if (unit.kind === "html") {

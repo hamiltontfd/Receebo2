@@ -74,6 +74,20 @@ function findRetailerDays(merchant?: string | null): number | null {
 export interface ReturnWindowResult {
   deadlineDate: Date;
   daysRemaining: number;
+  /** The window counts from the delivery date when known, else the purchase date. */
+  startsFrom: "delivery" | "purchase";
+}
+
+/**
+ * Start of the return window: the delivery date when it is known and valid
+ * (not before the purchase), otherwise the purchase date.
+ */
+export function returnWindowStart(purchaseDate: string, deliveryDate?: string | null): { date: string; from: "delivery" | "purchase" } {
+  if (deliveryDate && /^\d{4}-\d{2}-\d{2}$/.test(deliveryDate) &&
+      !Number.isNaN(new Date(deliveryDate + "T00:00:00Z").getTime()) && deliveryDate >= purchaseDate) {
+    return { date: deliveryDate, from: "delivery" };
+  }
+  return { date: purchaseDate, from: "purchase" };
 }
 
 /**
@@ -82,6 +96,7 @@ export interface ReturnWindowResult {
  */
 export function calcReturnWindow(params: {
   purchaseDate: string;
+  deliveryDate?: string | null;
   purchaseCountry?: string | null;
   isOnlinePurchase?: boolean | null;
   currency?: string | null;
@@ -92,6 +107,7 @@ export function calcReturnWindow(params: {
   // Parse purchase date — treat as UTC midnight to avoid timezone shifts
   const purchaseDateObj = new Date(purchaseDate + "T00:00:00Z");
   if (isNaN(purchaseDateObj.getTime())) return null;
+  const start = returnWindowStart(purchaseDate, params.deliveryDate);
 
   const countryCode = detectCountry({ currency, purchaseCountry, merchant });
   if (!countryCode) return null;
@@ -113,7 +129,7 @@ export function calcReturnWindow(params: {
 
   if (returnDays == null) return null;
 
-  const deadlineDate = new Date(purchaseDateObj);
+  const deadlineDate = new Date(start.date + "T00:00:00Z");
   deadlineDate.setUTCDate(deadlineDate.getUTCDate() + returnDays);
 
   const todayUtc = new Date();
@@ -122,5 +138,15 @@ export function calcReturnWindow(params: {
     (deadlineDate.getTime() - todayUtc.getTime()) / 86_400_000,
   );
 
-  return { deadlineDate, daysRemaining };
+  return { deadlineDate, daysRemaining, startsFrom: start.from };
+}
+
+/** Delivery date edits: null clears it; otherwise a real YYYY-MM-DD not before the purchase. */
+export function deliveryDateError(deliveryDate: string | null | undefined, purchaseDate: string | null): string | null {
+  if (deliveryDate === undefined || deliveryDate === null) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate) || Number.isNaN(new Date(`${deliveryDate}T00:00:00Z`).getTime())) {
+    return "Delivery date must be a date (YYYY-MM-DD)";
+  }
+  if (purchaseDate && deliveryDate < purchaseDate) return "Delivery date can't be before the purchase date";
+  return null;
 }

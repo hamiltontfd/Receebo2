@@ -182,6 +182,8 @@ export interface ReturnWindowInfo {
   formattedDeadline: string;
   source: string;
   urgency: ReturnUrgency;
+  /** Counted from the delivery date when known, else the purchase date. */
+  startsFrom: "delivery" | "purchase";
 }
 
 export interface StatutoryWarrantyInfo {
@@ -203,8 +205,25 @@ export interface ConsumerRightsResult {
 
 // ── Main derivation ──────────────────────────────────────────────────────────
 
+/** Delivery date when known and not before the purchase; else the purchase date. */
+export function returnWindowStartDate(
+  purchaseDate: string,
+  deliveryDate?: string | null,
+): { date: string; from: "delivery" | "purchase" } {
+  if (
+    deliveryDate &&
+    /^\d{4}-\d{2}-\d{2}$/.test(deliveryDate) &&
+    !isNaN(new Date(deliveryDate + "T00:00:00").getTime()) &&
+    deliveryDate >= purchaseDate
+  ) {
+    return { date: deliveryDate, from: "delivery" };
+  }
+  return { date: purchaseDate, from: "purchase" };
+}
+
 export function deriveConsumerRights(params: {
   purchaseDate?: string | null;
+  deliveryDate?: string | null;
   category?: string | null;
   currency?: string | null;
   purchaseCountry?: string | null;
@@ -253,7 +272,8 @@ export function deriveConsumerRights(params: {
     }
 
     if (returnDays != null && returnSource != null) {
-      const deadline = addDays(purchaseDateObj, returnDays);
+      const start = returnWindowStartDate(purchaseDate, params.deliveryDate);
+      const deadline = addDays(new Date(start.date + "T00:00:00"), returnDays);
       const daysLeft = daysFromNow(deadline);
       const isExpired = daysLeft < 0;
       const urgency: ReturnUrgency =
@@ -266,6 +286,7 @@ export function deriveConsumerRights(params: {
         formattedDeadline: fmtDate(deadline),
         source: returnSource,
         urgency,
+        startsFrom: start.from,
       };
     }
   }

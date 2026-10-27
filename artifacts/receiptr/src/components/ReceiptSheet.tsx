@@ -72,6 +72,7 @@ import {
 const editFormSchema = z.object({
   merchant: z.string().optional(),
   purchaseDate: z.string().optional(),
+  deliveryDate: z.string().optional(),
   total: z.coerce.number().optional(),
   currency: z.string().optional(),
   category: z.string().optional(),
@@ -123,6 +124,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
     defaultValues: {
       merchant: "",
       purchaseDate: "",
+      deliveryDate: "",
       total: undefined,
       currency: "USD",
       category: "",
@@ -136,6 +138,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
       form.reset({
         merchant: receipt.merchant || "",
         purchaseDate: receipt.purchaseDate || "",
+        deliveryDate: receipt.deliveryDate || "",
         total: receipt.total || undefined,
         currency: receipt.currency || "USD",
         category: receipt.category || "",
@@ -193,6 +196,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
         data: {
           merchant: data.merchant,
           purchaseDate: data.purchaseDate,
+          deliveryDate: data.deliveryDate ? data.deliveryDate : null,
           total: data.total,
           currency: data.currency,
           category: data.category,
@@ -541,6 +545,20 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             </FormItem>
                           )}
                         />
+                        <FormField
+                          control={form.control}
+                          name="deliveryDate"
+                          render={({ field }) => (
+                            <FormItem className="p-4 space-y-1">
+                              <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Delivered on (optional)</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} value={field.value ?? ""} data-testid="input-delivery-date" className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
+                              </FormControl>
+                              <p className="text-xs text-muted-foreground">Online orders: the return window counts from delivery.</p>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                         <div className="flex items-center gap-2 mt-4">
                           <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
                             {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -637,6 +655,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                   {!isEditing && (() => {
                     const rights = deriveConsumerRights({
                       purchaseDate: receipt.purchaseDate,
+                      deliveryDate: receipt.deliveryDate,
                       category: receipt.category,
                       currency: receipt.currency,
                       purchaseCountry: receipt.purchaseCountry,
@@ -677,6 +696,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                                       ? "Last day to return"
                                       : `${rights.returnWindow.daysLeft} day${rights.returnWindow.daysLeft !== 1 ? "s" : ""} left`}
                                   {" · "}{rights.returnWindow.source}
+                                  {rights.returnWindow.startsFrom === "delivery" ? " · from delivery" : ""}
                                 </p>
                               </div>
                             </div>

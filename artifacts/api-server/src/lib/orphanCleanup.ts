@@ -399,6 +399,7 @@ export async function runReturnWindowSweep(): Promise<void> {
     purchaseDate: string | null;
     purchaseCountry: string | null;
     isOnlinePurchase: boolean | null;
+    deliveryDate: string | null;
     currency: string | null;
     originalFileName: string;
     returnReminderSent7dAt: Date | null;
@@ -417,6 +418,7 @@ export async function runReturnWindowSweep(): Promise<void> {
         purchaseDate: receiptsTable.purchaseDate,
         purchaseCountry: receiptsTable.purchaseCountry,
         isOnlinePurchase: receiptsTable.isOnlinePurchase,
+        deliveryDate: receiptsTable.deliveryDate,
         currency: receiptsTable.currency,
         originalFileName: receiptsTable.originalFileName,
         returnReminderSent7dAt: receiptsTable.returnReminderSent7dAt,
@@ -462,6 +464,7 @@ export async function runReturnWindowSweep(): Promise<void> {
 
     const window = calcReturnWindow({
       purchaseDate: r.purchaseDate,
+      deliveryDate: r.deliveryDate,
       purchaseCountry: r.purchaseCountry,
       isOnlinePurchase: r.isOnlinePurchase,
       currency: r.currency,

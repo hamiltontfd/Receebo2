@@ -8,8 +8,15 @@
 import type { NotableItem } from './notableItem';
 
 export interface ReceiptUpdate {
+  /** @nullable */
+  isOnlinePurchase?: boolean | null;
   merchant?: string;
   purchaseDate?: string;
+  /**
+     * Delivery date (YYYY-MM-DD); null clears it.
+     * @nullable
+     */
+  deliveryDate?: string | null;
   total?: number;
   currency?: string;
   category?: string;

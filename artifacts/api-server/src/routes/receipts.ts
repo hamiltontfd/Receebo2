@@ -36,6 +36,7 @@ function normalizeCategory(value: string | null | undefined): string | undefined
   return "Other";
 }
 
+import { deliveryDateError } from "../lib/returnWindowCalc";
 const router: IRouter = Router();
 
 router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
@@ -377,6 +378,14 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
     eq(receiptsTable.id, params.data.id), eq(receiptsTable.userId, req.userId!),
   ));
   if (!existing) { res.status(404).json({ error: "Receipt not found" }); return; }
+  const deliveryError = deliveryDateError(
+    parsed.data.deliveryDate, parsed.data.purchaseDate ?? existing.purchaseDate,
+  );
+  if (deliveryError) { res.status(400).json({ error: deliveryError }); return; }
+  // A new purchase or delivery date moves the return deadline: re-arm its reminders.
+  const datesChanged =
+    (parsed.data.purchaseDate !== undefined && parsed.data.purchaseDate !== existing.purchaseDate) ||
+    (parsed.data.deliveryDate !== undefined && parsed.data.deliveryDate !== existing.deliveryDate);
   const manualAcceptance = parsed.data.isDraft === false && existing.status !== "completed";
   if (manualAcceptance && existing.status !== "failed") {
     res.status(409).json({ error: "Only a completed receipt or manually reviewed failed extraction can be saved" });
@@ -408,6 +417,10 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
     .set({
       ...parsed.data,
       ...(manualAcceptance ? { status: "completed" } : {}),
+      ...(datesChanged ? {
+        returnReminderSent7dAt: null, returnReminderSent2dAt: null,
+        returnPushSent2dAt: null, returnPushSent1dAt: null,
+      } : {}),
       ...(parsed.data.category !== undefined
         ? { category: normalizeCategory(parsed.data.category) }
         : {}),

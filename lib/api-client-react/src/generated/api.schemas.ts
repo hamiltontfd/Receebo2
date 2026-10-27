@@ -104,6 +104,11 @@ export interface Receipt {
      * @nullable
      */
   purchaseDate?: string | null;
+  /**
+     * Date the goods were delivered (YYYY-MM-DD), if known. Return windows count from it, else from the purchase date.
+     * @nullable
+     */
+  deliveryDate?: string | null;
   /** @nullable */
   total?: number | null;
   /** @nullable */
@@ -157,6 +162,11 @@ export interface ReceiptUpdate {
   isOnlinePurchase?: boolean | null;
   merchant?: string;
   purchaseDate?: string;
+  /**
+     * Delivery date (YYYY-MM-DD); null clears it.
+     * @nullable
+     */
+  deliveryDate?: string | null;
   total?: number;
   currency?: string;
   category?: string;

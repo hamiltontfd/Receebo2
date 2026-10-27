@@ -388,6 +388,7 @@ router.post(
             notableItems: data.notableItems ?? [],
             purchaseCountry: data.purchaseCountry,
             isOnlinePurchase: data.isOnlinePurchase,
+            deliveryDate: data.deliveryDate ?? null,
           })
           .returning();
         await tx

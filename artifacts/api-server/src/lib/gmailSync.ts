@@ -483,6 +483,7 @@ async function syncUserGmailUnlocked(
             notableItems: extraction.notableItems,
             purchaseCountry: extraction.purchaseCountry,
             isOnlinePurchase: extraction.isOnlinePurchase,
+            deliveryDate: extraction.deliveryDate,
           },
         });
         queued++;

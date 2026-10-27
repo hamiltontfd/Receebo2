@@ -16,6 +16,7 @@ import { extendTrialsToCurrentDuration, uncountUnsavedTrialDrafts } from "./lib/
 import { migrateTrialAiReads } from "./lib/trialAiReads";
 import { migrateAccountLifecycle } from "./lib/accountLifecycle";
 import { migrateAccountDeletionCodes } from "./lib/accountDeletionCode";
+import { migrateReceiptDeliveryDate } from "./lib/receiptColumns";
 
 const rawPort = process.env["PORT"];
 
@@ -103,6 +104,8 @@ async function runStartupMigrations(): Promise<void> {
       ALTER TABLE receipts
         ADD COLUMN IF NOT EXISTS warranty_reminder_sent_for text
     `);
+    // Return windows count from the delivery date when known
+    await migrateReceiptDeliveryDate();
     // Daily job lock so restarts/extra instances don't rerun the sweep
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS scheduled_job_runs (

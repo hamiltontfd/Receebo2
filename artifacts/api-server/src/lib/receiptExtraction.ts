@@ -32,6 +32,8 @@ export type ExtractedReceipt = {
   notableItems: ExtractedNotableItem[];
   purchaseCountry: string | null;
   isOnlinePurchase: boolean | null;
+  /** Date the goods were actually delivered, when the document states it (YYYY-MM-DD). */
+  deliveryDate: string | null;
 };
 
 const CANONICAL_CATEGORIES = ["Electronics", "Home", "Clothing & Apparel", "Groceries", "Other"] as const;
@@ -57,6 +59,7 @@ Respond ONLY with a JSON object matching this exact shape:
   "transactionNumber": string | null, // the transaction/receipt/confirmation number printed on the receipt (e.g. "TXN-4821039", "#00123456", "Order #123"), or null if not present
   "purchaseCountry": string | null,   // ISO-3166-1 alpha-2 country code where the purchase was made (e.g. "PT", "US", "BR", "DE"), inferred from currency, merchant name, address, language, or domain. null if not determinable.
   "isOnlinePurchase": boolean | null, // true if this is an e-commerce / online / distance purchase (order confirmation, Amazon, web store, delivery receipt, etc.); false if in-store; null if unclear.
+  "deliveryDate": string | null,    // the date the goods were actually DELIVERED ("delivered on", "entregue em", "data de entrega" of a completed delivery) in strict YYYY-MM-DD format. null if not stated, or if only an estimated/expected delivery date is shown ("arrives by", "previsão de entrega", "entrega prevista").
   "products": [                      // individual line items; empty array if none are legible
     { "name": string, "quantity": number | null, "price": number | null }
   ],
@@ -174,7 +177,18 @@ export async function extractReceiptData(
   return parseExtraction(completion.choices[0]?.message?.content ?? "{}");
 }
 
-function parseExtraction(raw: string): ExtractedReceipt {
+/** "YYYY-MM-DD" (or any parseable date) -> "YYYY-MM-DD"; null when missing or invalid. */
+export function toIsoDateOrNull(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const text = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return Number.isNaN(new Date(`${text}T00:00:00Z`).getTime()) ? null : text;
+  }
+  const d = new Date(text);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
+export function parseExtraction(raw: string): ExtractedReceipt {
   let parsed: Partial<ExtractedReceipt> = {};
   try {
     parsed = JSON.parse(raw);
@@ -218,13 +232,10 @@ function parseExtraction(raw: string): ExtractedReceipt {
         }))
     : [];
 
-  let purchaseDate = toStringOrNull(parsed.purchaseDate);
-  if (purchaseDate && !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) {
-    const d = new Date(purchaseDate);
-    purchaseDate = Number.isNaN(d.getTime())
-      ? null
-      : d.toISOString().slice(0, 10);
-  }
+  const purchaseDate = toIsoDateOrNull(parsed.purchaseDate);
+  let deliveryDate = toIsoDateOrNull((parsed as Partial<ExtractedReceipt>).deliveryDate);
+  // Goods can't arrive before they were bought.
+  if (deliveryDate && purchaseDate && deliveryDate < purchaseDate) deliveryDate = null;
 
   const isReceipt = typeof parsed.isReceipt === "boolean" ? parsed.isReceipt : true;
 
@@ -253,6 +264,7 @@ function parseExtraction(raw: string): ExtractedReceipt {
     notableItems,
     purchaseCountry,
     isOnlinePurchase,
+    deliveryDate,
   };
 }
 

@@ -32,6 +32,11 @@ export interface Receipt {
      * @nullable
      */
   purchaseDate?: string | null;
+  /**
+     * Date the goods were delivered (YYYY-MM-DD), if known. Return windows count from it, else from the purchase date.
+     * @nullable
+     */
+  deliveryDate?: string | null;
   /** @nullable */
   total?: number | null;
   /** @nullable */
