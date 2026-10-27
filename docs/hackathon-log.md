@@ -215,3 +215,26 @@ Technical details live in `docs/assistant-log.md`.
 - Fix: new tryWithUserDataLock / tryLockUserDataMutation in userDataLock.ts (pg_try_advisory_lock retried every 250 ms for up to 5 s on the same pooled connection, unlock in finally). The approve and dismiss routes in gmail.ts use it and answer 409 {code: "SYNC_IN_PROGRESS"} when the lock stays busy. Other lock users are unchanged. The success log now says "Outlook/Gmail import approved" with the provider.
 - Client: PendingImports shows a neutral toast "Still syncing your email — try again in a minute" (pt-BR/pt-PT copy in lib/mailImportCopy.ts via receebo:locale) and keeps the item. A 409 "already handled" refreshes the pending list and receipts instead of the red error.
 - Not pushed or published; Stripe untouched. Production needs a publish from Replit to get this.
+
+## 2026-10-27 — Session 22: email-import cost fixes (Grok Bot, Hamilton: "aprove as 3 soluções")
+- Goal: cut AI spend on Outlook imports and stop endless retries. Separate commits on main; not pushed or published; Stripe, production secrets and deployment settings untouched; no production DB access.
+- Commits:
+  - a4dab21 Retry cap and trial fix.
+    - New table mail_import_failures (user, provider, message; attempts, last_error, status retrying/failed). A message that really fails (download, upload, AI extraction or storing) is retried on later runs. After 3 attempts it is marked failed and seen, so it never comes back and never appears in "Found in your email". Deferrals and busy claims don't count. Success clears the row.
+    - claimTrialAiRead now counts one read per (user, source, ref), so retrying the same email or receipt no longer uses a second trial read. A new index trial_ai_reads_user_source_ref_idx backs this.
+  - 7a3323b Outlook background sync moved to the daily cron.
+    - POST /api/internal/cron/daily-maintenance (x-cron-secret; 503 without CRON_SECRET) now also runs runOutlookDailySweep. It covers connected mailboxes not waiting for a reconnect that haven't synced in 20 h, oldest first, and starts new users only for 120 s (the rest come back as `remaining`). A cross-instance advisory lock makes overlapping calls answer `busy`. A failing user doesn't stop the others. Repeat calls are idempotent.
+    - The in-process 4 h timer and the post-start sweep are gone; sync-on-connect and the Sync button are unchanged.
+  - 6146958 Stricter candidate filter plus a cheap pre-check.
+    - The listing filter now excludes collections/phishing ("regularize", "em atraso", "pagamento pendente"…), customs fees, review requests, account/security mail and carriers (CTT, DHL, UPS, DPD, GLS, SEUR…). It penalises marketing sender domains and emoji subjects. A store domain alone needs an attachment, and the minimum score is now 20.
+    - Email bodies get a fail-open yes/no pre-check with gpt-5.4-mini (3,000 characters, ~600 tokens) before the full gpt-5.4 extraction. It doesn't count as a trial AI read; the full extraction still does. Capped at 100 per run.
+    - Replit AI Integrations rejects gpt-5.4-nano. gpt-5-nano works, but even with minimal reasoning it called a clear order "not a receipt", so it wasn't used.
+    - ocrText stays in the extraction output because receipt search reads it.
+  - (this commit) docs/daily-cron.md (CRON_SECRET, scheduler options, curl) and this entry.
+- Measured on Hamilton's dev Outlook candidates (offline dry-run plus 14 real pre-check calls, about $0.01):
+  - Of 199 candidates, 20 reach the AI instead of 199 (6 PDF + 14 HTML), and the pre-check drops 1 more.
+  - 10 of 11 receipts are kept. The one lost is "O seu reembolso…", a refund.
+  - The 75-candidate sweep sample is now 7 (all 3 receipts kept).
+- Migrations: the new table and index are created by idempotent startup migrations (CREATE … IF NOT EXISTS), so production gets them on the next publish with no manual SQL. If the publish dialog offers the same schema change, accepting is safe.
+- Tests: typecheck clean (all projects); API 310 passed, 2 skipped; web 222 passed. The dev API was rebuilt and restarted; healthz 200; the cron endpoint answers 503 in dev until CRON_SECRET is set.
+- Open for Hamilton: set CRON_SECRET in dev Secrets and production deployment secrets; create the 06:00 Europe/Lisbon caller (cron-job.org recommended, see docs/daily-cron.md); publish. Until the caller exists, production Outlook only syncs on connect or the Sync button.
