@@ -173,3 +173,22 @@ Technical details live in `docs/assistant-log.md`.
 - Component: src/pages/landing/PromoVideoSection.tsx. One muted, looping, inline video (preload=metadata, poster, aria-label "Receebo in 30 seconds"); 9:16 below 768 px and 16:9 from 768 px up, picked by matchMedia so only one file downloads; aspect ratio reserved (no layout shift); plays only while on screen (IntersectionObserver); pause and sound on/off buttons with aria-labels; with prefers-reduced-motion it never autoplays and shows the poster with a play button.
 - Tests: typecheck clean; web 208 passed (4 new). Dev URL serves all six files with 206 range responses and the right content types; headless Chrome confirmed only the matching cut loads on desktop and mobile.
 - Outcome: on main in Replit, not pushed or published.
+
+## 2026-10-27 — Session 18: alert fixes, block A (Grok Bot, Hamilton: "Começa já, e eu não publico até ele avisar que terminou o bloco A")
+- Goal: verify the CEO agent's alert review against main (b20ab09) and fix block A. One commit per item on main; not pushed or published; Stripe untouched; no secrets shown. Plan and the notifications proposal (block B, not built) in /workspace/receebo/plan-alerts-notifications.md on the agents' computer.
+- Review: all nine findings confirmed on current main; P2 hadn't touched any of them (it only moved the return window to the delivery date).
+- Commits:
+  - d9633b1 A1 Warranty reminders: legal (PT 3y / EU 2y) and manufacturer end dates now computed on the server (lib/warrantyExpiry.ts, parses "2-year manufacturer warranty", "Garantia de 12 meses"…), stored in receipts.legal_/manufacturer_warranty_expires_on (startup migration + backfill by rules version, refreshed after extraction and edits); the sweep uses them, each with its own dedup.
+  - a68fe7a Receipts list (Hamilton's request): colored category pill next to the date removed from the Recent and search rows; the colored icon stays. Detail page, "Worth keeping" cards and filter chips unchanged.
+  - 5b0d607 A5 Warranty reminder when the end date is 0-30 days away (was 28-30), once per date.
+  - 539220c A3 Other EU/EEA countries (DE, ES, FR, NO…) get the EU rules on web and server.
+  - fc37662 A4 Unknown purchase channel is no longer treated as online at known retailers: no deadline or reminder, a store-policy note instead.
+  - 4f4dadd A6 Warranty reminders by push too, with their own dedup columns.
+  - f09f5bb A7 Legal warranty counts from delivery when known (DL 84/2021); second-hand comment fixed (18 months by agreement).
+  - ca17815 A8 29 Feb and month-end dates clamp to the last day of the month.
+  - 8b459ec A9 Re-arm return reminders on channel/store/currency edits; drafts skipped by the warranty sweep; "closes today"; the 1-day push also marks the 2-day one.
+  - c17958b A2 POST /api/internal/cron/daily-maintenance with x-cron-secret (CRON_SECRET env; 503 when unset) for an external cron or Scheduled Deployment. Deployment settings and the in-process tick unchanged.
+- Dev DB: receipts gained legal_warranty_expires_on, manufacturer_warranty_expires_on, legal_warranty_reminder_sent_for, warranty_calc_version, legal_/manufacturer_warranty_push_sent_for (idempotent startup migration, also applied by the API test global setup).
+- Tests: typecheck clean; web 215 passed; API 282 passed, 2 skipped.
+- Not done: the running dev API was not restarted, so it still serves the old build until the next restart; the expiry backfill runs then. Mobile (Expo) list row left as is (plain grey category text, no colored icon).
+- Open for Hamilton: create CRON_SECRET (dev + production) and a daily caller; Brazil CDC art. 26 reminders after legal review; expect a one-off batch of warranty reminders after publishing; approve the block B scope.
