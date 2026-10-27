@@ -37,6 +37,7 @@ import { planMessageImport } from "./mailProviders/candidates";
 import { isEverydayMerchantName } from "./mailProviders/merchants";
 import { aiReadCapApplies, claimTrialAiRead, trialAiReadsRemaining } from "./trialAiReads";
 import { renderTextPdf } from "./textPdf";
+import { clearMailImportFailure, failureText, recordMailImportFailure } from "./mailImportFailures";
 import type { MailMessage, MailProvider } from "./mailProviders/types";
 
 export const HTML_BODY_ATTACHMENT_ID = "body:html";
@@ -298,6 +299,8 @@ export async function syncMailboxClaimed(
 
     checked++;
     let retryableFailure = false;
+    /** Set with retryableFailure for real failures (not deferrals): counts toward MAX_IMPORT_ATTEMPTS. */
+    let failure: string | null = null;
 
     let message: MailMessage | null;
     try {
@@ -366,6 +369,7 @@ export async function syncMailboxClaimed(
             `${label} sync: attachment download failed`,
           );
           retryableFailure = true;
+          failure = failureText(err);
           await db.delete(pendingImportsTable).where(ownedClaim);
           continue;
         }
@@ -375,6 +379,7 @@ export async function syncMailboxClaimed(
         } catch (err) {
           logger.error({ err, userId }, `${label} sync: storage upload failed`);
           retryableFailure = true;
+          failure = failureText(err);
           await db.delete(pendingImportsTable).where(ownedClaim);
           continue;
         }
@@ -395,6 +400,7 @@ export async function syncMailboxClaimed(
         } catch (err) {
           logger.warn({ err, objectPath }, `${label} sync: extraction failed`);
           retryableFailure = true;
+          failure = failureText(err);
           await cleanupSyncObject(provider, userId, objectPath, "extraction failed");
           await db.delete(pendingImportsTable).where(ownedClaim);
           continue;
@@ -415,6 +421,7 @@ export async function syncMailboxClaimed(
         } catch (err) {
           logger.warn({ err, messageId }, `${label} sync: body extraction failed`);
           retryableFailure = true;
+          failure = failureText(err);
           await db.delete(pendingImportsTable).where(ownedClaim);
           continue;
         }
@@ -449,6 +456,7 @@ export async function syncMailboxClaimed(
         } catch (err) {
           logger.error({ err, userId }, `${label} sync: storage upload failed`);
           retryableFailure = true;
+          failure = failureText(err);
           await db.delete(pendingImportsTable).where(ownedClaim);
           continue;
         }
@@ -485,6 +493,7 @@ export async function syncMailboxClaimed(
       } catch (err) {
         logger.error({ err, userId }, `${label} sync: failed to store pending import`);
         retryableFailure = true;
+        failure = failureText(err);
         await cleanupSyncObject(provider, userId, storedPath, "database update failed");
         await db.delete(pendingImportsTable).where(ownedClaim);
       }
@@ -492,8 +501,18 @@ export async function syncMailboxClaimed(
 
     if (!retryableFailure) {
       await markSeen(provider, userId, messageId);
+      await clearMailImportFailure(userId, provider.id, messageId);
+    } else if (failure) {
+      const { attempts, failed } = await recordMailImportFailure(userId, provider.id, messageId, failure);
+      if (failed) {
+        // Stop retrying: no more AI spent on this message (and no pending item).
+        await markSeen(provider, userId, messageId);
+        logger.warn({ userId, messageId, attempts }, `${label} sync: message failed ${attempts} times, giving up`);
+      } else {
+        logger.warn({ userId, messageId, attempts }, `${label} sync: message left retryable after transient failure`);
+      }
     } else {
-      logger.warn({ userId, messageId }, `${label} sync: message left retryable after transient failure`);
+      logger.info({ userId, messageId }, `${label} sync: message deferred to the next run`);
     }
   }
 

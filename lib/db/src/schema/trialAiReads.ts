@@ -14,4 +14,8 @@ export const trialAiReadsTable = pgTable("trial_ai_reads", {
   /** Receipt id, object path or provider message id, for support/debugging. */
   ref: text("ref"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [index("trial_ai_reads_user_idx").on(table.userId)]);
+}, (table) => [
+  index("trial_ai_reads_user_idx").on(table.userId),
+  // A retried read of the same message/receipt is found here and not counted again.
+  index("trial_ai_reads_user_source_ref_idx").on(table.userId, table.source, table.ref),
+]);

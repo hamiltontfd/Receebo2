@@ -111,5 +111,31 @@ export const pendingImportsTable = pgTable(
   (t) => [unique().on(t.userId, t.gmailMessageId, t.gmailAttachmentId)],
 );
 
+/**
+ * Email import attempts that failed (AI extraction, attachment download,
+ * storage). A message is retried on later syncs until MAX_IMPORT_ATTEMPTS
+ * (api-server/src/lib/mailImportFailures.ts); then status becomes "failed" and
+ * the message is marked seen so syncs stop spending AI on it. Failed messages
+ * never create a pending import, so they are not shown in the pending list.
+ */
+export const mailImportFailuresTable = pgTable(
+  "mail_import_failures",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    provider: text("provider").notNull(),
+    messageId: text("message_id").notNull(),
+    /** retrying | failed */
+    status: text("status").notNull().default("retrying"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("mail_import_failures_user_provider_message_unique").on(t.userId, t.provider, t.messageId)],
+);
+
+export type MailImportFailure = typeof mailImportFailuresTable.$inferSelect;
+
 export type GmailConnection = typeof gmailConnectionsTable.$inferSelect;
 export type PendingImport = typeof pendingImportsTable.$inferSelect;

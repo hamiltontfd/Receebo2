@@ -14,6 +14,7 @@ import { billingOrigin } from "./lib/billingUrls";
 import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
 import { extendTrialsToCurrentDuration, uncountUnsavedTrialDrafts } from "./lib/accountTrial";
 import { migrateTrialAiReads } from "./lib/trialAiReads";
+import { migrateMailImportFailures } from "./lib/mailImportFailures";
 import { migrateAccountLifecycle } from "./lib/accountLifecycle";
 import { migrateAccountDeletionCodes } from "./lib/accountDeletionCode";
 import { migrateReceiptDeliveryDate, migrateReceiptWarrantyColumns } from "./lib/receiptColumns";
@@ -436,6 +437,11 @@ async function start(): Promise<void> {
     await migrateTrialAiReads();
   } catch (err) {
     logger.warn({ err }, "Trial AI reads migration warning (non-fatal) — continuing");
+  }
+  try {
+    await migrateMailImportFailures();
+  } catch (err) {
+    logger.warn({ err }, "Mail import failures migration warning (non-fatal) — continuing");
   }
   // Trials started under the old 7-day rule get the full 15 days from their
   // original start (idempotent; also reopens 7-day trials that ended < 15 days ago).
