@@ -173,7 +173,7 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
       manufacturerWarrantyPushSentFor: receiptsTable.manufacturerWarrantyPushSentFor,
     })
     .from(receiptsTable)
-    .where(eq(receiptsTable.status, "completed"));
+    .where(and(eq(receiptsTable.status, "completed"), eq(receiptsTable.isDraft, false)));
 
   const todayUtc = new Date(now);
   todayUtc.setUTCHours(0, 0, 0, 0);
@@ -628,11 +628,13 @@ export async function runReturnWindowSweep(): Promise<void> {
       ? receiptsTable.returnPushSent1dAt
       : receiptsTable.returnPushSent2dAt;
     if (shouldSendPush) {
+      // The 1-day push also marks the 2-day one, so a 2-day push never follows it.
+      const pushClaimedAt = new Date();
       const claimed = await db
         .update(receiptsTable)
         .set(needsPush1d
-          ? { returnPushSent1dAt: new Date() }
-          : { returnPushSent2dAt: new Date() })
+          ? { returnPushSent1dAt: pushClaimedAt, returnPushSent2dAt: r.returnPushSent2dAt ?? pushClaimedAt }
+          : { returnPushSent2dAt: pushClaimedAt })
         .where(and(eq(receiptsTable.id, r.id), isNull(pushField)))
         .returning({ id: receiptsTable.id });
 
@@ -651,7 +653,7 @@ export async function runReturnWindowSweep(): Promise<void> {
           await db
             .update(receiptsTable)
             .set(needsPush1d
-              ? { returnPushSent1dAt: null }
+              ? { returnPushSent1dAt: null, returnPushSent2dAt: r.returnPushSent2dAt }
               : { returnPushSent2dAt: null })
             .where(eq(receiptsTable.id, r.id));
         }

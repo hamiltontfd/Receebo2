@@ -449,6 +449,36 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
     expect(row.manufacturerWarrantyPushSentFor).toBe(soon);
     expect(row.warrantyReminderSentFor).toBe(soon);
   }, 30000);
+  it("the 1-day return push also marks the 2-day one, so no 2-day push follows", async () => {
+    await start();
+    const receipt = await upload();
+    let purchaseDate = "";
+    for (let d = 0; d < 60 && !purchaseDate; d++) {
+      const iso = new Date(Date.now() - d * DAY_MS).toISOString().slice(0, 10);
+      const w = calcReturnWindow({ purchaseDate: iso, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", merchant: "Fixture store" });
+      if (w && w.daysRemaining === 1) purchaseDate = iso;
+    }
+    await db.update(receiptsTable).set({ purchaseDate, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", isDraft: false })
+      .where(eq(receiptsTable.id, receipt.id));
+    fixture.returnEmail.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    fixture.push.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    await runReturnWindowSweep();
+    await runReturnWindowSweep();
+    expect(fixture.push.mock.calls.filter(([uid, p]) => uid === userId && p.receiptId === receipt.id)).toHaveLength(1);
+    const [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+    expect(row.returnPushSent1dAt).not.toBeNull();
+    expect(row.returnPushSent2dAt).not.toBeNull();
+  }, 30000);
+  it("skips draft receipts in the warranty sweep", async () => {
+    await start();
+    const receipt = await upload();
+    const soon = new Date(Date.now() + 10 * DAY_MS).toISOString().slice(0, 10);
+    await db.update(receiptsTable).set({ warranty: `Warranty until ${soon}`, isDraft: true })
+      .where(eq(receiptsTable.id, receipt.id));
+    fixture.warrantyEmail.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    await runWarrantyReminderSweep();
+    expect(fixture.warrantyEmail.mock.calls.filter(([uid, r]) => uid === userId && r.id === receipt.id)).toHaveLength(0);
+  }, 30000);
   it("lets the daily sweep run only once per ~23h across restarts/instances", async () => {
     const job = `test-job-${randomUUID()}`;
     const t0 = new Date("2026-10-26T03:00:00Z");

@@ -332,9 +332,10 @@ export async function sendReturnWindowEmail(
     receipt.originalFileName ||
     "your purchase";
 
-  const daysLabel =
-    receipt.daysRemaining === 1 ? "1 day" : `${receipt.daysRemaining} days`;
-  const subject = `Your ${subjectPart(itemName)} return window closes in ${daysLabel} — still time to act`;
+  const closesLabel = receipt.daysRemaining <= 0
+    ? "today"
+    : receipt.daysRemaining === 1 ? "in 1 day" : `in ${receipt.daysRemaining} days`;
+  const subject = `Your ${subjectPart(itemName)} return window closes ${closesLabel} — still time to act`;
   const receiptUrl = `${appUrl()}/receipts/${receipt.id}`;
   const unsub = unsubscribeLinks(userId);
   const deadlineStr = formatEmailDate(receipt.deadlineDate) ?? "";
@@ -343,7 +344,7 @@ export async function sendReturnWindowEmail(
     eyebrow: "Receebo — Return Reminder",
     bodyHtml: `<h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Still happy with ${escapeHtml(itemName)}?</h1>
   <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 6px;">
-    Your return window closes in <strong>${escapeHtml(daysLabel)}</strong> — on <strong>${escapeHtml(deadlineStr)}</strong>.
+    Your return window closes <strong>${escapeHtml(closesLabel)}</strong> — on <strong>${escapeHtml(deadlineStr)}</strong>.
   </p>
   <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 24px;">
     If you're not completely satisfied, now is the time to act. Open your receipt to check the return details and start a return if needed.

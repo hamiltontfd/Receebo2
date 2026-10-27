@@ -89,6 +89,15 @@ describe("escaping and subjects", () => {
 });
 
 describe("unsubscribe", () => {
+  it("says 'closes today' instead of 'closes in 0 days'", async () => {
+    mocks.send.mockClear();
+    await sendReturnWindowEmail("user_1", { ...returnWindow, daysRemaining: 0 });
+    await sendReturnWindowEmail("user_1", { ...returnWindow, daysRemaining: 1 });
+    const subjects = mocks.send.mock.calls.map(([m]) => m.subject as string);
+    expect(subjects[0]).toContain("return window closes today");
+    expect(subjects[1]).toContain("return window closes in 1 day");
+    mocks.send.mockClear();
+  });
   it("adds one-click List-Unsubscribe headers and a footer link to warranty and return emails", async () => {
     await sendWarrantyReminderEmail("user_1", warranty);
     await sendReturnWindowEmail("user_1", returnWindow);

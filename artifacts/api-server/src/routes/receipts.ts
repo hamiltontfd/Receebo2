@@ -383,10 +383,15 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
     parsed.data.deliveryDate, parsed.data.purchaseDate ?? existing.purchaseDate,
   );
   if (deliveryError) { res.status(400).json({ error: deliveryError }); return; }
-  // A new purchase or delivery date moves the return deadline: re-arm its reminders.
-  const datesChanged =
-    (parsed.data.purchaseDate !== undefined && parsed.data.purchaseDate !== existing.purchaseDate) ||
-    (parsed.data.deliveryDate !== undefined && parsed.data.deliveryDate !== existing.deliveryDate);
+  // Anything that moves or creates the return deadline (dates, channel, country,
+  // store, currency) re-arms its reminders.
+  // Only fields the body actually carries can change; the others stay undefined.
+  const body = parsed.data as Record<string, unknown>;
+  const current = existing as Record<string, unknown>;
+  const changed = (key: "purchaseDate" | "deliveryDate" | "isOnlinePurchase" | "purchaseCountry" | "merchant" | "currency") =>
+    body[key] !== undefined && body[key] !== current[key];
+  const datesChanged = changed("purchaseDate") || changed("deliveryDate") || changed("isOnlinePurchase") ||
+    changed("purchaseCountry") || changed("merchant") || changed("currency");
   const manualAcceptance = parsed.data.isDraft === false && existing.status !== "completed";
   if (manualAcceptance && existing.status !== "failed") {
     res.status(409).json({ error: "Only a completed receipt or manually reviewed failed extraction can be saved" });
