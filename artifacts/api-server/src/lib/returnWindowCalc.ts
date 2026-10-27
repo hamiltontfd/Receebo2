@@ -124,8 +124,10 @@ export function calcReturnWindow(params: {
 
   const retailerDays = findRetailerDays(merchant);
 
-  // Determine if online: explicit flag, or null but merchant is a known online retailer
-  const isOnline = isOnlinePurchase === true || (isOnlinePurchase == null && retailerDays !== null);
+  // Only an explicit online purchase has a withdrawal window. Unknown channel
+  // (null), even at a known retailer, gets no deadline or reminder: the app
+  // points to the store's policy instead.
+  const isOnline = isOnlinePurchase === true;
   if (!isOnline) return null;
 
   const rule = JURISDICTION_RULES.find((r) => r.code === countryCode) ?? null;

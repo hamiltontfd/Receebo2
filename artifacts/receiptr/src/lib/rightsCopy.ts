@@ -17,6 +17,8 @@ export interface RightsCopy {
   brRepairNote: string;
   brWithdrawalNote: string;
   usNoStatutoryNote: string;
+  /** Unknown channel at a known retailer: point to the store policy, no deadline. */
+  unknownChannelStorePolicy: (merchant: string, days: number) => string;
   disclaimer: string;
   legalReviewMarker: string;
 }
@@ -37,6 +39,7 @@ const en: RightsCopy = {
   brRepairNote: "If the seller doesn't fix it within 30 days, you can choose a replacement, a refund or a price reduction (CDC art. 18 §1).",
   brWithdrawalNote: "Bought online? You can withdraw within 7 days of receiving it, with a full refund (CDC art. 49).",
   usNoStatutoryNote: "No federal minimum warranty or return right in the US: check the written warranty and the store's policy.",
+  unknownChannelStorePolicy: (m, d) => `Not clear from the receipt whether this was bought online or in store. ${m} usually allows ${d} days for returns: check the store's policy.`,
   disclaimer: "General information, not legal advice. Check with the seller.",
   legalReviewMarker: LEGAL_REVIEW,
 };
@@ -51,6 +54,7 @@ const ptBR: RightsCopy = {
   brRepairNote: "Se o fornecedor não resolver em 30 dias, você pode escolher a troca, o dinheiro de volta ou um abatimento no preço (CDC art. 18, §1º).",
   brWithdrawalNote: "Comprou pela internet? Você tem 7 dias, contados do recebimento, para desistir com reembolso total (CDC art. 49).",
   usNoStatutoryNote: "Nos EUA não há garantia mínima nem direito de devolução federal: confira a garantia escrita e a política da loja.",
+  unknownChannelStorePolicy: (m, d) => `Não dá para saber pelo recibo se a compra foi online ou na loja. A ${m} costuma aceitar devoluções em ${d} dias: confira a política da loja.`,
   disclaimer: "Informações gerais, sem caráter de assessoria jurídica. Em caso de dúvida, procure o Procon.",
   legalReviewMarker: LEGAL_REVIEW,
 };
@@ -65,6 +69,7 @@ const ptPT: RightsCopy = {
   brRepairNote: "Se o fornecedor não resolver em 30 dias, pode escolher a substituição, o reembolso ou a redução do preço (CDC art. 18, §1).",
   brWithdrawalNote: "Comprou online? Tem 7 dias, a contar da receção, para desistir com reembolso total (CDC art. 49).",
   usNoStatutoryNote: "Nos EUA não existe garantia mínima nem direito de devolução federal: confirme a garantia escrita e a política da loja.",
+  unknownChannelStorePolicy: (m, d) => `Não é claro pelo recibo se a compra foi online ou na loja. A ${m} costuma aceitar devoluções em ${d} dias: confirme a política da loja.`,
   disclaimer: "Informação geral, não é aconselhamento jurídico. Confirme com o vendedor.",
   legalReviewMarker: LEGAL_REVIEW,
 };

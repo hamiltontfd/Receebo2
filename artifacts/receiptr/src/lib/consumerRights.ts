@@ -314,10 +314,11 @@ export function deriveConsumerRights(params: {
   const isDurable = rule ? rule.durableCategories.includes(cat) : false;
   const retailer = findRetailer(merchant);
 
-  // Determine if this is an online purchase:
-  //  - Explicit field set to true
-  //  - OR: field is null/unset but merchant matches a known online retailer
-  const isOnline = isOnlinePurchase === true || (isOnlinePurchase == null && retailer !== null);
+  // Only an explicit online purchase gets a withdrawal deadline. With an unknown
+  // channel (null) at a known retailer we only point to the store's policy
+  // (a note, no countdown, no reminder): it may have been bought in store.
+  const isOnline = isOnlinePurchase === true;
+  const unknownChannelRetailer = isOnlinePurchase == null && retailer !== null ? retailer : null;
 
   // ── Return window ──────────────────────────────────────────────────────────
   let returnWindow: ReturnWindowInfo | null = null;
@@ -420,6 +421,7 @@ export function deriveConsumerRights(params: {
     if (isOnline) notes.push(copy.brWithdrawalNote);
   }
   if (countryCode === "US") notes.push(copy.usNoStatutoryNote);
+  if (unknownChannelRetailer) notes.push(copy.unknownChannelStorePolicy(merchant ?? "", unknownChannelRetailer.days));
 
   const hasAny = returnWindow !== null || warranty !== null || manufacturerWarranty !== null || notes.length > 0;
   return {

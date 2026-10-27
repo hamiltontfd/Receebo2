@@ -105,3 +105,15 @@ describe("EU/EEA countries other than PT", () => {
     expect(r.returnWindow).toBeNull();
   });
 });
+
+describe("unknown purchase channel", () => {
+  it("shows the store policy as a note, with no deadline, at a known retailer", () => {
+    const r = deriveConsumerRights({ purchaseCountry: "PT", currency: "EUR", merchant: "Zara", category: "Clothing & Apparel", isOnlinePurchase: null, purchaseDate: "2026-03-10" });
+    expect(r.returnWindow).toBeNull();
+    expect(r.notes.some((n) => n.includes("Zara") && n.includes("30"))).toBe(true);
+  });
+  it("keeps the 14-day window for an explicit online purchase", () => {
+    const r = deriveConsumerRights({ purchaseCountry: "PT", currency: "EUR", merchant: "Zara", category: "Clothing & Apparel", isOnlinePurchase: true, purchaseDate: "2026-03-10" });
+    expect(r.returnWindow?.source).toBe("EU CRD / DL 24/2014");
+  });
+});

@@ -72,3 +72,12 @@ describe("EU/EEA countries other than PT", () => {
     expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "GB", isOnlinePurchase: true, currency: "GBP", merchant: "Some shop" })).toBeNull();
   });
 });
+
+describe("unknown purchase channel", () => {
+  it("gives no return deadline at a known retailer when the channel is unknown", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", isOnlinePurchase: null, currency: "EUR", merchant: "Amazon.es" })).toBeNull();
+    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", isOnlinePurchase: false, currency: "EUR", merchant: "Zara" })).toBeNull();
+    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", merchant: "Amazon.es" })?.daysRemaining).toBe(14);
+  });
+});
