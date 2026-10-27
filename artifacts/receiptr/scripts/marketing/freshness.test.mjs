@@ -119,7 +119,7 @@ test("CLI rejects unreviewed/missing/stale evidence and accepts explicit review 
     assert.equal(cli("status").status, 1);
     assert.match(cli("approve").stderr, /requires --visual-approved/);
     assert.match(cli("approve", "--visual-approved").stderr, /No successful capture/);
-    const screens = ["library-desktop", "receipt-desktop", "protection", "original-receipt",
+    const screens = ["library-desktop", "receipt-desktop", "protection", "show-to-store",
       "library-phone", "receipt-phone", "capture-poster", "find-poster", "protect-poster"];
     const clips = { capture: {}, find: {}, protect: {} };
     await save(`${out}/manifest.json`, { sampleData: true, errors: [], unexpected: [], screens, clips });

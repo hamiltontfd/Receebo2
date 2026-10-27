@@ -54,7 +54,7 @@ describe("real-app marketing media", () => {
 
   it.each([
     ["protection.webp", "Consumer rights panel", "420"],
-    ["original-receipt.webp", "Full original receipt", "420"],
+    ["show-to-store.webp", "Full-screen Show to store view", "420"],
   ])("gives %s outer spacing and an inset image surface without cropping", (file, alt, height) => {
     render(<AppCapture file={file} alt={alt} className={`h-[${height}px]`} caption="Sample screen caption" />);
     const img = screen.getByRole("img", { name: alt });

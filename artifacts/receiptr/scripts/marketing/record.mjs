@@ -82,8 +82,6 @@ try {
   await desk.page.getByText("Consumer Rights · Portugal", { exact: true }).evaluate(el => el.scrollIntoView({ block: "center" }));
   await desk.page.waitForTimeout(400);
   await still(desk.page, "protection", desk.page.getByText("Consumer Rights · Portugal", { exact: true }).locator(".."));
-  await desk.page.getByText("Original Receipt", { exact: true }).scrollIntoViewIfNeeded();
-  await still(desk.page, "original-receipt", desk.page.getByText("Original Receipt", { exact: true }).locator(".."));
   await close(desk);
 
   const phone = await context({ width: 390, height: 844 });
@@ -92,6 +90,20 @@ try {
   await phone.page.getByRole("button", { name: /Casa Lumen Electrónica.*Oct/ }).click();
   await phone.page.waitForTimeout(600);
   await still(phone.page, "receipt-phone");
+  // Prove: the real full-screen "Show to store" view of the sample receipt.
+  // A shorter phone viewport keeps the still close to the landing slot ratio.
+  await phone.page.setViewportSize({ width: 390, height: 640 });
+  const storeButton = phone.page.getByRole("button", { name: "Show to store", exact: true });
+  await storeButton.scrollIntoViewIfNeeded();
+  await storeButton.click();
+  // Rendered outside the modal sheet, so the sheet marks it aria-hidden; use CSS.
+  const storeImage = phone.page.locator('[aria-label="Dismiss full-screen receipt view"] img');
+  await storeImage.waitFor();
+  await storeImage.evaluate(img => img.decode());
+  // Keep the pointer marker on the black margin, off the receipt text.
+  await phone.page.mouse.move(340, 600);
+  await phone.page.waitForTimeout(600);
+  await still(phone.page, "show-to-store");
   await close(phone);
 
   for (const clip of ["capture", "find", "protect"]) {

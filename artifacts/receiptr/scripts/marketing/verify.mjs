@@ -225,7 +225,7 @@ for (const engine of engines) {
             const featureSection = page.locator("section").filter({ has: page.getByRole("button", { name: "Capture", exact: true }) });
             for (const [title, file] of Object.entries({
               Capture: "capture-poster.webp", Find: "find-poster.webp",
-              Protect: "protection.webp", Prove: "original-receipt.webp",
+              Protect: "protection.webp", Prove: "show-to-store.webp",
             })) {
               const tab = page.getByRole("button", { name: title, exact: true });
               await tab.click();

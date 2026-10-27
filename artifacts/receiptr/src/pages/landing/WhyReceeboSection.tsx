@@ -25,8 +25,8 @@ const FEATURES = [
   {
     title: "Prove",
     items: ["Fullscreen receipt view", "Download as PDF", "Share proof of purchase"],
-    image: "original-receipt.webp",
-    alt: "Receebo's original receipt viewer showing the fictional Casa Lumen Electrónica receipt for a €649 55-inch 4K Smart TV.",
+    image: "show-to-store.webp",
+    alt: "Receebo's full-screen Show to store view displaying the fictional Casa Lumen Electrónica receipt for a €649 55-inch 4K Smart TV.",
   },
 ];
 

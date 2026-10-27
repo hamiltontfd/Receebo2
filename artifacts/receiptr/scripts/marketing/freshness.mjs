@@ -60,7 +60,7 @@ export async function exportHashes(root = output) {
     throw new Error("Capture failed isolation/browser checks; inspect manifest.json.");
   }
   const screens = [
-    "library-desktop", "receipt-desktop", "protection", "original-receipt",
+    "library-desktop", "receipt-desktop", "protection", "show-to-store",
     "library-phone", "receipt-phone",
     "capture-poster", "find-poster", "protect-poster",
   ];

@@ -13,16 +13,16 @@ pricing flows, or product capabilities have been added.
 | Find video / feature | `find.mp4`, `find.webm`, `find-poster.webp` | Type “TV” → matching receipt → open sheet |
 | Protect video | `protect.mp4`, `protect.webm`, `protect-poster.webp` | Open receipt → scroll to warranty/consumer rights |
 | Protect feature / protection section | `protection.webp` | Consumer-rights panel: legal + manufacturer warranty side by side |
-| Prove feature | `original-receipt.webp` | Existing original-receipt viewer |
+| Prove feature | `show-to-store.webp` | Full-screen "Show to store" view (phone, 390×640) |
 
 `library-desktop.webp` and `receipt-desktop.webp` are captured as reference stills only.
 Since v2 the unused Gmail `email-settings` still and the composed `hero-*.webp` are no
 longer produced.
 
 Exports and the source archive live in existing App Storage, under
-`marketing/receebo-real-app/v2/` (v1 stays for the currently published release), served through the existing public-objects route:
+`marketing/receebo-real-app/v3/` (v1/v2 stay for older releases; v3 replaced the inline original-receipt viewer, removed from the app, with Show to store), served through the existing public-objects route:
 
-`/api/storage/public-objects/marketing/receebo-real-app/v1/<filename>`
+`/api/storage/public-objects/marketing/receebo-real-app/v3/<filename>`
 
 `source-captures.tar.gz` contains lossless PNGs, the three original WebM recordings,
 and fictional receipt fixtures. `manifest.json` maps the recordings to their exports,
