@@ -57,7 +57,7 @@ export default function DemoSection() {
           </motion.h2>
           <motion.p variants={fadeInUp} className="text-sm text-muted-foreground mt-4 max-w-2xl mx-auto">
             Real app recordings with fictional sample data and simulated extraction.
-            Silent clips play only when you choose. No live email connection is shown.
+            No live email connection is shown.
           </motion.p>
         </motion.div>
 
