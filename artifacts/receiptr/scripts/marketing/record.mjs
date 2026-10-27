@@ -42,6 +42,9 @@ try {
     const page = await ctx.newPage();
     page.on("pageerror", e => errors.push(e.message));
     await page.addInitScript(() => {
+      // The install bar is not part of the marketing story (and the capture
+      // harness does not mount it); keep it dismissed in case that changes.
+      try { localStorage.setItem("receebo:installBarDismissedAt", String(Date.now())); } catch {}
       // Capture-only emphasis follows actual pointer input; never changes UI.
       addEventListener("DOMContentLoaded", () => {
         const dot = document.createElement("div");
