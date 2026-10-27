@@ -201,3 +201,11 @@ Technical details live in `docs/assistant-log.md`.
 - Dev landing: pointed back at v1 during the upload, and switched to v2 only after every v2 URL returned 200 and matched byte for byte.
 - Tests: typecheck clean; web 214 passed (the email-settings case was removed); marketing freshness 6/6.
 - Notes: marketing:status lists MarketingMedia.tsx as changed since approval (the v1/v2 switch above). The promo's 22 s notification ("Return window closes in 3 days… Cordless vacuum… Return by 29 Oct") was not changed; the landing treats the vacuum as an in-store purchase.
+
+## 2026-10-27 — Session 20: compact install bar (Grok Bot, Hamilton: "Faz assim direto no dev, sem publicar")
+- Goal: replace the oversized "Add to Home Screen" panel, which on iPhone also covered the landing, with a one-line install bar. Not pushed or published; Stripe untouched.
+- Commits:
+  - 5216564 (Replit auto-checkpoint, taken mid-session) + 06cc84a. New InstallBar mounted only inside ProtectedShell: app icon, "Install Receebo on your phone" (pt-BR "Instale o Receebo no seu celular", pt-PT "Instale o Receebo no seu telemóvel" via the receebo:locale override), Install and X. Install uses the native beforeinstallprompt when available (captured from page load); otherwise a bottom sheet with 3 steps (iOS Safari with the Share icon drawn inline; other iOS browsers: open in Safari; others: browser menu > Install). Shown only when signed in, with at least one receipt, on a phone or with a native prompt, online, not standalone and not busy. X hides it for 30 days (localStorage receebo:installBarDismissedAt); hidden after appinstalled. The old PwaStatus install panel was removed. The mobile scan button moves up while the bar shows.
+- Marketing media: unaffected. The capture harness renders AppShell directly and never mounts the bar. record.mjs also presets the dismiss key. v2 media were not regenerated; marketing:status lists the changed source files as usual.
+- Tests: typecheck clean (all projects); web 218 passed (install tests moved to InstallBar.test.tsx); API 282 passed, 2 skipped; marketing freshness 6/6.
+- Visual check on dev (390x844, iPhone Safari UA, demo account): bar on the receipts list, iOS sheet, and signed-out landing with no bar.
