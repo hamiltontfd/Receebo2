@@ -27,3 +27,65 @@ describe("return window start (web)", () => {
     expect(returnWindowStartDate("2026-10-10", "2026-10-11")).toEqual({ date: "2026-10-11", from: "delivery" });
   });
 });
+
+import { parseManufacturerWarrantyMonths } from "./consumerRights";
+
+describe("Brazil: legal and manufacturer warranties side by side", () => {
+  const br = { purchaseCountry: "BR", currency: "BRL", merchant: "Magazine", category: "Electronics" };
+  it("legal = 90 days from delivery to report apparent defects; manufacturer = its own date; never added", () => {
+    const rights = deriveConsumerRights({
+      ...br, isOnlinePurchase: true, purchaseDate: "2026-03-01", deliveryDate: "2026-03-05",
+      warrantyText: "Garantia do fabricante: 12 meses",
+    });
+    expect(rights.warranty).toMatchObject({ kind: "complaint_deadline", citation: "CDC Art. 26 (Lei 8.078/1990)" });
+    expect(rights.warranty?.expiry.getTime()).toBe(new Date("2026-06-03T00:00:00").getTime()); // 5 Mar + 90 days
+    expect(rights.manufacturerWarranty?.months).toBe(12);
+    expect(rights.manufacturerWarranty?.expiry.getTime()).toBe(new Date("2027-03-01T00:00:00").getTime());
+    // Not added together: the legal date is not manufacturer end + 90 days.
+    expect(rights.warranty!.expiry.getTime()).toBeLessThan(rights.manufacturerWarranty!.expiry.getTime());
+    expect(rights.notes).toHaveLength(3); // hidden defect, art. 18, art. 49 (online)
+    expect(rights.legalReviewPending).toBe(true);
+  });
+  it("in store: no return window or withdrawal note; pt-BR copy", () => {
+    const rights = deriveConsumerRights({
+      ...br, category: "Clothing & Apparel", isOnlinePurchase: false, purchaseDate: "2026-03-01", locale: "pt-BR",
+    });
+    expect(rights.returnWindow).toBeNull();
+    expect(rights.warranty?.label).toBe("Garantia legal (CDC): 90 dias para reclamar de defeitos");
+    expect(rights.notes).toHaveLength(2);
+    expect(rights.disclaimer).toContain("Procon");
+  });
+});
+
+describe("US: structure only", () => {
+  it("no legal warranty; store policy labelled as typical; review marker on", () => {
+    const rights = deriveConsumerRights({
+      purchaseCountry: "US", currency: "USD", merchant: "Best Buy", category: "Electronics",
+      isOnlinePurchase: true, purchaseDate: "2026-03-01",
+    });
+    expect(rights.warranty).toBeNull();
+    expect(rights.returnWindow?.source).toBe("Best Buy return policy (typical, check with the store)");
+    expect(rights.notes[0]).toMatch(/No federal minimum/);
+    expect(rights.legalReviewPending).toBe(true);
+  });
+});
+
+describe("manufacturer warranty parsing", () => {
+  it("reads years and months in en/pt, ignores return policies and legal warranties", () => {
+    expect(parseManufacturerWarrantyMonths("2-year manufacturer warranty")).toBe(24);
+    expect(parseManufacturerWarrantyMonths("Garantia de 12 meses")).toBe(12);
+    expect(parseManufacturerWarrantyMonths("1 ano de garantia")).toBe(12);
+    expect(parseManufacturerWarrantyMonths("30-day returns")).toBeNull();
+    expect(parseManufacturerWarrantyMonths("Garantia legal de 3 anos")).toBeNull();
+    expect(parseManufacturerWarrantyMonths(null)).toBeNull();
+  });
+  it("PT keeps the 3-year legal warranty and shows the manufacturer one separately", () => {
+    const rights = deriveConsumerRights({
+      purchaseCountry: "PT", currency: "EUR", merchant: "Worten", category: "Electronics",
+      purchaseDate: "2026-01-10", warrantyText: "2-year manufacturer warranty",
+    });
+    expect(rights.warranty).toMatchObject({ kind: "warranty", label: "3-year legal warranty" });
+    expect(rights.manufacturerWarranty?.expiry.getFullYear()).toBe(2028);
+    expect(rights.legalReviewPending).toBe(false);
+  });
+});

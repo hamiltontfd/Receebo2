@@ -12,6 +12,7 @@ import {
   Sparkles, Package, Shield, Star, Scale, RotateCcw, Clock,
 } from "lucide-react";
 import { deriveConsumerRights } from "@/lib/consumerRights";
+import { getAppLocale } from "@/lib/locale";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -661,6 +662,8 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       purchaseCountry: receipt.purchaseCountry,
                       isOnlinePurchase: receipt.isOnlinePurchase,
                       merchant: receipt.merchant,
+                      warrantyText: receipt.warranty,
+                      locale: getAppLocale(),
                     });
                     if (!rights.hasAny) return null;
 
@@ -713,13 +716,47 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                                     : `${rights.warranty.label}`}
                                 </p>
                                 <p className="text-xs mt-0.5 opacity-80">
-                                  {rights.warranty.isExpired
-                                    ? `Expired ${rights.warranty.formattedExpiry}`
-                                    : `Valid until ${rights.warranty.formattedExpiry} · ${rights.warranty.citation}`}
+                                  {rights.warranty.kind === "complaint_deadline"
+                                    ? rights.warranty.isExpired
+                                      ? `Apparent defects: deadline passed ${rights.warranty.formattedExpiry} · ${rights.warranty.citation}`
+                                      : `Apparent defects: report by ${rights.warranty.formattedExpiry} · ${rights.warranty.citation}`
+                                    : rights.warranty.isExpired
+                                      ? `Expired ${rights.warranty.formattedExpiry}`
+                                      : `Valid until ${rights.warranty.formattedExpiry} · ${rights.warranty.citation}`}
                                 </p>
                               </div>
                             </div>
                           )}
+
+                          {/* Manufacturer warranty: own end date, next to the legal one (never added) */}
+                          {rights.manufacturerWarranty && (
+                            <div
+                              data-testid="card-manufacturer-warranty"
+                              className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${rights.manufacturerWarranty.isExpired ? "bg-muted border-border text-muted-foreground" : "bg-sky-50 border-sky-200 text-sky-700"}`}
+                            >
+                              <Shield className="w-4 h-4 mt-0.5 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold leading-tight">
+                                  {rights.manufacturerWarranty.label}
+                                </p>
+                                <p className="text-xs mt-0.5 opacity-80">
+                                  {rights.manufacturerWarranty.isExpired
+                                    ? `Expired ${rights.manufacturerWarranty.formattedExpiry}`
+                                    : `Until ${rights.manufacturerWarranty.formattedExpiry} · from the receipt`}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {rights.notes.length > 0 && (
+                            <ul className="space-y-1 px-1 text-xs leading-5 text-muted-foreground" data-testid="list-rights-notes">
+                              {rights.notes.map((note) => <li key={note}>{note}</li>)}
+                            </ul>
+                          )}
+                          <p className="px-1 text-[11px] leading-4 text-muted-foreground">
+                            {rights.disclaimer}
+                            {rights.legalReviewPending && <strong> {"[LEGAL REVIEW NEEDED]"}</strong>}
+                          </p>
 
                         </div>
                       </div>

@@ -1,3 +1,6 @@
+import { formatLocaleDate, type AppLocale } from "./locale";
+import { rightsCopy } from "./rightsCopy";
+
 /**
  * Consumer rights derivation utility.
  * Computes return windows and statutory warranty info from receipt fields.
@@ -17,6 +20,8 @@ interface JurisdictionRule {
   onlineReturnDays: number | null;
   warrantyCitation: string | null;
   returnCitation: string | null;
+  /** BR/US rules are drafts until a lawyer reviews them. */
+  legalReviewPending?: boolean;
 }
 
 const JURISDICTION_RULES: JurisdictionRule[] = [
@@ -54,6 +59,7 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
     onlineReturnDays: 7,
     warrantyCitation: "CDC Art. 26 (Lei 8.078/1990)",
     returnCitation: "CDC Art. 49",
+    legalReviewPending: true,
   },
   {
     code: "US",
@@ -64,6 +70,7 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
     onlineReturnDays: null,
     warrantyCitation: null,
     returnCitation: null,
+    legalReviewPending: true,
   },
   {
     code: "CA",
@@ -167,8 +174,30 @@ function daysFromNow(target: Date): number {
   return Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
 }
 
-function fmtDate(d: Date): string {
+function fmtDate(d: Date, locale?: AppLocale): string {
+  if (locale) return formatLocaleDate(d, locale);
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+/**
+ * Manufacturer warranty length from the receipt's warranty text, in months
+ * ("2-year manufacturer warranty", "Garantia de 12 meses", "1 ano de garantia").
+ * Only text that mentions a warranty counts; return policies ("30-day returns")
+ * and legal-warranty mentions ("garantia legal de 3 anos") don't.
+ */
+export function parseManufacturerWarrantyMonths(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  if (!/warrant|garantia|guarantee/.test(t)) return null;
+  // "Garantia legal de 3 anos" is the legal warranty, already shown on its own.
+  if (/\blegal\b|statutory|\blei\b|dl\s*84/.test(t) && !/manufacturer|fabricante|\bmarca\b|brand|extended|estendida|alargada/.test(t)) return null;
+  const words: Record<string, number> = { one: 1, two: 2, three: 3, five: 5, um: 1, uma: 1, dois: 2, "três": 3, tres: 3, cinco: 5 };
+  const num = String.raw`(?:^|[^a-z0-9à-ú])(\d{1,3}|one|two|three|five|um|uma|dois|três|tres|cinco)`;
+  const years = t.match(new RegExp(`${num}\\s*(?:-\\s*)?(?:years?|yrs?|anos?)\\b`));
+  const months = t.match(new RegExp(`${num}\\s*(?:-\\s*)?(?:months?|m[eê]s(?:es)?)\\b`));
+  const value = (raw: string) => (/^\d+$/.test(raw) ? Number(raw) : words[raw] ?? NaN);
+  const total = years ? value(years[1]) * 12 : months ? value(months[1]) : NaN;
+  return Number.isFinite(total) && total >= 1 && total <= 120 ? total : null;
 }
 
 // ── Public types ─────────────────────────────────────────────────────────────
@@ -187,11 +216,27 @@ export interface ReturnWindowInfo {
 }
 
 export interface StatutoryWarrantyInfo {
-  /** Human-readable label, e.g. "3-year legal warranty" or "90-day legal warranty" */
+  /**
+   * "warranty": a legal warranty period (PT/EU).
+   * "complaint_deadline": BR CDC art. 26, a deadline to report apparent defects
+   * counted from delivery (not a warranty period).
+   */
+  kind: "warranty" | "complaint_deadline";
+  /** Human-readable label, e.g. "3-year legal warranty" */
   label: string;
   expiry: Date;
   formattedExpiry: string;
   citation: string;
+  daysUntilExpiry: number;
+  isExpired: boolean;
+}
+
+/** Manufacturer (contractual) warranty read from the receipt. Shown next to the legal one, never added to it. */
+export interface ManufacturerWarrantyInfo {
+  label: string;
+  months: number;
+  expiry: Date;
+  formattedExpiry: string;
   daysUntilExpiry: number;
   isExpired: boolean;
 }
@@ -201,6 +246,12 @@ export interface ConsumerRightsResult {
   countryLabel: string | null;
   returnWindow: ReturnWindowInfo | null;
   warranty: StatutoryWarrantyInfo | null;
+  manufacturerWarranty: ManufacturerWarrantyInfo | null;
+  /** Extra fixed notes for the country (BR: hidden defects, art. 18, art. 49; US: no federal minimum). */
+  notes: string[];
+  disclaimer: string;
+  /** True for BR/US: draft rules, show the [LEGAL REVIEW NEEDED] marker. */
+  legalReviewPending: boolean;
 }
 
 // ── Main derivation ──────────────────────────────────────────────────────────
@@ -229,10 +280,18 @@ export function deriveConsumerRights(params: {
   purchaseCountry?: string | null;
   isOnlinePurchase?: boolean | null;
   merchant?: string | null;
+  /** The receipt's warranty text (manufacturer warranty, if stated). */
+  warrantyText?: string | null;
+  locale?: AppLocale;
 }): ConsumerRightsResult {
   const { purchaseDate, category, currency, purchaseCountry, isOnlinePurchase, merchant } = params;
+  const copy = rightsCopy(params.locale);
+  const fmt = (d: Date) => fmtDate(d, params.locale);
 
-  const none: ConsumerRightsResult = { hasAny: false, countryLabel: null, returnWindow: null, warranty: null };
+  const none: ConsumerRightsResult = {
+    hasAny: false, countryLabel: null, returnWindow: null, warranty: null,
+    manufacturerWarranty: null, notes: [], disclaimer: copy.disclaimer, legalReviewPending: false,
+  };
 
   if (!purchaseDate) return none;
   const purchaseDateObj = new Date(purchaseDate + "T00:00:00");
@@ -268,7 +327,10 @@ export function deriveConsumerRights(params: {
     // For US (no statutory right), or as a complementary source: retailer policy
     if ((returnDays == null || countryCode === "US") && retailer) {
       returnDays = retailer.days;
-      returnSource = `${merchant} return policy`;
+      // The retailer table is unsourced: in the US label it as typical, check with the store.
+      returnSource = countryCode === "US"
+        ? copy.returnSourceTypicalStorePolicy(merchant ?? "")
+        : copy.returnSourceStorePolicy(merchant ?? "");
     }
 
     if (returnDays != null && returnSource != null) {
@@ -283,7 +345,7 @@ export function deriveConsumerRights(params: {
         deadline,
         daysLeft,
         isExpired,
-        formattedDeadline: fmtDate(deadline),
+        formattedDeadline: fmt(deadline),
         source: returnSource,
         urgency,
         startsFrom: start.from,
@@ -295,15 +357,19 @@ export function deriveConsumerRights(params: {
   let warranty: StatutoryWarrantyInfo | null = null;
 
   if (countryCode === "BR") {
-    // Brazil: 90 days for durable goods, 30 days for non-durable (CDC Art. 26)
+    // CDC art. 26: 30 days (non-durable) / 90 days (durable) to report apparent
+    // defects, counted from effective delivery (§1). A deadline to complain,
+    // not a warranty period. [LEGAL REVIEW NEEDED]
     if (cat !== "Groceries") {
       const warrantyDays = isDurable ? 90 : 30;
-      const expiry = addDays(purchaseDateObj, warrantyDays);
+      const start = returnWindowStartDate(purchaseDate, params.deliveryDate);
+      const expiry = addDays(new Date(start.date + "T00:00:00"), warrantyDays);
       const daysUntilExpiry = daysFromNow(expiry);
       warranty = {
-        label: `${warrantyDays}-day legal warranty`,
+        kind: "complaint_deadline",
+        label: copy.brComplaintDeadline(warrantyDays),
         expiry,
-        formattedExpiry: fmtDate(expiry),
+        formattedExpiry: fmt(expiry),
         citation: "CDC Art. 26 (Lei 8.078/1990)",
         daysUntilExpiry,
         isExpired: daysUntilExpiry < 0,
@@ -313,15 +379,44 @@ export function deriveConsumerRights(params: {
     const expiry = addYears(purchaseDateObj, rule.warrantyYears);
     const daysUntilExpiry = daysFromNow(expiry);
     warranty = {
-      label: `${rule.warrantyYears}-year legal warranty`,
+      kind: "warranty",
+      label: copy.legalWarrantyYears(rule.warrantyYears),
       expiry,
-      formattedExpiry: fmtDate(expiry),
+      formattedExpiry: fmt(expiry),
       citation: rule.warrantyCitation ?? "",
       daysUntilExpiry,
       isExpired: daysUntilExpiry < 0,
     };
   }
 
-  const hasAny = returnWindow !== null || warranty !== null;
-  return { hasAny, countryLabel, returnWindow, warranty };
+  // ── Manufacturer warranty: its own end date, side by side, never added to the legal one ──
+  let manufacturerWarranty: ManufacturerWarrantyInfo | null = null;
+  const months = parseManufacturerWarrantyMonths(params.warrantyText);
+  if (months != null) {
+    const expiry = new Date(purchaseDateObj);
+    expiry.setMonth(expiry.getMonth() + months);
+    const daysUntilExpiry = daysFromNow(expiry);
+    manufacturerWarranty = {
+      label: copy.manufacturerWarranty(months),
+      months,
+      expiry,
+      formattedExpiry: fmt(expiry),
+      daysUntilExpiry,
+      isExpired: daysUntilExpiry < 0,
+    };
+  }
+
+  const notes: string[] = [];
+  if (countryCode === "BR" && cat !== "Groceries") {
+    notes.push(copy.brHiddenDefectNote, copy.brRepairNote);
+    if (isOnline) notes.push(copy.brWithdrawalNote);
+  }
+  if (countryCode === "US") notes.push(copy.usNoStatutoryNote);
+
+  const hasAny = returnWindow !== null || warranty !== null || manufacturerWarranty !== null || notes.length > 0;
+  return {
+    hasAny, countryLabel, returnWindow, warranty, manufacturerWarranty, notes,
+    disclaimer: copy.disclaimer,
+    legalReviewPending: rule?.legalReviewPending === true,
+  };
 }
