@@ -1,6 +1,6 @@
 import type { File as GCSFile } from "@google-cloud/storage";
 import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, userBillingTable, userPreferencesTable, type ReceiptNotableItem } from "@workspace/db";
-import { and, eq, gt, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
 import { logger } from "./logger";
@@ -31,6 +31,7 @@ function reminderAccessChecker(): (userId: string) => Promise<boolean> {
 import { sendPushNotification } from "./pushNotifications";
 import { calcReturnWindow } from "./returnWindowCalc";
 import { runDataRetentionSweep } from "./accountLifecycle";
+import { syncWarrantyExpiries, warrantyInputColumns } from "./warrantyExpiryStore";
 
 const ORPHAN_AGE_THRESHOLD_DAYS = 7;
 const ORPHAN_AGE_THRESHOLD_MS = ORPHAN_AGE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
@@ -148,26 +149,36 @@ const MS_PER_DAY = 86_400_000;
 /** Warranty reminders go out once per expiry date, 28-30 days before it (tolerates missed days). */
 const WARRANTY_REMINDER_MIN_DAYS = 28;
 const WARRANTY_REMINDER_MAX_DAYS = 30;
-const ISO_DATE_RE = /(\d{4}-\d{2}-\d{2})/g;
 
-/** Exported for tests; runs daily from runDailyMaintenance. Users without current access are skipped. */
+type WarrantyKind = "legal" | "manufacturer";
+
+/**
+ * Exported for tests; runs daily from runDailyMaintenance. Users without current access are skipped.
+ * Each receipt's legal (PT/EU) and manufacturer warranty end dates are computed on
+ * the server (lib/warrantyExpiry.ts), stored in receipts.*_warranty_expires_on and
+ * reminded separately, each deduplicated by its own end date.
+ */
 export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent: number; failed: number; skippedOptOut: number; skippedNoAccess: number }> {
   const warrantyReceipts = await db
     .select({
-      id: receiptsTable.id,
+      ...warrantyInputColumns,
       userId: receiptsTable.userId,
-      merchant: receiptsTable.merchant,
-      warranty: receiptsTable.warranty,
       originalFileName: receiptsTable.originalFileName,
       warrantyReminderSentFor: receiptsTable.warrantyReminderSentFor,
+      legalWarrantyReminderSentFor: receiptsTable.legalWarrantyReminderSentFor,
     })
     .from(receiptsTable)
-    .where(and(eq(receiptsTable.status, "completed"), isNotNull(receiptsTable.warranty)));
+    .where(eq(receiptsTable.status, "completed"));
 
   const todayUtc = new Date(now);
   todayUtc.setUTCHours(0, 0, 0, 0);
   const minMs = todayUtc.getTime() + WARRANTY_REMINDER_MIN_DAYS * MS_PER_DAY;
   const maxMs = todayUtc.getTime() + WARRANTY_REMINDER_MAX_DAYS * MS_PER_DAY;
+  const isDue = (iso: string | null): iso is string => {
+    if (!iso) return false;
+    const expiryMs = new Date(`${iso}T00:00:00Z`).getTime();
+    return expiryMs >= minMs && expiryMs <= maxMs;
+  };
 
   const optOutCache = new Map<string, boolean>();
   async function isOptedOut(userId: string): Promise<boolean> {
@@ -188,12 +199,15 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
   let skippedOptOut = 0;
   let skippedNoAccess = 0;
   for (const r of warrantyReceipts) {
-    if (!r.warranty) continue;
-    const due = (r.warranty.match(ISO_DATE_RE) ?? []).find(dateStr => {
-      const expiryMs = new Date(`${dateStr}T00:00:00Z`).getTime();
-      return expiryMs >= minMs && expiryMs <= maxMs;
-    });
-    if (!due || r.warrantyReminderSentFor === due) continue;
+    const expiries = await syncWarrantyExpiries(r);
+    const candidates: Array<{ kind: WarrantyKind; due: string; previous: string | null }> = [];
+    if (isDue(expiries.manufacturer) && r.warrantyReminderSentFor !== expiries.manufacturer) {
+      candidates.push({ kind: "manufacturer", due: expiries.manufacturer, previous: r.warrantyReminderSentFor });
+    }
+    if (isDue(expiries.legal) && r.legalWarrantyReminderSentFor !== expiries.legal) {
+      candidates.push({ kind: "legal", due: expiries.legal, previous: r.legalWarrantyReminderSentFor });
+    }
+    if (candidates.length === 0) continue;
     if (!(await hasAccess(r.userId))) {
       skippedNoAccess++;
       continue;
@@ -202,32 +216,34 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
       skippedOptOut++;
       continue;
     }
-    // Claim before sending so concurrent sweeps never double-send.
-    const previous = r.warrantyReminderSentFor;
-    const claimed = await db
-      .update(receiptsTable)
-      .set({ warrantyReminderSentFor: due })
-      .where(and(
-        eq(receiptsTable.id, r.id),
-        previous === null
-          ? isNull(receiptsTable.warrantyReminderSentFor)
-          : eq(receiptsTable.warrantyReminderSentFor, previous),
-      ))
-      .returning({ id: receiptsTable.id });
-    if (claimed.length === 0) continue;
-    const ok = await sendWarrantyReminderEmail(r.userId, {
-      id: r.id,
-      merchant: r.merchant,
-      warranty: r.warranty,
-      originalFileName: r.originalFileName,
-    });
-    if (ok) {
-      sent++;
-    } else {
-      failed++;
-      // Release the claim so the next daily run retries.
-      await db.update(receiptsTable).set({ warrantyReminderSentFor: previous })
-        .where(and(eq(receiptsTable.id, r.id), eq(receiptsTable.warrantyReminderSentFor, due)));
+    for (const { kind, due, previous } of candidates) {
+      const column = kind === "legal" ? receiptsTable.legalWarrantyReminderSentFor : receiptsTable.warrantyReminderSentFor;
+      const mark = (value: string | null) => kind === "legal"
+        ? { legalWarrantyReminderSentFor: value }
+        : { warrantyReminderSentFor: value };
+      // Claim before sending so concurrent sweeps never double-send.
+      const claimed = await db
+        .update(receiptsTable)
+        .set(mark(due))
+        .where(and(eq(receiptsTable.id, r.id), previous === null ? isNull(column) : eq(column, previous)))
+        .returning({ id: receiptsTable.id });
+      if (claimed.length === 0) continue;
+      const ok = await sendWarrantyReminderEmail(r.userId, {
+        id: r.id,
+        merchant: r.merchant,
+        warranty: r.warranty,
+        originalFileName: r.originalFileName,
+        kind,
+        expiresOn: due,
+      });
+      if (ok) {
+        sent++;
+      } else {
+        failed++;
+        // Release the claim so the next daily run retries.
+        await db.update(receiptsTable).set(mark(previous))
+          .where(and(eq(receiptsTable.id, r.id), eq(column, due)));
+      }
     }
   }
   if (sent || failed || skippedOptOut || skippedNoAccess) {

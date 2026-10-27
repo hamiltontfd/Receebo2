@@ -54,6 +54,14 @@ export const receiptsTable = pgTable("receipts", {
   returnPushSent1dAt: timestamp("return_push_sent_1d_at", { withTimezone: true }),
   /** ISO expiry date (YYYY-MM-DD) the warranty reminder was last sent for (dedup). */
   warrantyReminderSentFor: text("warranty_reminder_sent_for"),
+  /** Server-computed legal warranty end (PT/EU), YYYY-MM-DD. */
+  legalWarrantyExpiresOn: date("legal_warranty_expires_on", { mode: "string" }),
+  /** Server-computed manufacturer warranty end, YYYY-MM-DD. */
+  manufacturerWarrantyExpiresOn: date("manufacturer_warranty_expires_on", { mode: "string" }),
+  /** Legal warranty end date the reminder was last sent for (dedup). */
+  legalWarrantyReminderSentFor: text("legal_warranty_reminder_sent_for"),
+  /** Rules version the stored warranty dates were computed with (startup backfill). */
+  warrantyCalcVersion: integer("warranty_calc_version"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

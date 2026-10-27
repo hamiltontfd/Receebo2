@@ -269,8 +269,13 @@ export async function sendPaymentAttentionEmail(
 export interface WarrantyReceipt {
   id: number;
   merchant?: string | null;
-  warranty: string;
+  /** Warranty text from the receipt, if any. */
+  warranty?: string | null;
   originalFileName?: string;
+  /** Which warranty ends: the legal one (PT/EU) or the manufacturer's. */
+  kind?: "legal" | "manufacturer";
+  /** End date, YYYY-MM-DD. */
+  expiresOn?: string;
 }
 
 export async function sendWarrantyReminderEmail(
@@ -289,7 +294,8 @@ export async function sendWarrantyReminderEmail(
     eyebrow: "Receebo — Warranty Reminder",
     bodyHtml: `<h1 style="font-size:22px;font-weight:800;margin:0 0 6px;line-height:1.2;">Warranty expiring soon</h1>
   <p style="font-size:18px;font-weight:600;margin:0 0 8px;">${escapeHtml(merchant)}</p>
-  <p style="color:#444;font-size:14px;margin:0 0 28px;">${escapeHtml(receipt.warranty)}</p>`,
+  ${receipt.expiresOn ? `<p style="font-size:15px;margin:0 0 8px;">${receipt.kind === "legal" ? "Legal warranty" : "Manufacturer warranty"} ends on ${escapeHtml(new Date(`${receipt.expiresOn}T00:00:00Z`).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }))}</p>` : ""}
+  ${receipt.warranty && receipt.kind !== "legal" ? `<p style="color:#444;font-size:14px;margin:0 0 28px;">${escapeHtml(receipt.warranty)}</p>` : `<div style="margin:0 0 20px;"></div>`}`,
     cta: { label: "View Receipt", href: receiptUrl },
     footerHtml: "Your warranty is expiring within 30 days. Open the receipt to review your coverage.",
     unsubscribeUrl: unsub.url,

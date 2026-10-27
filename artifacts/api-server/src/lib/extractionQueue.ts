@@ -1,3 +1,4 @@
+import { refreshWarrantyExpiries } from "./warrantyExpiryStore";
 import { db, receiptsTable } from "@workspace/db";
 import { eq, and, lt } from "drizzle-orm";
 import { checkIsReceipt, extractReceiptData, type ExtractedProduct } from "./receiptExtraction";
@@ -129,6 +130,7 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
       .where(eq(receiptsTable.id, receiptId));
     await finishTrialUpload(objectPath, true, receiptId, tx);
     });
+    await refreshWarrantyExpiries(receiptId);
     logger.info({ receiptId, attempt }, "Extraction job completed");
 
     activeJobs.delete(receiptId);

@@ -40,7 +40,7 @@ const PT_MERCHANT_HINTS = [
   "galp", "bp portugal",
 ];
 
-function detectCountry(params: {
+export function detectCountry(params: {
   currency?: string | null;
   purchaseCountry?: string | null;
   merchant?: string | null;

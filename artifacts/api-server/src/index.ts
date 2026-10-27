@@ -16,7 +16,8 @@ import { extendTrialsToCurrentDuration, uncountUnsavedTrialDrafts } from "./lib/
 import { migrateTrialAiReads } from "./lib/trialAiReads";
 import { migrateAccountLifecycle } from "./lib/accountLifecycle";
 import { migrateAccountDeletionCodes } from "./lib/accountDeletionCode";
-import { migrateReceiptDeliveryDate } from "./lib/receiptColumns";
+import { migrateReceiptDeliveryDate, migrateReceiptWarrantyColumns } from "./lib/receiptColumns";
+import { backfillWarrantyExpiries } from "./lib/warrantyExpiryStore";
 
 const rawPort = process.env["PORT"];
 
@@ -106,6 +107,8 @@ async function runStartupMigrations(): Promise<void> {
     `);
     // Return windows count from the delivery date when known
     await migrateReceiptDeliveryDate();
+    // Server-side warranty end dates (legal + manufacturer) for reminders
+    await migrateReceiptWarrantyColumns();
     // Daily job lock so restarts/extra instances don't rerun the sweep
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS scheduled_job_runs (
@@ -441,6 +444,12 @@ async function start(): Promise<void> {
     if (extended > 0) logger.info({ extended }, "Extended account trials to current duration");
   } catch (err) {
     logger.error({ err }, "Failed to extend account trials to current duration");
+  }
+  try {
+    const backfilled = await backfillWarrantyExpiries();
+    if (backfilled > 0) logger.info({ backfilled }, "Computed warranty expiry dates");
+  } catch (err) {
+    logger.error({ err }, "Warranty expiry backfill failed");
   }
   // Encrypt any gmail_connections rows that still have plaintext tokens
   await migrateGmailTokenEncryption();

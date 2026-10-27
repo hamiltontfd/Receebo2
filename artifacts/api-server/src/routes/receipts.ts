@@ -37,6 +37,7 @@ function normalizeCategory(value: string | null | undefined): string | undefined
 }
 
 import { deliveryDateError } from "../lib/returnWindowCalc";
+import { refreshWarrantyExpiries } from "../lib/warrantyExpiryStore";
 const router: IRouter = Router();
 
 router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
@@ -454,6 +455,7 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
     res.status(404).json({ error: "Receipt not found" });
     return;
   }
+  await refreshWarrantyExpiries(receipt.id);
 
   res.json(UpdateReceiptResponse.parse(receipt));
 }));

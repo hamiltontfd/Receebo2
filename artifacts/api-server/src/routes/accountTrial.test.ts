@@ -377,6 +377,44 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
     expect(row.warrantyReminderSentFor).toBe(expiry);
     expect(fixture.warrantyEmail.mock.calls.filter(([uid]) => uid === userId)).toHaveLength(1);
   }, 30000);
+  it("reminds a realistic manufacturer warranty and the PT legal warranty separately, once each", async () => {
+    await start();
+    const receipt = await upload();
+    const target = new Date(Date.now() + 29 * DAY_MS).toISOString().slice(0, 10);
+    const { addMonthsClamped } = await import("../lib/warrantyExpiry");
+    // Manufacturer: "2-year" text, bought 24 months before the target end date.
+    const purchaseDate = addMonthsClamped(target, -24);
+    await db.update(receiptsTable).set({
+      purchaseDate, purchaseCountry: "PT", currency: "EUR", category: "Electronics", isDraft: false,
+      warranty: "2-year manufacturer warranty",
+    }).where(eq(receiptsTable.id, receipt.id));
+    fixture.warrantyEmail.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    await runWarrantyReminderSweep();
+    await runWarrantyReminderSweep();
+    let calls = fixture.warrantyEmail.mock.calls.filter(([uid, r]) => uid === userId && r.id === receipt.id);
+    if (addMonthsClamped(purchaseDate, 24) === target) {
+      expect(calls).toHaveLength(1);
+      expect(calls[0][1]).toMatchObject({ kind: "manufacturer", expiresOn: target });
+    }
+    let [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+    expect(row.manufacturerWarrantyExpiresOn).toBe(addMonthsClamped(purchaseDate, 24));
+    expect(row.legalWarrantyExpiresOn).toBe(addMonthsClamped(purchaseDate, 36));
+
+    // Legal: bought 3 years before the target end date, no manufacturer text.
+    const legalPurchase = addMonthsClamped(target, -36);
+    await db.update(receiptsTable).set({ purchaseDate: legalPurchase, warranty: null })
+      .where(eq(receiptsTable.id, receipt.id));
+    fixture.warrantyEmail.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    await runWarrantyReminderSweep();
+    await runWarrantyReminderSweep();
+    calls = fixture.warrantyEmail.mock.calls.filter(([uid, r]) => uid === userId && r.id === receipt.id);
+    if (addMonthsClamped(legalPurchase, 36) === target) {
+      expect(calls).toHaveLength(1);
+      expect(calls[0][1]).toMatchObject({ kind: "legal", expiresOn: target });
+      [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+      expect(row.legalWarrantyReminderSentFor).toBe(target);
+    }
+  }, 30000);
   it("lets the daily sweep run only once per ~23h across restarts/instances", async () => {
     const job = `test-job-${randomUUID()}`;
     const t0 = new Date("2026-10-26T03:00:00Z");
