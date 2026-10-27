@@ -248,3 +248,14 @@ Technical details live in `docs/assistant-log.md`.
 - Promo video (public/media, 16x9 and 9x16): unaffected. Its detail shot never showed the old preview.
 - Tests: typecheck clean; web 222 passed; marketing freshness 6/6. marketing:status lists MarketingMedia.tsx and WhyReceeboSection.tsx as changed since approval: the v3 switch was made after the upload on purpose, the same as in the v2 release.
 - Production: the landing gets v3 on the next publish (the objects are already in App Storage). Production demo data was not checked directly, because the workspace has no production DB access. The demo login is a Clerk "+clerk_test" address, which only works on the dev Clerk instance, and the seed was only run in dev, so a production demo account is not expected. If one exists, the steps in scripts/demo-seed/README.md would need running against production (Hamilton's call).
+
+## 2026-10-27 — Session 24: Postgres pool error guards (Grok Bot, Hamilton: "Sim, aplica a correção em dev sem publicar")
+- Bug (production, 15:09 Lisbon): the API exited with status 1 after "Emitted 'error' event on BoundPool instance". None of the three pg pools (app `pool`, `advisoryLockPool`, the StripeSync pool) had an `error` listener, so a dropped idle connection became an uncaught exception. Lock clients borrowed for pg_advisory_lock (withUserDataLock, tryWithUserDataLock, the daily Outlook sweep) were also unprotected while checked out, because pg-pool removes its own listener then.
+- Fix (6af08d0):
+  - lib/db/src/poolErrors.ts: guardPoolErrors() logs the pool name, error code and message only. connectGuarded() keeps an error listener on a borrowed client and releases an errored client with discard.
+  - The app and advisory-lock pools are guarded at creation. getStripeSync() guards the StripeSync pool (guardStripeSyncPool).
+  - userDataLock.ts: connectLockClient() and unlockAndRelease(). An errored client, or a failed unlock, is destroyed instead of going back to the pool, which also drops its session lock. The Outlook daily sweep uses the same helpers.
+  - index.ts: log-only process `unhandledRejection` handler (name, code, stack frames; no messages). uncaughtException keeps the default crash.
+- Tests: new poolErrors.test.ts (6). Typecheck clean (all projects); API 316 passed, 2 skipped; web 222 passed.
+- Dev API rebuilt and restarted (detached, PORT 8080); healthz 200 locally and on the dev URL.
+- Not pushed or published; Stripe, production secrets, deployment and production data untouched. Production gets this on the next publish.
