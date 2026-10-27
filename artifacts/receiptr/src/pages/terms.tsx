@@ -62,16 +62,33 @@ export default function TermsOfService() {
           free account trial. No payment method is required. The trial lasts
           15 days from its start. During the trial you can add up to five
           receipts in total, counting both uploads and approved email
-          imports. After the fifth receipt you cannot add more, but you keep
+          imports. An upload counts only once you save it after review. The
+          trial also includes up to 10 automatic receipt reads, whether or not
+          the result is saved <strong>[LEGAL REVIEW NEEDED]</strong>. After the fifth receipt you cannot add more, but you keep
           access to view, search, open, and export your receipts and to
           receive warranty and return alerts until the trial ends. The trial
           never converts into a paid subscription automatically.
         </li>
         <li>
           When the trial ends, you can still access
-          Settings, your profile, these legal documents, billing, data export
-          and account deletion, and you can review the receipt from your final
-          trial upload. Other features require a paid subscription.
+          Settings, your profile, these legal documents, billing and account
+          deletion, and you can review the receipt from your final trial
+          upload. Other features require a paid subscription.
+        </li>
+        <li>
+          {/* [LEGAL REVIEW NEEDED] Draft clause (account pause and deletion after 60 days). */}
+          <strong>[LEGAL REVIEW NEEDED]</strong> If you don’t have an active
+          subscription after your free trial ends, or after your paid
+          subscription ends, your account is paused: you can no longer add or
+          open receipts, email imports stop, and warranty and return reminders
+          stop. While your account has access you can export your data from
+          Settings; while it is paused, you can ask for a copy of your data by
+          emailing <a href="mailto:contact@receebo.net">contact@receebo.net</a>.
+          Your account and data are kept for 60 days from the date your access
+          ended and then permanently deleted, as described in the Privacy
+          Policy. We email you 30 days and 7 days before deletion and confirm
+          the deletion afterwards. Subscribing before the deletion date keeps
+          your account and data. Deleted data cannot be recovered.
         </li>
         <li>
           A paid subscription starts only when you explicitly choose a plan
@@ -157,7 +174,8 @@ export default function TermsOfService() {
       <h2>10. Suspension and termination</h2>
       <p>
         You may cancel your subscription or delete your account through
-        Settings. Receebo may suspend or terminate access for serious or repeated
+        Settings. Paused accounts are deleted after 60 days as
+        described in section 4 <strong>[LEGAL REVIEW NEEDED]</strong>. Receebo may suspend or terminate access for serious or repeated
         breach, fraud, security risk, non-payment, or legal necessity. Where
         appropriate, Receebo will provide notice and an opportunity to remedy
         the issue. Terms that by nature should survive termination—including

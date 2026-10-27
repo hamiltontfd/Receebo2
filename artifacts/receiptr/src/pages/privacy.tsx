@@ -185,6 +185,24 @@ export default function PrivacyPolicy() {
           to the exceptions below.
         </li>
         <li>
+          {/* [LEGAL REVIEW NEEDED] Draft retention clause for paused accounts. */}
+          <strong>[LEGAL REVIEW NEEDED]</strong> When your access to Receebo
+          ends without an active subscription, either because your free trial
+          ended or because your paid subscription was cancelled or lapsed, your
+          account is paused and we keep your account and data for 60 days so
+          you can subscribe or ask for a copy. While paused, copies are
+          provided on request to{" "}
+          <a href="mailto:contact@receebo.net">contact@receebo.net</a>; there
+          is no in-app export. We email you 30 days and 7 days before the
+          deletion date. If you subscribe before then, nothing is deleted. On
+          the deletion date we permanently delete your account and all
+          associated data, including receipts, uploaded files, extracted
+          information and any Outlook connection. We keep only the billing and
+          payment records that we or our payment processor, Stripe, are
+          required to keep by law, for the period the law requires. We email
+          you to confirm the deletion.
+        </li>
+        <li>
           A receipt used for the one-receipt onboarding test is temporary unless
           you create an account and start a trial to save it.
         </li>
@@ -221,9 +239,10 @@ export default function PrivacyPolicy() {
       <p>
         Depending on the circumstances, you may have the right to access,
         correct, erase, restrict, or object to processing; receive portable data;
-        and withdraw consent without affecting earlier lawful processing. You
-        can download a structured data export and request account deletion in
-        Settings, or contact{" "}
+        and withdraw consent without affecting earlier lawful processing. While
+        your account has access you can download a structured data export in
+        Settings; while it is paused you can request a copy by email. You can
+        request account deletion in Settings, or contact{" "}
         <a href="mailto:contact@receebo.net">contact@receebo.net</a>. Receebo may
         need to verify your identity before fulfilling a request.
       </p>

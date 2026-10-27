@@ -17,6 +17,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useBillingStatus } from "@/hooks/useBilling";
+import { FROZEN_EXPORT_NOTE, isFrozenAccount } from "@/lib/accountLifecycle";
 
 const BASE_PATH = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
 const API_BASE = `${BASE_PATH}/api`;
@@ -39,6 +41,9 @@ export function PrivacyAndDataSettings() {
   const { signOut } = useClerk();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  // Self-serve export only while the account has access; frozen accounts ask by email.
+  const { data: billing } = useBillingStatus();
+  const frozen = isFrozenAccount(billing);
 
   const downloadExport = async () => {
     setExporting(true);
@@ -160,12 +165,13 @@ export function PrivacyAndDataSettings() {
         <div className="flex items-center justify-between gap-4 p-5">
           <div>
             <p className="text-sm font-medium">Download your data</p>
-            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-              Export your account and structured receipt data as a JSON file.
-              Receipt images and attachments remain downloadable from each receipt.
+            <p className="mt-0.5 text-xs leading-5 text-muted-foreground" data-testid="text-export-description">
+              {frozen
+                ? FROZEN_EXPORT_NOTE
+                : "Export your account and structured receipt data as a JSON file. Receipt images and attachments remain downloadable from each receipt."}
             </p>
           </div>
-          <Button
+          {!frozen && <Button
             variant="outline"
             size="sm"
             className="shrink-0 rounded-full"
@@ -180,7 +186,7 @@ export function PrivacyAndDataSettings() {
             <span className="ml-2 hidden sm:inline">
               {exporting ? "Preparing…" : "Download"}
             </span>
-          </Button>
+          </Button>}
         </div>
 
         <div className="flex items-center justify-between gap-4 p-5">

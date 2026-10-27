@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { accessEndedAt, deletionDueAt, isFrozen, scheduledDeletionDate } from "../lib/accountLifecycleSchedule";
 import { and, eq } from "drizzle-orm";
 import { db, userBillingTable, accountTrialsTable, trialFunnelCheckoutsTable } from "@workspace/db";
 import { funnelSubject, recordFunnelEvent, paywallReason, safeFunnel, createFunnelCheckout, confirmPaidFunnel } from "../lib/trialFunnel";
@@ -32,8 +33,14 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
     if (status.accessState === "paid") {
       await safeFunnel(() => confirmPaidFunnel(req.userId!));
     }
+    // Frozen accounts see when their data will be deleted (spec: docs/account-lifecycle.md).
+    const now = new Date();
+    const dataDeletionAt = isFrozen(status)
+      ? (await scheduledDeletionDate(req.userId!)) ?? deletionDueAt(accessEndedAt(status, now), now)
+      : null;
     res.json({
       ...status,
+      dataDeletionAt: dataDeletionAt?.toISOString() ?? null,
       stripeSubscriptionId: undefined,
       plan: status.plan,
       trialEndAt: status.trialEndAt?.toISOString() ?? null,

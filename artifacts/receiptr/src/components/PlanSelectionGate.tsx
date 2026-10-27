@@ -18,6 +18,7 @@ import {
 } from "@/hooks/useBilling";
 import { PlanChoice, FoundingNote } from "@/components/PlanChoice";
 import { trackTrialInteraction } from "@/lib/trialFunnel";
+import { frozenRetentionNotice, FROZEN_COPY_NOTE } from "@/lib/accountLifecycle";
 
 const ACTIVATING_TIMEOUT_MS = 10_000;
 export const ACTIVE_REVIEW_KEY = "receebo:activeReviewReceiptId";
@@ -245,6 +246,11 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
             {copy.title}
           </h1>
           <p className="mt-3 text-muted-foreground text-sm leading-relaxed">{copy.body}</p>
+          {frozenRetentionNotice(billing) && (
+            <p className="mt-3 text-muted-foreground text-xs leading-relaxed" data-testid="text-paywall-retention">
+              {frozenRetentionNotice(billing)} {FROZEN_COPY_NOTE}
+            </p>
+          )}
           {reviewId != null && (
             <Link
               href={`/receipts/${reviewId}`}

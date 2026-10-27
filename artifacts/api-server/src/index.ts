@@ -14,6 +14,7 @@ import { billingOrigin } from "./lib/billingUrls";
 import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
 import { extendTrialsToCurrentDuration, uncountUnsavedTrialDrafts } from "./lib/accountTrial";
 import { migrateTrialAiReads } from "./lib/trialAiReads";
+import { migrateAccountLifecycle } from "./lib/accountLifecycle";
 
 const rawPort = process.env["PORT"];
 
@@ -413,6 +414,11 @@ async function start(): Promise<void> {
     if (uncounted > 0) logger.info({ uncounted }, "Unsaved trial drafts no longer count toward the receipt cap");
   } catch (err) {
     logger.warn({ err }, "Trial draft migration warning (non-fatal) — continuing");
+  }
+  try {
+    await migrateAccountLifecycle();
+  } catch (err) {
+    logger.warn({ err }, "Account lifecycle migration warning (non-fatal) — continuing");
   }
   try {
     await migrateTrialAiReads();

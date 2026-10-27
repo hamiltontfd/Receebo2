@@ -30,6 +30,7 @@ function reminderAccessChecker(): (userId: string) => Promise<boolean> {
 }
 import { sendPushNotification } from "./pushNotifications";
 import { calcReturnWindow } from "./returnWindowCalc";
+import { runDataRetentionSweep } from "./accountLifecycle";
 
 const ORPHAN_AGE_THRESHOLD_DAYS = 7;
 const ORPHAN_AGE_THRESHOLD_MS = ORPHAN_AGE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
@@ -258,6 +259,13 @@ async function runDailyMaintenance(): Promise<void> {
     await runReturnWindowSweep();
   } catch (err) {
     logger.error({ err }, "Return window sweep failed");
+  }
+  // Frozen accounts: deletion warnings and 60-day deletion (dry run unless
+  // DATA_DELETION_ENABLED=true).
+  try {
+    await runDataRetentionSweep();
+  } catch (err) {
+    logger.error({ err }, "Data retention sweep failed");
   }
 }
 

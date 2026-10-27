@@ -421,3 +421,140 @@ export async function sendTrialEndingEmail(
     context: { daysRemaining, planLabel, chargeStr },
   });
 }
+
+// ── Account lifecycle: deletion warnings and confirmation ─────────────────────
+// PLACEHOLDER COPY: adapted from marketing's lifecycle-emails-en.md to the
+// approved plan (no self-serve download while paused: copies by email to
+// contact@receebo.net). Marketing owns the final text. Strictly transactional
+// (no unsubscribe). The postal address stays [ADDRESS] until Hamilton sets it.
+
+export const SUPPORT_EMAIL = "contact@receebo.net";
+export const EMAIL_LEGAL_LINE = "Receebo · operated by Hamilton Freitas · [ADDRESS]";
+
+function lifecycleFooterHtml(reason: string): string {
+  return `${escapeHtml(reason)}<br>Questions? Email <a href="mailto:${SUPPORT_EMAIL}" style="color:#999;">${SUPPORT_EMAIL}</a>.<br>${escapeHtml(EMAIL_LEGAL_LINE)}`;
+}
+
+function lifecycleFooterText(reason: string): string {
+  return `--\n${reason}\n\nQuestions? Email ${SUPPORT_EMAIL}\n\n${EMAIL_LEGAL_LINE}`;
+}
+
+const P_STYLE = "color:#444;font-size:15px;line-height:1.6;margin:0 0 16px;";
+const H1_STYLE = "font-size:22px;font-weight:800;margin:0 0 12px;line-height:1.2;";
+
+async function getUserContact(userId: string): Promise<{ email: string; firstName: string | null } | null> {
+  if (userId.startsWith("guest_")) return null;
+  try {
+    const user = await clerkClient.users.getUser(userId);
+    const email = user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress;
+    return email ? { email, firstName: user.firstName ?? null } : null;
+  } catch (err) {
+    logger.warn({ err, userId }, "emailService: failed to fetch Clerk user");
+    return null;
+  }
+}
+
+/** Email address to use for the post-deletion confirmation (read BEFORE deleting). */
+export async function getDeletionConfirmationContact(userId: string) {
+  return getUserContact(userId);
+}
+
+export type DeletionWarningStage = "30d" | "7d";
+
+export function renderDeletionWarningEmail(input: {
+  stage: DeletionWarningStage;
+  deletionDate: Date;
+  receiptCount: number;
+  firstName?: string | null;
+  baseUrl?: string;
+}): { subject: string; html: string; text: string } {
+  const date = formatEmailDate(input.deletionDate) ?? "";
+  const subscribeUrl = `${input.baseUrl ?? appUrl()}/settings#upgrade-plans`;
+  const greeting = input.firstName ? `Hi ${input.firstName},` : "Hi,";
+  const receipts = input.receiptCount === 1 ? "your 1 receipt" : `your ${input.receiptCount} receipts`;
+  const subject = input.stage === "30d"
+    ? `Your Receebo receipts will be deleted on ${date}`
+    : "7 days left before we delete your receipts";
+  const heading = input.stage === "30d"
+    ? `Your receipts will be deleted on ${date}`
+    : `Last reminder: your receipts will be deleted on ${date}`;
+  const lines = [
+    `You don't have an active Receebo subscription, so your account is paused. On ${date} we'll permanently delete your account and everything in it, including ${receipts} and their warranty dates. This can't be undone.`,
+    "To keep them, subscribe before then. Subscribing cancels the deletion.",
+    `Want a copy of your files first? Email ${SUPPORT_EMAIL} and we'll send it to you.`,
+  ];
+  const reason = "You're getting this because your Receebo account is paused.";
+  const html = renderEmailLayout({
+    eyebrow: input.stage === "30d" ? "Receebo — Account paused" : "Receebo — Final reminder",
+    bodyHtml: `<h1 style="${H1_STYLE}">${escapeHtml(heading)}</h1>
+  <p style="${P_STYLE}">${escapeHtml(greeting)}</p>
+  ${lines.map((l) => `<p style="${P_STYLE}">${escapeHtml(l)}</p>`).join("\n  ")}`,
+    cta: { label: "Keep my receipts", href: subscribeUrl },
+    footerHtml: lifecycleFooterHtml(reason),
+  });
+  const text = [
+    heading.toUpperCase(),
+    "",
+    greeting,
+    "",
+    ...lines.flatMap((l) => [l, ""]),
+    "Keep my receipts:",
+    subscribeUrl,
+    "",
+    lifecycleFooterText(reason),
+  ].join("\n");
+  return { subject, html, text };
+}
+
+export async function sendDeletionWarningEmail(
+  userId: string,
+  input: { stage: DeletionWarningStage; deletionDate: Date; receiptCount: number },
+): Promise<boolean> {
+  const contact = await getUserContact(userId);
+  if (!contact) return false;
+  const { subject, html, text } = renderDeletionWarningEmail({ ...input, firstName: contact.firstName });
+  return deliver({
+    kind: `deletion_warning_${input.stage}`, userId, to: contact.email, subject, html, text,
+    idempotencyKey: `deletion-warning/${input.stage}/${userId}/${input.deletionDate.toISOString().slice(0, 10)}`,
+    context: { stage: input.stage },
+  });
+}
+
+export function renderAccountDeletedEmail(input: {
+  reason: "inactive" | "requested";
+  firstName?: string | null;
+}): { subject: string; html: string; text: string } {
+  const greeting = input.firstName ? `Hi ${input.firstName},` : "Hi,";
+  const lines = [
+    input.reason === "inactive"
+      ? "As announced, we've deleted your Receebo account because it had no active subscription for 60 days."
+      : "As you asked, we've deleted your Receebo account.",
+    "We deleted your account, receipts, uploaded files, extracted data and any Outlook connection. We keep only the billing records the law requires.",
+    "If you ever want to start again, you're welcome back anytime at https://receebo.net.",
+  ];
+  const reason = "You're getting this to confirm your Receebo account was deleted.";
+  const subject = "Your Receebo account has been deleted";
+  const html = renderEmailLayout({
+    eyebrow: "Receebo — Account deleted",
+    bodyHtml: `<h1 style="${H1_STYLE}">Your account has been deleted</h1>
+  <p style="${P_STYLE}">${escapeHtml(greeting)}</p>
+  ${lines.map((l) => `<p style="${P_STYLE}">${escapeHtml(l)}</p>`).join("\n  ")}`,
+    footerHtml: lifecycleFooterHtml(reason),
+  });
+  const text = ["YOUR ACCOUNT HAS BEEN DELETED", "", greeting, "", ...lines.flatMap((l) => [l, ""]),
+    lifecycleFooterText(reason)].join("\n");
+  return { subject, html, text };
+}
+
+/** Sent after deletion, so the address is passed in (the sign-in account is gone). */
+export async function sendAccountDeletedEmail(
+  userId: string,
+  contact: { email: string; firstName: string | null },
+  reason: "inactive" | "requested",
+): Promise<boolean> {
+  const { subject, html, text } = renderAccountDeletedEmail({ reason, firstName: contact.firstName });
+  return deliver({
+    kind: `account_deleted_${reason}`, userId, to: contact.email, subject, html, text,
+    idempotencyKey: `account-deleted/${userId}`,
+  });
+}

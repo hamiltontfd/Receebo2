@@ -46,6 +46,8 @@ export type BillingStatus = SubscriptionStatus & {
   canUpload?: boolean;
   canUseApp?: boolean;
   reviewReceiptId?: number | null;
+  /** Frozen accounts only: when the data will be deleted (ISO). */
+  dataDeletionAt?: string | null;
 };
 
 const ACCESS_STATES: AccessState[] = [
