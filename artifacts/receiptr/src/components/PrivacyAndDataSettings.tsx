@@ -19,6 +19,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useBillingStatus } from "@/hooks/useBilling";
 import { FROZEN_EXPORT_NOTE, isFrozenAccount } from "@/lib/accountLifecycle";
+import {
+  cleanDeletionCodeInput,
+  deletionCodeSentMessage,
+  isCompleteDeletionCode,
+} from "@/lib/accountDeletionCode";
 
 const BASE_PATH = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
 const API_BASE = `${BASE_PATH}/api`;
@@ -37,7 +42,41 @@ export function PrivacyAndDataSettings() {
   const [deleting, setDeleting] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Step 1: warning + type DELETE. Step 2: the 6-digit code from the email.
+  const [codeSentTo, setCodeSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
   usePwaUpdateBlocker(exporting || deleting || dialogOpen);
+
+  const resetDeletionDialog = () => {
+    setConfirmation("");
+    setCodeSentTo(null);
+    setCode("");
+    setCodeError(null);
+  };
+
+  const requestDeletionCode = async () => {
+    if (confirmation !== "DELETE") return;
+    setSendingCode(true);
+    setCodeError(null);
+    try {
+      const response = await fetch(`${API_BASE}/account/deletion-code`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error(await responseError(response, "Could not send the code."));
+      }
+      const body = (await response.json()) as { sentTo?: string };
+      setCodeSentTo(body.sentTo ?? "your email");
+      setCode("");
+    } catch (error) {
+      setCodeError(error instanceof Error ? error.message : "Could not send the code.");
+    } finally {
+      setSendingCode(false);
+    }
+  };
   const { signOut } = useClerk();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -90,14 +129,15 @@ export function PrivacyAndDataSettings() {
   };
 
   const deleteAccount = async () => {
-    if (confirmation !== "DELETE") return;
+    if (confirmation !== "DELETE" || !isCompleteDeletionCode(code)) return;
     setDeleting(true);
+    setCodeError(null);
     try {
       const response = await fetch(`${API_BASE}/account`, {
         method: "DELETE",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmation }),
+        body: JSON.stringify({ confirmation, code }),
       });
       if (!response.ok) {
         throw new Error(
@@ -116,6 +156,7 @@ export function PrivacyAndDataSettings() {
       }
     } catch (error) {
       setDeleting(false);
+      setCodeError(error instanceof Error ? error.message : "Could not delete your account.");
       toast({
         variant: "destructive",
         title: "Account was not deleted",
@@ -202,7 +243,7 @@ export function PrivacyAndDataSettings() {
             onOpenChange={(open) => {
               if (!deleting) {
                 setDialogOpen(open);
-                if (!open) setConfirmation("");
+                if (!open) resetDeletionDialog();
               }
             }}
           >
@@ -231,29 +272,81 @@ export function PrivacyAndDataSettings() {
                   </span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <label className="text-sm font-medium" htmlFor="delete-confirmation">
-                Type DELETE to confirm
-              </label>
-              <input
-                id="delete-confirmation"
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-                autoComplete="off"
-                className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-              />
+              {codeSentTo === null ? (
+                <>
+                  <label className="text-sm font-medium" htmlFor="delete-confirmation">
+                    Type DELETE to confirm
+                  </label>
+                  <input
+                    id="delete-confirmation"
+                    value={confirmation}
+                    onChange={(event) => setConfirmation(event.target.value)}
+                    autoComplete="off"
+                    className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    We'll email you a 6-digit code to confirm it's you.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground" data-testid="text-deletion-code-sent">
+                    {deletionCodeSentMessage(codeSentTo)}
+                  </p>
+                  <label className="text-sm font-medium" htmlFor="delete-code">
+                    Enter the code
+                  </label>
+                  <input
+                    id="delete-code"
+                    value={code}
+                    onChange={(event) => setCode(cleanDeletionCodeInput(event.target.value))}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    className="h-10 rounded-md border bg-background px-3 font-mono text-lg tracking-[0.4em] outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <button
+                    type="button"
+                    className="self-start text-xs font-medium underline underline-offset-4 disabled:opacity-50"
+                    disabled={sendingCode || deleting}
+                    onClick={() => void requestDeletionCode()}
+                  >
+                    {sendingCode ? "Sending…" : "Send a new code"}
+                  </button>
+                </>
+              )}
+              {codeError && (
+                <p className="text-sm text-destructive" role="alert" data-testid="text-deletion-error">
+                  {codeError}
+                </p>
+              )}
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={deleting}>Keep account</AlertDialogCancel>
-                <AlertDialogAction
-                  disabled={confirmation !== "DELETE" || deleting}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    void deleteAccount();
-                  }}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {deleting ? "Deleting…" : "Permanently delete"}
-                </AlertDialogAction>
+                {codeSentTo === null ? (
+                  <AlertDialogAction
+                    disabled={confirmation !== "DELETE" || sendingCode}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void requestDeletionCode();
+                    }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {sendingCode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {sendingCode ? "Sending…" : "Email me a code"}
+                  </AlertDialogAction>
+                ) : (
+                  <AlertDialogAction
+                    disabled={!isCompleteDeletionCode(code) || deleting}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void deleteAccount();
+                    }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {deleting ? "Deleting…" : "Permanently delete"}
+                  </AlertDialogAction>
+                )}
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>

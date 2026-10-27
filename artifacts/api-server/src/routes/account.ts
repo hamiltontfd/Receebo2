@@ -24,7 +24,25 @@ import {
 import { lockUserDataMutation } from "../lib/userDataLock";
 import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
 import { isFrozen } from "../lib/accountLifecycleSchedule";
-import { getDeletionConfirmationContact, sendAccountDeletedEmail } from "../lib/emailService";
+import {
+  getDeletionConfirmationContact,
+  sendAccountDeletedEmail,
+  sendDeletionCodeEmail,
+} from "../lib/emailService";
+import {
+  DELETION_CODE_ERRORS,
+  DELETION_CODE_TTL_MS,
+  invalidateDeletionCode,
+  issueDeletionCode,
+  verifyDeletionCode,
+} from "../lib/accountDeletionCode";
+
+/** "ana@example.com" -> "a••@example.com", so the dialog can say where the code went. */
+export function maskEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!domain) return "your email";
+  return `${local.slice(0, 1)}${"•".repeat(Math.max(2, Math.min(local.length - 1, 6)))}@${domain}`;
+}
 
 export const EXPORT_FROZEN_MESSAGE =
   "Your account is paused, so in-app export is off. Email contact@receebo.net and we'll send you a copy of your data.";
@@ -241,13 +259,64 @@ router.get("/account/export", requireAuth, async (req, res): Promise<void> => {
   }
 });
 
+// Step 1 of deletion: email a 6-digit code to the account address.
+router.post("/account/deletion-code", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.userId!;
+  const contact = await getDeletionConfirmationContact(userId);
+  if (!contact) {
+    res.status(409).json({
+      error: "We couldn't find an email address for this account. Email contact@receebo.net to delete it.",
+      code: "deletion_code_no_email",
+    });
+    return;
+  }
+  const issued = await issueDeletionCode(userId);
+  if (!issued.ok) {
+    res.setHeader("Retry-After", String(issued.retryAfterSeconds));
+    res.status(429).json({
+      error: `Please wait ${issued.retryAfterSeconds < 120 ? `${issued.retryAfterSeconds} seconds` : `${Math.ceil(issued.retryAfterSeconds / 60)} minutes`} before requesting another code.`,
+      code: "deletion_code_rate_limited",
+      retryAfterSeconds: issued.retryAfterSeconds,
+    });
+    return;
+  }
+  const sent = await sendDeletionCodeEmail(userId, contact, {
+    code: issued.code, expiresAt: issued.expiresAt, expiresInMinutes: DELETION_CODE_TTL_MS / 60_000,
+  });
+  if (!sent) {
+    await invalidateDeletionCode(userId);
+    res.status(502).json({ error: "We couldn't send the code. Try again in a minute.", code: "deletion_code_send_failed" });
+    return;
+  }
+  res.status(202).json({ sentTo: maskEmail(contact.email), expiresAt: issued.expiresAt.toISOString() });
+});
+
+// Step 2: confirm with "DELETE" and the emailed code.
 router.delete("/account", requireAuth, async (req, res): Promise<void> => {
   const userId = req.userId!;
-  const { confirmation } = req.body as { confirmation?: unknown };
+  const { confirmation, code } = req.body as { confirmation?: unknown; code?: unknown };
 
   if (confirmation !== "DELETE") {
     res.status(400).json({ error: 'Type "DELETE" to confirm account deletion' });
     return;
+  }
+
+  // A deletion that already started (code verified) and failed part-way can be
+  // retried without a new code.
+  if (!(await isAccountDeletionInProgress(userId))) {
+    if (code === undefined || code === null || code === "") {
+      res.status(400).json({ error: DELETION_CODE_ERRORS.required, code: "deletion_code_required" });
+      return;
+    }
+    const verified = await verifyDeletionCode(userId, code);
+    if (!verified.ok) {
+      res.status(400).json({
+        error: DELETION_CODE_ERRORS[verified.reason],
+        code: `deletion_code_${verified.reason}`,
+        ...(verified.reason === "invalid" ? { attemptsLeft: verified.attemptsLeft } : {}),
+      });
+      return;
+    }
   }
 
   // Read the address first: the sign-in account is gone after deletion.

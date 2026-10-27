@@ -15,6 +15,7 @@ import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
 import { extendTrialsToCurrentDuration, uncountUnsavedTrialDrafts } from "./lib/accountTrial";
 import { migrateTrialAiReads } from "./lib/trialAiReads";
 import { migrateAccountLifecycle } from "./lib/accountLifecycle";
+import { migrateAccountDeletionCodes } from "./lib/accountDeletionCode";
 
 const rawPort = process.env["PORT"];
 
@@ -419,6 +420,11 @@ async function start(): Promise<void> {
     await migrateAccountLifecycle();
   } catch (err) {
     logger.warn({ err }, "Account lifecycle migration warning (non-fatal) — continuing");
+  }
+  try {
+    await migrateAccountDeletionCodes();
+  } catch (err) {
+    logger.warn({ err }, "Account deletion code migration warning (non-fatal) — continuing");
   }
   try {
     await migrateTrialAiReads();

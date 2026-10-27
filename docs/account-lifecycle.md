@@ -22,7 +22,13 @@ Status: implemented in dev (session 16, 27 Oct 2026), **not published**. Legal w
 - **Safety switch:** runs only when `DATA_DELETION_ENABLED=true`. **Default off**: the daily sweep records each frozen account's schedule and logs a **dry run** ("would send warning", "would delete account" with receipt/file/connection counts), sending nothing and deleting nothing.
 - Daily, inside the existing daily maintenance (DB lock, at most once per ~23 h): `lib/accountLifecycle.ts` → `runDataRetentionSweep()`.
 
-## 4. Open for Hamilton
+## 4. User-requested deletion
+Settings → Delete account → in-app warning → a **6-digit code** is emailed (expires in 15 minutes, single use, 5 attempts) → the user types it → deletion → confirmation email. The code is never in the subject or preheader. Copy is a placeholder (marketing owns it).
+- API: `POST /api/account/deletion-code` emails the code (202 `{sentTo, expiresAt}`; 429 with `Retry-After` after a send in the last 60 s or 5 sends in an hour; 502 if Resend refuses, and that code is voided). `DELETE /api/account` takes `{confirmation: "DELETE", code}`; wrong codes return 400 `deletion_code_invalid` with `attemptsLeft`, then `deletion_code_too_many_attempts`, `deletion_code_expired` or `deletion_code_missing`.
+- Storage: `account_deletion_codes` keeps only an HMAC of the code (keyed with `SESSION_SECRET`), the expiry, the attempt count and the send counters. A deletion that already started (code verified) and failed part-way can be retried without a new code.
+- Email: `renderDeletionCodeEmail` in `emailService.ts`, subject "Confirm your Receebo account deletion", no code in the subject or preheader, no delete link. Copy: PLACEHOLDER from `deletion-code.txt`.
+
+## 5. Open for Hamilton
 - Postal address for the email footer (`[ADDRESS]`).
 - Confirm the final warning timing (7 days before deletion).
 - Legal review of the terms/privacy clauses marked [LEGAL REVIEW NEEDED], and whether to bump `TERMS_VERSION`/`PRIVACY_VERSION` (forces re-acceptance).

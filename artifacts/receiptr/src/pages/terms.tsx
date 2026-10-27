@@ -174,7 +174,9 @@ export default function TermsOfService() {
       <h2>10. Suspension and termination</h2>
       <p>
         You may cancel your subscription or delete your account through
-        Settings. Paused accounts are deleted after 60 days as
+        Settings; to protect your account, deletion is confirmed with a
+        one-time code sent to your account email{" "}
+        <strong>[LEGAL REVIEW NEEDED]</strong>. Paused accounts are deleted after 60 days as
         described in section 4 <strong>[LEGAL REVIEW NEEDED]</strong>. Receebo may suspend or terminate access for serious or repeated
         breach, fraud, security risk, non-payment, or legal necessity. Where
         appropriate, Receebo will provide notice and an opportunity to remedy

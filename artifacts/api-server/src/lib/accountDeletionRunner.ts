@@ -222,6 +222,14 @@ export async function performAccountDeletion(
         await tx.execute(sql`DELETE FROM trial_ai_reads WHERE user_id = ${userId}`);
       });
       deletionStage = "database_deleted";
+      // Best effort, outside the transaction: these tables come from startup
+      // migrations and hold no personal content (code hash, schedule dates).
+      for (const statement of [
+        sql`DELETE FROM account_deletion_codes WHERE user_id = ${userId}`,
+        sql`DELETE FROM account_lifecycle WHERE user_id = ${userId}`,
+      ]) {
+        try { await db.execute(statement); } catch (err) { logger.warn({ err, userId }, "Account deletion: auxiliary cleanup skipped"); }
+      }
       await db
         .update(accountDeletionRequestsTable)
         .set({ stage: deletionStage, lastError: null, updatedAt: new Date() })

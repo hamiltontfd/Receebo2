@@ -242,7 +242,8 @@ export default function PrivacyPolicy() {
         and withdraw consent without affecting earlier lawful processing. While
         your account has access you can download a structured data export in
         Settings; while it is paused you can request a copy by email. You can
-        request account deletion in Settings, or contact{" "}
+        request account deletion in Settings (confirmed with a one-time code
+        sent to your account email) <strong>[LEGAL REVIEW NEEDED]</strong>, or contact{" "}
         <a href="mailto:contact@receebo.net">contact@receebo.net</a>. Receebo may
         need to verify your identity before fulfilling a request.
       </p>

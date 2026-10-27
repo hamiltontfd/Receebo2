@@ -558,3 +558,63 @@ export async function sendAccountDeletedEmail(
     idempotencyKey: `account-deleted/${userId}`,
   });
 }
+
+// ── Account deletion code (spec §10, deletion-code.txt) ────────────────────────
+// PLACEHOLDER COPY from /workspace/receebo-email/deletion-code.txt. Marketing
+// owns the final text. The code is never in the subject or preheader (both show
+// on lock screens), and there is no button or link that deletes anything.
+
+const CODE_STYLE = "font-family:'Spline Sans Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace;font-size:32px;line-height:40px;font-weight:600;letter-spacing:8px;padding-left:8px;color:#121212;margin:0;user-select:all;-webkit-user-select:all;";
+const CODE_PANEL_STYLE = "background:#F5F5F5;border:1px solid #E6E6E6;border-radius:8px;padding:20px 16px;text-align:center;margin:0 0 16px;";
+export const DELETION_CODE_SUBJECT = "Confirm your Receebo account deletion";
+export const DELETION_CODE_PREHEADER = "Use the code inside to confirm. It expires in 15 minutes.";
+
+export function renderDeletionCodeEmail(input: { code: string; expiresInMinutes: number }): { subject: string; html: string; text: string } {
+  const intro = "You asked to delete your Receebo account. To confirm, enter this code in Receebo. This permanently deletes your account and all your receipts, and it can't be undone.";
+  const expiry = `This code expires in ${input.expiresInMinutes} minutes and can only be used once.`;
+  const notYou = `Didn't request this? Ignore this email and your account stays as it is. If you think someone else can sign in to your account, email ${SUPPORT_EMAIL}.`;
+  const reason = "You're getting this because someone asked to delete the Receebo account linked to this email address.";
+  const html = renderEmailLayout({
+    eyebrow: "Receebo — Deletion requested",
+    bodyHtml: `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(DELETION_CODE_PREHEADER)}</div>
+  <h1 style="${H1_STYLE}">Confirm you want to delete your account.</h1>
+  <p style="${P_STYLE}">${escapeHtml(intro)}</p>
+  <div style="${CODE_PANEL_STYLE}">
+    <p style="font-size:12px;line-height:16px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#737373;margin:0 0 8px;">Your code</p>
+    <p class="rb-code" style="${CODE_STYLE}">${escapeHtml(input.code)}</p>
+  </div>
+  <p style="color:#737373;font-size:14px;line-height:20px;margin:0 0 16px;">${escapeHtml(expiry)}</p>
+  <p style="color:#737373;font-size:14px;line-height:20px;margin:0 0 16px;">${escapeHtml(notYou)}</p>`,
+    footerHtml: lifecycleFooterHtml(reason),
+  });
+  const text = [
+    "ACCOUNT DELETION - deletion requested",
+    "",
+    "Confirm you want to delete your account.",
+    "",
+    intro,
+    "",
+    "Your code:",
+    input.code,
+    "",
+    expiry,
+    "",
+    notYou,
+    "",
+    lifecycleFooterText(reason),
+  ].join("\n");
+  return { subject: DELETION_CODE_SUBJECT, html, text };
+}
+
+/** Sends the code to the account's primary email. False if there is no address or Resend refused. */
+export async function sendDeletionCodeEmail(
+  userId: string,
+  contact: { email: string },
+  code: { code: string; expiresAt: Date; expiresInMinutes: number },
+): Promise<boolean> {
+  const { subject, html, text } = renderDeletionCodeEmail(code);
+  return deliver({
+    kind: "account_deletion_code", userId, to: contact.email, subject, html, text,
+    idempotencyKey: `deletion-code/${userId}/${code.expiresAt.getTime()}`,
+  });
+}
