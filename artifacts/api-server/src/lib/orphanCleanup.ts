@@ -146,8 +146,11 @@ async function runOrphanFileCleanup(): Promise<void> {
 }
 
 const MS_PER_DAY = 86_400_000;
-/** Warranty reminders go out once per expiry date, 28-30 days before it (tolerates missed days). */
-const WARRANTY_REMINDER_MIN_DAYS = 28;
+/**
+ * Warranty reminders go out once per expiry date, as soon as it is 30 days or
+ * less away (and not past). A receipt added with 5 days left still gets one.
+ */
+const WARRANTY_REMINDER_MIN_DAYS = 0;
 const WARRANTY_REMINDER_MAX_DAYS = 30;
 
 type WarrantyKind = "legal" | "manufacturer";
