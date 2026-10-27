@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { runDailyMaintenanceIfDue } from "../lib/orphanCleanup";
+import { runOutlookDailySweep } from "../lib/outlookSync";
 import { logger } from "../lib/logger";
 
 /**
@@ -13,6 +14,13 @@ import { logger } from "../lib/logger";
  *   x-cron-secret: <CRON_SECRET>
  *
  * Shares the DB run lock with the in-process tick, so it never runs twice in ~23h.
+ *
+ * Then runs the daily Outlook sweep (intended schedule 06:00 Europe/Lisbon),
+ * synchronously within the request: autoscale can stop an instance once no
+ * request is in flight, so nothing is left running after the response. The
+ * sweep has a ~2 min budget per call and only syncs connections not synced in
+ * the last 20 h, so calling twice is harmless and a second call continues
+ * where a timed-out one stopped (response: outlook.remaining > 0).
  */
 const router: IRouter = Router();
 
@@ -37,7 +45,14 @@ router.post("/internal/cron/daily-maintenance", async (req: Request, res: Respon
   try {
     const ran = await runDailyMaintenanceIfDue();
     logger.info({ ran }, "Cron: daily maintenance requested");
-    res.json({ ran });
+    let outlook: Awaited<ReturnType<typeof runOutlookDailySweep>> | { status: "error" };
+    try {
+      outlook = await runOutlookDailySweep();
+    } catch (err) {
+      logger.error({ err }, "Cron: Outlook daily sweep failed");
+      outlook = { status: "error" };
+    }
+    res.json({ ran, outlook });
   } catch (err) {
     logger.error({ err }, "Cron: daily maintenance failed");
     res.status(500).json({ error: "Daily maintenance failed" });

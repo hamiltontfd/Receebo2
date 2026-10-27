@@ -1,11 +1,12 @@
 /**
  * Outlook (Microsoft Graph) mailbox connection + import, plugged into the
  * shared pipeline in mailSync.ts. Inert when MICROSOFT_CLIENT_ID /
- * MICROSOFT_CLIENT_SECRET are missing: nothing is scheduled and the routes
- * report "not configured".
+ * MICROSOFT_CLIENT_SECRET are missing: the daily sweep does nothing and the
+ * routes report "not configured". Background sync runs once a day from the
+ * cron endpoint (routes/cron.ts); there is no in-process timer.
  */
-import { db, emailConnectionsTable, type EmailConnection } from "@workspace/db";
-import { and, eq, ne } from "drizzle-orm";
+import { advisoryLockPool, db, emailConnectionsTable, type EmailConnection } from "@workspace/db";
+import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { outlookLogger as logger } from "./logger";
 import { decryptToken, encryptToken, hasTokenEncryptionKey } from "./tokenCrypto";
 import {
@@ -201,63 +202,95 @@ export function syncUserOutlook(userId: string): Promise<MailSyncResult> {
   return syncUserMailbox(userId, outlookProvider);
 }
 
-let outlookSweepRunning = false;
+/** A connection synced (cron, manual Sync or connect) more recently than this is skipped by the daily sweep. */
+export const OUTLOOK_DAILY_FRESH_MS = 20 * 60 * 60 * 1000;
+/** Default time budget of one cron call; users not reached are reported as "remaining". */
+export const OUTLOOK_SWEEP_TIME_BUDGET_MS = 120_000;
+/** Advisory lock key so two cron calls (or instances) never sweep at the same time. */
+const SWEEP_LOCK_KEY = "receebo:outlook-daily-sweep";
 
-/** Sweep all active Outlook connections. Called by the scheduler. */
-export async function syncAllOutlookConnections(): Promise<void> {
-  if (!isMailProviderEnabled(PROVIDER) || !isOutlookConfigured()) return;
-  if (outlookSweepRunning) {
-    logger.warn("Outlook sync: previous sweep still running, skipping overlap");
-    return;
-  }
-  outlookSweepRunning = true;
+export interface OutlookSweepResult {
+  status: "ok" | "busy" | "inactive";
+  /** Connections due (not synced in the last 20 h) at the start of this call. */
+  due: number;
+  synced: number;
+  failed: number;
+  queued: number;
+  /** Due connections left for the next call because the time budget ran out. */
+  remaining: number;
+}
+
+/**
+ * Daily Outlook sweep, run synchronously inside the cron request (autoscale
+ * may stop an instance once no request is in flight, so no background work).
+ *
+ * - Only connections not synced in the last 20 h are processed, oldest first,
+ *   so a second call the same day is a no-op (idempotent) and a call that ran
+ *   out of time continues where it stopped.
+ * - Users without current access are skipped inside syncUserMailbox (no AI).
+ * - A new user is started only while the time budget lasts; one user's sync
+ *   can still take ~2 min (it is capped at 25 email bodies per run).
+ */
+export async function runOutlookDailySweep(options: {
+  now?: () => number;
+  timeBudgetMs?: number;
+  syncUser?: (userId: string) => Promise<MailSyncResult>;
+} = {}): Promise<OutlookSweepResult> {
+  const empty = { due: 0, synced: 0, failed: 0, queued: 0, remaining: 0 };
+  if (!isMailProviderEnabled(PROVIDER) || !isOutlookConfigured()) return { status: "inactive", ...empty };
+  const now = options.now ?? Date.now;
+  const budget = options.timeBudgetMs ?? OUTLOOK_SWEEP_TIME_BUDGET_MS;
+  const syncUser = options.syncUser ?? syncUserOutlook;
+  const started = now();
+
+  const lockClient = await advisoryLockPool.connect();
+  let locked = false;
   try {
-    const connections = await db
+    const lock = await lockClient.query<{ locked: boolean }>(
+      "SELECT pg_try_advisory_lock(hashtext($1)) AS locked", [SWEEP_LOCK_KEY]);
+    locked = Boolean(lock.rows[0]?.locked);
+    if (!locked) {
+      logger.warn("Outlook sync: daily sweep already running, skipping");
+      return { status: "busy", ...empty };
+    }
+
+    const freshAfter = new Date(started - OUTLOOK_DAILY_FRESH_MS);
+    const due = await db
       .select({ userId: emailConnectionsTable.userId })
       .from(emailConnectionsTable)
-      .where(
-        and(
-          eq(emailConnectionsTable.provider, PROVIDER),
-          ne(emailConnectionsTable.status, "needs_reconnect"),
-        ),
-      );
-    if (connections.length === 0) return;
-    logger.info({ count: connections.length }, "Outlook sync: starting sweep");
-    for (const conn of connections) {
+      .where(and(
+        eq(emailConnectionsTable.provider, PROVIDER),
+        ne(emailConnectionsTable.status, "needs_reconnect"),
+        or(isNull(emailConnectionsTable.lastSyncedAt), lt(emailConnectionsTable.lastSyncedAt, freshAfter)),
+      ))
+      .orderBy(sql`${emailConnectionsTable.lastSyncedAt} ASC NULLS FIRST`);
+
+    const result: OutlookSweepResult = { status: "ok", ...empty, due: due.length };
+    logger.info({ due: due.length }, "Outlook sync: starting daily sweep");
+    for (const [index, conn] of due.entries()) {
+      if (now() - started >= budget) {
+        result.remaining = due.length - index;
+        break;
+      }
       try {
-        const result = await syncUserOutlook(conn.userId);
-        if (result.queued > 0) {
-          logger.info({ userId: conn.userId, ...result }, "Outlook sync: new pending imports created");
+        const synced = await syncUser(conn.userId);
+        result.synced++;
+        result.queued += synced.queued;
+        if (synced.queued > 0) {
+          logger.info({ userId: conn.userId, ...synced }, "Outlook sync: new pending imports created");
         }
       } catch (err) {
+        result.failed++;
         logger.error({ err, userId: conn.userId }, "Outlook sync: user sweep error");
       }
     }
-  } catch (err) {
-    logger.error({ err }, "Outlook sync: failed to load connections");
+    logger.info({ ...result, elapsedMs: now() - started }, "Outlook sync: daily sweep finished");
+    return result;
   } finally {
-    outlookSweepRunning = false;
-  }
-}
-
-const OUTLOOK_SYNC_INTERVAL_MS = 4 * 60 * 60 * 1000; // every 4 hours
-let outlookSyncTimer: ReturnType<typeof setInterval> | null = null;
-
-export function startOutlookSyncScheduler(): void {
-  if (outlookSyncTimer) return;
-  const initial = setTimeout(() => void syncAllOutlookConnections(), 120_000);
-  if (initial.unref) initial.unref();
-  outlookSyncTimer = setInterval(
-    () => void syncAllOutlookConnections(),
-    OUTLOOK_SYNC_INTERVAL_MS,
-  );
-  if (outlookSyncTimer.unref) outlookSyncTimer.unref();
-  logger.info({ intervalMs: OUTLOOK_SYNC_INTERVAL_MS }, "Outlook sync scheduler started");
-}
-
-export function stopOutlookSyncScheduler(): void {
-  if (outlookSyncTimer) {
-    clearInterval(outlookSyncTimer);
-    outlookSyncTimer = null;
+    try {
+      if (locked) await lockClient.query("SELECT pg_advisory_unlock(hashtext($1))", [SWEEP_LOCK_KEY]);
+    } finally {
+      lockClient.release();
+    }
   }
 }

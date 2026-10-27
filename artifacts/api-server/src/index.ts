@@ -3,7 +3,7 @@ import { logger, gmailLogger } from "./lib/logger";
 import { startExtractionWatchdog } from "./lib/extractionQueue";
 import { startOrphanCleanupScheduler } from "./lib/orphanCleanup";
 import { startGmailSyncScheduler } from "./lib/gmailSync";
-import { startOutlookSyncScheduler, isOutlookConfigured } from "./lib/outlookSync";
+import { isOutlookConfigured } from "./lib/outlookSync";
 import { isMailProviderEnabled } from "./lib/mailProviders/config";
 import { encryptToken, decryptToken } from "./lib/tokenCrypto";
 import { sql, eq } from "drizzle-orm";
@@ -472,11 +472,12 @@ async function start(): Promise<void> {
       gmailLogger.info("Gmail import disabled by MAIL_PROVIDERS_ENABLED; scheduler not started");
     }
     if (isMailProviderEnabled("outlook") && isOutlookConfigured()) {
-      startOutlookSyncScheduler();
+      // No in-process timer (autoscale sleeps): the daily cron runs the sweep.
+      logger.info("Outlook background sync runs from POST /api/internal/cron/daily-maintenance");
     } else {
       logger.info(
         { enabled: isMailProviderEnabled("outlook"), configured: isOutlookConfigured() },
-        "Outlook import inactive; scheduler not started",
+        "Outlook import inactive",
       );
     }
     void initStripe();
