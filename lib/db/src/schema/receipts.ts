@@ -62,6 +62,9 @@ export const receiptsTable = pgTable("receipts", {
   legalWarrantyReminderSentFor: text("legal_warranty_reminder_sent_for"),
   /** Rules version the stored warranty dates were computed with (startup backfill). */
   warrantyCalcVersion: integer("warranty_calc_version"),
+  /** Warranty end dates the push reminder was last sent for (dedup, independent of email). */
+  legalWarrantyPushSentFor: text("legal_warranty_push_sent_for"),
+  manufacturerWarrantyPushSentFor: text("manufacturer_warranty_push_sent_for"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

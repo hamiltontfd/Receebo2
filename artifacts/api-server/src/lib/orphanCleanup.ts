@@ -169,6 +169,8 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
       originalFileName: receiptsTable.originalFileName,
       warrantyReminderSentFor: receiptsTable.warrantyReminderSentFor,
       legalWarrantyReminderSentFor: receiptsTable.legalWarrantyReminderSentFor,
+      legalWarrantyPushSentFor: receiptsTable.legalWarrantyPushSentFor,
+      manufacturerWarrantyPushSentFor: receiptsTable.manufacturerWarrantyPushSentFor,
     })
     .from(receiptsTable)
     .where(eq(receiptsTable.status, "completed"));
@@ -201,51 +203,79 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
   let failed = 0;
   let skippedOptOut = 0;
   let skippedNoAccess = 0;
+  const fmtDay = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
+    year: "numeric", month: "short", day: "numeric", timeZone: "UTC",
+  });
   for (const r of warrantyReceipts) {
     const expiries = await syncWarrantyExpiries(r);
-    const candidates: Array<{ kind: WarrantyKind; due: string; previous: string | null }> = [];
-    if (isDue(expiries.manufacturer) && r.warrantyReminderSentFor !== expiries.manufacturer) {
-      candidates.push({ kind: "manufacturer", due: expiries.manufacturer, previous: r.warrantyReminderSentFor });
+    const candidates: Array<{ kind: WarrantyKind; due: string; emailPrev: string | null; pushPrev: string | null }> = [];
+    if (isDue(expiries.manufacturer)) {
+      candidates.push({ kind: "manufacturer", due: expiries.manufacturer, emailPrev: r.warrantyReminderSentFor, pushPrev: r.manufacturerWarrantyPushSentFor });
     }
-    if (isDue(expiries.legal) && r.legalWarrantyReminderSentFor !== expiries.legal) {
-      candidates.push({ kind: "legal", due: expiries.legal, previous: r.legalWarrantyReminderSentFor });
+    if (isDue(expiries.legal)) {
+      candidates.push({ kind: "legal", due: expiries.legal, emailPrev: r.legalWarrantyReminderSentFor, pushPrev: r.legalWarrantyPushSentFor });
     }
-    if (candidates.length === 0) continue;
+    const pending = candidates.filter(c => c.emailPrev !== c.due || c.pushPrev !== c.due);
+    if (pending.length === 0) continue;
     if (!(await hasAccess(r.userId))) {
       skippedNoAccess++;
       continue;
     }
-    if (await isOptedOut(r.userId)) {
-      skippedOptOut++;
-      continue;
-    }
-    for (const { kind, due, previous } of candidates) {
-      const column = kind === "legal" ? receiptsTable.legalWarrantyReminderSentFor : receiptsTable.warrantyReminderSentFor;
-      const mark = (value: string | null) => kind === "legal"
-        ? { legalWarrantyReminderSentFor: value }
-        : { warrantyReminderSentFor: value };
-      // Claim before sending so concurrent sweeps never double-send.
-      const claimed = await db
-        .update(receiptsTable)
-        .set(mark(due))
-        .where(and(eq(receiptsTable.id, r.id), previous === null ? isNull(column) : eq(column, previous)))
-        .returning({ id: receiptsTable.id });
-      if (claimed.length === 0) continue;
-      const ok = await sendWarrantyReminderEmail(r.userId, {
-        id: r.id,
-        merchant: r.merchant,
-        warranty: r.warranty,
-        originalFileName: r.originalFileName,
-        kind,
-        expiresOn: due,
-      });
-      if (ok) {
-        sent++;
-      } else {
-        failed++;
-        // Release the claim so the next daily run retries.
-        await db.update(receiptsTable).set(mark(previous))
-          .where(and(eq(receiptsTable.id, r.id), eq(column, due)));
+    // Email respects the email opt-out; browser push is managed by the device subscription.
+    const optedOut = await isOptedOut(r.userId);
+    if (optedOut && pending.some(c => c.emailPrev !== c.due)) skippedOptOut++;
+    for (const { kind, due, emailPrev, pushPrev } of pending) {
+      if (emailPrev !== due && !optedOut) {
+        const column = kind === "legal" ? receiptsTable.legalWarrantyReminderSentFor : receiptsTable.warrantyReminderSentFor;
+        const mark = (value: string | null) => kind === "legal"
+          ? { legalWarrantyReminderSentFor: value }
+          : { warrantyReminderSentFor: value };
+        // Claim before sending so concurrent sweeps never double-send.
+        const claimed = await db
+          .update(receiptsTable)
+          .set(mark(due))
+          .where(and(eq(receiptsTable.id, r.id), emailPrev === null ? isNull(column) : eq(column, emailPrev)))
+          .returning({ id: receiptsTable.id });
+        if (claimed.length > 0) {
+          const ok = await sendWarrantyReminderEmail(r.userId, {
+            id: r.id,
+            merchant: r.merchant,
+            warranty: r.warranty,
+            originalFileName: r.originalFileName,
+            kind,
+            expiresOn: due,
+          });
+          if (ok) {
+            sent++;
+          } else {
+            failed++;
+            // Release the claim so the next daily run retries.
+            await db.update(receiptsTable).set(mark(emailPrev))
+              .where(and(eq(receiptsTable.id, r.id), eq(column, due)));
+          }
+        }
+      }
+      if (pushPrev !== due) {
+        const column = kind === "legal" ? receiptsTable.legalWarrantyPushSentFor : receiptsTable.manufacturerWarrantyPushSentFor;
+        const mark = (value: string | null) => kind === "legal"
+          ? { legalWarrantyPushSentFor: value }
+          : { manufacturerWarrantyPushSentFor: value };
+        const claimed = await db
+          .update(receiptsTable)
+          .set(mark(due))
+          .where(and(eq(receiptsTable.id, r.id), pushPrev === null ? isNull(column) : eq(column, pushPrev)))
+          .returning({ id: receiptsTable.id });
+        if (claimed.length > 0) {
+          const pushed = await sendPushNotification(r.userId, {
+            title: "Warranty ending soon",
+            body: `${r.merchant || "Your purchase"} · ${kind === "legal" ? "legal warranty" : "manufacturer warranty"} ends ${fmtDay(due)}`,
+            receiptId: r.id,
+          });
+          if (!pushed) {
+            await db.update(receiptsTable).set(mark(pushPrev))
+              .where(and(eq(receiptsTable.id, r.id), eq(column, due)));
+          }
+        }
       }
     }
   }

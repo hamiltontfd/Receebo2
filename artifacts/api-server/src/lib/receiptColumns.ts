@@ -13,5 +13,7 @@ export async function migrateReceiptWarrantyColumns(): Promise<void> {
       ADD COLUMN IF NOT EXISTS legal_warranty_expires_on date,
       ADD COLUMN IF NOT EXISTS manufacturer_warranty_expires_on date,
       ADD COLUMN IF NOT EXISTS legal_warranty_reminder_sent_for text,
-      ADD COLUMN IF NOT EXISTS warranty_calc_version integer`);
+      ADD COLUMN IF NOT EXISTS warranty_calc_version integer,
+      ADD COLUMN IF NOT EXISTS legal_warranty_push_sent_for text,
+      ADD COLUMN IF NOT EXISTS manufacturer_warranty_push_sent_for text`);
 }

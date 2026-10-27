@@ -432,6 +432,23 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
     await runWarrantyReminderSweep();
     expect(fixture.warrantyEmail.mock.calls.filter(([uid, r]) => uid === userId && r.id === receipt.id)).toHaveLength(0);
   }, 30000);
+  it("also sends warranty reminders by push, once per end date, with its own dedup", async () => {
+    await start();
+    const receipt = await upload();
+    const soon = new Date(Date.now() + 10 * DAY_MS).toISOString().slice(0, 10);
+    await db.update(receiptsTable).set({ warranty: `Warranty until ${soon}`, isDraft: false })
+      .where(eq(receiptsTable.id, receipt.id));
+    fixture.warrantyEmail.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    fixture.push.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    await runWarrantyReminderSweep();
+    await runWarrantyReminderSweep();
+    const pushes = fixture.push.mock.calls.filter(([uid, p]) => uid === userId && p.receiptId === receipt.id);
+    expect(pushes).toHaveLength(1);
+    expect(pushes[0][1].title).toBe("Warranty ending soon");
+    const [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+    expect(row.manufacturerWarrantyPushSentFor).toBe(soon);
+    expect(row.warrantyReminderSentFor).toBe(soon);
+  }, 30000);
   it("lets the daily sweep run only once per ~23h across restarts/instances", async () => {
     const job = `test-job-${randomUUID()}`;
     const t0 = new Date("2026-10-26T03:00:00Z");
