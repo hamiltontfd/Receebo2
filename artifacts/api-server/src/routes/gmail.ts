@@ -5,7 +5,7 @@ import {
   pendingImportsTable,
   receiptsTable,
 } from "@workspace/db";
-import { eq, and, count, ne } from "drizzle-orm";
+import { eq, and, count, ne, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   buildGmailOAuthUrl,
@@ -29,6 +29,12 @@ import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
 import { gmailOrigin } from "../lib/gmailUrls";
 import { createOAuthState, verifyAndConsumeOAuthState } from "../lib/oauthState";
 import { isMailProviderEnabled } from "../lib/mailProviders/config";
+import { normalizeCategory } from "../lib/categories";
+import {
+  pendingItemCount,
+  pendingTotalsByCurrency,
+  rankPendingImports,
+} from "../lib/pendingImportRanking";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -282,38 +288,171 @@ router.post("/gmail/sync", requireAuth, requireCurrentLegalAcceptance, async (re
 });
 
 // ---------------------------------------------------------------------------
-// GET /gmail/pending  — list pending imports
+// Pending imports (shared by every mail provider)
 // ---------------------------------------------------------------------------
-// The pending-imports queue is shared by every mail provider. It is served
-// under both /gmail/pending (legacy, mobile app) and /mail/pending.
+// The queue is served under /gmail/pending (legacy, mobile app) and
+// /mail/pending. Items come ranked "worth keeping first" (see
+// lib/pendingImportRanking.ts). The default response stays a plain array for
+// the Expo app; ?meta=1 wraps it as { items, count, totals }.
+
+type PendingImportRow = typeof pendingImportsTable.$inferSelect;
+type ApproveTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Hard cap on ids per bulk call: keeps the user's data lock short. */
+export const MAX_BULK_PENDING_IDS = 50;
+
+function toPendingListItem(r: PendingImportRow) {
+  // Only what the list UI needs: never the full ocrText.
+  const data = r.extractionData;
+  const products = data?.products ?? [];
+  return {
+    id: r.id,
+    provider: r.provider,
+    gmailMessageId: r.gmailMessageId,
+    originalFileName: r.originalFileName,
+    merchant: data?.merchant ?? null,
+    total: data?.total ?? null,
+    currency: data?.currency ?? null,
+    purchaseDate: data?.purchaseDate ?? null,
+    category: data?.category ?? null,
+    summary: data?.summary ?? null,
+    createdAt: r.createdAt,
+    itemCount: pendingItemCount(data),
+    firstItemName: products[0]?.name ?? null,
+    productCount: products.length,
+    notableCount: data?.notableItems?.length ?? 0,
+  };
+}
+
+async function selectUserPending(userId: string, ids?: number[]): Promise<PendingImportRow[]> {
+  return db
+    .select()
+    .from(pendingImportsTable)
+    .where(
+      and(
+        eq(pendingImportsTable.userId, userId),
+        eq(pendingImportsTable.status, "pending"),
+        ...(ids ? [inArray(pendingImportsTable.id, ids)] : []),
+      ),
+    );
+}
+
+/** Positive integer ids, deduplicated, 1..MAX_BULK_PENDING_IDS of them; null when invalid. */
+function parseBulkIds(body: unknown): number[] | null {
+  const raw = (body as { ids?: unknown } | null)?.ids;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  if (!raw.every((id) => Number.isSafeInteger(id) && (id as number) > 0)) return null;
+  const ids = [...new Set(raw as number[])];
+  return ids.length <= MAX_BULK_PENDING_IDS ? ids : null;
+}
+
+/** Optional category override in an approve body: undefined (none), a canonical category, or null (invalid). */
+function parseCategoryOverride(body: unknown): string | undefined | null {
+  const raw = (body as { category?: unknown } | null)?.category;
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const normalized = normalizeCategory(raw);
+  return normalized.toLowerCase() === raw.trim().toLowerCase() ? normalized : null;
+}
+
+type ApproveAccess =
+  | { ok: true; trial: Awaited<ReturnType<typeof accountTrialStatus>> }
+  | { ok: false; status: number; body: Record<string, unknown> };
+
+/** Same entitlement rules for single and bulk approval. */
+async function checkApproveAccess(userId: string): Promise<ApproveAccess> {
+  const access = await getSubscriptionStatus(userId);
+  const trial = access.accessState === "account_trial" ? await accountTrialStatus(userId) : null;
+  if (receiptCapReached(access) || (trial && trial.remaining < 1)) {
+    return { ok: false, status: 403, body: { ...TRIAL_CAP_ERROR,
+      code: receiptCapReached(access) ? "trial_exhausted" : "TRIAL_UPLOAD_LIMIT" } };
+  }
+  if (!access.canUseApp) {
+    return { ok: false, status: 403, body: { error: "subscription_required", code: access.accessState,
+      message: "Your trial has ended. Subscribe to import more receipts." } };
+  }
+  return { ok: true, trial };
+}
+
+/**
+ * Turn one pending import into a receipt inside `tx`. The status='pending'
+ * guard makes it idempotent: returns null when the row was already handled
+ * (or is not the user's). Counts toward the no-card trial when `trial` is set.
+ */
+async function approvePendingInTx(
+  tx: ApproveTx,
+  userId: string,
+  id: number,
+  trial: Awaited<ReturnType<typeof accountTrialStatus>>,
+  categoryOverride?: string,
+) {
+  const [imp] = await tx
+    .update(pendingImportsTable)
+    .set({ status: "approved", updatedAt: new Date() })
+    .where(
+      and(
+        eq(pendingImportsTable.id, id),
+        eq(pendingImportsTable.userId, userId),
+        eq(pendingImportsTable.status, "pending"),
+      ),
+    )
+    .returning();
+
+  if (!imp) return null;
+  if (!imp.extractionData) {
+    throw new Error("Pending import has no extraction data");
+  }
+
+  const data = imp.extractionData;
+  const [created] = await tx
+    .insert(receiptsTable)
+    .values({
+      userId,
+      objectPath: imp.objectPath,
+      originalFileName: imp.originalFileName,
+      contentType: "application/pdf",
+      status: "completed",
+      merchant: data.merchant,
+      purchaseDate: data.purchaseDate,
+      total: data.total,
+      currency: data.currency,
+      category: categoryOverride ?? data.category ?? "Other",
+      summary: data.summary,
+      ocrText: data.ocrText,
+      warranty: data.warranty,
+      transactionNumber: data.transactionNumber,
+      products: data.products ?? [],
+      notableItems: data.notableItems ?? [],
+      purchaseCountry: data.purchaseCountry,
+      isOnlinePurchase: data.isOnlinePurchase,
+      deliveryDate: data.deliveryDate ?? null,
+    })
+    .returning();
+  await tx
+    .update(pendingImportsTable)
+    .set({ approvedReceiptId: created.id, updatedAt: new Date() })
+    .where(eq(pendingImportsTable.id, imp.id));
+  if (trial) {
+    await tx.insert(trialUploadsTable).values({
+      userId, objectPath: `${imp.provider}:${imp.id}`,
+      state: "succeeded", receiptId: created.id, expiresAt: trial.trial.endsAt,
+    });
+  }
+  return { ...created, provider: imp.provider };
+}
+
+// ---------------------------------------------------------------------------
+// GET /mail/pending  — list pending imports, ranked
+// ---------------------------------------------------------------------------
 router.get(["/gmail/pending", "/mail/pending"], requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
   try {
-    const rows = await db
-      .select()
-      .from(pendingImportsTable)
-      .where(
-        and(
-          eq(pendingImportsTable.userId, req.userId!),
-          eq(pendingImportsTable.status, "pending"),
-        ),
-      )
-      .orderBy(pendingImportsTable.createdAt);
-
-    // Expose only the fields the UI needs (avoid sending full ocrText)
-    const items = rows.map((r) => ({
-      id: r.id,
-      provider: r.provider,
-      gmailMessageId: r.gmailMessageId,
-      originalFileName: r.originalFileName,
-      merchant: r.extractionData?.merchant ?? null,
-      total: r.extractionData?.total ?? null,
-      currency: r.extractionData?.currency ?? null,
-      purchaseDate: r.extractionData?.purchaseDate ?? null,
-      category: r.extractionData?.category ?? null,
-      summary: r.extractionData?.summary ?? null,
-      createdAt: r.createdAt,
-    }));
-
+    const rows = rankPendingImports(await selectUserPending(req.userId!));
+    const items = rows.map(toPendingListItem);
+    res.setHeader("X-Pending-Count", String(items.length));
+    if (req.query.meta === "1") {
+      res.json({ items, count: items.length, totals: pendingTotalsByCurrency(rows) });
+      return;
+    }
     res.json(items);
   } catch (err) {
     logger.error({ err }, "GET /gmail/pending failed");
@@ -322,7 +461,43 @@ router.get(["/gmail/pending", "/mail/pending"], requireAuth, requireCurrentLegal
 });
 
 // ---------------------------------------------------------------------------
-// POST /gmail/pending/:id/approve  — move import to the receipts table
+// GET /mail/pending/:id  — read-only details for the pending sheet
+// ---------------------------------------------------------------------------
+router.get(["/gmail/pending/:id", "/mail/pending/:id"], requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  try {
+    const [row] = await selectUserPending(req.userId!, [id]);
+    if (!row || !row.extractionData) {
+      res.status(404).json({ error: "Pending import not found" });
+      return;
+    }
+    // Everything the AI read except the raw transcription.
+    const { ocrText: _ocrText, ...extraction } = row.extractionData;
+    res.json({
+      ...toPendingListItem(row),
+      extraction: {
+        ...extraction,
+        products: extraction.products ?? [],
+        notableItems: extraction.notableItems ?? [],
+        deliveryDate: extraction.deliveryDate ?? null,
+      },
+      objectPath: row.objectPath,
+      // Served by the private storage route (owner + pending check there).
+      originalUrl: `/api/storage${row.objectPath}`,
+    });
+  } catch (err) {
+    logger.error({ err }, "GET /gmail/pending/:id failed");
+    res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /mail/pending/:id/approve  — move import to the receipts table
+// Optional body { category } overrides the AI's suggestion.
 // ---------------------------------------------------------------------------
 router.post(
   ["/gmail/pending/:id/approve", "/mail/pending/:id/approve"],
@@ -334,75 +509,20 @@ router.post(
       res.status(400).json({ error: "Invalid id" });
       return;
     }
+    const categoryOverride = parseCategoryOverride(req.body);
+    if (categoryOverride === null) {
+      res.status(400).json({ error: "Invalid category" });
+      return;
+    }
 
     try {
-      const access = await getSubscriptionStatus(req.userId!);
-      const trial = access.accessState === "account_trial" ? await accountTrialStatus(req.userId!) : null;
-      if (receiptCapReached(access) || (trial && trial.remaining < 1)) {
-        res.status(403).json({ ...TRIAL_CAP_ERROR,
-          code: receiptCapReached(access) ? "trial_exhausted" : "TRIAL_UPLOAD_LIMIT" });
+      const access = await checkApproveAccess(req.userId!);
+      if (!access.ok) {
+        res.status(access.status).json(access.body);
         return;
       }
-      if (!access.canUseApp) {
-        res.status(403).json({ error: "subscription_required", code: access.accessState,
-          message: "Your trial has ended. Subscribe to import more receipts." });
-        return;
-      }
-      const receipt = await db.transaction(async (tx) => {
-        const [imp] = await tx
-          .update(pendingImportsTable)
-          .set({ status: "approved", updatedAt: new Date() })
-          .where(
-            and(
-              eq(pendingImportsTable.id, id),
-              eq(pendingImportsTable.userId, req.userId!),
-              eq(pendingImportsTable.status, "pending"),
-            ),
-          )
-          .returning();
-
-        if (!imp) return null;
-        if (!imp.extractionData) {
-          throw new Error("Pending import has no extraction data");
-        }
-
-        const data = imp.extractionData;
-        const [created] = await tx
-          .insert(receiptsTable)
-          .values({
-            userId: req.userId!,
-            objectPath: imp.objectPath,
-            originalFileName: imp.originalFileName,
-            contentType: "application/pdf",
-            status: "completed",
-            merchant: data.merchant,
-            purchaseDate: data.purchaseDate,
-            total: data.total,
-            currency: data.currency,
-            category: data.category ?? "Other",
-            summary: data.summary,
-            ocrText: data.ocrText,
-            warranty: data.warranty,
-            transactionNumber: data.transactionNumber,
-            products: data.products ?? [],
-            notableItems: data.notableItems ?? [],
-            purchaseCountry: data.purchaseCountry,
-            isOnlinePurchase: data.isOnlinePurchase,
-            deliveryDate: data.deliveryDate ?? null,
-          })
-          .returning();
-        await tx
-          .update(pendingImportsTable)
-          .set({ approvedReceiptId: created.id, updatedAt: new Date() })
-          .where(eq(pendingImportsTable.id, imp.id));
-        if (trial) {
-          await tx.insert(trialUploadsTable).values({
-            userId: req.userId!, objectPath: `${imp.provider}:${imp.id}`,
-            state: "succeeded", receiptId: created.id, expiresAt: trial.trial.endsAt,
-          });
-        }
-        return { ...created, provider: imp.provider };
-      });
+      const receipt = await db.transaction((tx) =>
+        approvePendingInTx(tx, req.userId!, id, access.trial, categoryOverride));
 
       if (!receipt) {
         const [existing] = await db
@@ -436,6 +556,120 @@ router.post(
     } catch (err) {
       logger.error({ err }, "POST /gmail/pending/:id/approve failed");
       res.status(500).json({ error: "Failed to approve import" });
+    }
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// POST /mail/pending/bulk-approve  { ids }  — one lock, one transaction
+// ---------------------------------------------------------------------------
+// A running sync holds the lock: the whole batch gets 409 SYNC_IN_PROGRESS and
+// nothing changes. On the no-card trial only the remaining slots are approved,
+// in ranking order; the rest stay pending and are listed in `skipped`.
+router.post(
+  "/mail/pending/bulk-approve",
+  requireAuth,
+  requireCurrentLegalAcceptance,
+  tryLockUserDataMutation(async (req, res): Promise<void> => {
+    const ids = parseBulkIds(req.body);
+    if (!ids) {
+      res.status(400).json({ error: `ids must be 1-${MAX_BULK_PENDING_IDS} positive integers` });
+      return;
+    }
+    try {
+      const access = await checkApproveAccess(req.userId!);
+      if (!access.ok) {
+        res.status(access.status).json(access.body);
+        return;
+      }
+      const rows = rankPendingImports(await selectUserPending(req.userId!, ids));
+      const limit = access.trial ? access.trial.remaining : rows.length;
+      const toApprove = rows.slice(0, limit);
+      const skipped = rows.slice(limit).map((r) => r.id);
+
+      const approved = await db.transaction(async (tx) => {
+        const done: Array<{ id: number; receiptId: number }> = [];
+        for (const row of toApprove) {
+          const receipt = await approvePendingInTx(tx, req.userId!, row.id, access.trial);
+          if (receipt) done.push({ id: row.id, receiptId: receipt.id });
+        }
+        return done;
+      });
+
+      const handled = new Set([...approved.map((a) => a.id), ...skipped]);
+      const notFound = ids.filter((id) => !handled.has(id));
+      logger.info(
+        { userId: req.userId, approved: approved.length, skipped: skipped.length, notFound: notFound.length },
+        "Bulk import approval",
+      );
+      res.json({
+        approved,
+        skipped,
+        notFound,
+        ...(skipped.length > 0 ? { code: "TRIAL_UPLOAD_LIMIT", message: TRIAL_CAP_ERROR.message } : {}),
+      });
+    } catch (err) {
+      logger.error({ err }, "POST /mail/pending/bulk-approve failed");
+      res.status(500).json({ error: "Failed to approve imports" });
+    }
+  }),
+);
+
+/** Delete stored files first (outside any transaction), then the rows whose file is gone. */
+async function dismissPendingRows(userId: string, rows: Array<{ id: number; objectPath: string }>) {
+  const failed = await deletePendingImportObjects(
+    rows,
+    (objectPath) => objectStorageService.deleteObject(objectPath),
+    (err) => err instanceof ObjectNotFoundError,
+    (pendingImport, err) => {
+      logger.warn(
+        { err, userId, importId: pendingImport.id, objectPath: pendingImport.objectPath },
+        "Could not delete dismissed mail import object",
+      );
+    },
+  );
+  const failedSet = new Set(failed);
+  const removable = rows.map((r) => r.id).filter((id) => !failedSet.has(id));
+  if (removable.length > 0) {
+    await db
+      .delete(pendingImportsTable)
+      .where(
+        and(
+          inArray(pendingImportsTable.id, removable),
+          eq(pendingImportsTable.userId, userId),
+          eq(pendingImportsTable.status, "pending"),
+        ),
+      );
+  }
+  return { dismissed: removable, failed };
+}
+
+// ---------------------------------------------------------------------------
+// POST /mail/pending/bulk-dismiss  { ids }
+// ---------------------------------------------------------------------------
+router.post(
+  "/mail/pending/bulk-dismiss",
+  requireAuth,
+  requireCurrentLegalAcceptance,
+  tryLockUserDataMutation(async (req, res): Promise<void> => {
+    const ids = parseBulkIds(req.body);
+    if (!ids) {
+      res.status(400).json({ error: `ids must be 1-${MAX_BULK_PENDING_IDS} positive integers` });
+      return;
+    }
+    try {
+      const rows = await selectUserPending(req.userId!, ids);
+      const { dismissed, failed } = await dismissPendingRows(req.userId!, rows);
+      const found = new Set(rows.map((r) => r.id));
+      const notFound = ids.filter((id) => !found.has(id));
+      if (failed.length > 0 && dismissed.length === 0) {
+        res.status(503).json({ error: "Could not remove these imports. Please try again.", failed, notFound });
+        return;
+      }
+      res.json({ dismissed, failed, notFound });
+    } catch (err) {
+      logger.error({ err }, "POST /mail/pending/bulk-dismiss failed");
+      res.status(500).json({ error: "Failed to dismiss imports" });
     }
   }),
 );

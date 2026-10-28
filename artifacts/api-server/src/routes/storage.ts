@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { and, eq } from "drizzle-orm";
-import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, trialUploadsTable } from "@workspace/db";
+import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, trialUploadsTable, pendingImportsTable } from "@workspace/db";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -232,8 +232,25 @@ router.get("/storage/objects/*path", requireAuthOrGuest, async (req: Request, re
         .limit(1);
 
       if (!ownedByAttachment) {
-        res.status(404).json({ error: "Object not found" });
-        return;
+        // "View original" on a pending email import, before it is accepted.
+        // Only the owner's imports that are still pending; dismissed ones are gone
+        // and approved ones are served through their receipt above.
+        const [ownedByPendingImport] = await db
+          .select({ id: pendingImportsTable.id })
+          .from(pendingImportsTable)
+          .where(
+            and(
+              eq(pendingImportsTable.objectPath, objectPath),
+              eq(pendingImportsTable.userId, req.userId!),
+              eq(pendingImportsTable.status, "pending"),
+            ),
+          )
+          .limit(1);
+
+        if (!ownedByPendingImport) {
+          res.status(404).json({ error: "Object not found" });
+          return;
+        }
       }
     }
     const access = await getSubscriptionStatus(req.userId!);

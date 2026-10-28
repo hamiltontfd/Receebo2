@@ -17,7 +17,7 @@ vi.mock("../middlewares/guestAuth", () => ({
 vi.mock("../lib/userDataLock", () => ({ lockUserDataMutation: (handler: unknown) => handler, tryLockUserDataMutation: (handler: unknown) => handler }));
 vi.mock("drizzle-orm", () => ({ and: vi.fn(), eq: vi.fn() }));
 vi.mock("@workspace/db", () => ({
-  receiptsTable: {}, receiptAttachmentsTable: {}, uploadIntentsTable: {},
+  receiptsTable: {}, receiptAttachmentsTable: {}, uploadIntentsTable: {}, pendingImportsTable: {},
   db: {
     select: () => {
       const query = {
