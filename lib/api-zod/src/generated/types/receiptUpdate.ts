@@ -6,10 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { NotableItem } from './notableItem';
+import type { ReceiptUpdatePurchaseType } from './receiptUpdatePurchaseType';
 
 export interface ReceiptUpdate {
   /** @nullable */
   isOnlinePurchase?: boolean | null;
+  /**
+     * Manual purchase type (the "This is a subscription" switch). Null clears it.
+     * @nullable
+     */
+  purchaseType?: ReceiptUpdatePurchaseType;
   merchant?: string;
   purchaseDate?: string;
   /**

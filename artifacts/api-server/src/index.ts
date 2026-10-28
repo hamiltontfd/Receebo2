@@ -17,8 +17,9 @@ import { migrateTrialAiReads } from "./lib/trialAiReads";
 import { migrateMailImportFailures } from "./lib/mailImportFailures";
 import { migrateAccountLifecycle } from "./lib/accountLifecycle";
 import { migrateAccountDeletionCodes } from "./lib/accountDeletionCode";
-import { migrateReceiptDeliveryDate, migrateReceiptWarrantyColumns } from "./lib/receiptColumns";
+import { migrateReceiptDeliveryDate, migrateReceiptWarrantyColumns, migrateReceiptPurchaseType } from "./lib/receiptColumns";
 import { backfillWarrantyExpiries } from "./lib/warrantyExpiryStore";
+import { backfillPurchaseTypes, purchaseTypeBackfillMode } from "./lib/purchaseTypeBackfill";
 
 // Log-only: a stray rejected promise must not take the whole API down. Only the
 // error name, code and stack frames are logged (messages from provider SDKs can
@@ -125,6 +126,8 @@ async function runStartupMigrations(): Promise<void> {
     await migrateReceiptDeliveryDate();
     // Server-side warranty end dates (legal + manufacturer) for reminders
     await migrateReceiptWarrantyColumns();
+    // Purchase type: subscriptions/digital/tickets get no return or warranty dates
+    await migrateReceiptPurchaseType();
     // Daily job lock so restarts/extra instances don't rerun the sweep
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS scheduled_job_runs (
@@ -471,6 +474,14 @@ async function start(): Promise<void> {
     if (backfilled > 0) logger.info({ backfilled }, "Computed warranty expiry dates");
   } catch (err) {
     logger.error({ err }, "Warranty expiry backfill failed");
+  }
+  // Subscriptions/digital/tickets saved before purchase_type existed: dry run
+  // (counts only) unless PURCHASE_TYPE_BACKFILL=apply.
+  try {
+    const report = await backfillPurchaseTypes({ apply: purchaseTypeBackfillMode() === "apply" });
+    logger.info(report, report.applied ? "Purchase type backfill applied" : "Purchase type backfill dry run (set PURCHASE_TYPE_BACKFILL=apply to write)");
+  } catch (err) {
+    logger.error({ err }, "Purchase type backfill failed");
   }
   // Encrypt any gmail_connections rows that still have plaintext tokens
   await migrateGmailTokenEncryption();

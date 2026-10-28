@@ -1,5 +1,5 @@
 import type { File as GCSFile } from "@google-cloud/storage";
-import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, userBillingTable, userPreferencesTable, type ReceiptNotableItem } from "@workspace/db";
+import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, userBillingTable, userPreferencesTable, type ReceiptNotableItem, type ReceiptProductItem } from "@workspace/db";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { objectStorageClient } from "./objectStorage";
@@ -30,6 +30,7 @@ function reminderAccessChecker(): (userId: string) => Promise<boolean> {
 }
 import { sendPushNotification } from "./pushNotifications";
 import { calcReturnWindow } from "./returnWindowCalc";
+import { renderReturnReminder, renderWarrantyReminder } from "./reminderCopy";
 import { runDataRetentionSweep } from "./accountLifecycle";
 import { syncWarrantyExpiries, warrantyInputColumns } from "./warrantyExpiryStore";
 
@@ -167,6 +168,9 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
       ...warrantyInputColumns,
       userId: receiptsTable.userId,
       originalFileName: receiptsTable.originalFileName,
+      total: receiptsTable.total,
+      products: receiptsTable.products,
+      notableItems: receiptsTable.notableItems,
       warrantyReminderSentFor: receiptsTable.warrantyReminderSentFor,
       legalWarrantyReminderSentFor: receiptsTable.legalWarrantyReminderSentFor,
       legalWarrantyPushSentFor: receiptsTable.legalWarrantyPushSentFor,
@@ -203,9 +207,6 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
   let failed = 0;
   let skippedOptOut = 0;
   let skippedNoAccess = 0;
-  const fmtDay = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
-    year: "numeric", month: "short", day: "numeric", timeZone: "UTC",
-  });
   for (const r of warrantyReceipts) {
     const expiries = await syncWarrantyExpiries(r);
     const candidates: Array<{ kind: WarrantyKind; due: string; emailPrev: string | null; pushPrev: string | null }> = [];
@@ -224,7 +225,23 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
     // Email respects the email opt-out; browser push is managed by the device subscription.
     const optedOut = await isOptedOut(r.userId);
     if (optedOut && pending.some(c => c.emailPrev !== c.due)) skippedOptOut++;
+    const todayIso = todayUtc.toISOString().slice(0, 10);
     for (const { kind, due, emailPrev, pushPrev } of pending) {
+      // Product + amount copy (lib/reminderCopy.ts); mentions the other warranty if it still runs.
+      const otherKind: WarrantyKind = kind === "legal" ? "manufacturer" : "legal";
+      const otherDue = expiries[otherKind];
+      const reminder = {
+        id: r.id,
+        merchant: r.merchant,
+        notableItems: r.notableItems,
+        products: r.products,
+        total: r.total,
+        currency: r.currency,
+        purchaseDate: r.purchaseDate,
+        kind,
+        expiresOn: due,
+        other: otherDue && otherDue >= todayIso && otherDue !== due ? { kind: otherKind, expiresOn: otherDue } : null,
+      };
       if (emailPrev !== due && !optedOut) {
         const column = kind === "legal" ? receiptsTable.legalWarrantyReminderSentFor : receiptsTable.warrantyReminderSentFor;
         const mark = (value: string | null) => kind === "legal"
@@ -238,12 +255,9 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
           .returning({ id: receiptsTable.id });
         if (claimed.length > 0) {
           const ok = await sendWarrantyReminderEmail(r.userId, {
-            id: r.id,
-            merchant: r.merchant,
+            ...reminder,
             warranty: r.warranty,
             originalFileName: r.originalFileName,
-            kind,
-            expiresOn: due,
           });
           if (ok) {
             sent++;
@@ -266,11 +280,8 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
           .where(and(eq(receiptsTable.id, r.id), pushPrev === null ? isNull(column) : eq(column, pushPrev)))
           .returning({ id: receiptsTable.id });
         if (claimed.length > 0) {
-          const pushed = await sendPushNotification(r.userId, {
-            title: "Warranty ending soon",
-            body: `${r.merchant || "Your purchase"} · ${kind === "legal" ? "legal warranty" : "manufacturer warranty"} ends ${fmtDay(due)}`,
-            receiptId: r.id,
-          });
+          const { push } = renderWarrantyReminder(reminder);
+          const pushed = await sendPushNotification(r.userId, { ...push, receiptId: r.id });
           if (!pushed) {
             await db.update(receiptsTable).set(mark(pushPrev))
               .where(and(eq(receiptsTable.id, r.id), eq(column, due)));
@@ -445,6 +456,9 @@ export async function runReturnWindowSweep(): Promise<void> {
     userId: string;
     merchant: string | null;
     notableItems: ReceiptNotableItem[];
+    products: ReceiptProductItem[] | null;
+    total: number | null;
+    purchaseType: string | null;
     purchaseDate: string | null;
     purchaseCountry: string | null;
     isOnlinePurchase: boolean | null;
@@ -464,6 +478,9 @@ export async function runReturnWindowSweep(): Promise<void> {
         userId: receiptsTable.userId,
         merchant: receiptsTable.merchant,
         notableItems: receiptsTable.notableItems,
+        products: receiptsTable.products,
+        total: receiptsTable.total,
+        purchaseType: receiptsTable.purchaseType,
         purchaseDate: receiptsTable.purchaseDate,
         purchaseCountry: receiptsTable.purchaseCountry,
         isOnlinePurchase: receiptsTable.isOnlinePurchase,
@@ -518,10 +535,26 @@ export async function runReturnWindowSweep(): Promise<void> {
       isOnlinePurchase: r.isOnlinePurchase,
       currency: r.currency,
       merchant: r.merchant,
+      // Subscriptions, digital purchases and tickets have no return window.
+      purchaseType: r.purchaseType,
     });
 
     if (!window) continue;
     const { deadlineDate, daysRemaining } = window;
+    const reminder = {
+      id: r.id,
+      merchant: r.merchant,
+      notableItems: r.notableItems,
+      products: r.products,
+      total: r.total,
+      currency: r.currency,
+      purchaseDate: r.purchaseDate,
+      deadlineDate,
+      daysRemaining,
+      basis: window.basis,
+      windowDays: window.days,
+      originalFileName: r.originalFileName,
+    };
 
     // Skip already expired windows
     if (daysRemaining < 0) {
@@ -549,8 +582,6 @@ export async function runReturnWindowSweep(): Promise<void> {
       skippedOptOut++;
     }
 
-    const notableItemName = r.notableItems?.[0]?.name ?? null;
-
     // --- 7-day alert ---
     if (needs7d && !optedOut) {
       // Atomically claim the send slot
@@ -566,14 +597,7 @@ export async function runReturnWindowSweep(): Promise<void> {
         .returning({ id: receiptsTable.id });
 
       if (claimed.length > 0) {
-        const ok = await sendReturnWindowEmail(r.userId, {
-          id: r.id,
-          merchant: r.merchant,
-          notableItemName,
-          deadlineDate,
-          daysRemaining,
-          originalFileName: r.originalFileName,
-        });
+        const ok = await sendReturnWindowEmail(r.userId, reminder);
         if (ok) {
           sent7d++;
         } else {
@@ -601,14 +625,7 @@ export async function runReturnWindowSweep(): Promise<void> {
         .returning({ id: receiptsTable.id });
 
       if (claimed.length > 0) {
-        const ok = await sendReturnWindowEmail(r.userId, {
-          id: r.id,
-          merchant: r.merchant,
-          notableItemName,
-          deadlineDate,
-          daysRemaining,
-          originalFileName: r.originalFileName,
-        });
+        const ok = await sendReturnWindowEmail(r.userId, reminder);
         if (ok) {
           sent2d++;
         } else {
@@ -639,16 +656,8 @@ export async function runReturnWindowSweep(): Promise<void> {
         .returning({ id: receiptsTable.id });
 
       if (claimed.length > 0) {
-        const sent = await sendPushNotification(r.userId, {
-          title: "Return window closing soon",
-          body: `${notableItemName || r.merchant || "Your purchase"} · closes ${deadlineDate.toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            timeZone: "UTC",
-          })}`,
-          receiptId: r.id,
-        });
+        const { push } = renderReturnReminder({ ...reminder, deadline: deadlineDate });
+        const sent = await sendPushNotification(r.userId, { ...push, receiptId: r.id });
         if (!sent) {
           await db
             .update(receiptsTable)

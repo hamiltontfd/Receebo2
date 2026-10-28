@@ -19,6 +19,7 @@ export const warrantyInputColumns = {
   purchaseCountry: receiptsTable.purchaseCountry,
   merchant: receiptsTable.merchant,
   warranty: receiptsTable.warranty,
+  purchaseType: receiptsTable.purchaseType,
   legalWarrantyExpiresOn: receiptsTable.legalWarrantyExpiresOn,
   manufacturerWarrantyExpiresOn: receiptsTable.manufacturerWarrantyExpiresOn,
   warrantyCalcVersion: receiptsTable.warrantyCalcVersion,

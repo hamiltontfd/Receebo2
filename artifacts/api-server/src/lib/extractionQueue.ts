@@ -7,6 +7,7 @@ import { isAccountDeletionInProgress } from "./accountDeletionState";
 import { withUserDataLock } from "./userDataLock";
 import { finishTrialUpload } from "./accountTrial";
 import { aiReadCapApplies, claimTrialAiRead } from "./trialAiReads";
+import { resolvePurchaseType } from "./purchaseType";
 
 function deduplicateProducts(products: ExtractedProduct[]): ExtractedProduct[] {
   const seen = new Map<string, ExtractedProduct>();
@@ -126,6 +127,7 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
         purchaseCountry: data.purchaseCountry,
         isOnlinePurchase: data.isOnlinePurchase,
         deliveryDate: data.deliveryDate,
+        ...resolvePurchaseType(data.purchaseType, { ...data, products: deduplicatedProducts }),
       })
       .where(eq(receiptsTable.id, receiptId));
     await finishTrialUpload(objectPath, true, receiptId, tx);

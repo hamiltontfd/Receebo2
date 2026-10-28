@@ -1,5 +1,9 @@
 import type { PendingImportExtractionData } from "@workspace/db";
 import { DURABLE_RANKING_CATEGORIES } from "./categories";
+import {
+  hasNoConsumerDates, normalizePurchaseType, purchaseTypeHint,
+  type PurchaseType, type PurchaseTypeSource,
+} from "./purchaseType";
 
 /** The fields of a pending_imports row the ranking and list views need. */
 export interface RankablePendingImport {
@@ -8,12 +12,34 @@ export interface RankablePendingImport {
   extractionData: PendingImportExtractionData | null;
 }
 
+/**
+ * Purchase type of a pending import: what the import stored (AI or sender
+ * hints), else hints from the stored text (imports from before 28 Oct 2026).
+ */
+export function pendingPurchaseType(
+  data: PendingImportExtractionData | null,
+): { purchaseType: PurchaseType | null; purchaseTypeSource: PurchaseTypeSource | null } {
+  if (!data) return { purchaseType: null, purchaseTypeSource: null };
+  const stored = normalizePurchaseType(data.purchaseType);
+  if (stored) {
+    const source = data.purchaseTypeSource === "hint" || data.purchaseTypeSource === "manual" ? data.purchaseTypeSource : "ai";
+    return { purchaseType: stored, purchaseTypeSource: source };
+  }
+  const hint = purchaseTypeHint(data);
+  return hint ? { purchaseType: hint, purchaseTypeSource: "hint" } : { purchaseType: null, purchaseTypeSource: null };
+}
+
+/** Subscriptions, digital purchases, tickets and services never get the durable-goods priority. */
+function worthKeepingType(data: PendingImportExtractionData | null): boolean {
+  return !hasNoConsumerDates(pendingPurchaseType(data).purchaseType);
+}
+
 function hasNotableItems(data: PendingImportExtractionData | null): boolean {
-  return (data?.notableItems?.length ?? 0) > 0;
+  return (data?.notableItems?.length ?? 0) > 0 && worthKeepingType(data);
 }
 
 function hasDurableCategory(data: PendingImportExtractionData | null): boolean {
-  return !!data?.category && DURABLE_RANKING_CATEGORIES.has(data.category);
+  return !!data?.category && DURABLE_RANKING_CATEGORIES.has(data.category) && worthKeepingType(data);
 }
 
 function purchaseTime(row: RankablePendingImport): number {
@@ -26,6 +52,7 @@ function purchaseTime(row: RankablePendingImport): number {
  * "Worth keeping first" order for pending email imports:
  * 1. has notableItems (durable goods the AI flagged),
  * 2. durable category (Electronics, Home, Clothing & Apparel),
+ *    (1 and 2 never apply to subscriptions, digital purchases, tickets or services),
  * 3. highest total (missing totals last),
  * 4. most recent purchase (then most recently found, then id).
  * Totals in different currencies are compared as plain numbers.

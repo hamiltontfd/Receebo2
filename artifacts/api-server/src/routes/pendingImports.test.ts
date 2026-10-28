@@ -203,6 +203,36 @@ describe("POST /mail/pending/:id/approve with a category override", () => {
   });
 });
 
+describe("POST /mail/pending/:id/approve with a purchase type", () => {
+  it("keeps the detected type (no dates for a subscription) and saves the switch as manual", async () => {
+    const user = newUser("owner");
+    const [sub, flipped, plain] = await seed(user, [
+      { merchant: "Apple", category: "Electronics", products: [{ name: "iCloud+ 200 GB", quantity: 1, price: 2.99 }], purchaseType: "subscription", purchaseTypeSource: "ai" },
+      { merchant: "Apple", category: "Electronics", products: [{ name: "Apple One", quantity: 1, price: 19.95 }] },
+      { category: "Electronics" },
+    ]);
+    const list = await (await call(user, "/mail/pending")).json();
+    const listed = (Array.isArray(list) ? list : list.items) as Array<{ id: number; purchaseType: string | null }>;
+    expect(listed.find((i) => i.id === sub.id)?.purchaseType).toBe("subscription");
+    expect(listed.find((i) => i.id === flipped.id)?.purchaseType).toBe("subscription");
+    expect(listed.find((i) => i.id === plain.id)?.purchaseType).toBeNull();
+
+    expect((await call(user, `/mail/pending/${plain.id}/approve`, { purchaseType: "banana" })).status).toBe(400);
+    const read = async (id: number) => {
+      const { receiptId } = await (await call(user, `/mail/pending/${id}/approve`, id === flipped.id ? { purchaseType: "goods" } : {})).json();
+      const [receipt] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receiptId));
+      return receipt;
+    };
+    expect(await read(sub.id)).toMatchObject({ purchaseType: "subscription", purchaseTypeSource: "ai", legalWarrantyExpiresOn: null });
+    const goods = await read(flipped.id);
+    expect(goods).toMatchObject({ purchaseType: "goods", purchaseTypeSource: "manual" });
+    expect(goods.legalWarrantyExpiresOn).not.toBeNull();
+    const unknown = await read(plain.id);
+    expect(unknown).toMatchObject({ purchaseType: null, purchaseTypeSource: null });
+    expect(unknown.legalWarrantyExpiresOn).not.toBeNull();
+  });
+});
+
 describe("POST /mail/pending/bulk-approve", () => {
   it("approves owned pending items once (idempotent) and reports the rest", async () => {
     const user = newUser("owner");

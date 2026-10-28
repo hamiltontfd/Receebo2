@@ -3,6 +3,9 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { clerkClient } from "@clerk/express";
 import { logger } from "./logger";
 import { billingOrigin, PUBLISHED_ORIGIN } from "./billingUrls";
+import {
+  renderReturnReminder, renderWarrantyReminder, type ReminderMessage, type ReminderPurchase,
+} from "./reminderCopy";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -65,28 +68,9 @@ function subjectPart(value: string, max = 60): string {
   return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
 }
 
-/** "€12.50", "£3.00", "US$9.99"; falls back to "12.50 XYZ" for unknown codes. */
-export function formatMoney(amount: number, currency?: string | null): string {
-  const code = (currency ?? "").trim().toUpperCase();
-  if (/^[A-Z]{3}$/.test(code)) {
-    try {
-      return new Intl.NumberFormat("en-GB", { style: "currency", currency: code }).format(amount);
-    } catch {
-      // Unknown ISO code: fall through.
-    }
-  }
-  const fixed = amount.toFixed(2);
-  return code ? `${fixed} ${code}` : fixed;
-}
+import { formatMoney, formatEmailDate } from "./emailFormat";
 
-/** "26 Oct 2026" (en-GB, UTC). Accepts Date or "YYYY-MM-DD…" strings. */
-export function formatEmailDate(value: Date | string): string | null {
-  const date = typeof value === "string"
-    ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value)
-    : value;
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-}
+export { formatMoney, formatEmailDate };
 
 // ── Delivery ──────────────────────────────────────────────────────────────────
 
@@ -264,18 +248,57 @@ export async function sendPaymentAttentionEmail(
   }
 }
 
-// ── Warranty reminder ─────────────────────────────────────────────────────────
+// ── Warranty and return reminders (product + amount, Marketing copy 28 Oct 2026) ──
 
-export interface WarrantyReceipt {
+const REMINDER_ITEM_STYLE = "font-size:15px;font-weight:600;color:#121212;line-height:1.5;margin:0 0 6px;";
+const REMINDER_SECONDARY_STYLE = "font-size:15px;color:#444;line-height:1.5;margin:0 0 16px;";
+const REMINDER_NOTE_STYLE = "font-size:13px;color:#737373;line-height:1.5;margin:0 0 24px;";
+
+/** HTML and plain text of a reminder; every value is escaped here. */
+export function renderReminderEmail(
+  message: ReminderMessage, opts: { eyebrow: string; receiptUrl: string; unsubscribeUrl?: string },
+): { html: string; text: string } {
+  const settingsUrl = `${appUrl()}/settings`;
+  const html = renderEmailLayout({
+    eyebrow: opts.eyebrow,
+    bodyHtml: `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(message.preheader)}</div>
+  <h1 style="${H1_STYLE}">${escapeHtml(message.title)}</h1>
+  <p style="${message.secondary ? REMINDER_ITEM_STYLE : REMINDER_ITEM_STYLE.replace("0 0 6px", "0 0 16px")}">${escapeHtml(message.itemLine)}</p>${
+    message.secondary ? `\n  <p style="${REMINDER_SECONDARY_STYLE}">${escapeHtml(message.secondary)}</p>` : ""}
+  <p style="${P_STYLE}">${escapeHtml(message.body)}</p>${
+    message.note ? `\n  <p style="${REMINDER_NOTE_STYLE}">${escapeHtml(message.note)}</p>` : `\n  <div style="margin:0 0 8px;"></div>`}`,
+    cta: { label: "View receipt", href: opts.receiptUrl },
+    footerHtml: `${escapeHtml(message.footer)} <a href="${escapeHtml(settingsUrl)}" style="color:#999;">Manage reminders</a>.`,
+    unsubscribeUrl: opts.unsubscribeUrl,
+  });
+  const text = [
+    message.title,
+    "",
+    message.itemLine,
+    ...(message.secondary ? [message.secondary] : []),
+    "",
+    message.body,
+    ...(message.note ? ["", message.note] : []),
+    "",
+    `View receipt: ${opts.receiptUrl}`,
+    "",
+    `${message.footer} Manage reminders: ${settingsUrl}`,
+    ...(opts.unsubscribeUrl ? [`Unsubscribe: ${opts.unsubscribeUrl}`] : []),
+  ].join("\n");
+  return { html, text };
+}
+
+export interface WarrantyReceipt extends ReminderPurchase {
   id: number;
-  merchant?: string | null;
-  /** Warranty text from the receipt, if any. */
+  /** Warranty text from the receipt, if any (not shown; kept for callers). */
   warranty?: string | null;
   originalFileName?: string;
   /** Which warranty ends: the legal one (PT/EU) or the manufacturer's. */
-  kind?: "legal" | "manufacturer";
+  kind: "legal" | "manufacturer";
   /** End date, YYYY-MM-DD. */
-  expiresOn?: string;
+  expiresOn: string;
+  /** The other warranty, if it is still running. */
+  other?: { kind: "legal" | "manufacturer"; expiresOn: string } | null;
 }
 
 export async function sendWarrantyReminderEmail(
@@ -285,38 +308,32 @@ export async function sendWarrantyReminderEmail(
   const email = await getUserEmail(userId);
   if (!email) return false;
 
-  const merchant = receipt.merchant || receipt.originalFileName || "Your purchase";
-  const subject = `Warranty expiring soon — ${subjectPart(merchant)}`;
+  const message = renderWarrantyReminder({
+    ...receipt,
+    merchant: receipt.merchant || receipt.originalFileName || null,
+  });
   const receiptUrl = `${appUrl()}/receipts/${receipt.id}`;
   const unsub = unsubscribeLinks(userId);
-
-  const html = renderEmailLayout({
-    eyebrow: "Receebo — Warranty Reminder",
-    bodyHtml: `<h1 style="font-size:22px;font-weight:800;margin:0 0 6px;line-height:1.2;">Warranty expiring soon</h1>
-  <p style="font-size:18px;font-weight:600;margin:0 0 8px;">${escapeHtml(merchant)}</p>
-  ${receipt.expiresOn ? `<p style="font-size:15px;margin:0 0 8px;">${receipt.kind === "legal" ? "Legal warranty" : "Manufacturer warranty"} ends on ${escapeHtml(new Date(`${receipt.expiresOn}T00:00:00Z`).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }))}</p>` : ""}
-  ${receipt.warranty && receipt.kind !== "legal" ? `<p style="color:#444;font-size:14px;margin:0 0 28px;">${escapeHtml(receipt.warranty)}</p>` : `<div style="margin:0 0 20px;"></div>`}`,
-    cta: { label: "View Receipt", href: receiptUrl },
-    footerHtml: "Your warranty is expiring within 30 days. Open the receipt to review your coverage.",
-    unsubscribeUrl: unsub.url,
+  const { html, text } = renderReminderEmail(message, {
+    eyebrow: "Receebo — Warranty Reminder", receiptUrl, unsubscribeUrl: unsub.url,
   });
 
   return deliver({
-    kind: "warranty_reminder", userId, to: email, subject, html,
+    kind: "warranty_reminder", userId, to: email, subject: message.subject, html, text,
     headers: unsub.headers, context: { receiptId: receipt.id },
   });
 }
 
-// ── Return window reminder ────────────────────────────────────────────────────
-
-export interface ReturnWindowReceipt {
+export interface ReturnWindowReceipt extends ReminderPurchase {
   id: number;
-  merchant?: string | null;
-  /** First notable item name if available, shown in subject and body */
+  /** Legacy: first notable item name, used when notableItems is not given. */
   notableItemName?: string | null;
   deadlineDate: Date;
   daysRemaining: number;
   originalFileName?: string;
+  /** "law" (statutory withdrawal period of windowDays) or "store" (retailer policy). */
+  basis?: "law" | "store";
+  windowDays?: number;
 }
 
 export async function sendReturnWindowEmail(
@@ -326,36 +343,19 @@ export async function sendReturnWindowEmail(
   const email = await getUserEmail(userId);
   if (!email) return false;
 
-  const itemName =
-    receipt.notableItemName ||
-    receipt.merchant ||
-    receipt.originalFileName ||
-    "your purchase";
-
-  const closesLabel = receipt.daysRemaining <= 0
-    ? "today"
-    : receipt.daysRemaining === 1 ? "in 1 day" : `in ${receipt.daysRemaining} days`;
-  const subject = `Your ${subjectPart(itemName)} return window closes ${closesLabel} — still time to act`;
+  const message = renderReturnReminder({
+    ...receipt,
+    notableItems: receipt.notableItems ?? (receipt.notableItemName ? [{ name: receipt.notableItemName }] : []),
+    deadline: receipt.deadlineDate,
+  });
   const receiptUrl = `${appUrl()}/receipts/${receipt.id}`;
   const unsub = unsubscribeLinks(userId);
-  const deadlineStr = formatEmailDate(receipt.deadlineDate) ?? "";
-
-  const html = renderEmailLayout({
-    eyebrow: "Receebo — Return Reminder",
-    bodyHtml: `<h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Still happy with ${escapeHtml(itemName)}?</h1>
-  <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 6px;">
-    Your return window closes <strong>${escapeHtml(closesLabel)}</strong> — on <strong>${escapeHtml(deadlineStr)}</strong>.
-  </p>
-  <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 24px;">
-    If you're not completely satisfied, now is the time to act. Open your receipt to check the return details and start a return if needed.
-  </p>`,
-    cta: { label: "View Receipt", href: receiptUrl },
-    footerHtml: "You received this because warranty and return reminders are enabled for your Receebo account.",
-    unsubscribeUrl: unsub.url,
+  const { html, text } = renderReminderEmail(message, {
+    eyebrow: "Receebo — Return Reminder", receiptUrl, unsubscribeUrl: unsub.url,
   });
 
   return deliver({
-    kind: "return_window", userId, to: email, subject, html, headers: unsub.headers,
+    kind: "return_window", userId, to: email, subject: message.subject, html, text, headers: unsub.headers,
     context: { receiptId: receipt.id, daysRemaining: receipt.daysRemaining },
   });
 }

@@ -44,6 +44,7 @@ import { planMessageImport } from "./mailProviders/candidates";
 import { isEverydayMerchantName } from "./mailProviders/merchants";
 import { aiReadCapApplies, claimTrialAiRead, trialAiReadsRemaining } from "./trialAiReads";
 import { renderTextPdf } from "./textPdf";
+import { resolvePurchaseType } from "./purchaseType";
 import { clearMailImportFailure, failureText, recordMailImportFailure } from "./mailImportFailures";
 import type { MailMessage, MailProvider } from "./mailProviders/types";
 
@@ -123,8 +124,16 @@ export async function uploadPdfToStorage(buffer: Buffer): Promise<string> {
 
 function toPendingExtractionData(
   extraction: ExtractedReceipt,
+  message: Pick<MailMessage, "from" | "subject">,
 ): PendingImportExtractionData {
+  // AI first; otherwise sender/text hints (e.g. "Your receipt from Apple"
+  // from email.apple.com), which are only known while importing.
+  const { purchaseType, purchaseTypeSource } = resolvePurchaseType(extraction.purchaseType, {
+    ...extraction, from: message.from, subject: message.subject,
+  });
   return {
+    purchaseType,
+    purchaseTypeSource,
     merchant: extraction.merchant,
     purchaseDate: extraction.purchaseDate,
     total: extraction.total,
@@ -524,7 +533,7 @@ export async function syncMailboxClaimed(
             objectPath: storedPath,
             status: "pending",
             updatedAt: new Date(),
-            extractionData: toPendingExtractionData(extraction),
+            extractionData: toPendingExtractionData(extraction, message),
           })
           .where(ownedClaim)
           .returning({ id: pendingImportsTable.id });

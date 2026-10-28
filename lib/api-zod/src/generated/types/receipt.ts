@@ -7,6 +7,8 @@
  */
 import type { NotableItem } from './notableItem';
 import type { ReceiptProduct } from './receiptProduct';
+import type { ReceiptPurchaseType } from './receiptPurchaseType';
+import type { ReceiptPurchaseTypeSource } from './receiptPurchaseTypeSource';
 import type { ReceiptStatus } from './receiptStatus';
 
 export interface Receipt {
@@ -68,6 +70,16 @@ export interface Receipt {
      * @nullable
      */
   isOnlinePurchase?: boolean | null;
+  /**
+     * What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).
+     * @nullable
+     */
+  purchaseType?: ReceiptPurchaseType;
+  /**
+     * Where purchaseType came from. A manual choice is never overwritten.
+     * @nullable
+     */
+  purchaseTypeSource?: ReceiptPurchaseTypeSource;
   products?: ReceiptProduct[];
   /** Items flagged as notable (expensive or warranty-relevant). */
   notableItems?: NotableItem[];

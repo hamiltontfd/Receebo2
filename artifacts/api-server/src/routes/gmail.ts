@@ -32,9 +32,12 @@ import { isMailProviderEnabled } from "../lib/mailProviders/config";
 import { normalizeCategory } from "../lib/categories";
 import {
   pendingItemCount,
+  pendingPurchaseType,
   pendingTotalsByCurrency,
   rankPendingImports,
 } from "../lib/pendingImportRanking";
+import { PURCHASE_TYPES, type PurchaseType } from "../lib/purchaseType";
+import { refreshWarrantyExpiries } from "../lib/warrantyExpiryStore";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -321,6 +324,7 @@ function toPendingListItem(r: PendingImportRow) {
     firstItemName: products[0]?.name ?? null,
     productCount: products.length,
     notableCount: data?.notableItems?.length ?? 0,
+    purchaseType: pendingPurchaseType(data).purchaseType,
   };
 }
 
@@ -344,6 +348,13 @@ function parseBulkIds(body: unknown): number[] | null {
   if (!raw.every((id) => Number.isSafeInteger(id) && (id as number) > 0)) return null;
   const ids = [...new Set(raw as number[])];
   return ids.length <= MAX_BULK_PENDING_IDS ? ids : null;
+}
+
+/** Optional purchase type in an approve body (the sheet's subscription switch): undefined, a type, or null (invalid). */
+function parsePurchaseTypeOverride(body: unknown): PurchaseType | undefined | null {
+  const raw = (body as { purchaseType?: unknown } | null)?.purchaseType;
+  if (raw === undefined || raw === null) return undefined;
+  return (PURCHASE_TYPES as readonly unknown[]).includes(raw) ? (raw as PurchaseType) : null;
 }
 
 /** Optional category override in an approve body: undefined (none), a canonical category, or null (invalid). */
@@ -385,6 +396,7 @@ async function approvePendingInTx(
   id: number,
   trial: Awaited<ReturnType<typeof accountTrialStatus>>,
   categoryOverride?: string,
+  purchaseTypeOverride?: PurchaseType,
 ) {
   const [imp] = await tx
     .update(pendingImportsTable)
@@ -404,6 +416,10 @@ async function approvePendingInTx(
   }
 
   const data = imp.extractionData;
+  // Manual choice in the sheet > stored AI/hint type > hints from the text.
+  const type = purchaseTypeOverride
+    ? { purchaseType: purchaseTypeOverride, purchaseTypeSource: "manual" as const }
+    : pendingPurchaseType(data);
   const [created] = await tx
     .insert(receiptsTable)
     .values({
@@ -426,6 +442,8 @@ async function approvePendingInTx(
       purchaseCountry: data.purchaseCountry,
       isOnlinePurchase: data.isOnlinePurchase,
       deliveryDate: data.deliveryDate ?? null,
+      purchaseType: type.purchaseType,
+      purchaseTypeSource: type.purchaseTypeSource,
     })
     .returning();
   await tx
@@ -514,6 +532,11 @@ router.post(
       res.status(400).json({ error: "Invalid category" });
       return;
     }
+    const purchaseTypeOverride = parsePurchaseTypeOverride(req.body);
+    if (purchaseTypeOverride === null) {
+      res.status(400).json({ error: "Invalid purchase type" });
+      return;
+    }
 
     try {
       const access = await checkApproveAccess(req.userId!);
@@ -522,7 +545,7 @@ router.post(
         return;
       }
       const receipt = await db.transaction((tx) =>
-        approvePendingInTx(tx, req.userId!, id, access.trial, categoryOverride));
+        approvePendingInTx(tx, req.userId!, id, access.trial, categoryOverride, purchaseTypeOverride));
 
       if (!receipt) {
         const [existing] = await db
@@ -548,6 +571,8 @@ router.post(
         return;
       }
 
+      // Warranty end dates now (none for subscriptions/digital/tickets), not at the next daily sweep.
+      await refreshWarrantyExpiries(receipt.id);
       logger.info(
         { userId: req.userId, importId: id, receiptId: receipt.id, provider: receipt.provider },
         `${receipt.provider === "outlook" ? "Outlook" : "Gmail"} import approved`,
@@ -596,6 +621,7 @@ router.post(
         return done;
       });
 
+      for (const { receiptId } of approved) await refreshWarrantyExpiries(receiptId);
       const handled = new Set([...approved.map((a) => a.id), ...skipped]);
       const notFound = ids.filter((id) => !handled.has(id));
       logger.info(

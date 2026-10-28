@@ -48,6 +48,14 @@ export const receiptsTable = pgTable("receipts", {
   notableItems: jsonb("notable_items").$type<ReceiptNotableItem[]>().notNull().default([]),
   purchaseCountry: text("purchase_country"),
   isOnlinePurchase: boolean("is_online_purchase"),
+  /**
+   * goods | subscription | digital | service | ticket; null = unknown (old
+   * receipts keep today's rules). Anything but goods gets no return window,
+   * no warranty dates and no reminders.
+   */
+  purchaseType: text("purchase_type"),
+  /** ai | hint | manual. A manual choice is never overwritten by the backfill. */
+  purchaseTypeSource: text("purchase_type_source"),
   returnReminderSent7dAt: timestamp("return_reminder_sent_7d_at", { withTimezone: true }),
   returnReminderSent2dAt: timestamp("return_reminder_sent_2d_at", { withTimezone: true }),
   returnPushSent2dAt: timestamp("return_push_sent_2d_at", { withTimezone: true }),

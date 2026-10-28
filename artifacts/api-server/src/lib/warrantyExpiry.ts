@@ -9,14 +9,16 @@
  * warranty, and is left out until legal review.
  */
 import { detectCountry, returnWindowStart } from "./returnWindowCalc";
+import { hasNoConsumerDates } from "./purchaseType";
 
 /** Bump when the rules change so the startup backfill recomputes stored dates. */
 export const WARRANTY_CALC_VERSION = 3;
 
 const LEGAL_WARRANTY_YEARS: Record<string, number> = { PT: 3, EU: 2 };
-// "Entertainment" (tickets, events) keeps the same legal-warranty treatment as
-// "Other", where those receipts used to land. Whether tickets should have no
-// legal warranty is Hamilton's decision; do not change it here without him.
+// "Entertainment" keeps the same legal-warranty treatment as "Other" for
+// receipts without a purchase type. Tickets, subscriptions and digital
+// purchases lose their dates through purchaseType (Hamilton, 28 Oct 2026),
+// not through the category.
 const DURABLE_CATEGORIES = new Set(["Electronics", "Home", "Clothing & Apparel", "Entertainment", "Other"]);
 const ISO_DATE_RE = /(\d{4}-\d{2}-\d{2})/g;
 
@@ -71,6 +73,8 @@ export interface WarrantyExpiryInput {
   purchaseCountry?: string | null;
   merchant?: string | null;
   warranty?: string | null;
+  /** Subscriptions, digital purchases, tickets and services have no warranty dates. */
+  purchaseType?: string | null;
 }
 
 export interface WarrantyExpiries {
@@ -86,6 +90,7 @@ function legalStart(input: WarrantyExpiryInput): string | null {
 }
 
 export function computeWarrantyExpiries(input: WarrantyExpiryInput): WarrantyExpiries {
+  if (hasNoConsumerDates(input.purchaseType)) return { legal: null, manufacturer: null };
   let legal: string | null = null;
   const start = legalStart(input);
   const country = detectCountry({ currency: input.currency, purchaseCountry: input.purchaseCountry, merchant: input.merchant });

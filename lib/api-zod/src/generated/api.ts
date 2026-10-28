@@ -95,6 +95,8 @@ export const ListReceiptsResponseItem = zod.object({
   "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
   "purchaseCountry": zod.string().nullish().describe('ISO-3166-1 alpha-2 country code where the purchase was made (e.g. \"PT\", \"US\", \"BR\").'),
   "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
+  "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
+  "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -168,6 +170,8 @@ export const GetRecentReceiptsResponseItem = zod.object({
   "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
   "purchaseCountry": zod.string().nullish().describe('ISO-3166-1 alpha-2 country code where the purchase was made (e.g. \"PT\", \"US\", \"BR\").'),
   "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
+  "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
+  "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -264,6 +268,8 @@ export const GetReceiptResponse = zod.object({
   "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
   "purchaseCountry": zod.string().nullish().describe('ISO-3166-1 alpha-2 country code where the purchase was made (e.g. \"PT\", \"US\", \"BR\").'),
   "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
+  "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
+  "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -288,6 +294,7 @@ export const UpdateReceiptParams = zod.object({
 
 export const UpdateReceiptBody = zod.object({
   "isOnlinePurchase": zod.boolean().nullish(),
+  "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('Manual purchase type (the \"This is a subscription\" switch). Null clears it.'),
   "merchant": zod.string().optional(),
   "purchaseDate": zod.string().optional(),
   "deliveryDate": zod.string().nullish().describe('Delivery date (YYYY-MM-DD); null clears it.'),
@@ -323,6 +330,8 @@ export const UpdateReceiptResponse = zod.object({
   "transactionNumber": zod.string().nullish().describe('Transaction or reference number from the receipt.'),
   "purchaseCountry": zod.string().nullish().describe('ISO-3166-1 alpha-2 country code where the purchase was made (e.g. \"PT\", \"US\", \"BR\").'),
   "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
+  "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
+  "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),

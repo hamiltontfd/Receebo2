@@ -27,6 +27,12 @@ export type PendingImportExtractionData = {
   }>;
   purchaseCountry: string | null;
   isOnlinePurchase: boolean | null;
+  /**
+   * goods | subscription | digital | service | ticket, from the AI or the
+   * sender/text hints (absent on imports stored before 28 Oct 2026).
+   */
+  purchaseType?: string | null;
+  purchaseTypeSource?: string | null;
   /** Absent on imports stored before delivery dates were extracted. */
   deliveryDate?: string | null;
 };

@@ -86,6 +86,7 @@ import { runReturnWindowSweep, runWarrantyReminderSweep } from "../lib/orphanCle
 import { claimScheduledRun } from "../lib/scheduledJobLock";
 import { scheduledJobRunsTable } from "@workspace/db";
 import { calcReturnWindow } from "../lib/returnWindowCalc";
+import { refreshWarrantyExpiries } from "../lib/warrantyExpiryStore";
 import { migrateTrialAiReads, TRIAL_AI_READ_LIMIT, TRIAL_AI_READS_MESSAGE, claimTrialAiRead, countTrialAiReads } from "../lib/trialAiReads";
 import { sql } from "drizzle-orm";
 
@@ -444,10 +445,75 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
     await runWarrantyReminderSweep();
     const pushes = fixture.push.mock.calls.filter(([uid, p]) => uid === userId && p.receiptId === receipt.id);
     expect(pushes).toHaveLength(1);
-    expect(pushes[0][1].title).toBe("Warranty ending soon");
+    expect(pushes[0][1].title).toMatch(/^Manufacturer warranty ends \d{1,2} [A-Z][a-z]{2} \d{4}$/);
     const [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
     expect(row.manufacturerWarrantyPushSentFor).toBe(soon);
     expect(row.warrantyReminderSentFor).toBe(soon);
+  }, 30000);
+  it("the subscription switch (PATCH purchaseType) clears dates and stops reminders; goods brings them back", async () => {
+    await start();
+    const receipt = await upload();
+    let purchaseDate = "";
+    for (let d = 0; d < 60 && !purchaseDate; d++) {
+      const iso = new Date(Date.now() - d * DAY_MS).toISOString().slice(0, 10);
+      const w = calcReturnWindow({ purchaseDate: iso, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", merchant: "Fixture store" });
+      if (w && w.daysRemaining === 1) purchaseDate = iso;
+    }
+    await db.update(receiptsTable).set({ purchaseDate, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR",
+      category: "Electronics", isDraft: false }).where(eq(receiptsTable.id, receipt.id));
+    expect((await request(`/receipts/${receipt.id}`, { purchaseType: "subscription" }, "PATCH")).status).toBe(200);
+    let [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+    expect(row).toMatchObject({ purchaseType: "subscription", purchaseTypeSource: "manual", legalWarrantyExpiresOn: null, manufacturerWarrantyExpiresOn: null });
+    fixture.returnEmail.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    fixture.push.mockReset().mockImplementation(async (uid: string) => uid === userId);
+    await runReturnWindowSweep();
+    expect(fixture.returnEmail.mock.calls.filter(([, r]) => r.id === receipt.id)).toHaveLength(0);
+    expect(fixture.push.mock.calls.filter(([, p]) => p.receiptId === receipt.id)).toHaveLength(0);
+    expect((await request(`/receipts/${receipt.id}`, { purchaseType: "banana" }, "PATCH")).status).toBe(400);
+
+    expect((await request(`/receipts/${receipt.id}`, { purchaseType: "goods" }, "PATCH")).status).toBe(200);
+    [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+    expect(row).toMatchObject({ purchaseType: "goods", purchaseTypeSource: "manual" });
+    expect(row.legalWarrantyExpiresOn).not.toBeNull();
+    await runReturnWindowSweep();
+    const emails = fixture.returnEmail.mock.calls.filter(([, r]) => r.id === receipt.id);
+    expect(emails).toHaveLength(1);
+    const pushes = fixture.push.mock.calls.filter(([, p]) => p.receiptId === receipt.id);
+    expect(pushes[0][1].title).toBe("Return window closes tomorrow");
+    expect((await request(`/receipts/${receipt.id}`, { purchaseType: null }, "PATCH")).status).toBe(200);
+    [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
+    expect(row).toMatchObject({ purchaseType: null, purchaseTypeSource: null });
+  }, 30000);
+  it("backfills purchase types: dry run by default (no writes), writes only with apply", async () => {
+    await start();
+    const sub = await upload();
+    const tv = await upload();
+    const purchaseDate = new Date(Date.now() - 3 * DAY_MS).toISOString().slice(0, 10);
+    await db.update(receiptsTable).set({ merchant: "Apple", purchaseDate, purchaseCountry: "PT", currency: "EUR", isOnlinePurchase: true,
+      category: "Electronics", products: [{ name: "Apple One Individual", quantity: 1, price: 19.95 }], isDraft: false })
+      .where(eq(receiptsTable.id, sub.id));
+    await db.update(receiptsTable).set({ merchant: "Worten", purchaseDate, purchaseCountry: "PT", currency: "EUR",
+      category: "Electronics", products: [{ name: "Samsung TV", quantity: 1, price: 499 }], isDraft: false })
+      .where(eq(receiptsTable.id, tv.id));
+    await refreshWarrantyExpiries(sub.id);
+    const { backfillPurchaseTypes, purchaseTypeBackfillMode } = await import("../lib/purchaseTypeBackfill");
+    expect(purchaseTypeBackfillMode({})).toBe("dry-run");
+    expect(purchaseTypeBackfillMode({ PURCHASE_TYPE_BACKFILL: "apply" })).toBe("apply");
+
+    const dry = await backfillPurchaseTypes({ userId });
+    expect(dry).toMatchObject({ applied: false, byType: { subscription: 1 }, byMerchant: { Apple: 1 }, withWarrantyDates: 1, withOpenReturnWindow: 1, updated: 0 });
+    let [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, sub.id));
+    expect(row.purchaseType).toBeNull();
+    expect(row.legalWarrantyExpiresOn).not.toBeNull();
+
+    const applied = await backfillPurchaseTypes({ userId, apply: true });
+    expect(applied).toMatchObject({ applied: true, byType: { subscription: 1 }, updated: 1 });
+    [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, sub.id));
+    expect(row).toMatchObject({ purchaseType: "subscription", purchaseTypeSource: "hint", legalWarrantyExpiresOn: null, manufacturerWarrantyExpiresOn: null });
+    const [goods] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, tv.id));
+    expect(goods.purchaseType).toBeNull();
+    // Idempotent: nothing left to classify.
+    expect((await backfillPurchaseTypes({ userId, apply: true })).updated).toBe(0);
   }, 30000);
   it("the 1-day return push also marks the 2-day one, so no 2-day push follows", async () => {
     await start();

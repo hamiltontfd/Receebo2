@@ -514,6 +514,14 @@ components:
         isOnlinePurchase:
           type: ["boolean", "null"]
           description: True if this is an e-commerce/online/distance purchase.
+        purchaseType:
+          type: ["string", "null"]
+          enum: [goods, subscription, digital, service, ticket, null]
+          description: What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).
+        purchaseTypeSource:
+          type: ["string", "null"]
+          enum: [ai, hint, manual, null]
+          description: Where purchaseType came from. A manual choice is never overwritten.
         products:
           type: array
           items:
@@ -574,6 +582,10 @@ components:
       properties:
         isOnlinePurchase:
           type: ["boolean", "null"]
+        purchaseType:
+          type: ["string", "null"]
+          enum: [goods, subscription, digital, service, ticket, null]
+          description: Manual purchase type (the "This is a subscription" switch). Null clears it.
         merchant:
           type: string
         purchaseDate:

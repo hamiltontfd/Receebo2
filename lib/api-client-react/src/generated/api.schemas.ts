@@ -53,6 +53,34 @@ export const ReceiptStatus = {
   not_a_receipt: 'not_a_receipt',
 } as const;
 
+/**
+ * What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).
+ * @nullable
+ */
+export type ReceiptPurchaseType = typeof ReceiptPurchaseType[keyof typeof ReceiptPurchaseType] | null;
+
+
+export const ReceiptPurchaseType = {
+  goods: 'goods',
+  subscription: 'subscription',
+  digital: 'digital',
+  service: 'service',
+  ticket: 'ticket',
+} as const;
+
+/**
+ * Where purchaseType came from. A manual choice is never overwritten.
+ * @nullable
+ */
+export type ReceiptPurchaseTypeSource = typeof ReceiptPurchaseTypeSource[keyof typeof ReceiptPurchaseTypeSource] | null;
+
+
+export const ReceiptPurchaseTypeSource = {
+  ai: 'ai',
+  hint: 'hint',
+  manual: 'manual',
+} as const;
+
 export interface ReceiptProduct {
   name: string;
   /** @nullable */
@@ -140,6 +168,16 @@ export interface Receipt {
      * @nullable
      */
   isOnlinePurchase?: boolean | null;
+  /**
+     * What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).
+     * @nullable
+     */
+  purchaseType?: ReceiptPurchaseType;
+  /**
+     * Where purchaseType came from. A manual choice is never overwritten.
+     * @nullable
+     */
+  purchaseTypeSource?: ReceiptPurchaseTypeSource;
   products?: ReceiptProduct[];
   /** Items flagged as notable (expensive or warranty-relevant). */
   notableItems?: NotableItem[];
@@ -158,8 +196,28 @@ export interface ReceiptInput {
   contentType: string;
 }
 
+/**
+ * Manual purchase type (the "This is a subscription" switch). Null clears it.
+ * @nullable
+ */
+export type ReceiptUpdatePurchaseType = typeof ReceiptUpdatePurchaseType[keyof typeof ReceiptUpdatePurchaseType] | null;
+
+
+export const ReceiptUpdatePurchaseType = {
+  goods: 'goods',
+  subscription: 'subscription',
+  digital: 'digital',
+  service: 'service',
+  ticket: 'ticket',
+} as const;
+
 export interface ReceiptUpdate {
   isOnlinePurchase?: boolean | null;
+  /**
+     * Manual purchase type (the "This is a subscription" switch). Null clears it.
+     * @nullable
+     */
+  purchaseType?: ReceiptUpdatePurchaseType;
   merchant?: string;
   purchaseDate?: string;
   /**

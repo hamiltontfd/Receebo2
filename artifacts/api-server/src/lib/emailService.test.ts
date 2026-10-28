@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 
-const warranty = { id: 7, merchant: "Worten", warranty: "2 years until 2026-11-25" };
+const warranty = { id: 7, merchant: "Worten", warranty: "2 years until 2026-11-25", kind: "manufacturer" as const, expiresOn: "2026-11-25" };
 const returnWindow = { id: 8, merchant: "Zara", deadlineDate: new Date("2026-10-28T00:00:00Z"), daysRemaining: 2 };
 
 describe("email links and sender", () => {
@@ -70,7 +70,8 @@ describe("delivery results", () => {
 describe("escaping and subjects", () => {
   it("escapes user/AI-derived text in HTML", async () => {
     await sendWarrantyReminderEmail("user_1", {
-      id: 1, merchant: `"><a href="https://evil.test">Win</a>`, warranty: "<script>alert(1)</script> until 2026-11-25",
+      id: 1, merchant: `"><a href="https://evil.test">Win</a>`, warranty: "until 2026-11-25",
+      products: [{ name: "<script>alert(1)</script>", price: 10 }], kind: "manufacturer", expiresOn: "2026-11-25",
     });
     const { html } = mocks.send.mock.calls[0][0];
     expect(html).not.toContain("<script>");
@@ -89,13 +90,13 @@ describe("escaping and subjects", () => {
 });
 
 describe("unsubscribe", () => {
-  it("says 'closes today' instead of 'closes in 0 days'", async () => {
+  it("says 'Last day to return' and 'closes tomorrow' instead of 0/1 days", async () => {
     mocks.send.mockClear();
     await sendReturnWindowEmail("user_1", { ...returnWindow, daysRemaining: 0 });
     await sendReturnWindowEmail("user_1", { ...returnWindow, daysRemaining: 1 });
     const subjects = mocks.send.mock.calls.map(([m]) => m.subject as string);
-    expect(subjects[0]).toContain("return window closes today");
-    expect(subjects[1]).toContain("return window closes in 1 day");
+    expect(subjects[0]).toBe("Last day to return your Zara purchase");
+    expect(subjects[1]).toBe("Return window for your Zara purchase closes tomorrow");
     mocks.send.mockClear();
   });
   it("adds one-click List-Unsubscribe headers and a footer link to warranty and return emails", async () => {

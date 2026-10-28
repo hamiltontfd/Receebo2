@@ -1,3 +1,5 @@
+import { hasNoConsumerDates } from "./purchaseType";
+
 /**
  * Server-side return window calculator.
  * Mirrors key jurisdiction rules from the frontend consumerRights.ts
@@ -86,6 +88,10 @@ export interface ReturnWindowResult {
   daysRemaining: number;
   /** The window counts from the delivery date when known, else the purchase date. */
   startsFrom: "delivery" | "purchase";
+  /** Length of the window in days. */
+  days: number;
+  /** "law": statutory withdrawal period; "store": the retailer's return policy. */
+  basis: "law" | "store";
 }
 
 /**
@@ -111,8 +117,11 @@ export function calcReturnWindow(params: {
   isOnlinePurchase?: boolean | null;
   currency?: string | null;
   merchant?: string | null;
+  /** Subscriptions, digital purchases, tickets and services have no return window. */
+  purchaseType?: string | null;
 }): ReturnWindowResult | null {
   const { purchaseDate, purchaseCountry, isOnlinePurchase, currency, merchant } = params;
+  if (hasNoConsumerDates(params.purchaseType)) return null;
 
   // Parse purchase date — treat as UTC midnight to avoid timezone shifts
   const purchaseDateObj = new Date(purchaseDate + "T00:00:00Z");
@@ -133,10 +142,12 @@ export function calcReturnWindow(params: {
   const rule = JURISDICTION_RULES.find((r) => r.code === countryCode) ?? null;
 
   let returnDays: number | null = rule?.onlineReturnDays ?? null;
+  let basis: "law" | "store" = "law";
 
   // For US (no statutory right) or as override: use retailer policy
   if ((returnDays == null || countryCode === "US") && retailerDays != null) {
     returnDays = retailerDays;
+    basis = "store";
   }
 
   if (returnDays == null) return null;
@@ -150,7 +161,7 @@ export function calcReturnWindow(params: {
     (deadlineDate.getTime() - todayUtc.getTime()) / 86_400_000,
   );
 
-  return { deadlineDate, daysRemaining, startsFrom: start.from };
+  return { deadlineDate, daysRemaining, startsFrom: start.from, days: returnDays, basis };
 }
 
 /** Delivery date edits: null clears it; otherwise a real YYYY-MM-DD not before the purchase. */

@@ -1,5 +1,6 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { normalizeCategory } from "./categories";
+import { normalizePurchaseType, type PurchaseType } from "./purchaseType";
 import { ObjectStorageService } from "./objectStorage";
 import { logger } from "./logger";
 
@@ -35,6 +36,8 @@ export type ExtractedReceipt = {
   isOnlinePurchase: boolean | null;
   /** Date the goods were actually delivered, when the document states it (YYYY-MM-DD). */
   deliveryDate: string | null;
+  /** goods | subscription | digital | service | ticket, or null when unclear. */
+  purchaseType: PurchaseType | null;
 };
 
 
@@ -54,6 +57,7 @@ Respond ONLY with a JSON object matching this exact shape:
   "transactionNumber": string | null, // the transaction/receipt/confirmation number printed on the receipt (e.g. "TXN-4821039", "#00123456", "Order #123"), or null if not present
   "purchaseCountry": string | null,   // ISO-3166-1 alpha-2 country code where the purchase was made (e.g. "PT", "US", "BR", "DE"), inferred from currency, merchant name, address, language, or domain. null if not determinable.
   "isOnlinePurchase": boolean | null, // true if this is an e-commerce / online / distance purchase (order confirmation, Amazon, web store, delivery receipt, etc.); false if in-store; null if unclear.
+  "purchaseType": string | null,    // exactly one of "goods", "subscription", "digital", "service", "ticket" (see rules), or null if unclear
   "deliveryDate": string | null,    // the date the goods were actually DELIVERED ("delivered on", "entregue em", "data de entrega" of a completed delivery) in strict YYYY-MM-DD format. null if not stated, or if only an estimated/expected delivery date is shown ("arrives by", "previsão de entrega", "entrega prevista").
   "products": [                      // individual line items; empty array if none are legible
     { "name": string, "quantity": number | null, "price": number | null }
@@ -74,6 +78,7 @@ Rules:
 - purchaseDate: when a document shows several dates, prefer the transaction/order/issue date. A payment due date, billing period end or delivery date is never the purchase date.
 - "total" and "price" must be numbers (e.g. 12.99), never strings, and must not include currency symbols.
 - Transcribe ocrText faithfully, including item lines, taxes, and totals.
+- purchaseType: "subscription" for recurring plans and renewals (iCloud+, Apple One, Apple Music, Spotify, Netflix, Google One, Microsoft 365, any "Renews on…", monthly or annual plan, membership); "digital" for a one-off digital purchase with nothing physical delivered (an app, an in-app purchase, a film, series or e-book bought or rented, game DLC); "ticket" for tickets to a dated event (concert, cinema, theatre, sports, festival, museum); "service" for work done for the buyer (repair, installation, course, consultation, cleaning); "goods" for physical products, including a product sold together with a service. Gift cards and vouchers are "goods". Use null only when it is genuinely unclear.
 - Do not include any commentary outside the JSON.
 - For notableItems: include any line item priced above ~$50 that falls into a durable-goods category such as electronics, appliances, tools, furniture, sporting equipment, or similar. These are purchases where a receipt may be needed for warranty claims, returns, or insurance. Exclude consumables (food, drinks, toiletries), services, and low-value items regardless of category.
 - Deduplication: if the same line item (identical name and price) appears more than once in the image — for example because two overlapping receipt segments were photographed — include it only ONCE in the products array. Do not repeat identical line items.
@@ -260,6 +265,7 @@ export function parseExtraction(raw: string): ExtractedReceipt {
     purchaseCountry,
     isOnlinePurchase,
     deliveryDate,
+    purchaseType: normalizePurchaseType((parsed as Record<string, unknown>).purchaseType),
   };
 }
 

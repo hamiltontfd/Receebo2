@@ -17,3 +17,15 @@ export async function migrateReceiptWarrantyColumns(): Promise<void> {
       ADD COLUMN IF NOT EXISTS legal_warranty_push_sent_for text,
       ADD COLUMN IF NOT EXISTS manufacturer_warranty_push_sent_for text`);
 }
+
+/**
+ * receipts.purchase_type (+ source): subscriptions, digital purchases, tickets
+ * and services get no return/warranty dates. Idempotent startup migration;
+ * existing rows stay null (today's behaviour) until the gated backfill.
+ */
+export async function migrateReceiptPurchaseType(): Promise<void> {
+  await db.execute(sql`
+    ALTER TABLE receipts
+      ADD COLUMN IF NOT EXISTS purchase_type text,
+      ADD COLUMN IF NOT EXISTS purchase_type_source text`);
+}

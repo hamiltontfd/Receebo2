@@ -387,10 +387,11 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   // Only fields the body actually carries can change; the others stay undefined.
   const body = parsed.data as Record<string, unknown>;
   const current = existing as Record<string, unknown>;
-  const changed = (key: "purchaseDate" | "deliveryDate" | "isOnlinePurchase" | "purchaseCountry" | "merchant" | "currency") =>
+  const changed = (key: "purchaseDate" | "deliveryDate" | "isOnlinePurchase" | "purchaseCountry" | "merchant" | "currency" | "purchaseType") =>
     body[key] !== undefined && body[key] !== current[key];
+  // The subscription switch also re-arms (or, for subscriptions, ends) the reminders.
   const datesChanged = changed("purchaseDate") || changed("deliveryDate") || changed("isOnlinePurchase") ||
-    changed("purchaseCountry") || changed("merchant") || changed("currency");
+    changed("purchaseCountry") || changed("merchant") || changed("currency") || changed("purchaseType");
   const manualAcceptance = parsed.data.isDraft === false && existing.status !== "completed";
   if (manualAcceptance && existing.status !== "failed") {
     res.status(409).json({ error: "Only a completed receipt or manually reviewed failed extraction can be saved" });
@@ -422,6 +423,10 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
     .set({
       ...parsed.data,
       ...(manualAcceptance ? { status: "completed" } : {}),
+      // A purchase type sent by the app is the user's choice: never overwritten by hints or the backfill.
+      ...(parsed.data.purchaseType !== undefined
+        ? { purchaseTypeSource: parsed.data.purchaseType === null ? null : "manual" }
+        : {}),
       ...(datesChanged ? {
         returnReminderSent7dAt: null, returnReminderSent2dAt: null,
         returnPushSent2dAt: null, returnPushSent1dAt: null,
