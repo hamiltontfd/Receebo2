@@ -1,211 +1,137 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, X, Mail, RefreshCw, Loader2, AlertTriangle } from "lucide-react";
-import { Link, useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Check, X, Mail, Loader2, AlertTriangle, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
+import { Button } from "@/components/ui/button";
 import { useMailStatus } from "@/components/MailConnections";
-import { MAIL_PROVIDER_LABELS, syncMail, type MailProviderId } from "@/lib/mailConnection";
+import { PendingImportSheet } from "@/components/PendingImportSheet";
+import { MAIL_PROVIDER_LABELS } from "@/lib/mailConnection";
 import { BILLING_QUERY_KEY, isAtTrialCap, type BillingStatus } from "@/hooks/useBilling";
-import { subscribeToastAction } from "@/components/SubscribeToastAction";
+import { usePendingImportActions } from "@/hooks/usePendingImportActions";
 import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON, SUBSCRIBE_HREF } from "@/lib/trialCopy";
-import { SYNC_IN_PROGRESS_CODE, SYNC_IN_PROGRESS_COPY } from "@/lib/mailImportCopy";
-import { getAppLocale } from "@/lib/locale";
+import { categoryIcon, categoryStyle } from "@/lib/categories";
+import {
+  PENDING_QUERY_KEY, fetchPending, formatMoney, formatPurchaseDate, itemsSummary,
+  type PendingImportItem, type PendingList,
+} from "@/lib/pendingImports";
 
-/** The server refused the approval because the free-trial receipt cap is reached. */
-export class TrialCapError extends Error {
-  constructor() { super(TRIAL_CAP_MESSAGE); }
-}
+export {
+  TrialCapError, SyncInProgressError, AlreadyHandledError, type PendingImportItem,
+} from "@/lib/pendingImports";
 
-/** A mailbox sync holds the user's data lock; the item stays and can be retried shortly. */
-export class SyncInProgressError extends Error {
-  constructor() { super(SYNC_IN_PROGRESS_COPY.en); }
-}
-
-/** The import was already approved or dismissed (e.g. a retry after a dropped response). */
-export class AlreadyHandledError extends Error {
-  constructor() { super("Pending import was already handled"); }
-}
-
-const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
-
-export interface PendingImportItem {
-  id: number;
-  provider?: MailProviderId;
-  gmailMessageId: string;
-  originalFileName: string;
-  merchant: string | null;
-  total: number | null;
-  currency: string | null;
-  purchaseDate: string | null;
-  category: string | null;
-  summary: string | null;
-  createdAt: string;
-}
-
-async function fetchPending(): Promise<PendingImportItem[]> {
-  const res = await fetch(`${BASE}api/mail/pending`, { credentials: "include" });
-  if (!res.ok) throw new Error("Failed to load pending imports");
-  return res.json() as Promise<PendingImportItem[]>;
-}
-
-async function approvePending(id: number): Promise<{ approved: boolean; receiptId: number }> {
-  const res = await fetch(`${BASE}api/mail/pending/${id}/approve`, {
-    method: "POST",
-    credentials: "include",
+export function usePendingImports() {
+  return useQuery<PendingList>({
+    queryKey: PENDING_QUERY_KEY,
+    queryFn: fetchPending,
+    staleTime: 60_000,
+    retry: false,
   });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { code?: string } | null;
-    if (res.status === 403 && (body?.code === "trial_exhausted" || body?.code === "TRIAL_UPLOAD_LIMIT")) {
-      throw new TrialCapError();
-    }
-    if (res.status === 409) {
-      throw body?.code === SYNC_IN_PROGRESS_CODE ? new SyncInProgressError() : new AlreadyHandledError();
-    }
-    throw new Error("Failed to approve");
-  }
-  return res.json() as Promise<{ approved: boolean; receiptId: number }>;
-}
-
-async function dismissPending(id: number): Promise<void> {
-  const res = await fetch(`${BASE}api/mail/pending/${id}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-  if (!res.ok) {
-    if (res.status === 409) {
-      const body = (await res.json().catch(() => null)) as { code?: string } | null;
-      if (body?.code === SYNC_IN_PROGRESS_CODE) throw new SyncInProgressError();
-    }
-    throw new Error("Failed to dismiss");
-  }
-}
-
-function triggerSync() {
-  return syncMail(BASE);
-}
-
-function formatCurrency(amount: number | null, currency: string | null): string {
-  if (amount === null) return "";
-  const sym =
-    currency === "EUR"
-      ? "€"
-      : currency === "GBP"
-        ? "£"
-        : currency === "USD"
-          ? "$"
-          : currency
-            ? `${currency} `
-            : "";
-  return `${sym}${amount.toFixed(2)}`;
 }
 
 export function usePendingImportCount() {
-  const { data } = useQuery<PendingImportItem[]>({
-    queryKey: ["mail", "pending"],
-    queryFn: fetchPending,
-    staleTime: 60_000,
-    retry: false,
-  });
-  return data?.length ?? 0;
+  const { data } = usePendingImports();
+  return data?.count ?? 0;
 }
 
+/** The one card shown on the home screen: the highest-ranked pending receipt. */
+export function PendingImportCard({
+  item, stacked, atCap, busy, onOpen, onAccept, onDismiss,
+}: {
+  item: PendingImportItem;
+  stacked: boolean;
+  atCap: boolean;
+  busy: boolean;
+  onOpen: () => void;
+  onAccept: () => void;
+  onDismiss: () => void;
+}) {
+  const Icon = categoryIcon(item.category);
+  const summary = itemsSummary(item);
+  const provider = item.provider ? MAIL_PROVIDER_LABELS[item.provider] : null;
+  return (
+    <div className="relative" data-testid="pending-home-card">
+      <div className="relative z-10 rounded-2xl border bg-background p-4 shadow-sm">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="w-full text-left"
+          aria-label={`Review ${item.merchant ?? item.originalFileName}`}
+          data-testid="pending-card-open"
+        >
+          <div className="flex items-start gap-3">
+            <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
+              <Icon className="w-[1.1rem] h-[1.1rem]" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold truncate">{item.merchant ?? item.originalFileName}</p>
+              {item.purchaseDate && (
+                <p className="text-xs text-muted-foreground">{formatPurchaseDate(item.purchaseDate)}</p>
+              )}
+            </div>
+            <p className="font-bold font-mono shrink-0">{formatMoney(item.total, item.currency)}</p>
+          </div>
+          <div className="flex items-center gap-2 mt-3 min-w-0">
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${categoryStyle(item.category)}`}>
+              {item.category ?? "Other"}
+            </span>
+            {summary && <span className="text-sm truncate">{summary}</span>}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+            <Mail className="w-3 h-3" />
+            {provider && <>{provider} · </>}
+            Found {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+          </p>
+        </button>
+        <div className="flex items-center gap-2 mt-3">
+          <Button
+            variant="secondary"
+            className="flex-1 rounded-full h-10"
+            disabled={busy}
+            onClick={onDismiss}
+            title="Dismiss"
+          >
+            <X className="w-4 h-4 mr-1.5" />
+            Dismiss
+          </Button>
+          <Button
+            className="flex-1 rounded-full h-10"
+            disabled={atCap || busy}
+            onClick={onAccept}
+            title={atCap ? TRIAL_CAP_MESSAGE : "Add to library"}
+          >
+            <Check className="w-4 h-4 mr-1.5" />
+            Accept
+          </Button>
+        </div>
+      </div>
+      {stacked && (
+        <div aria-hidden data-testid="pending-stack-edges">
+          <div className="mx-3 -mt-2 h-3 rounded-b-2xl border border-t-0 bg-background" />
+          <div className="mx-6 -mt-1.5 h-2.5 rounded-b-2xl border border-t-0 bg-background" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Home "Found in your email": one card at a time (best ranked first), a badge
+ * with the total, "View all" to /imports when there are 2 or more, and a
+ * compact "all caught up" line once the queue is empty.
+ */
 export default function PendingImports() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
   // Read the billing status from the shared cache (fetched by the app shell).
   const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, enabled: false });
   const atCap = isAtTrialCap(billing);
-
-  const { data: items = [], isLoading } = useQuery<PendingImportItem[]>({
-    queryKey: ["mail", "pending"],
-    queryFn: fetchPending,
-    staleTime: 60_000,
-    retry: false,
-  });
-
-  const approve = useMutation({
-    mutationFn: approvePending,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["mail", "pending"] });
-      void queryClient.invalidateQueries({ queryKey: ["receipts"] });
-      toast({ title: "Receipt added to your library" });
-    },
-    onError: (err) => {
-      if (err instanceof TrialCapError) {
-        void queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY });
-        toast({
-          title: "Receipt not added",
-          description: TRIAL_CAP_MESSAGE,
-          variant: "destructive",
-          action: subscribeToastAction(setLocation),
-        });
-        return;
-      }
-      if (err instanceof SyncInProgressError) {
-        toast({ title: SYNC_IN_PROGRESS_COPY[getAppLocale()] });
-        return;
-      }
-      if (err instanceof AlreadyHandledError) {
-        void queryClient.invalidateQueries({ queryKey: ["mail", "pending"] });
-        void queryClient.invalidateQueries({ queryKey: ["receipts"] });
-        return;
-      }
-      toast({
-        title: "Something went wrong",
-        description: "Could not approve receipt. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const dismiss = useMutation({
-    mutationFn: dismissPending,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["mail", "pending"] });
-    },
-    onError: (err) =>
-      err instanceof SyncInProgressError
-        ? toast({ title: SYNC_IN_PROGRESS_COPY[getAppLocale()] })
-        : toast({
-          title: "Something went wrong",
-          description: "Could not dismiss import.",
-          variant: "destructive",
-        }),
-  });
+  const { data, isLoading } = usePendingImports();
+  const { approve, dismiss, busy } = usePendingImportActions();
+  const [openId, setOpenId] = useState<number | null>(null);
 
   const { data: mailStatus } = useMailStatus();
-  const reconnectProviders = (mailStatus?.providers ?? []).filter(
-    (p) => p.enabled && p.connected && p.needsReconnect,
-  );
-
-  const sync = useMutation({
-    mutationFn: triggerSync,
-    onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ["mail"] });
-      if (result.needsReconnect?.length) {
-        toast({
-          title: "Reconnect needed",
-          description: "Your email connection expired. Reconnect it in Settings.",
-          variant: "destructive",
-        });
-      } else if (result.queued > 0) {
-        toast({
-          title: `Found ${result.queued} new receipt${result.queued > 1 ? "s" : ""}`,
-          description: "Review them below.",
-        });
-      } else {
-        toast({ title: "No new receipts found" });
-      }
-    },
-    onError: () =>
-      toast({
-        title: "Sync failed",
-        description: "Could not reach your inbox. Try again shortly.",
-        variant: "destructive",
-      }),
-  });
+  const providers = mailStatus?.providers ?? [];
+  const reconnectProviders = providers.filter((p) => p.enabled && p.connected && p.needsReconnect);
+  const connectedProviders = providers.filter((p) => p.enabled && p.connected);
 
   if (isLoading) {
     return (
@@ -215,6 +141,10 @@ export default function PendingImports() {
       </div>
     );
   }
+
+  const items = data?.items ?? [];
+  const count = data?.count ?? items.length;
+  const top = items[0];
 
   const reconnectBanner = reconnectProviders.length > 0 && (
     <div
@@ -232,107 +162,80 @@ export default function PendingImports() {
     </div>
   );
 
-  if (items.length === 0) {
+  // Nothing pending and no mailbox connected: nothing to show.
+  if (!top && connectedProviders.length === 0) {
     return reconnectBanner ? <div className="mb-6">{reconnectBanner}</div> : null;
   }
 
+  const providerNames = connectedProviders.map((p) => p.label).join(" or ") || "your email";
+
   return (
-    <div className="mb-6">
+    <section className="mb-6" data-testid="pending-imports">
       {reconnectBanner}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Mail className="w-4 h-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">
+          <h2 className="text-sm font-semibold flex items-center">
             Found in your email
-            <span className="ml-1.5 bg-foreground text-background text-xs font-bold rounded-full px-1.5 py-0.5">
-              {items.length}
-            </span>
+            {count > 0 && (
+              <span
+                className="ml-1.5 bg-foreground text-background text-xs font-bold rounded-full px-1.5 py-0.5 leading-none"
+                data-testid="pending-count-badge"
+              >
+                {count}
+              </span>
+            )}
           </h2>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs text-muted-foreground rounded-full"
-          onClick={() => sync.mutate()}
-          disabled={sync.isPending}
-        >
-          {sync.isPending ? (
-            <Loader2 className="w-3 h-3 animate-spin mr-1" />
-          ) : (
-            <RefreshCw className="w-3 h-3 mr-1" />
-          )}
-          Sync
-        </Button>
+        {count >= 2 && (
+          <Link
+            href="/imports"
+            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center"
+            data-testid="link-view-all-imports"
+          >
+            View all
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
       </div>
 
-      {atCap && (
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950" data-testid="pending-trial-cap">
-          <span>{TRIAL_CAP_MESSAGE}</span>
-          <Link href={SUBSCRIBE_HREF} className="font-semibold underline" data-testid="link-pending-subscribe">
-            {TRIAL_CAP_BUTTON}
-          </Link>
+      {!top ? (
+        <div
+          className="rounded-2xl border px-4 py-3 flex items-center gap-3 text-sm"
+          data-testid="pending-caught-up"
+        >
+          <span className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+            <Check className="w-4 h-4" />
+          </span>
+          <p>
+            <span className="font-semibold">You're all caught up.</span>{" "}
+            <span className="text-muted-foreground">New receipts from {providerNames} will show up here.</span>
+          </p>
         </div>
+      ) : (
+        <>
+          {atCap && (
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950" data-testid="pending-trial-cap">
+              <span>{TRIAL_CAP_MESSAGE}</span>
+              <Link href={SUBSCRIBE_HREF} className="font-semibold underline" data-testid="link-pending-subscribe">
+                {TRIAL_CAP_BUTTON}
+              </Link>
+            </div>
+          )}
+          <PendingImportCard
+            key={top.id}
+            item={top}
+            stacked={count >= 2}
+            atCap={atCap}
+            busy={busy}
+            onOpen={() => setOpenId(top.id)}
+            onAccept={() => approve.mutate({ id: top.id })}
+            onDismiss={() => dismiss.mutate(top.id)}
+          />
+        </>
       )}
 
-      <div className="flex flex-col gap-2">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center gap-3 border rounded-xl px-4 py-3 bg-background"
-          >
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {item.merchant ?? item.originalFileName}
-              </p>
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                {item.total !== null && (
-                  <span className="text-xs font-semibold text-foreground">
-                    {formatCurrency(item.total, item.currency)}
-                  </span>
-                )}
-                {item.purchaseDate && (
-                  <span className="text-xs text-muted-foreground">
-                    {item.purchaseDate}
-                  </span>
-                )}
-                {item.provider && MAIL_PROVIDER_LABELS[item.provider] && (
-                  <span className="text-xs text-muted-foreground">
-                    {MAIL_PROVIDER_LABELS[item.provider]}
-                  </span>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  Found{" "}
-                  {formatDistanceToNow(new Date(item.createdAt), {
-                    addSuffix: true,
-                  })}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 shrink-0">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="w-8 h-8 rounded-full text-muted-foreground hover:text-destructive"
-                disabled={dismiss.isPending || approve.isPending}
-                onClick={() => dismiss.mutate(item.id)}
-                title="Dismiss"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-              <Button
-                size="icon"
-                className="w-8 h-8 rounded-full"
-                disabled={atCap || dismiss.isPending || approve.isPending}
-                onClick={() => approve.mutate(item.id)}
-                title={atCap ? TRIAL_CAP_MESSAGE : "Add to library"}
-              >
-                <Check className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+      {openId != null && <PendingImportSheet importId={openId} open onClose={() => setOpenId(null)} />}
+    </section>
   );
 }
