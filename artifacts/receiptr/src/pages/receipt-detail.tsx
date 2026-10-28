@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRoute, Link, useLocation } from "wouter";
+import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -25,6 +25,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 
 import { ReceiptPreview } from "@/components/ReceiptPreview";
+import { ReceiptReview } from "@/components/ReceiptReview";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { StoreFullscreen } from "@/components/StoreFullscreen";
 import { PageTransition, listVariants, itemVariants } from "@/components/PageTransition";
@@ -66,6 +67,15 @@ type EditFormValues = z.infer<typeof editFormSchema>;
 export default function ReceiptDetail() {
   const [match, params] = useRoute("/receipts/:id");
   const receiptId = match ? parseInt(params.id) : 0;
+  const search = new URLSearchParams(useSearch());
+  // Just accepted from "Found in your email": show the short review instead.
+  if (search.get("review") === "1") {
+    return <ReceiptReview receiptId={receiptId} doneHref={search.get("from") === "imports" ? "/imports" : "/search"} />;
+  }
+  return <ReceiptDetailView receiptId={receiptId} />;
+}
+
+function ReceiptDetailView({ receiptId }: { receiptId: number }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
