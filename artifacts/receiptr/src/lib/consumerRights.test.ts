@@ -137,3 +137,16 @@ describe("date edge cases", () => {
     expect(day(r.manufacturerWarranty!.expiry)).toBe("2026-02-28");
   });
 });
+
+describe("subscriptions, digital purchases and tickets (no consumer dates)", () => {
+  const base = { purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", merchant: "Apple", category: "Entertainment", purchaseDate: local(-2), warrantyText: "2-year manufacturer warranty" };
+  it("shows no return window or warranty, only a note", () => {
+    expect(deriveConsumerRights(base).returnWindow).not.toBeNull();
+    const sub = deriveConsumerRights({ ...base, purchaseType: "subscription" });
+    expect(sub).toMatchObject({ hasAny: true, returnWindow: null, warranty: null, manufacturerWarranty: null });
+    expect(sub.notes).toEqual(["Subscription: no return window or legal warranty is tracked, and you won't get reminders for it."]);
+    expect(deriveConsumerRights({ ...base, purchaseType: "ticket" }).notes[0]).toMatch(/^Event ticket:/);
+    expect(deriveConsumerRights({ ...base, purchaseType: "digital", locale: "pt-PT" }).notes[0]).toMatch(/^Compra digital: sem prazo/);
+    expect(deriveConsumerRights({ ...base, purchaseType: "goods" }).warranty).not.toBeNull();
+  });
+});

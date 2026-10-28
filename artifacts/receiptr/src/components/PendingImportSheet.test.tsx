@@ -25,10 +25,10 @@ const detail = {
   objectPath: "/objects/uploads/x", originalUrl: "/api/storage/objects/uploads/x",
 };
 
-function mount(billing: Record<string, unknown> = { plan: "pro", accessState: "paid", canUseApp: true }) {
+function mount(billing: Record<string, unknown> = { plan: "pro", accessState: "paid", canUseApp: true }, item: Record<string, unknown> = detail) {
   const fetchMock = vi.fn().mockImplementation(async (url: string) => {
     if (url.includes("/approve")) return { ok: true, status: 200, json: async () => ({ approved: true, receiptId: 77 }) };
-    return { ok: true, status: 200, json: async () => detail };
+    return { ok: true, status: 200, json: async () => item };
   });
   vi.stubGlobal("fetch", fetchMock);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -67,5 +67,20 @@ describe("PendingImportSheet", () => {
     mount({ plan: "free", accessState: "trial_exhausted", canUseApp: true, canUpload: false });
     expect(await screen.findByTestId("pending-sheet-accept")).toBeDisabled();
     expect(screen.getByTestId("pending-sheet-trial-cap")).toBeInTheDocument();
+  });
+
+  it("marks a detected subscription (no dates) and sends the switch only when changed", async () => {
+    const sub = { ...detail, merchant: "Apple", purchaseType: "subscription",
+      extraction: { ...detail.extraction, merchant: "Apple", products: [{ name: "iCloud+ 200 GB", quantity: 1, price: 2.99 }] } };
+    const { fetchMock } = mount(undefined, sub);
+    expect(await screen.findByTestId("pending-purchase-type")).toHaveTextContent("Subscription");
+    expect(screen.getByTestId("pending-switch-subscription")).toHaveAttribute("data-state", "checked");
+    expect(screen.getByText(/^Subscription: no return window/)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("pending-switch-subscription"));
+    expect(screen.getByTestId("pending-switch-subscription")).toHaveAttribute("data-state", "unchecked");
+    fireEvent.click(screen.getByTestId("pending-sheet-accept"));
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalled());
+    const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/approve"));
+    expect(JSON.parse(String(call![1].body))).toEqual({ category: "Electronics", purchaseType: "goods" });
   });
 });

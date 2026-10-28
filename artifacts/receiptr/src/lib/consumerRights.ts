@@ -1,5 +1,6 @@
 import { formatLocaleDate, type AppLocale } from "./locale";
 import { rightsCopy } from "./rightsCopy";
+import { hasNoConsumerDates } from "./purchaseType";
 
 /**
  * Consumer rights derivation utility.
@@ -301,6 +302,8 @@ export function deriveConsumerRights(params: {
   merchant?: string | null;
   /** The receipt's warranty text (manufacturer warranty, if stated). */
   warrantyText?: string | null;
+  /** Subscription / digital / ticket / service: no return window, no warranty, just a note. */
+  purchaseType?: string | null;
   locale?: AppLocale;
 }): ConsumerRightsResult {
   const { purchaseDate, category, currency, purchaseCountry, isOnlinePurchase, merchant } = params;
@@ -311,6 +314,10 @@ export function deriveConsumerRights(params: {
     hasAny: false, countryLabel: null, returnWindow: null, warranty: null,
     manufacturerWarranty: null, notes: [], disclaimer: copy.disclaimer, legalReviewPending: false,
   };
+
+  if (hasNoConsumerDates(params.purchaseType)) {
+    return { ...none, hasAny: true, notes: [copy.noConsumerDatesNote(params.purchaseType)] };
+  }
 
   if (!purchaseDate) return none;
   const purchaseDateObj = new Date(purchaseDate + "T00:00:00");

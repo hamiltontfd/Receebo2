@@ -13,6 +13,8 @@ import { usePendingImportActions } from "@/hooks/usePendingImportActions";
 import { MAIL_PROVIDER_LABELS } from "@/lib/mailConnection";
 import { deriveConsumerRights } from "@/lib/consumerRights";
 import { getAppLocale } from "@/lib/locale";
+import { hasNoConsumerDates, type PurchaseType } from "@/lib/purchaseType";
+import { Switch } from "@/components/ui/switch";
 import { TRIAL_CAP_BUTTON, TRIAL_CAP_MESSAGE, SUBSCRIBE_HREF } from "@/lib/trialCopy";
 import {
   fetchPendingDetail, formatMoney, formatPurchaseDate, pendingDetailQueryKey,
@@ -74,10 +76,16 @@ function ViewOriginalButton({ url }: { url: string }) {
   );
 }
 
-function SheetBody({ detail, category, onCategory }: {
+const NO_DATES_BADGE: Record<string, string> = {
+  subscription: "Subscription", digital: "Digital", ticket: "Ticket", service: "Service",
+};
+
+function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType }: {
   detail: PendingImportDetail;
   category: string;
   onCategory: (c: string) => void;
+  purchaseType: PurchaseType | null;
+  onPurchaseType: (t: PurchaseType) => void;
 }) {
   const data = detail.extraction;
   const provider = detail.provider ? MAIL_PROVIDER_LABELS[detail.provider] : "your email";
@@ -91,8 +99,10 @@ function SheetBody({ detail, category, onCategory }: {
     isOnlinePurchase: data.isOnlinePurchase,
     merchant: data.merchant,
     warrantyText: data.warranty,
+    purchaseType,
     locale: getAppLocale(),
   });
+  const noDates = hasNoConsumerDates(purchaseType);
   const suggested = (data.category ?? "Other") === category;
 
   return (
@@ -135,6 +145,25 @@ function SheetBody({ detail, category, onCategory }: {
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center justify-between gap-3 pt-2 mt-2 border-t">
+          <label htmlFor="pending-switch-subscription" className="text-sm font-medium flex items-center gap-2">
+            This is a subscription
+            {noDates && purchaseType && (
+              <span data-testid="pending-purchase-type" className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                {NO_DATES_BADGE[purchaseType]}
+              </span>
+            )}
+          </label>
+          <Switch
+            id="pending-switch-subscription"
+            data-testid="pending-switch-subscription"
+            checked={noDates}
+            onCheckedChange={(on) => onPurchaseType(on ? "subscription" : "goods")}
+          />
+        </div>
+        {noDates && rights.notes[0] && (
+          <p className="text-xs text-muted-foreground pt-1" data-testid="pending-no-dates-note">{rights.notes[0]}</p>
+        )}
       </div>
 
       {products.length > 0 && (
@@ -219,14 +248,20 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
   });
 
   const [category, setCategory] = useState<string>("Other");
+  // Detected type; the switch overrides it (sent only when changed, saved as manual).
+  const [purchaseType, setPurchaseType] = useState<PurchaseType | null>(null);
   useEffect(() => {
-    if (detail) setCategory(detail.extraction.category ?? "Other");
+    if (detail) {
+      setCategory(detail.extraction.category ?? "Other");
+      setPurchaseType(detail.purchaseType ?? null);
+    }
   }, [detail]);
 
   const handleAccept = () => {
     if (!detail) return;
     const from = typeof window !== "undefined" ? window.location.pathname : "";
-    approve.mutate({ id: detail.id, category }, {
+    const typeChanged = purchaseType !== null && purchaseType !== (detail.purchaseType ?? null);
+    approve.mutate({ id: detail.id, category, ...(typeChanged ? { purchaseType } : {}) }, {
       onSuccess: ({ receiptId }) => {
         queryClient.removeQueries({ queryKey: pendingDetailQueryKey(detail.id) });
         onClose();
@@ -304,7 +339,13 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
             </div>
 
             <div className="flex-1 overflow-y-auto">
-              <SheetBody detail={detail} category={category} onCategory={setCategory} />
+              <SheetBody
+                detail={detail}
+                category={category}
+                onCategory={setCategory}
+                purchaseType={purchaseType}
+                onPurchaseType={setPurchaseType}
+              />
             </div>
 
             <div className="border-t px-5 py-3 shrink-0 space-y-2 bg-background">

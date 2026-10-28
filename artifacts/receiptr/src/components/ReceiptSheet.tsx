@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { deriveConsumerRights } from "@/lib/consumerRights";
 import { getAppLocale } from "@/lib/locale";
+import { hasNoConsumerDates } from "@/lib/purchaseType";
+import { Switch } from "@/components/ui/switch";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -79,7 +81,15 @@ const editFormSchema = z.object({
   category: z.string().optional(),
   warranty: z.string().optional(),
   isOnlinePurchase: z.boolean().nullable().optional(),
+  purchaseType: z.enum(["goods", "subscription", "digital", "service", "ticket"]).nullable().optional(),
 });
+
+/** Helper line under the switch when the type was detected as something other than a subscription. */
+const NO_DATES_TYPE_LABEL: Record<string, string> = {
+  digital: "Detected as a digital purchase (app, film or in-app).",
+  ticket: "Detected as an event ticket.",
+  service: "Detected as a service.",
+};
 
 type EditFormValues = z.infer<typeof editFormSchema>;
 
@@ -131,6 +141,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
       category: "",
       warranty: "",
       isOnlinePurchase: null,
+      purchaseType: null,
     },
   });
 
@@ -145,6 +156,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
         category: receipt.category || "",
         warranty: receipt.warranty || "",
         isOnlinePurchase: receipt.isOnlinePurchase ?? null,
+        purchaseType: receipt.purchaseType ?? null,
       });
     }
   }, [receipt, isEditing, form]);
@@ -203,6 +215,10 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
           category: data.category,
           warranty: data.warranty,
           isOnlinePurchase: data.isOnlinePurchase,
+          // Only when the switch changed it: an untouched AI/hint type stays as detected.
+          ...((data.purchaseType ?? null) !== (receipt?.purchaseType ?? null)
+            ? { purchaseType: data.purchaseType ?? null }
+            : {}),
         },
       });
       setIsEditing(false);
@@ -548,6 +564,32 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                         />
                         <FormField
                           control={form.control}
+                          name="purchaseType"
+                          render={({ field }) => {
+                            const checked = hasNoConsumerDates(field.value);
+                            return (
+                              <FormItem className="p-4 space-y-1">
+                                <div className="flex items-center justify-between gap-3">
+                                  <FormLabel htmlFor="switch-subscription" className="text-sm font-medium">This is a subscription</FormLabel>
+                                  <FormControl>
+                                    <Switch
+                                      id="switch-subscription"
+                                      data-testid="switch-subscription"
+                                      checked={checked}
+                                      onCheckedChange={(on) => field.onChange(on ? "subscription" : "goods")}
+                                    />
+                                  </FormControl>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {checked && field.value && NO_DATES_TYPE_LABEL[field.value] ? `${NO_DATES_TYPE_LABEL[field.value]} ` : ""}
+                                  No return window, warranty or reminders for subscriptions, digital purchases and tickets.
+                                </p>
+                              </FormItem>
+                            );
+                          }}
+                        />
+                        <FormField
+                          control={form.control}
                           name="deliveryDate"
                           render={({ field }) => (
                             <FormItem className="p-4 space-y-1">
@@ -663,6 +705,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       isOnlinePurchase: receipt.isOnlinePurchase,
                       merchant: receipt.merchant,
                       warrantyText: receipt.warranty,
+                      purchaseType: receipt.purchaseType,
                       locale: getAppLocale(),
                     });
                     if (!rights.hasAny) return null;

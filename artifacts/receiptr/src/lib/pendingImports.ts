@@ -2,6 +2,7 @@ import type { MailProviderId } from "@/lib/mailConnection";
 import { SYNC_IN_PROGRESS_CODE, SYNC_IN_PROGRESS_COPY } from "@/lib/mailImportCopy";
 import { TRIAL_CAP_MESSAGE } from "@/lib/trialCopy";
 import { currencySymbol } from "@/lib/currency";
+import type { PurchaseType } from "@/lib/purchaseType";
 
 /** The server refused the approval because the free-trial receipt cap is reached. */
 export class TrialCapError extends Error {
@@ -41,6 +42,8 @@ export interface PendingImportItem {
   firstItemName?: string | null;
   productCount?: number;
   notableCount?: number;
+  /** Detected purchase type (subscription/digital/ticket/service get no dates); null = not detected. */
+  purchaseType?: PurchaseType | null;
 }
 
 export interface PendingTotal {
@@ -109,13 +112,13 @@ export async function fetchPendingDetail(id: number): Promise<PendingImportDetai
 }
 
 export async function approvePending(
-  { id, category }: { id: number; category?: string },
+  { id, category, purchaseType }: { id: number; category?: string; purchaseType?: PurchaseType },
 ): Promise<{ approved: boolean; receiptId: number }> {
   const res = await fetch(`${BASE}api/mail/pending/${id}/approve`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(category ? { category } : {}),
+    body: JSON.stringify({ ...(category ? { category } : {}), ...(purchaseType ? { purchaseType } : {}) }),
   });
   if (!res.ok) {
     const code = await errorCode(res);
