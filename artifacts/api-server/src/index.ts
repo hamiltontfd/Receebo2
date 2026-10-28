@@ -487,8 +487,8 @@ async function start(): Promise<void> {
       gmailLogger.info("Gmail import disabled by MAIL_PROVIDERS_ENABLED; scheduler not started");
     }
     if (isMailProviderEnabled("outlook") && isOutlookConfigured()) {
-      // No in-process timer (autoscale sleeps): the daily cron runs the sweep.
-      logger.info("Outlook background sync runs from POST /api/internal/cron/daily-maintenance");
+      // No in-process timer (autoscale sleeps): an external cron runs the sweep.
+      logger.info("Outlook background sync runs from POST /api/internal/cron/mail-sync (every 4 h) and the daily maintenance call");
     } else {
       logger.info(
         { enabled: isMailProviderEnabled("outlook"), configured: isOutlookConfigured() },

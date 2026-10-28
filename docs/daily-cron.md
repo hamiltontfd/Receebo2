@@ -1,6 +1,33 @@
-# Daily cron: maintenance + Outlook sync
+# Cron: daily maintenance + Outlook sync every 4 h
 
-Production runs on an autoscale deployment, which scales to zero when idle, so in-process timers are unreliable. Once a day, an outside scheduler calls:
+Production runs on an autoscale deployment, which scales to zero when idle, so in-process timers are unreliable. An outside scheduler makes two calls (both need the same `x-cron-secret` header):
+
+| Job | Call | Schedule (Europe/Lisbon) |
+|---|---|---|
+| Daily maintenance (+ fallback Outlook sweep) | `POST /api/internal/cron/daily-maintenance` | `0 6 * * *` |
+| Mail sync (Outlook sweep only) | `POST /api/internal/cron/mail-sync` | `0 */4 * * *` (since 28 Oct 2026) |
+
+## Mail sync every 4 h
+
+```
+POST /api/internal/cron/mail-sync
+x-cron-secret: <CRON_SECRET>
+```
+
+Runs only the Outlook sweep (no reminder emails, no cleanup). Same rules as below: connections synced in the last 3 h are skipped, 120 s budget for starting new users, `remaining` for the rest, `busy` if another sweep holds the lock. Each mailbox lists only mail received since its last complete sync minus 1 h (90 days on the first sync).
+
+| Status | Body | Meaning |
+|---|---|---|
+| 200 | `{ "outlook": { "status": "ok\|busy\|inactive", "due", "synced", "failed", "queued", "remaining" } }` | Call accepted |
+| 401 | | Wrong or missing secret |
+| 500 | | The sweep itself failed (retry at the next slot) |
+| 503 | | `CRON_SECRET` is not set |
+
+cron-job.org: create a second job with URL `https://receebo.net/api/internal/cron/mail-sync`, method POST, header `x-cron-secret` = production `CRON_SECRET`, custom crontab `0 */4 * * *`, time zone Europe/Lisbon (runs 00:00, 04:00, 08:00, 12:00, 16:00, 20:00).
+
+## Daily maintenance
+
+Once a day, an outside scheduler calls:
 
 ```
 POST /api/internal/cron/daily-maintenance
@@ -10,11 +37,11 @@ x-cron-secret: <CRON_SECRET>
 That one call does two things:
 
 1. **Daily maintenance:** orphan cleanup, return and warranty reminders. Claimed in `scheduled_job_runs`, so it runs at most once every ~23 h.
-2. **Outlook sweep:** every connected Outlook mailbox that isn't waiting for a reconnect and hasn't synced in the last 20 h, oldest first.
+2. **Outlook sweep (fallback):** every connected Outlook mailbox that isn't waiting for a reconnect and hasn't synced in the last 3 h, oldest first. With the 4-hourly mail-sync job in place this usually finds few or none due.
    - It starts new users only during the first 120 s; the rest are reported as `outlook.remaining`.
    - A cross-instance advisory lock prevents overlapping sweeps; a second call during a sweep gets `"busy"`.
 
-Calling it again is safe. A second call the same day does nothing, apart from finishing any `remaining` users.
+Calling it again is safe. A second call the same day does nothing for maintenance, and the sweep only picks up mailboxes not synced in the last 3 h.
 
 **Responses:**
 
@@ -25,7 +52,7 @@ Calling it again is safe. A second call the same day does nothing, apart from fi
 | 500 | | Daily maintenance itself failed (retry later) |
 | 503 | | `CRON_SECRET` is not set |
 
-Sync-on-connect and the Sync button in the app are unchanged. There is no 4 h timer and no post-start sweep any more.
+Sync-on-connect and the Sync button in the app are unchanged. There is no in-process Outlook timer; the legacy in-process Gmail 4 h timer only starts when `MAIL_PROVIDERS_ENABLED` includes `gmail` (off by default).
 
 ## 1. CRON_SECRET
 
@@ -49,7 +76,7 @@ Free, has a per-job time zone, and needs no code.
 3. Schedule: custom crontab `0 6 * * *`, time zone Europe/Lisbon.
 4. Optionally add second and third runs at 06:10 and 06:20 (`0,10,20 6 * * *`). They only finish any `remaining` users, so they cost nothing when there's nothing left.
 
-The scheduler gives up waiting after about 30 s, but the server finishes the run anyway. Check the result in the deployment logs: look for "Outlook sync: daily sweep finished".
+The scheduler gives up waiting after about 30 s, but the server finishes the run anyway. Check the result in the deployment logs: look for "Outlook sync: sweep finished".
 
 ### Option B: GitHub Actions
 Only if the repo is on GitHub. Scheduled workflows accept `timezone:` since March 2026. Add a repo secret `CRON_SECRET`, then create `.github/workflows/daily-cron.yml`:

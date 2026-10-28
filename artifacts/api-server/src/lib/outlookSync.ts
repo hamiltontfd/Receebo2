@@ -1,9 +1,9 @@
 /**
  * Outlook (Microsoft Graph) mailbox connection + import, plugged into the
  * shared pipeline in mailSync.ts. Inert when MICROSOFT_CLIENT_ID /
- * MICROSOFT_CLIENT_SECRET are missing: the daily sweep does nothing and the
- * routes report "not configured". Background sync runs once a day from the
- * cron endpoint (routes/cron.ts); there is no in-process timer.
+ * MICROSOFT_CLIENT_SECRET are missing: the cron sweep does nothing and the
+ * routes report "not configured". Background sync runs every 4 h from the
+ * cron endpoints (routes/cron.ts); there is no in-process timer.
  */
 import { db, emailConnectionsTable, type EmailConnection } from "@workspace/db";
 import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
@@ -217,16 +217,24 @@ export function syncUserOutlook(userId: string): Promise<MailSyncResult> {
   return syncUserMailbox(userId, outlookProvider);
 }
 
-/** A connection synced (cron, manual Sync or connect) more recently than this is skipped by the daily sweep. */
-export const OUTLOOK_DAILY_FRESH_MS = 20 * 60 * 60 * 1000;
+/**
+ * A connection synced (cron, manual Sync or connect) more recently than this
+ * is skipped by the sweep. The sweep runs every 4 h (POST
+ * /api/internal/cron/mail-sync); 3 h leaves room for a sync that ran a few
+ * minutes after its cron slot, so no mailbox skips a 4 h round.
+ */
+export const OUTLOOK_SWEEP_FRESH_MS = 3 * 60 * 60 * 1000;
 /** Default time budget of one cron call; users not reached are reported as "remaining". */
 export const OUTLOOK_SWEEP_TIME_BUDGET_MS = 120_000;
-/** Advisory lock key so two cron calls (or instances) never sweep at the same time. */
+/**
+ * Advisory lock key so two cron calls (or instances) never sweep at the same
+ * time. Shared by both cron endpoints; the name predates the 4 h schedule.
+ */
 const SWEEP_LOCK_KEY = "receebo:outlook-daily-sweep";
 
 export interface OutlookSweepResult {
   status: "ok" | "busy" | "inactive";
-  /** Connections due (not synced in the last 20 h) at the start of this call. */
+  /** Connections due (not synced in the last 3 h) at the start of this call. */
   due: number;
   synced: number;
   failed: number;
@@ -236,19 +244,20 @@ export interface OutlookSweepResult {
 }
 
 /**
- * Daily Outlook sweep, run synchronously inside the cron request (autoscale
- * may stop an instance once no request is in flight, so no background work).
+ * Outlook sweep (every 4 h via /internal/cron/mail-sync, also run by the daily
+ * maintenance call), synchronously inside the cron request (autoscale may stop
+ * an instance once no request is in flight, so no background work).
  *
- * - Only connections not synced in the last 20 h are processed, oldest first,
- *   so a second call the same day is a no-op (idempotent) and a call that ran
- *   out of time continues where it stopped.
+ * - Only connections not synced in the last 3 h are processed, oldest first,
+ *   so a repeated call is a no-op (idempotent) and a call that ran out of time
+ *   continues where it stopped.
  *   A sync that left messages for later (trial limit, per-run caps, transient
  *   failures) does not move lastSyncedAt, so that user stays due.
  * - Users without current access are skipped inside syncUserMailbox (no AI).
  * - A new user is started only while the time budget lasts; one user's sync
  *   can still take ~2 min (it is capped at 25 email bodies per run).
  */
-export async function runOutlookDailySweep(options: {
+export async function runOutlookSweep(options: {
   now?: () => number;
   timeBudgetMs?: number;
   syncUser?: (userId: string) => Promise<MailSyncResult>;
@@ -268,11 +277,11 @@ export async function runOutlookDailySweep(options: {
       "SELECT pg_try_advisory_lock(hashtext($1)) AS locked", [SWEEP_LOCK_KEY]);
     locked = Boolean(lock.rows[0]?.locked);
     if (!locked) {
-      logger.warn("Outlook sync: daily sweep already running, skipping");
+      logger.warn("Outlook sync: sweep already running, skipping");
       return { status: "busy", ...empty };
     }
 
-    const freshAfter = new Date(started - OUTLOOK_DAILY_FRESH_MS);
+    const freshAfter = new Date(started - OUTLOOK_SWEEP_FRESH_MS);
     const due = await db
       .select({ userId: emailConnectionsTable.userId })
       .from(emailConnectionsTable)
@@ -284,7 +293,7 @@ export async function runOutlookDailySweep(options: {
       .orderBy(sql`${emailConnectionsTable.lastSyncedAt} ASC NULLS FIRST`);
 
     const result: OutlookSweepResult = { status: "ok", ...empty, due: due.length };
-    logger.info({ due: due.length }, "Outlook sync: starting daily sweep");
+    logger.info({ due: due.length }, "Outlook sync: starting sweep");
     for (const [index, conn] of due.entries()) {
       if (now() - started >= budget) {
         result.remaining = due.length - index;
@@ -302,7 +311,7 @@ export async function runOutlookDailySweep(options: {
         logger.error({ err, userId: conn.userId }, "Outlook sync: user sweep error");
       }
     }
-    logger.info({ ...result, elapsedMs: now() - started }, "Outlook sync: daily sweep finished");
+    logger.info({ ...result, elapsedMs: now() - started }, "Outlook sync: sweep finished");
     return result;
   } finally {
     await unlockAndRelease(lease, SWEEP_LOCK_KEY, locked);

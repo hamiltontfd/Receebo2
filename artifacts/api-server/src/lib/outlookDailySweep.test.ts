@@ -5,7 +5,7 @@ import { eq, like } from "drizzle-orm";
 
 vi.mock("./mailProviders/config", () => ({ isMailProviderEnabled: () => true }));
 
-import { OUTLOOK_DAILY_FRESH_MS, runOutlookDailySweep } from "./outlookSync";
+import { OUTLOOK_SWEEP_FRESH_MS, runOutlookSweep } from "./outlookSync";
 
 const PREFIX = "outlook-sweep-test-";
 const HOUR = 60 * 60 * 1000;
@@ -46,23 +46,25 @@ function fakeSync(markSynced = true) {
   return { fn, calls };
 }
 
-describe("daily Outlook sweep (cron)", () => {
-  it("syncs only connections not synced in the last 20 h, oldest first, and is idempotent", async () => {
-    expect(OUTLOOK_DAILY_FRESH_MS).toBe(20 * HOUR);
+describe("Outlook sweep (cron, every 4 h)", () => {
+  it("syncs only connections not synced in the last 3 h, oldest first, and is idempotent", async () => {
+    expect(OUTLOOK_SWEEP_FRESH_MS).toBe(3 * HOUR);
     const never = await connection(null);
     const old = await connection(new Date(Date.now() - 30 * HOUR));
+    // Synced by the previous 4-hourly run, a few minutes after its slot.
+    const lastRound = await connection(new Date(Date.now() - 4 * HOUR + 10 * 60 * 1000));
     const fresh = await connection(new Date(Date.now() - 2 * HOUR));
     const reconnect = await connection(null, "needs_reconnect");
     const { fn, calls } = fakeSync();
 
-    const first = await runOutlookDailySweep({ syncUser: fn });
+    const first = await runOutlookSweep({ syncUser: fn });
     expect(first.status).toBe("ok");
-    expect(calls).toEqual([never, old]);
+    expect(calls).toEqual([never, old, lastRound]);
     expect(calls).not.toContain(fresh);
     expect(calls).not.toContain(reconnect);
 
     calls.length = 0;
-    const second = await runOutlookDailySweep({ syncUser: fn });
+    const second = await runOutlookSweep({ syncUser: fn });
     expect(second.status).toBe("ok");
     expect(calls).toEqual([]);
   });
@@ -73,11 +75,11 @@ describe("daily Outlook sweep (cron)", () => {
     let clock = 0;
     const { fn, calls } = fakeSync();
     const timed = vi.fn(async (userId: string) => { const r = await fn(userId); if (userId.startsWith(PREFIX)) clock += 100_000; return r; });
-    const result = await runOutlookDailySweep({ syncUser: timed, now: () => clock, timeBudgetMs: 50_000 });
+    const result = await runOutlookSweep({ syncUser: timed, now: () => clock, timeBudgetMs: 50_000 });
     expect(calls).toHaveLength(1);
     expect(result.remaining).toBeGreaterThanOrEqual(1);
     // The next call continues with the user that was not reached.
-    const next = await runOutlookDailySweep({ syncUser: fn });
+    const next = await runOutlookSweep({ syncUser: fn });
     expect(next.status).toBe("ok");
     expect(calls).toHaveLength(2);
   });
@@ -87,14 +89,14 @@ describe("daily Outlook sweep (cron)", () => {
     await connection(null);
     const { fn, calls } = fakeSync();
     const flaky = vi.fn(async (userId: string) => { if (userId === bad) throw new Error("graph 500"); return fn(userId); });
-    const result = await runOutlookDailySweep({ syncUser: flaky });
+    const result = await runOutlookSweep({ syncUser: flaky });
     expect(result.failed).toBeGreaterThanOrEqual(1);
     expect(calls).toHaveLength(1);
 
     const holder = await advisoryLockPool.connect();
     try {
       await holder.query("SELECT pg_advisory_lock(hashtext($1))", ["receebo:outlook-daily-sweep"]);
-      expect((await runOutlookDailySweep({ syncUser: fn })).status).toBe("busy");
+      expect((await runOutlookSweep({ syncUser: fn })).status).toBe("busy");
     } finally {
       await holder.query("SELECT pg_advisory_unlock(hashtext($1))", ["receebo:outlook-daily-sweep"]);
       holder.release();
