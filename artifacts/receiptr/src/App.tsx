@@ -15,6 +15,7 @@ import SearchPage from "@/pages/search";
 import ImportsPage from "@/pages/imports";
 import Settings from "@/pages/settings";
 import ProfilePage from "@/pages/profile";
+import RecurringSuppliersPage from "@/pages/recurring-suppliers";
 import GetStarted from "@/pages/get-started";
 import PrivacyPolicy from "@/pages/privacy";
 import TermsOfService from "@/pages/terms";
@@ -352,6 +353,9 @@ function ClerkProviderWithRoutes() {
             </Route>
             <Route path="/settings">
               <ProtectedShell><Settings /></ProtectedShell>
+            </Route>
+            <Route path="/profile/recurring">
+              <ProtectedShell><RecurringSuppliersPage /></ProtectedShell>
             </Route>
             <Route path="/profile">
               <ProtectedShell><ProfilePage /></ProtectedShell>

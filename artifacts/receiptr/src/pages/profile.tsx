@@ -14,6 +14,7 @@ import {
 } from "@/hooks/useBilling";
 import { AccessBadge } from "@/pages/settings";
 import { format } from "date-fns";
+import { EmailImportsSection } from "@/pages/recurring-suppliers";
 
 function Initials({ name, email }: { name: string | null; email: string | null }) {
   const text = name?.trim() || email?.trim() || "?";
@@ -218,6 +219,9 @@ export default function ProfilePage() {
           </p>
         )}
       </section>
+
+      {/* ── Email imports ── */}
+      <EmailImportsSection />
 
       {/* ── Account actions ── */}
       <section>
