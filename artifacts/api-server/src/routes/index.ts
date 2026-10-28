@@ -10,6 +10,7 @@ import notificationsRouter from "./notifications";
 import gmailRouter from "./gmail";
 import outlookRouter from "./outlook";
 import mailRouter from "./mail";
+import recurringSuppliersRouter from "./recurringSuppliers";
 import pushRouter from "./push";
 import accountRouter from "./account";
 import cronRouter from "./cron";
@@ -21,7 +22,7 @@ const router: IRouter = Router();
 router.use(healthRouter);
 router.use(cronRouter);
 router.use(
-  ["/receipts", "/gmail/sync", "/gmail/pending", "/outlook/sync", "/mail/sync", "/mail/pending", "/storage/objects"],
+  ["/receipts", "/gmail/sync", "/gmail/pending", "/outlook/sync", "/mail/sync", "/mail/pending", "/mail/recurring-suppliers", "/storage/objects"],
   requireAuthOrGuest,
   requireProductAccess,
 );
@@ -35,6 +36,7 @@ router.use(notificationsRouter);
 router.use(gmailRouter);
 router.use(outlookRouter);
 router.use(mailRouter);
+router.use(recurringSuppliersRouter);
 router.use(pushRouter);
 router.use(accountRouter);
 

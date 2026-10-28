@@ -14,6 +14,7 @@ import { billingOrigin } from "./lib/billingUrls";
 import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
 import { extendTrialsToCurrentDuration, uncountUnsavedTrialDrafts } from "./lib/accountTrial";
 import { migrateTrialAiReads } from "./lib/trialAiReads";
+import { migrateRecurringSuppliers } from "./lib/recurringSuppliers";
 import { migrateMailImportFailures } from "./lib/mailImportFailures";
 import { migrateAccountLifecycle } from "./lib/accountLifecycle";
 import { migrateAccountDeletionCodes } from "./lib/accountDeletionCode";
@@ -450,6 +451,11 @@ async function start(): Promise<void> {
     await migrateAccountDeletionCodes();
   } catch (err) {
     logger.warn({ err }, "Account deletion code migration warning (non-fatal) — continuing");
+  }
+  try {
+    await migrateRecurringSuppliers();
+  } catch (err) {
+    logger.warn({ err }, "Recurring suppliers migration warning (non-fatal) — continuing");
   }
   try {
     await migrateTrialAiReads();

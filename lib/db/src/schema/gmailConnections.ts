@@ -35,6 +35,8 @@ export type PendingImportExtractionData = {
   purchaseTypeSource?: string | null;
   /** Absent on imports stored before delivery dates were extracted. */
   deliveryDate?: string | null;
+  /** Sender's email domain (e.g. "edp.pt"), for recurring supplier rules; absent before 28 Oct 2026. */
+  senderDomain?: string | null;
 };
 
 /**
