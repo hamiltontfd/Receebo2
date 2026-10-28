@@ -23,17 +23,16 @@ import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { getSubscriptionStatus, receiptCapReached } from "../lib/subscriptionStatus";
 import { lockUserDataMutation } from "../lib/userDataLock";
+import { normalizeCategory } from "../lib/categories";
 import {
   consumeTrialReservation, accountTrialStatus, confirmTrialReceiptSaved, releaseTrialDraft, TRIAL_CAP_ERROR,
 } from "../lib/accountTrial";
 
 const objectStorageService = new ObjectStorageService();
 
-const CANONICAL_CATEGORIES = ["Electronics", "Home", "Clothing & Apparel", "Groceries", "Other"] as const;
-function normalizeCategory(value: string | null | undefined): string | undefined {
+function normalizeCategoryPatch(value: string | null | undefined): string | undefined {
   if (value === undefined) return undefined;
-  if (value && (CANONICAL_CATEGORIES as readonly string[]).includes(value)) return value;
-  return "Other";
+  return normalizeCategory(value);
 }
 
 import { deliveryDateError } from "../lib/returnWindowCalc";
@@ -428,7 +427,7 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
         returnPushSent2dAt: null, returnPushSent1dAt: null,
       } : {}),
       ...(parsed.data.category !== undefined
-        ? { category: normalizeCategory(parsed.data.category) }
+        ? { category: normalizeCategoryPatch(parsed.data.category) }
         : {}),
     })
     .where(

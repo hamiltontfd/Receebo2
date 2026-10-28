@@ -23,6 +23,10 @@ describe("server warranty expiry", () => {
     expect(computeWarrantyExpiries({ ...pt, category: "Groceries", purchaseDate: "2026-03-10" }).legal).toBeNull();
     expect(computeWarrantyExpiries({ purchaseDate: "2026-03-10", currency: "GBP", category: "Electronics" }).legal).toBeNull();
   });
+  it("keeps Entertainment on the same legal warranty as Other (Hamilton's decision pending)", () => {
+    const other = computeWarrantyExpiries({ ...pt, category: "Other", purchaseDate: "2026-03-10" });
+    expect(computeWarrantyExpiries({ ...pt, category: "Entertainment", purchaseDate: "2026-03-10" })).toEqual(other);
+  });
   it("clamps 29 Feb and month ends", () => {
     expect(addYearsClamped("2028-02-29", 1)).toBe("2029-02-28");
     expect(addYearsClamped("2028-02-29", 4)).toBe("2032-02-29");

@@ -1,4 +1,5 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { normalizeCategory } from "./categories";
 import { ObjectStorageService } from "./objectStorage";
 import { logger } from "./logger";
 
@@ -36,12 +37,6 @@ export type ExtractedReceipt = {
   deliveryDate: string | null;
 };
 
-const CANONICAL_CATEGORIES = ["Electronics", "Home", "Clothing & Apparel", "Groceries", "Other"] as const;
-
-function normalizeCategory(value: string | null): string {
-  if (value && (CANONICAL_CATEGORIES as readonly string[]).includes(value)) return value;
-  return "Other";
-}
 
 const SYSTEM_PROMPT = `You are an expert receipt and invoice analyst. You are given an image or PDF. First determine whether the image actually shows a purchase receipt, invoice, or proof of purchase. If it does not (e.g. it is a selfie, landscape photo, document, screenshot of something unrelated, or any non-purchase document), set "isReceipt" to false and leave all other fields as null or empty.
 
@@ -52,7 +47,7 @@ Respond ONLY with a JSON object matching this exact shape:
   "purchaseDate": string | null,    // the purchase date in strict YYYY-MM-DD format, or null if not present. For invoices and bills use the ISSUE date (invoice date, "data de emissão", "data da fatura"), NEVER the due date ("data limite de pagamento", "data de vencimento", "pagar até", "due date")
   "total": number | null,           // the grand total amount actually paid, as a plain number (no currency symbol)
   "currency": string | null,        // ISO currency code such as "EUR", "USD", "GBP" if determinable, else null
-  "category": string | null,        // must be exactly one of: "Electronics", "Home", "Clothing & Apparel", "Groceries", "Other"
+  "category": string | null,        // must be exactly one of: "Electronics", "Home", "Clothing & Apparel", "Groceries", "Entertainment", "Other". Entertainment: tickets (concerts, cinema, theatre, sports, festivals, museums), events, streaming and media subscriptions, digital games and e-books. Physical goods such as consoles, physical games or books stay in Electronics/Other
   "summary": string | null,         // one or two natural sentences summarizing what was bought and the context
   "ocrText": string | null,         // the full raw text content transcribed from the receipt, preserving line breaks
   "warranty": string | null,        // warranty or return-policy information printed on the receipt (e.g. "2-year manufacturer warranty", "30-day returns"), or null if none is mentioned

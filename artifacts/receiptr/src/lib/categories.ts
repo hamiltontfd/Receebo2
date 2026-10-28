@@ -1,11 +1,13 @@
-import { Cpu, Home, Shirt, ShoppingBasket, Package } from "lucide-react";
+import { Cpu, Home, Shirt, ShoppingBasket, Ticket, Package } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+// Keep in sync with api-server/src/lib/categories.ts (CANONICAL_CATEGORIES).
 export const CATEGORIES = [
   "Electronics",
   "Home",
   "Clothing & Apparel",
   "Groceries",
+  "Entertainment",
   "Other",
 ] as const;
 
@@ -16,6 +18,7 @@ const STYLES: Record<string, string> = {
   Home: "bg-amber-100 text-amber-700",
   "Clothing & Apparel": "bg-pink-100 text-pink-700",
   Groceries: "bg-green-100 text-green-700",
+  Entertainment: "bg-violet-100 text-violet-700",
   Other: "bg-gray-100 text-gray-600",
 };
 
@@ -24,6 +27,7 @@ const ICONS: Record<string, LucideIcon> = {
   Home: Home,
   "Clothing & Apparel": Shirt,
   Groceries: ShoppingBasket,
+  Entertainment: Ticket,
   Other: Package,
 };
 

@@ -24,6 +24,9 @@ interface JurisdictionRule {
   legalReviewPending?: boolean;
 }
 
+// "Entertainment" (tickets, events) is listed with the durable categories so it
+// keeps the treatment it had as "Other". Removing the legal warranty for tickets
+// is Hamilton's decision (pending); keep in sync with api-server warrantyExpiry.ts.
 const JURISDICTION_RULES: JurisdictionRule[] = [
   {
     code: "PT",
@@ -32,7 +35,7 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
     // 3 years for new goods, counted from delivery. For second-hand goods the
     // parties may agree to cut it to 18 months; we use 3 as the default.
     warrantyYears: 3,
-    durableCategories: ["Electronics", "Home", "Clothing & Apparel", "Other"],
+    durableCategories: ["Electronics", "Home", "Clothing & Apparel", "Entertainment", "Other"],
     // EU Consumer Rights Directive 2011/83/EU, transposed via DL 24/2014
     onlineReturnDays: 14,
     warrantyCitation: "Decree-Law 84/2021",
@@ -43,7 +46,7 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
     label: "EU",
     // EU Directive 2019/771 — 2 year minimum (PT extends to 3, handled above)
     warrantyYears: 2,
-    durableCategories: ["Electronics", "Home", "Clothing & Apparel", "Other"],
+    durableCategories: ["Electronics", "Home", "Clothing & Apparel", "Entertainment", "Other"],
     // EU Directive 2011/83/EU
     onlineReturnDays: 14,
     warrantyCitation: "EU Directive 2019/771",
@@ -55,7 +58,7 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
     // CDC Art. 26 (Lei 8.078/1990): 90 days durable, 30 days non-durable
     // Handled specially below — warrantyYears is null, we use days instead
     warrantyYears: null,
-    durableCategories: ["Electronics", "Home", "Clothing & Apparel", "Other"],
+    durableCategories: ["Electronics", "Home", "Clothing & Apparel", "Entertainment", "Other"],
     // CDC Art. 49: 7 calendar days from delivery
     onlineReturnDays: 7,
     warrantyCitation: "CDC Art. 26 (Lei 8.078/1990)",

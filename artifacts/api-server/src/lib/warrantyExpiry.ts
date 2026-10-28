@@ -14,7 +14,10 @@ import { detectCountry, returnWindowStart } from "./returnWindowCalc";
 export const WARRANTY_CALC_VERSION = 3;
 
 const LEGAL_WARRANTY_YEARS: Record<string, number> = { PT: 3, EU: 2 };
-const DURABLE_CATEGORIES = new Set(["Electronics", "Home", "Clothing & Apparel", "Other"]);
+// "Entertainment" (tickets, events) keeps the same legal-warranty treatment as
+// "Other", where those receipts used to land. Whether tickets should have no
+// legal warranty is Hamilton's decision; do not change it here without him.
+const DURABLE_CATEGORIES = new Set(["Electronics", "Home", "Clothing & Apparel", "Entertainment", "Other"]);
 const ISO_DATE_RE = /(\d{4}-\d{2}-\d{2})/g;
 
 export function isIsoDate(value: string | null | undefined): value is string {
