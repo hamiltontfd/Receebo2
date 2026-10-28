@@ -22,6 +22,11 @@ ${symbol}
 const standard = svg(48);
 await writeFile(resolve(publicDir, "favicon.svg"), standard);
 await writeFile(resolve(publicDir, "icons/icon-source.svg"), standard);
+// Bare symbol (no white canvas) for in-app UI such as the install bar.
+await writeFile(
+  resolve(publicDir, "logo-mark.svg"),
+  `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="3 3 48 48" fill="none">\n${symbol}\n</svg>\n`,
+);
 const browser = await chromium.launch({
   headless: true,
   ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),

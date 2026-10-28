@@ -50,6 +50,12 @@ describe("install bar show rules", () => {
     expect(screen.getByRole("button", { name: "Install" })).toBeInTheDocument();
     expect(screen.queryByText(/Add to Home Screen/)).not.toBeInTheDocument();
   });
+  it("shows the current Receebo mark, not the legacy app icon", () => {
+    render(<InstallBar />);
+    const logo = bar()!.querySelector("img")!;
+    expect(logo.getAttribute("src")).toMatch(/logo-mark\.svg$/);
+    expect(logo.getAttribute("alt")).toBe("");
+  });
   it("is hidden for signed-out visitors", () => {
     mocks.signedIn = false;
     render(<InstallBar />);

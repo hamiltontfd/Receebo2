@@ -103,7 +103,7 @@ export default function InstallBar() {
       <div role="region" aria-label={copy.title} data-testid="install-bar"
         className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur shadow-[0_-4px_16px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-3 px-3">
-          <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" className="h-8 w-8 shrink-0 rounded-lg" />
+          <img src={`${import.meta.env.BASE_URL}logo-mark.svg`} alt="" className="h-8 w-8 shrink-0" />
           <p className="min-w-0 flex-1 truncate text-sm font-medium">{copy.bar}</p>
           <Button size="sm" className="rounded-full" onClick={() => void install()}>{copy.install}</Button>
           <button type="button" aria-label={copy.dismiss} onClick={dismiss}

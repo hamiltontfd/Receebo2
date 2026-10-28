@@ -43,7 +43,7 @@ export default defineConfig({
       filename: "sw.ts",
       registerType: "prompt",
       injectRegister: null,
-      includeAssets: ["logo.svg", "logo.png", "favicon.svg", "icons/*.png"],
+      includeAssets: ["logo.svg", "logo-mark.svg", "logo.png", "favicon.svg", "icons/*.png"],
       manifest: {
         name: "Receebo — Receipts. Easy to find.",
         short_name: "Receebo",

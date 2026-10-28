@@ -13,6 +13,16 @@ describe("Receebo brand icons", () => {
     expect(favicon).toContain('<rect width="512" height="512" fill="#ffffff"/>');
     expect(favicon.match(/<path\b/g)).toHaveLength(2);
   });
+  it("ships the bare symbol as logo-mark.svg, cropped to the 48x48 mark", () => {
+    const logo = readFileSync(resolve(publicDir, "logo.svg"), "utf8");
+    const mark = readFileSync(resolve(publicDir, "logo-mark.svg"), "utf8");
+    expect(mark).toContain('viewBox="3 3 48 48"');
+    expect(mark).toContain(logo.match(/<rect\b[^>]*\/>/)![0]);
+    for (const [path] of [...logo.matchAll(/<path\b[^>]*\/>/g)].slice(0, 2)) expect(mark).toContain(path);
+    expect(mark).toContain(logo.match(/<circle\b[^>]*\/>/)![0]);
+    expect(mark.match(/<path\b/g)).toHaveLength(2);
+    expect(mark).not.toContain("#ffffff");
+  });
   it.each([
     ["receebo-white-32.png", 32],
     ["receebo-white-180.png", 180],
