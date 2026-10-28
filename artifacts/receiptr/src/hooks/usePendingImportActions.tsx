@@ -6,9 +6,10 @@ import { subscribeToastAction } from "@/components/SubscribeToastAction";
 import { SYNC_IN_PROGRESS_COPY } from "@/lib/mailImportCopy";
 import { TRIAL_CAP_MESSAGE } from "@/lib/trialCopy";
 import { getAppLocale } from "@/lib/locale";
+import { ToastAction } from "@/components/ui/toast";
 import {
-  AlreadyHandledError, PENDING_QUERY_KEY, SyncInProgressError, TrialCapError,
-  approvePending, bulkApprovePending, bulkDismissPending, dismissPending,
+  AlreadyHandledError, PENDING_QUERY_KEY, RECURRING_QUERY_KEY, SyncInProgressError, TrialCapError,
+  alwaysImportSupplier, approvePending, bulkApprovePending, bulkDismissPending, dismissPending,
   type PendingList,
 } from "@/lib/pendingImports";
 
@@ -122,6 +123,28 @@ export function usePendingImportActions() {
     onError: (err) => showError(err, "Could not dismiss these imports."),
   });
 
-  const busy = approve.isPending || dismiss.isPending || bulkApprove.isPending || bulkDismiss.isPending;
-  return { approve, dismiss, bulkApprove, bulkDismiss, busy };
+  // "Always import" a recurring supplier: this receipt plus all its pending ones.
+  const alwaysImport = useMutation({
+    mutationFn: alwaysImportSupplier,
+    onSuccess: (result) => {
+      removeFromCache(queryClient, result.approved.map((a) => a.id));
+      refresh();
+      void queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: RECURRING_QUERY_KEY });
+      const added = `${result.approved.length} added`;
+      toast({
+        title: `${result.supplier.displayName} receipts will now import automatically`,
+        description: result.skipped.length > 0 ? `${added} · ${result.skipped.length} still waiting` : added,
+        action: (
+          <ToastAction altText="Manage" onClick={() => setLocation("/profile/recurring")} data-testid="toast-action-manage">
+            Manage
+          </ToastAction>
+        ),
+      });
+    },
+    onError: (err) => showError(err, "Could not import from this supplier. Please try again."),
+  });
+
+  const busy = approve.isPending || dismiss.isPending || bulkApprove.isPending || bulkDismiss.isPending || alwaysImport.isPending;
+  return { approve, dismiss, bulkApprove, bulkDismiss, alwaysImport, busy };
 }

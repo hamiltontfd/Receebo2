@@ -41,6 +41,18 @@ function mount(
       if (approveResponse.ok) list = list.filter((i: any) => !url.includes(`/${i.id}/approve`));
       return { ok: approveResponse.ok, status: approveResponse.status, json: async () => approveResponse.body };
     }
+    if (url.includes("/always-import") && init?.method === "POST") {
+      const key = decodeURIComponent(url.split("/recurring-suppliers/")[1]!.split("/")[0]!);
+      const mine: any[] = list.filter((i: any) => i.recurring?.supplierKey === key);
+      list = list.filter((i: any) => i.recurring?.supplierKey !== key);
+      return {
+        ok: true, status: 200,
+        json: async () => ({
+          supplier: { supplierKey: key, displayName: mine[0]?.recurring.displayName, status: "on" },
+          approved: mine.map((i: any, n: number) => ({ id: i.id, receiptId: 100 + n })), skipped: [],
+        }),
+      };
+    }
     if (init?.method === "DELETE") {
       list = list.filter((i: any) => !url.endsWith(`/${i.id}`));
       return { ok: true, status: 200, json: async () => ({ dismissed: true }) };
@@ -69,7 +81,8 @@ describe("Home 'Found in your email' card", () => {
     expect(viewAll).toHaveTextContent(/^View all$/);
     expect(screen.getByTestId("pending-stack-edges")).toBeInTheDocument();
     expect(screen.getByText("Soundbar 3.1 Dolby Atmos + 1 more")).toBeInTheDocument();
-    expect(screen.getByText(/Outlook · Found/)).toBeInTheDocument();
+    // No "Outlook · Found X ago" line on home cards (the section header says it).
+    expect(screen.queryByText(/Found .* ago/)).not.toBeInTheDocument();
     expect(screen.getAllByTestId("pending-home-card")).toHaveLength(1);
   });
 
@@ -165,5 +178,46 @@ describe("PendingImports while a mailbox sync holds the lock", () => {
     const pendingCalls = () => fetchMock.mock.calls.filter(([url]) => String(url).endsWith("api/mail/pending?meta=1")).length;
     await waitFor(() => expect(pendingCalls()).toBeGreaterThanOrEqual(2));
     expect(mocks.toast).not.toHaveBeenCalled();
+  });
+});
+
+describe("Home card for an undecided recurring supplier", () => {
+  const edp = (id: number, pendingCount: number) => make(id, {
+    merchant: "EDP Comercial", category: "Home",
+    recurring: { supplierKey: "edp", displayName: "EDP Comercial", kind: "utility", category: "Home", status: "undecided", pendingCount },
+  });
+
+  it("shows the slim banner (title only) and Dismiss / Always import, no Accept", async () => {
+    mount(paid, undefined, [edp(1, 3), make(2), edp(3, 3), edp(4, 3)]);
+    const banner = await screen.findByTestId("pending-recurring-banner");
+    expect(banner).toHaveTextContent(/^EDP Comercial looks like a recurring bill$/);
+    const card = screen.getByTestId("pending-home-card");
+    expect(within(card).getByRole("button", { name: /Dismiss/ })).toBeInTheDocument();
+    expect(within(card).getByTestId("pending-card-always-import")).toHaveTextContent("Always import");
+    expect(within(card).queryByRole("button", { name: /^Accept$/ })).not.toBeInTheDocument();
+  });
+
+  it("Always import accepts all its pending receipts: badge drops by n+1, toast with Manage", async () => {
+    const fetchMock = mount(paid, undefined, [edp(1, 3), make(2), edp(3, 3), edp(4, 3), make(5)]);
+    await screen.findByTestId("pending-recurring-banner");
+    expect(screen.getByTestId("pending-count-badge")).toHaveTextContent("5");
+    fireEvent.click(screen.getByTestId("pending-card-always-import"));
+    await waitFor(() => expect(screen.getByTestId("pending-count-badge")).toHaveTextContent("2"));
+    const call = fetchMock.mock.calls.find(([u]) => String(u).includes("/always-import"))!;
+    expect(call[0]).toContain("/api/mail/recurring-suppliers/edp/always-import");
+    expect(JSON.parse(String(call[1].body))).toEqual({ id: 1 });
+    const t = mocks.toast.mock.calls.at(-1)![0];
+    expect(t.title).toBe("EDP Comercial receipts will now import automatically");
+    expect(t.description).toBe("3 added");
+    render(t.action);
+    fireEvent.click(screen.getByTestId("toast-action-manage"));
+    expect(mocks.navigate).toHaveBeenCalledWith("/profile/recurring");
+  });
+
+  it("a decided (off) supplier keeps the normal Accept card", async () => {
+    mount(paid, undefined, [make(1, { recurring: { supplierKey: "edp", displayName: "EDP", kind: "utility", category: "Home", status: "off", pendingCount: 1 } })]);
+    await screen.findByTestId("pending-home-card");
+    expect(screen.queryByTestId("pending-recurring-banner")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Accept$/ })).toBeInTheDocument();
   });
 });

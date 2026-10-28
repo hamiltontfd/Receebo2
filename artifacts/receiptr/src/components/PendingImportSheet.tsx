@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Check, Clock, FileText, Loader2, Mail, Package, Scale, Sparkles, X, AlertTriangle } from "lucide-react";
+import { Check, Clock, FileText, Layers, Loader2, Mail, Package, Repeat, Scale, Sparkles, AlertTriangle } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -17,8 +17,8 @@ import { hasNoConsumerDates, type PurchaseType } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
 import { TRIAL_CAP_BUTTON, TRIAL_CAP_MESSAGE, SUBSCRIBE_HREF } from "@/lib/trialCopy";
 import {
-  fetchPendingDetail, formatMoney, formatPurchaseDate, pendingDetailQueryKey,
-  type PendingImportDetail,
+  fetchPendingDetail, formatMoney, formatPurchaseDate, pendingDetailQueryKey, recurringTitle, undecidedRecurring,
+  type PendingImportDetail, type PendingRecurring,
 } from "@/lib/pendingImports";
 
 interface PendingImportSheetProps {
@@ -80,6 +80,28 @@ const NO_DATES_BADGE: Record<string, string> = {
   subscription: "Subscription", digital: "Digital", ticket: "Ticket", service: "Service",
 };
 
+/** Undecided recurring supplier: informational only (the footer has the actions). */
+function RecurringInfoCard({ recurring }: { recurring: PendingRecurring }) {
+  const others = recurring.pendingCount - 1;
+  return (
+    <div
+      className="rounded-2xl border border-violet-200 bg-violet-50/60 px-3.5 py-3 flex gap-2.5"
+      data-testid="pending-recurring-card"
+    >
+      <Repeat className="w-4 h-4 text-violet-700 shrink-0 mt-0.5" aria-hidden />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">{recurringTitle(recurring)}</p>
+        {others >= 1 && (
+          <p className="text-xs font-medium mt-1.5 flex items-center gap-1.5" data-testid="pending-recurring-count">
+            <Layers className="w-3 h-3" aria-hidden />
+            Also adds {others} more waiting here.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType }: {
   detail: PendingImportDetail;
   category: string;
@@ -104,9 +126,11 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
   });
   const noDates = hasNoConsumerDates(purchaseType);
   const suggested = (data.category ?? "Other") === category;
+  const recurring = undecidedRecurring(detail);
 
   return (
     <div className="px-5 py-5 space-y-5">
+      {recurring && <RecurringInfoCard recurring={recurring} />}
       <div className="rounded-2xl border border-violet-200 bg-violet-50/60 px-4 py-3 flex items-center gap-3">
         <span className="w-9 h-9 rounded-xl bg-background border flex items-center justify-center shrink-0">
           <Mail className="w-4 h-4" />
@@ -145,6 +169,7 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
             ))}
           </SelectContent>
         </Select>
+        {!recurring && (<>
         <div className="flex items-center justify-between gap-3 pt-2 mt-2 border-t">
           <label htmlFor="pending-switch-subscription" className="text-sm font-medium flex items-center gap-2">
             This is a subscription
@@ -164,6 +189,7 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
         {noDates && rights.notes[0] && (
           <p className="text-xs text-muted-foreground pt-1" data-testid="pending-no-dates-note">{rights.notes[0]}</p>
         )}
+        </>)}
       </div>
 
       {products.length > 0 && (
@@ -235,7 +261,7 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
   const isDesktop = useIsDesktop();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  const { approve, dismiss, busy } = usePendingImportActions();
+  const { approve, dismiss, alwaysImport, busy } = usePendingImportActions();
   const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, enabled: false });
   const atCap = isAtTrialCap(billing);
 
@@ -270,12 +296,27 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
     });
   };
 
+  // Supplier on + this receipt and all its pending ones; no review screen.
+  // On 409 (sync running) nothing changes and the sheet stays open.
+  const handleAlwaysImport = () => {
+    const recurring = undecidedRecurring(detail);
+    if (!detail || !recurring) return;
+    const picked = category !== (detail.extraction.category ?? "Other");
+    alwaysImport.mutate({ supplierKey: recurring.supplierKey, id: detail.id, ...(picked ? { category } : {}) }, {
+      onSuccess: () => {
+        queryClient.removeQueries({ queryKey: pendingDetailQueryKey(detail.id) });
+        onClose();
+      },
+    });
+  };
+
   const handleDismiss = () => {
     if (!detail) return;
     dismiss.mutate(detail.id, { onSuccess: onClose });
   };
 
   const data = detail?.extraction;
+  const recurring = undecidedRecurring(detail);
   const HeaderIcon = categoryIcon(category);
 
   return (
@@ -319,22 +360,17 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
               <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(category)}`}>
                 <HeaderIcon className="w-[1.1rem] h-[1.1rem]" />
               </span>
+              {/* No close X: tapping outside (or dragging) closes without deciding. */}
               <div className="min-w-0 flex-1">
-                <SheetTitle className="font-bold text-base leading-tight truncate">
-                  {data.merchant ?? detail.originalFileName}
-                </SheetTitle>
+                <div className="flex items-start justify-between gap-3">
+                  <SheetTitle className="font-bold text-base leading-5 truncate">
+                    {data.merchant ?? detail.originalFileName}
+                  </SheetTitle>
+                  <p className="font-bold font-mono leading-5 shrink-0" data-testid="pending-sheet-total">
+                    {formatMoney(data.total, data.currency)}
+                  </p>
+                </div>
                 <p className="text-xs text-muted-foreground">{formatPurchaseDate(data.purchaseDate)}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  aria-label="Close"
-                  className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <p className="font-bold font-mono">{formatMoney(data.total, data.currency)}</p>
               </div>
             </div>
 
@@ -367,15 +403,27 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
                   {dismiss.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Dismiss
                 </Button>
-                <Button
-                  className="flex-[1.4] rounded-full h-11"
-                  disabled={busy || atCap}
-                  onClick={handleAccept}
-                  data-testid="pending-sheet-accept"
-                >
-                  {approve.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                  Accept
-                </Button>
+                {recurring ? (
+                  <Button
+                    className="flex-[1.4] rounded-full h-11"
+                    disabled={busy || atCap}
+                    onClick={handleAlwaysImport}
+                    data-testid="pending-sheet-always-import"
+                  >
+                    {alwaysImport.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Repeat className="w-4 h-4 mr-2" />}
+                    Always import
+                  </Button>
+                ) : (
+                  <Button
+                    className="flex-[1.4] rounded-full h-11"
+                    disabled={busy || atCap}
+                    onClick={handleAccept}
+                    data-testid="pending-sheet-accept"
+                  >
+                    {approve.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                    Accept
+                  </Button>
+                )}
               </div>
             </div>
           </>

@@ -44,6 +44,29 @@ export interface PendingImportItem {
   notableCount?: number;
   /** Detected purchase type (subscription/digital/ticket/service get no dates); null = not detected. */
   purchaseType?: PurchaseType | null;
+  /** Recurring supplier this receipt belongs to (null: not recurring). */
+  recurring?: PendingRecurring | null;
+}
+
+export interface PendingRecurring {
+  supplierKey: string;
+  displayName: string;
+  kind: "subscription" | "utility";
+  category: string;
+  /** undecided: show the info card and Dismiss / Always import. */
+  status: "undecided" | "on" | "off";
+  /** Pending receipts from this supplier, this one included. */
+  pendingCount: number;
+}
+
+/** An undecided recurring supplier: Dismiss / Always import instead of Accept. */
+export function undecidedRecurring(item: Pick<PendingImportItem, "recurring"> | null | undefined): PendingRecurring | null {
+  return item?.recurring?.status === "undecided" ? item.recurring : null;
+}
+
+/** "{Supplier} looks like a subscription" / "… a recurring bill". */
+export function recurringTitle(r: Pick<PendingRecurring, "displayName" | "kind">): string {
+  return `${r.displayName} looks like ${r.kind === "utility" ? "a recurring bill" : "a subscription"}`;
 }
 
 export interface PendingTotal {
@@ -274,4 +297,71 @@ export const DISMISS_UNDER_EUR = 20;
 
 export function itemsUnder(items: PendingImportItem[], limit = DISMISS_UNDER_EUR): PendingImportItem[] {
   return items.filter((i) => i.currency === "EUR" && typeof i.total === "number" && i.total < limit);
+}
+
+// ── Recurring suppliers ("approve once") ────────────────────────────────────
+
+export const RECURRING_QUERY_KEY = ["mail", "recurring-suppliers"] as const;
+
+export interface RecurringSupplier {
+  supplierKey: string;
+  displayName: string;
+  kind: "subscription" | "utility";
+  category: string;
+  status: "undecided" | "on" | "off";
+  receiptCount: number;
+  lastReceiptDate: string | null;
+  lastAmount: number | null;
+  lastCurrency: string | null;
+  pendingCount: number;
+}
+
+export interface AlwaysImportResult {
+  supplier: RecurringSupplier;
+  approved: Array<{ id: number; receiptId: number }>;
+  skipped: number[];
+  code?: string;
+}
+
+const supplierUrl = (key: string) => `${BASE}api/mail/recurring-suppliers/${encodeURIComponent(key)}`;
+
+export async function fetchRecurringSuppliers(): Promise<RecurringSupplier[]> {
+  const res = await fetch(`${BASE}api/mail/recurring-suppliers`, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to load recurring suppliers");
+  return ((await res.json()) as { suppliers: RecurringSupplier[] }).suppliers;
+}
+
+/** Profile switch: on = import automatically, off = stop importing (future receipts only). */
+export async function setRecurringSupplierStatus(
+  { supplierKey, status }: { supplierKey: string; status: "on" | "off" },
+): Promise<RecurringSupplier> {
+  const res = await fetch(supplierUrl(supplierKey), {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error("Failed to update supplier");
+  return ((await res.json()) as { supplier: RecurringSupplier }).supplier;
+}
+
+/** "Always import": supplier on, plus this receipt and every pending one from it (trial slots only). */
+export async function alwaysImportSupplier(
+  { supplierKey, id, category }: { supplierKey: string; id?: number; category?: string },
+): Promise<AlwaysImportResult> {
+  const res = await fetch(`${supplierUrl(supplierKey)}/always-import`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...(id ? { id } : {}), ...(category ? { category } : {}) }),
+  });
+  if (!res.ok) {
+    const code = await errorCode(res);
+    if (res.status === 409 && code === SYNC_IN_PROGRESS_CODE) throw new SyncInProgressError();
+    if (res.status === 403 && (code === "trial_exhausted" || code === "TRIAL_UPLOAD_LIMIT")) {
+      throw new TrialCapError();
+    }
+    throw new Error("Failed to import from this supplier");
+  }
+  return res.json() as Promise<AlwaysImportResult>;
 }

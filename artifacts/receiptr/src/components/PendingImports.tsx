@@ -1,18 +1,16 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, X, Mail, Loader2, AlertTriangle, ChevronRight } from "lucide-react";
+import { Check, X, Mail, Loader2, AlertTriangle, ChevronRight, Repeat } from "lucide-react";
 import { Link } from "wouter";
-import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { useMailStatus } from "@/components/MailConnections";
 import { PendingImportSheet } from "@/components/PendingImportSheet";
-import { MAIL_PROVIDER_LABELS } from "@/lib/mailConnection";
 import { BILLING_QUERY_KEY, isAtTrialCap, type BillingStatus } from "@/hooks/useBilling";
 import { usePendingImportActions } from "@/hooks/usePendingImportActions";
 import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON, SUBSCRIBE_HREF } from "@/lib/trialCopy";
 import { categoryIcon, categoryStyle } from "@/lib/categories";
 import {
-  PENDING_QUERY_KEY, fetchPending, formatMoney, formatPurchaseDate, itemsSummary,
+  PENDING_QUERY_KEY, fetchPending, formatMoney, formatPurchaseDate, itemsSummary, recurringTitle, undecidedRecurring,
   type PendingImportItem, type PendingList,
 } from "@/lib/pendingImports";
 
@@ -36,7 +34,7 @@ export function usePendingImportCount() {
 
 /** The one card shown on the home screen: the highest-ranked pending receipt. */
 export function PendingImportCard({
-  item, stacked, atCap, busy, onOpen, onAccept, onDismiss,
+  item, stacked, atCap, busy, onOpen, onAccept, onDismiss, onAlwaysImport,
 }: {
   item: PendingImportItem;
   stacked: boolean;
@@ -45,10 +43,12 @@ export function PendingImportCard({
   onOpen: () => void;
   onAccept: () => void;
   onDismiss: () => void;
+  /** Undecided recurring supplier: replaces Accept. */
+  onAlwaysImport?: () => void;
 }) {
   const Icon = categoryIcon(item.category);
   const summary = itemsSummary(item);
-  const provider = item.provider ? MAIL_PROVIDER_LABELS[item.provider] : null;
+  const recurring = onAlwaysImport ? undecidedRecurring(item) : null;
   return (
     <div className="relative" data-testid="pending-home-card">
       <div className="relative z-10 rounded-2xl border bg-background p-4 shadow-sm">
@@ -77,12 +77,16 @@ export function PendingImportCard({
             </span>
             {summary && <span className="text-sm truncate">{summary}</span>}
           </div>
-          <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-            <Mail className="w-3 h-3" />
-            {provider && <>{provider} · </>}
-            Found {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
-          </p>
         </button>
+        {recurring && (
+          <div
+            className="mt-3 rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-2.5 flex items-center gap-2"
+            data-testid="pending-recurring-banner"
+          >
+            <Repeat className="w-4 h-4 text-violet-700 shrink-0" aria-hidden />
+            <p className="text-xs font-semibold">{recurringTitle(recurring)}</p>
+          </div>
+        )}
         <div className="flex items-center gap-2 mt-3">
           <Button
             variant="secondary"
@@ -94,15 +98,28 @@ export function PendingImportCard({
             <X className="w-4 h-4 mr-1.5" />
             Dismiss
           </Button>
-          <Button
-            className="flex-1 rounded-full h-10"
-            disabled={atCap || busy}
-            onClick={onAccept}
-            title={atCap ? TRIAL_CAP_MESSAGE : "Add to library"}
-          >
-            <Check className="w-4 h-4 mr-1.5" />
-            Accept
-          </Button>
+          {recurring ? (
+            <Button
+              className="flex-1 rounded-full h-10"
+              disabled={atCap || busy}
+              onClick={onAlwaysImport}
+              title={atCap ? TRIAL_CAP_MESSAGE : "Import this and future receipts automatically"}
+              data-testid="pending-card-always-import"
+            >
+              <Repeat className="w-4 h-4 mr-1.5" />
+              Always import
+            </Button>
+          ) : (
+            <Button
+              className="flex-1 rounded-full h-10"
+              disabled={atCap || busy}
+              onClick={onAccept}
+              title={atCap ? TRIAL_CAP_MESSAGE : "Add to library"}
+            >
+              <Check className="w-4 h-4 mr-1.5" />
+              Accept
+            </Button>
+          )}
         </div>
       </div>
       {stacked && (
@@ -125,7 +142,7 @@ export default function PendingImports() {
   const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, enabled: false });
   const atCap = isAtTrialCap(billing);
   const { data, isLoading } = usePendingImports();
-  const { approve, dismiss, busy } = usePendingImportActions();
+  const { approve, dismiss, alwaysImport, busy } = usePendingImportActions();
   const [openId, setOpenId] = useState<number | null>(null);
 
   const { data: mailStatus } = useMailStatus();
@@ -231,6 +248,10 @@ export default function PendingImports() {
             onOpen={() => setOpenId(top.id)}
             onAccept={() => approve.mutate({ id: top.id })}
             onDismiss={() => dismiss.mutate(top.id)}
+            onAlwaysImport={() => {
+              const r = undecidedRecurring(top);
+              if (r) alwaysImport.mutate({ supplierKey: r.supplierKey, id: top.id });
+            }}
           />
         </>
       )}
