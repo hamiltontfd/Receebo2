@@ -181,7 +181,8 @@ export const outlookProvider: MailProvider = {
     }
   },
 
-  listCandidateMessageIds: (accessToken, since) => listOutlookCandidateIds(accessToken, { since }),
+  listCandidateMessageIds: (accessToken, since, filter) =>
+    listOutlookCandidateIds(accessToken, { since, senderDecision: filter?.senderDecision }),
   getMessage: (accessToken, messageId) => getOutlookMessage(accessToken, messageId),
   downloadAttachment: (accessToken, messageId, attachmentId) =>
     downloadOutlookAttachment(accessToken, messageId, attachmentId),

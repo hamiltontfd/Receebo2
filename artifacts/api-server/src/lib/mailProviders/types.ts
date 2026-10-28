@@ -43,7 +43,7 @@ export interface MailProvider {
    * mailSync.ts syncWindowStart: last complete sync minus an overlap, at most
    * 90 days back).
    */
-  listCandidateMessageIds(accessToken: string, since: Date): Promise<string[]>;
+  listCandidateMessageIds(accessToken: string, since: Date, options?: ListCandidatesFilter): Promise<string[]>;
   getMessage(accessToken: string, messageId: string): Promise<MailMessage | null>;
   downloadAttachment(
     accessToken: string,
@@ -101,4 +101,10 @@ export function isReconnectRequiredError(error: unknown): boolean {
   return candidates.some(
     (value) => typeof value === "string" && RECONNECT_ERROR_CODES.has(value),
   );
+}
+
+/** Per-user sender decisions applied while listing (recurring suppliers). */
+export interface ListCandidatesFilter {
+  /** "on": import even utility/everyday senders; "off": never list; null: default rules. */
+  senderDecision?: (from: string | null) => "on" | "off" | null;
 }

@@ -239,6 +239,8 @@ export interface ListCandidatesOptions extends GraphClientOptions {
   since?: Date;
   /** Window length when `since` is not given (default 90). */
   days?: number;
+  /** Recurring supplier decisions: "off" senders are never listed, "on" senders skip the everyday filter. */
+  senderDecision?: (from: string | null) => "on" | "off" | null;
   /** Max messages scanned (listing pages) per run. */
   maxScanned?: number;
   /** Max candidate IDs returned per run. */
@@ -273,11 +275,14 @@ export async function listOutlookCandidateIds(
       await graphGet(accessToken, url, options);
     for (const message of page.value ?? []) {
       scanned++;
+      const from = formatGraphSender(message.from);
+      const decision = options.senderDecision?.(from) ?? null;
+      if (decision === "off") continue;
       const listing = scoreReceiptListing({
         subject: message.subject ?? null,
-        from: formatGraphSender(message.from),
+        from,
         hasAttachments: message.hasAttachments,
-      });
+      }, { allowEveryday: decision === "on" });
       if (listing.include) {
         candidates.push({ id: message.id, score: listing.score, order: candidates.length });
         if (candidates.length >= maxCandidates) break;

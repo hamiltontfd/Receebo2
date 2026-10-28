@@ -174,6 +174,20 @@ describe("Microsoft Graph client", () => {
     expect(await listOutlookCandidateIds("AT", { fetchImpl })).toEqual(["worten", "amazon", "unknown"]);
   });
 
+  it("recurring suppliers: lists an 'on' utility sender, never an 'off' one", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse(200, {
+      value: [
+        { id: "edp", subject: "Fatura", from: { emailAddress: { name: "EDP Comercial", address: "faturas@edp.pt" } } },
+        { id: "netflix", subject: "Your receipt", from: { emailAddress: { name: "Netflix", address: "info@account.netflix.com" } } },
+        { id: "worten", subject: "Fatura da encomenda", from: { emailAddress: { address: "faturas@worten.pt" } } },
+      ],
+    }));
+    const senderDecision = (from: string | null) =>
+      from?.includes("edp.pt") ? "on" as const : from?.includes("netflix.com") ? "off" as const : null;
+    const ids = await listOutlookCandidateIds("AT", { fetchImpl, senderDecision });
+    expect([...ids].sort()).toEqual(["edp", "worten"]);
+  });
+
   it("stops at the per-run candidate cap", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, {
       value: Array.from({ length: 50 }, (_, i) => ({ id: `m${i}`, subject: "Your order" })),

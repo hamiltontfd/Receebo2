@@ -75,6 +75,15 @@ const TIER_SCORE: Record<Exclude<MerchantTier, "everyday">, number> = {
   marketplace: 15,
 };
 
+export interface ListingOptions {
+  /**
+   * The sender is a recurring supplier the user set to "Always import"
+   * (lib/recurringSuppliers.ts): its bills are imported even though utility
+   * and everyday senders are skipped otherwise.
+   */
+  allowEveryday?: boolean;
+}
+
 export interface ListingScore {
   /** false = never sent to the AI (not receipt-like, everyday/utility, marketing, shipping-only). */
   include: boolean;
@@ -91,12 +100,12 @@ export function scoreReceiptListing(input: {
   subject: string | null;
   from: string | null;
   hasAttachments?: boolean;
-}): ListingScore {
+}, options: ListingOptions = {}): ListingScore {
   if (!looksLikeReceiptEmail(input)) return { include: false, score: 0, reason: "not_receipt_like" };
-  const tier = merchantTier(input.from);
+  const tier = options.allowEveryday ? null : merchantTier(input.from);
   if (tier === "everyday") return { include: false, score: 0, reason: "everyday_sender" };
   const subject = input.subject ?? "";
-  if (UTILITY_SUBJECT_PATTERN.test(subject)) return { include: false, score: 0, reason: "utility_bill" };
+  if (!options.allowEveryday && UTILITY_SUBJECT_PATTERN.test(subject)) return { include: false, score: 0, reason: "utility_bill" };
   if (CARRIER_SENDER_PATTERN.test(input.from ?? "")) return { include: false, score: 0, reason: "carrier" };
   let score = 10;
   if (tier) score += TIER_SCORE[tier];
@@ -139,10 +148,11 @@ export const MAX_BODY_TEXT_LENGTH = 20_000;
  *   usable body → send the body text to the AI;
  * - otherwise skip.
  */
-export function planMessageImport(message: MailMessage): MessageImportPlan {
+export function planMessageImport(message: MailMessage, options: ListingOptions = {}): MessageImportPlan {
   // Groceries, utilities, telecoms and other recurring bills never reach the
-  // AI, even with a PDF attached (e.g. an EDP or Continente invoice).
-  const listing = scoreReceiptListing({ ...message, hasAttachments: message.pdfAttachments.length > 0 });
+  // AI, even with a PDF attached (e.g. an EDP or Continente invoice), unless
+  // the user set that supplier to import automatically.
+  const listing = scoreReceiptListing({ ...message, hasAttachments: message.pdfAttachments.length > 0 }, options);
   if (listing.reason === "everyday_sender" || listing.reason === "utility_bill") {
     return { kind: "skip", reason: listing.reason };
   }

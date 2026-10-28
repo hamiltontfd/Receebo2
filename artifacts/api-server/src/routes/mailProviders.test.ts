@@ -252,7 +252,7 @@ describe("Outlook routes", () => {
     try {
       const res = await realFetch(`${base}/outlook/sync`, { method: "POST" });
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ checked: 0, queued: 0 });
+      expect(await res.json()).toEqual({ checked: 0, queued: 0, autoImported: 0 });
       expect(state.updates).toContainEqual(expect.objectContaining({
         accessToken: "enc(AT2)", refreshToken: "enc(RT2)", status: "active",
       }));

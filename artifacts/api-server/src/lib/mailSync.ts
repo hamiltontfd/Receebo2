@@ -18,6 +18,12 @@
  *     outcome, so transient failures retry on the next sync.
  *
  * Dedupe key: (user, provider, message id, attachment id | "body:html").
+ *
+ * Recurring suppliers (lib/recurringSuppliers.ts): mail from a supplier the
+ * user switched off is skipped (before any AI read when the sender is known,
+ * otherwise right after extraction); receipts from a supplier set to "Always
+ * import" are accepted straight away (utility bills included) unless the
+ * no-card trial has no slots left, in which case they stay pending.
  */
 import { randomUUID } from "crypto";
 import { db } from "@workspace/db";
@@ -41,12 +47,17 @@ import {
 import { isAccountDeletionInProgress } from "./accountDeletionState";
 import { withUserDataLock } from "./userDataLock";
 import { planMessageImport } from "./mailProviders/candidates";
-import { isEverydayMerchantName } from "./mailProviders/merchants";
+import { isEverydayMerchantName, senderDomain } from "./mailProviders/merchants";
 import { aiReadCapApplies, claimTrialAiRead, trialAiReadsRemaining } from "./trialAiReads";
 import { renderTextPdf } from "./textPdf";
 import { resolvePurchaseType } from "./purchaseType";
 import { clearMailImportFailure, failureText, recordMailImportFailure } from "./mailImportFailures";
 import type { MailMessage, MailProvider } from "./mailProviders/types";
+import { loadSupplierRules, rememberSupplierDomain, type SupplierRules } from "./recurringSuppliers";
+import { approvePendingBatch, checkApproveAccess } from "./pendingApproval";
+import type { RecurringSupplierRow } from "@workspace/db";
+
+const NO_SUPPLIER_RULES: SupplierRules = { forSender: () => null, forReceipt: () => null };
 
 export const HTML_BODY_ATTACHMENT_ID = "body:html";
 /** Cost guard: max AI extractions of email bodies per mailbox per run. */
@@ -75,6 +86,8 @@ export function syncWindowStart(lastSyncedAt: Date | null, now: number = Date.no
 export interface MailSyncResult {
   checked: number;
   queued: number;
+  /** Of `queued`, accepted automatically for "Always import" suppliers. */
+  autoImported?: number;
 }
 
 async function cleanupSyncObject(
@@ -134,6 +147,7 @@ function toPendingExtractionData(
   return {
     purchaseType,
     purchaseTypeSource,
+    senderDomain: senderDomain(message.from),
     merchant: extraction.merchant,
     purchaseDate: extraction.purchaseDate,
     total: extraction.total,
@@ -308,9 +322,18 @@ export async function syncMailboxClaimed(
   // Taken before listing: mail arriving during this run is inside the next window.
   const startedAt = new Date();
   const since = syncWindowStart(await provider.getLastSyncedAt(userId), startedAt.getTime());
+  // Without the rules (DB hiccup) the sync falls back to the default filters:
+  // nothing is auto-accepted and new mail lands in pending as usual.
+  let supplierRules: SupplierRules = NO_SUPPLIER_RULES;
+  try {
+    supplierRules = await loadSupplierRules(userId);
+  } catch (err) {
+    logger.warn({ err, userId }, `${label} sync: recurring supplier rules unavailable`);
+  }
+  const senderDecision = (from: string | null) => (supplierRules.forSender(from)?.status as "on" | "off" | undefined) ?? null;
   let messageIds: string[];
   try {
-    messageIds = await provider.listCandidateMessageIds(accessToken, since);
+    messageIds = await provider.listCandidateMessageIds(accessToken, since, { senderDecision });
   } catch (err) {
     logger.error({ err, userId }, `${label} sync: failed to list messages`);
     throw new Error(`Failed to list ${label} messages`, { cause: err });
@@ -318,6 +341,7 @@ export async function syncMailboxClaimed(
 
   let checked = 0;
   let queued = 0;
+  let autoImported = 0;
   let bodyExtractions = 0;
   let prechecks = 0;
   /** False once a listed message is left unseen for a later run. */
@@ -356,7 +380,14 @@ export async function syncMailboxClaimed(
       continue;
     }
 
-    const plan = planMessageImport(message);
+    const senderRule = supplierRules.forSender(message.from);
+    if (senderRule?.status === "off") {
+      // Supplier switched off in Profile: no AI read, no pending item.
+      logger.info({ userId, messageId }, `${label} sync: recurring supplier is off, skipping`);
+      await markSeen(provider, userId, messageId);
+      continue;
+    }
+    const plan = planMessageImport(message, { allowEveryday: senderRule?.status === "on" });
     if (plan.kind === "skip") {
       await markSeen(provider, userId, messageId);
       continue;
@@ -370,7 +401,7 @@ export async function syncMailboxClaimed(
 
     for (const unit of units) {
       if (await isAccountDeletionInProgress(userId)) {
-        return { checked, queued };
+        return { checked, queued, autoImported };
       }
 
       if (aiReadCap && (await trialAiReadsRemaining(userId)) < 1) {
@@ -378,7 +409,7 @@ export async function syncMailboxClaimed(
         // message stays unseen so it can be imported after subscribing, and
         // lastSyncedAt stays put so the next window still covers it.
         logger.info({ userId }, `${label} sync: trial AI read limit reached, stopping`);
-        return { checked, queued };
+        return { checked, queued, autoImported };
       }
 
       if (unit.kind === "html" && bodyExtractions >= MAX_BODY_EXTRACTIONS_PER_RUN) {
@@ -445,13 +476,13 @@ export async function syncMailboxClaimed(
 
         if (await isAccountDeletionInProgress(userId)) {
           await cleanupSyncObject(provider, userId, objectPath, "account deletion began");
-          return { checked, queued };
+          return { checked, queued, autoImported };
         }
 
         if (aiReadCap && !(await claimTrialAiRead(userId, "email", messageId))) {
           await cleanupSyncObject(provider, userId, objectPath, "trial AI read limit");
           await db.delete(pendingImportsTable).where(ownedClaim);
-          return { checked, queued };
+          return { checked, queued, autoImported };
         }
         try {
           extraction = await extractReceiptData(objectPath, "application/pdf");
@@ -466,7 +497,7 @@ export async function syncMailboxClaimed(
       } else {
         if (aiReadCap && !(await claimTrialAiRead(userId, "email", messageId))) {
           await db.delete(pendingImportsTable).where(ownedClaim);
-          return { checked, queued };
+          return { checked, queued, autoImported };
         }
         bodyExtractions++;
         try {
@@ -484,7 +515,15 @@ export async function syncMailboxClaimed(
         }
       }
 
-      const everyday = extraction.isReceipt && isEverydayExtraction(extraction);
+      const supplierRule = supplierRules.forReceipt(extraction.merchant, senderDomain(message.from)) ?? senderRule;
+      if (extraction.isReceipt && supplierRule?.status === "off") {
+        logger.info({ userId, messageId }, `${label} sync: recurring supplier is off, discarding`);
+        if (objectPath) await cleanupSyncObject(provider, userId, objectPath, "recurring supplier off");
+        const [deletedClaim] = await db.delete(pendingImportsTable).where(ownedClaim).returning({ id: pendingImportsTable.id });
+        if (!deletedClaim) retryableFailure = true;
+        continue;
+      }
+      const everyday = extraction.isReceipt && isEverydayExtraction(extraction) && supplierRule?.status !== "on";
       if (!extraction.isReceipt || everyday) {
         logger.info(
           { messageId, source: unit.kind, everyday },
@@ -524,7 +563,7 @@ export async function syncMailboxClaimed(
         if (await isAccountDeletionInProgress(userId)) {
           await cleanupSyncObject(provider, userId, storedPath, "account deletion began");
           await db.delete(pendingImportsTable).where(ownedClaim);
-          return { checked, queued };
+          return { checked, queued, autoImported };
         }
 
         const [queuedImport] = await db
@@ -547,6 +586,10 @@ export async function syncMailboxClaimed(
           { userId, messageId, source: unit.kind },
           `${label} sync: receipt queued as pending import`,
         );
+        if (supplierRule?.status === "on" &&
+            await autoImportForSupplier(userId, queuedImport.id, supplierRule, senderDomain(message.from), logger)) {
+          autoImported++;
+        }
       } catch (err) {
         logger.error({ err, userId }, `${label} sync: failed to store pending import`);
         retryableFailure = true;
@@ -583,8 +626,36 @@ export async function syncMailboxClaimed(
       `${label} sync: messages left for a later run, keeping the search window anchored`,
     );
   }
-  logger.info({ userId, checked, queued, complete }, `${label} sync complete`);
-  return { checked, queued };
+  logger.info({ userId, checked, queued, autoImported, complete }, `${label} sync complete`);
+  return { checked, queued, autoImported };
+}
+
+/**
+ * "Always import" supplier: accept the just-queued import right away. With
+ * the no-card trial full (or no access) it stays pending, as usual.
+ */
+async function autoImportForSupplier(
+  userId: string,
+  importId: number,
+  supplier: RecurringSupplierRow,
+  domain: string | null,
+  logger: MailProvider["logger"],
+): Promise<boolean> {
+  try {
+    const access = await checkApproveAccess(userId);
+    if (!access.ok) return false;
+    const { approved } = await approvePendingBatch(userId, [{ id: importId }], access.trial,
+      () => supplier.category ?? undefined);
+    await rememberSupplierDomain(supplier, domain);
+    if (approved.length > 0) {
+      logger.info({ userId, importId, receiptId: approved[0]!.receiptId, supplier: supplier.supplierKey },
+        "Mail sync: receipt imported automatically (recurring supplier)");
+    }
+    return approved.length > 0;
+  } catch (err) {
+    logger.warn({ err, userId, importId }, "Mail sync: automatic import failed; left pending");
+    return false;
+  }
 }
 
 /** Lock the user's data, check upload access, then sync one provider. */
