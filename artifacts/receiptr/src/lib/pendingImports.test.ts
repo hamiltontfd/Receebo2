@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  bulkApprovePending, groupByMonth, itemsSummary, itemsUnder, formatTotals, type PendingImportItem,
+  bulkApprovePending, groupByMonth, itemCountLabel, itemsSummary, itemsUnder, formatTotals, type PendingImportItem,
 } from "./pendingImports";
 
 const make = (id: number, over: Partial<PendingImportItem> = {}): PendingImportItem => ({
@@ -27,6 +27,17 @@ describe("pending import helpers", () => {
     expect(itemsSummary({ firstItemName: "Soundbar", productCount: 2, summary: null })).toBe("Soundbar + 1 more");
     expect(itemsSummary({ firstItemName: "Soundbar", productCount: 1, summary: null })).toBe("Soundbar");
     expect(itemsSummary({ firstItemName: null, productCount: 0, summary: "Cinema tickets" })).toBe("Cinema tickets");
+  });
+
+  it("counts receipt lines, never summed quantities or weights", () => {
+    expect(itemCountLabel({ productCount: 1, itemCount: 1 })).toBe("1 item");
+    expect(itemCountLabel({ productCount: 3, itemCount: 3 })).toBe("3 items");
+    // An older server summed quantities incl. kg weights: the line count wins.
+    expect(itemCountLabel({ productCount: 12, itemCount: 84.305 })).toBe("12 items");
+    expect(itemCountLabel({ itemCount: 2 })).toBe("2 items");
+    expect(itemCountLabel({ itemCount: 32.144999999999996 })).toBeNull();
+    expect(itemCountLabel({ productCount: 0, itemCount: 0 })).toBeNull();
+    expect(itemCountLabel({})).toBeNull();
   });
 
   it("selects only EUR items with a known total under €20", () => {

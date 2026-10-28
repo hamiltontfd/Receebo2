@@ -24,7 +24,7 @@ const ITEMS = [
   make(1, { merchant: "Casa Lumen", total: 349, purchaseDate: "2026-10-25" }),
   make(2, { merchant: "Casa & Jardim", total: 189.9, purchaseDate: "2026-10-22", category: "Home" }),
   make(3, { merchant: "Sala Aurora", total: 18.4, purchaseDate: "2026-10-24", category: "Entertainment" }),
-  make(4, { merchant: "Mercado Verde", total: 12.35, purchaseDate: "2026-09-20", category: "Groceries" }),
+  make(4, { merchant: "Mercado Verde", total: 12.35, purchaseDate: "2026-09-20", category: "Groceries", itemCount: 40.27, productCount: 14 }),
 ];
 
 function mount(billing: Record<string, unknown>) {
@@ -57,6 +57,14 @@ describe("/imports", () => {
     expect(october).toHaveTextContent("3 items · €557.30");
     expect(screen.getByTestId("month-2026-09")).toHaveTextContent("1 item · €12.35");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Found in your email (4)");
+  });
+
+  it("shows the number of receipt lines on each row, not summed weights", async () => {
+    mount(paid);
+    const september = await screen.findByTestId("month-2026-09");
+    expect(september).toHaveTextContent("14 items");
+    expect(september).not.toHaveTextContent("40.27");
+    expect(screen.getByTestId("month-2026-10")).toHaveTextContent("1 item");
   });
 
   it("selects items and accepts the selection in one bulk call", async () => {

@@ -36,7 +36,7 @@ export interface PendingImportItem {
   category: string | null;
   summary: string | null;
   createdAt: string;
-  /** Sum of item quantities (absent on older servers). */
+  /** Number of line items (older servers sent summed quantities; prefer productCount). */
   itemCount?: number;
   firstItemName?: string | null;
   productCount?: number;
@@ -214,8 +214,10 @@ export function formatPurchaseDate(iso: string | null | undefined): string | nul
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function itemCountLabel(n: number | undefined): string | null {
-  if (!n) return null;
+/** "1 item" / "3 items": the number of receipt lines, never summed quantities or weights. */
+export function itemCountLabel(item: Pick<PendingImportItem, "productCount" | "itemCount">): string | null {
+  const n = item.productCount ?? item.itemCount;
+  if (typeof n !== "number" || !Number.isInteger(n) || n < 1) return null;
   return `${n} item${n === 1 ? "" : "s"}`;
 }
 

@@ -53,12 +53,12 @@ export function rankPendingImports<T extends RankablePendingImport>(rows: readon
   return [...rows].sort(comparePendingImports);
 }
 
-/** Sum of item quantities (a line without a quantity counts as 1). */
+/**
+ * Number of line items on the receipt. Quantities are not summed: grocery
+ * lines carry weights (0.305 kg), which made "84.305 items".
+ */
 export function pendingItemCount(data: PendingImportExtractionData | null): number {
-  return (data?.products ?? []).reduce(
-    (sum, p) => sum + (typeof p.quantity === "number" && p.quantity > 0 ? p.quantity : 1),
-    0,
-  );
+  return data?.products?.length ?? 0;
 }
 
 export interface PendingTotal {

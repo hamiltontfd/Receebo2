@@ -51,7 +51,7 @@ function PendingRow({
   onDismiss: () => void;
 }) {
   const Icon = categoryIcon(item.category);
-  const meta = [formatPurchaseDate(item.purchaseDate), itemCountLabel(item.itemCount)].filter(Boolean).join(" · ");
+  const meta = [formatPurchaseDate(item.purchaseDate), itemCountLabel(item)].filter(Boolean).join(" · ");
   return (
     <li
       data-testid={`pending-row-${item.id}`}
