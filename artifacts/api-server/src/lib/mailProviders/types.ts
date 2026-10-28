@@ -38,15 +38,28 @@ export interface MailProvider {
    * token (the connection is marked needs_reconnect before throwing).
    */
   getAccessToken(userId: string): Promise<string | null>;
-  /** Message IDs of likely receipts from the last 90 days. */
-  listCandidateMessageIds(accessToken: string): Promise<string[]>;
+  /**
+   * Message IDs of likely receipts received on or after `since` (see
+   * mailSync.ts syncWindowStart: last complete sync minus an overlap, at most
+   * 90 days back).
+   */
+  listCandidateMessageIds(accessToken: string, since: Date): Promise<string[]>;
   getMessage(accessToken: string, messageId: string): Promise<MailMessage | null>;
   downloadAttachment(
     accessToken: string,
     messageId: string,
     attachmentId: string,
   ): Promise<Buffer>;
-  markSynced(userId: string): Promise<void>;
+  /**
+   * When the last complete sync started (null before the first one). It
+   * anchors the next sync's search window.
+   */
+  getLastSyncedAt(userId: string): Promise<Date | null>;
+  /**
+   * Record a complete sync. `syncedAt` is when that run started listing, so
+   * mail that arrived while it ran is still inside the next window.
+   */
+  markSynced(userId: string, syncedAt: Date): Promise<void>;
 }
 
 /** Thrown when the user must reconnect the mailbox (invalid_grant etc.). */

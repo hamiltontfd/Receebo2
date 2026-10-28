@@ -552,8 +552,9 @@ export function gmailPayloadToMessage(
 /** Max message IDs considered per Gmail run (seen ones are skipped cheaply). */
 const GMAIL_MAX_CANDIDATES_PER_RUN = 500;
 
-export function buildGmailSearchQuery(now = Date.now()): string {
-  const afterEpoch = Math.floor((now - 90 * 24 * 60 * 60 * 1000) / 1000);
+/** Gmail search for receipt-like mail received on or after `since`. */
+export function buildGmailSearchQuery(since: Date): string {
+  const afterEpoch = Math.floor(since.getTime() / 1000);
   // Receipt-like subjects (with or without PDF) plus well-known order
   // senders. PDF attachments are imported as before; order emails without a
   // PDF go through HTML-body extraction.
@@ -610,8 +611,8 @@ export const gmailProvider: MailProvider = {
     }
   },
 
-  async listCandidateMessageIds(accessToken) {
-    const q = encodeURIComponent(buildGmailSearchQuery());
+  async listCandidateMessageIds(accessToken, since) {
+    const q = encodeURIComponent(buildGmailSearchQuery(since));
     const messageIds: string[] = [];
     let pageToken: string | undefined;
     do {
@@ -647,10 +648,19 @@ export const gmailProvider: MailProvider = {
     return Buffer.from(att.data, "base64url");
   },
 
-  async markSynced(userId) {
+  async getLastSyncedAt(userId) {
+    const [row] = await db
+      .select({ lastSyncedAt: gmailConnectionsTable.lastSyncedAt })
+      .from(gmailConnectionsTable)
+      .where(eq(gmailConnectionsTable.userId, userId))
+      .limit(1);
+    return row?.lastSyncedAt ?? null;
+  },
+
+  async markSynced(userId, syncedAt) {
     await db
       .update(gmailConnectionsTable)
-      .set({ lastSyncedAt: new Date(), updatedAt: new Date() })
+      .set({ lastSyncedAt: syncedAt, updatedAt: new Date() })
       .where(eq(gmailConnectionsTable.userId, userId));
   },
 };

@@ -1,7 +1,13 @@
 /**
  * Provider-neutral email import pipeline (Gmail, Outlook, ...).
  *
- * For each candidate message (last 90 days, receipt-like):
+ * Candidates are receipt-like messages received since the last complete sync
+ * (minus a 1 h overlap; 90 days on the first sync, never more than 90 days).
+ * A run is complete when no listed message was left unseen for later; only
+ * then does lastSyncedAt move, so deferred, failed or trial-limited messages
+ * stay inside the next window.
+ *
+ * For each candidate message:
  *   - skip if already recorded in gmail_seen_messages for this provider;
  *   - PDF attachments → upload, AI extraction, pending import (same as the
  *     original Gmail logic);
@@ -48,6 +54,22 @@ export const MAX_BODY_EXTRACTIONS_PER_RUN = 25;
 export const MAX_PRECHECKS_PER_RUN = 100;
 
 const objectStorageService = new ObjectStorageService();
+
+/** Oldest mail any sync looks at (also the first sync's window). */
+export const MAIL_SYNC_MAX_WINDOW_DAYS = 90;
+/** Re-list this much before the last complete sync (late delivery, clock skew). */
+export const MAIL_SYNC_OVERLAP_MS = 60 * 60 * 1000;
+
+/**
+ * Start of a sync's search window: the last complete sync minus the overlap,
+ * or 90 days back when there was none; never older than 90 days.
+ */
+export function syncWindowStart(lastSyncedAt: Date | null, now: number = Date.now()): Date {
+  const oldest = now - MAIL_SYNC_MAX_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const last = lastSyncedAt?.getTime();
+  if (last === undefined || Number.isNaN(last)) return new Date(oldest);
+  return new Date(Math.max(oldest, Math.min(last, now) - MAIL_SYNC_OVERLAP_MS));
+}
 
 export interface MailSyncResult {
   checked: number;
@@ -274,9 +296,12 @@ export async function syncMailboxClaimed(
   const accessToken = await provider.getAccessToken(userId);
   if (!accessToken) return { checked: 0, queued: 0 };
 
+  // Taken before listing: mail arriving during this run is inside the next window.
+  const startedAt = new Date();
+  const since = syncWindowStart(await provider.getLastSyncedAt(userId), startedAt.getTime());
   let messageIds: string[];
   try {
-    messageIds = await provider.listCandidateMessageIds(accessToken);
+    messageIds = await provider.listCandidateMessageIds(accessToken, since);
   } catch (err) {
     logger.error({ err, userId }, `${label} sync: failed to list messages`);
     throw new Error(`Failed to list ${label} messages`, { cause: err });
@@ -286,6 +311,8 @@ export async function syncMailboxClaimed(
   let queued = 0;
   let bodyExtractions = 0;
   let prechecks = 0;
+  /** False once a listed message is left unseen for a later run. */
+  let complete = true;
 
   for (const messageId of messageIds) {
     const [alreadySeen] = await db
@@ -311,6 +338,7 @@ export async function syncMailboxClaimed(
       message = await provider.getMessage(accessToken, messageId);
     } catch (err) {
       logger.warn({ err, messageId, userId }, `${label} sync: failed to fetch message`);
+      complete = false;
       continue;
     }
 
@@ -338,9 +366,9 @@ export async function syncMailboxClaimed(
 
       if (aiReadCap && (await trialAiReadsRemaining(userId)) < 1) {
         // Trial AI budget used up: stop before spending anything else. The
-        // message stays unseen so it can be imported after subscribing.
+        // message stays unseen so it can be imported after subscribing, and
+        // lastSyncedAt stays put so the next window still covers it.
         logger.info({ userId }, `${label} sync: trial AI read limit reached, stopping`);
-        await provider.markSynced(userId);
         return { checked, queued };
       }
 
@@ -414,7 +442,6 @@ export async function syncMailboxClaimed(
         if (aiReadCap && !(await claimTrialAiRead(userId, "email", messageId))) {
           await cleanupSyncObject(provider, userId, objectPath, "trial AI read limit");
           await db.delete(pendingImportsTable).where(ownedClaim);
-          await provider.markSynced(userId);
           return { checked, queued };
         }
         try {
@@ -430,7 +457,6 @@ export async function syncMailboxClaimed(
       } else {
         if (aiReadCap && !(await claimTrialAiRead(userId, "email", messageId))) {
           await db.delete(pendingImportsTable).where(ownedClaim);
-          await provider.markSynced(userId);
           return { checked, queued };
         }
         bodyExtractions++;
@@ -531,15 +557,24 @@ export async function syncMailboxClaimed(
         await markSeen(provider, userId, messageId);
         logger.warn({ userId, messageId, attempts }, `${label} sync: message failed ${attempts} times, giving up`);
       } else {
+        complete = false;
         logger.warn({ userId, messageId, attempts }, `${label} sync: message left retryable after transient failure`);
       }
     } else {
+      complete = false;
       logger.info({ userId, messageId }, `${label} sync: message deferred to the next run`);
     }
   }
 
-  await provider.markSynced(userId);
-  logger.info({ userId, checked, queued }, `${label} sync complete`);
+  if (complete) {
+    await provider.markSynced(userId, startedAt);
+  } else {
+    logger.info(
+      { userId, since: since.toISOString() },
+      `${label} sync: messages left for a later run, keeping the search window anchored`,
+    );
+  }
+  logger.info({ userId, checked, queued, complete }, `${label} sync complete`);
   return { checked, queued };
 }
 

@@ -235,6 +235,9 @@ export function formatGraphSender(from: GraphEmailAddress | null | undefined): s
 
 export interface ListCandidatesOptions extends GraphClientOptions {
   now?: number;
+  /** Window start; wins over `days`. */
+  since?: Date;
+  /** Window length when `since` is not given (default 90). */
   days?: number;
   /** Max messages scanned (listing pages) per run. */
   maxScanned?: number;
@@ -243,7 +246,8 @@ export interface ListCandidatesOptions extends GraphClientOptions {
 }
 
 /**
- * List likely receipt emails from the last `days` days across all folders.
+ * List likely receipt emails received since `since` (or in the last `days`
+ * days) across all folders.
  * Uses a receivedDateTime $filter (deterministic, sortable) and filters
  * subject/sender in code; follows @odata.nextLink.
  */
@@ -255,7 +259,7 @@ export async function listOutlookCandidateIds(
   const days = options.days ?? 90;
   const maxScanned = options.maxScanned ?? 2000;
   const maxCandidates = options.maxCandidates ?? 200;
-  const since = new Date(now - days * 24 * 60 * 60 * 1000).toISOString();
+  const since = (options.since ?? new Date(now - days * 24 * 60 * 60 * 1000)).toISOString();
 
   let url: string | undefined =
     `/me/messages?$filter=${encodeURIComponent(`receivedDateTime ge ${since}`)}` +

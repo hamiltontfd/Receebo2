@@ -154,6 +154,13 @@ describe("Microsoft Graph client", () => {
     expect(fetchImpl.mock.calls[0]![1].headers.Authorization).toBe("Bearer AT");
   });
 
+  it("lists only mail received since the given window start", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse(200, { value: [] }));
+    await listOutlookCandidateIds("AT", { fetchImpl, now: Date.parse("2026-10-28T12:00:00Z"), since: new Date("2026-10-28T07:00:00Z") });
+    const url = decodeURIComponent(fetchImpl.mock.calls[0]![0] as string);
+    expect(url).toContain("$filter=receivedDateTime ge 2026-10-28T07:00:00.000Z");
+  });
+
   it("returns the best purchase candidates first and never lists grocery/utility senders", async () => {
     const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse(200, {
       value: [

@@ -41,21 +41,29 @@ afterEach(async () => {
 
 const ORDER_HTML = "<p>Order #A-1 confirmed. Bosch drill PSB 1800, total 89,99 EUR. Thank you for your purchase at the store.</p>";
 
-function fakeProvider(messageId: string): MailProvider {
-  return {
+function fakeProvider(messageId: string, lastSyncedAt: Date | null = null) {
+  const sync = {
+    lastSyncedAt,
+    windows: [] as Date[],
+    markSynced: vi.fn(async (_userId: string, syncedAt: Date) => { sync.lastSyncedAt = syncedAt; }),
+  };
+  const provider: MailProvider & { sync: typeof sync } = {
+    sync,
     id: "outlook",
     label: "Outlook",
     logger: pino({ level: "silent" }),
     isConfigured: () => true,
     getAccessToken: async () => "token",
-    listCandidateMessageIds: async () => [messageId],
+    listCandidateMessageIds: async (_token, since) => { sync.windows.push(since); return [messageId]; },
     getMessage: async () => ({
       id: messageId, subject: "Your order confirmation", from: "orders@shop.example",
       receivedAt: "2026-10-20T10:00:00Z", pdfAttachments: [], html: ORDER_HTML, text: null,
     }),
     downloadAttachment: async () => Buffer.from(""),
-    markSynced: async () => undefined,
+    getLastSyncedAt: async () => sync.lastSyncedAt,
+    markSynced: sync.markSynced,
   };
+  return provider;
 }
 
 async function failureRow(userId: string) {
@@ -113,6 +121,67 @@ describe("email import retry cap", () => {
     expect(await recordMailImportFailure(userId, "outlook", "m", "e2")).toEqual({ attempts: 2, failed: false });
     expect(await recordMailImportFailure(userId, "outlook", "m", "e3")).toEqual({ attempts: 3, failed: true });
     expect(await recordMailImportFailure(userId, "outlook", "other", "e")).toEqual({ attempts: 1, failed: false });
+  });
+});
+
+describe("incremental search window", () => {
+  it("first sync looks back 90 days; a complete sync moves the anchor to its start", async () => {
+    const userId = newUser();
+    const provider = fakeProvider("msg-win");
+    extraction.text.mockResolvedValue({ isReceipt: false });
+    const before = Date.now();
+    await syncMailboxClaimed(userId, provider, { aiReadCap: false });
+    const first = provider.sync.windows[0]!.getTime();
+    expect(Math.abs(first - (before - 90 * 24 * 60 * 60 * 1000))).toBeLessThan(5_000);
+    expect(provider.sync.markSynced).toHaveBeenCalledTimes(1);
+    const anchor = provider.sync.lastSyncedAt!;
+    expect(anchor.getTime()).toBeGreaterThanOrEqual(before);
+
+    await syncMailboxClaimed(userId, provider, { aiReadCap: false });
+    expect(provider.sync.windows[1]!.getTime()).toBe(anchor.getTime() - 60 * 60 * 1000);
+  });
+
+  it("keeps the anchor when a message is left retryable, so the next window still covers it", async () => {
+    const userId = newUser();
+    const anchor = new Date(Date.now() - 4 * 60 * 60 * 1000);
+    const provider = fakeProvider("msg-retry", anchor);
+    extraction.text.mockRejectedValueOnce(new Error("429 rate limited"));
+    await syncMailboxClaimed(userId, provider, { aiReadCap: false });
+    expect(provider.sync.markSynced).not.toHaveBeenCalled();
+    expect(provider.sync.lastSyncedAt).toBe(anchor);
+    expect(await isSeen(userId, "msg-retry")).toBe(false);
+  });
+
+  it("keeps the anchor when the trial AI budget stops the run (imported after subscribing)", async () => {
+    const userId = newUser();
+    for (let i = 0; i < TRIAL_AI_READ_LIMIT; i++) await claimTrialAiRead(userId, "upload", `u${i}`);
+    const anchor = new Date(Date.now() - 4 * 60 * 60 * 1000);
+    const provider = fakeProvider("msg-trial", anchor);
+    await syncMailboxClaimed(userId, provider, { aiReadCap: true });
+    expect(extraction.text).not.toHaveBeenCalled();
+    expect(provider.sync.markSynced).not.toHaveBeenCalled();
+    expect(await isSeen(userId, "msg-trial")).toBe(false);
+
+    // After subscribing (no cap) the same window finds and imports it.
+    extraction.text.mockResolvedValue({ isReceipt: false });
+    await syncMailboxClaimed(userId, provider, { aiReadCap: false });
+    expect(provider.sync.windows[1]!.getTime()).toBe(anchor.getTime() - 60 * 60 * 1000);
+    expect(extraction.text).toHaveBeenCalledTimes(1);
+    expect(await isSeen(userId, "msg-trial")).toBe(true);
+    expect(provider.sync.markSynced).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves the anchor once a failing message is given up for good", async () => {
+    const userId = newUser();
+    const provider = fakeProvider("msg-giveup", new Date(Date.now() - 60_000));
+    extraction.text.mockRejectedValue(new Error("model returned invalid JSON"));
+    for (let attempt = 1; attempt < MAX_IMPORT_ATTEMPTS; attempt++) {
+      await syncMailboxClaimed(userId, provider, { aiReadCap: false });
+    }
+    expect(provider.sync.markSynced).not.toHaveBeenCalled();
+    await syncMailboxClaimed(userId, provider, { aiReadCap: false });
+    expect(await isSeen(userId, "msg-giveup")).toBe(true);
+    expect(provider.sync.markSynced).toHaveBeenCalledTimes(1);
   });
 });
 

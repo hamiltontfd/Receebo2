@@ -181,15 +181,29 @@ export const outlookProvider: MailProvider = {
     }
   },
 
-  listCandidateMessageIds: (accessToken) => listOutlookCandidateIds(accessToken),
+  listCandidateMessageIds: (accessToken, since) => listOutlookCandidateIds(accessToken, { since }),
   getMessage: (accessToken, messageId) => getOutlookMessage(accessToken, messageId),
   downloadAttachment: (accessToken, messageId, attachmentId) =>
     downloadOutlookAttachment(accessToken, messageId, attachmentId),
 
-  async markSynced(userId) {
+  async getLastSyncedAt(userId) {
+    const [row] = await db
+      .select({ lastSyncedAt: emailConnectionsTable.lastSyncedAt })
+      .from(emailConnectionsTable)
+      .where(
+        and(
+          eq(emailConnectionsTable.userId, userId),
+          eq(emailConnectionsTable.provider, PROVIDER),
+        ),
+      )
+      .limit(1);
+    return row?.lastSyncedAt ?? null;
+  },
+
+  async markSynced(userId, syncedAt) {
     await db
       .update(emailConnectionsTable)
-      .set({ lastSyncedAt: new Date(), updatedAt: new Date() })
+      .set({ lastSyncedAt: syncedAt, updatedAt: new Date() })
       .where(
         and(
           eq(emailConnectionsTable.userId, userId),
@@ -228,6 +242,8 @@ export interface OutlookSweepResult {
  * - Only connections not synced in the last 20 h are processed, oldest first,
  *   so a second call the same day is a no-op (idempotent) and a call that ran
  *   out of time continues where it stopped.
+ *   A sync that left messages for later (trial limit, per-run caps, transient
+ *   failures) does not move lastSyncedAt, so that user stays due.
  * - Users without current access are skipped inside syncUserMailbox (no AI).
  * - A new user is started only while the time budget lasts; one user's sync
  *   can still take ~2 min (it is capped at 25 email bodies per run).
