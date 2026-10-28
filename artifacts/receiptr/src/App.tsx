@@ -12,6 +12,7 @@ import Landing from "@/pages/landing";
 import ReceiptDetail from "@/pages/receipt-detail";
 import Scan from "@/pages/scan";
 import SearchPage from "@/pages/search";
+import ImportsPage from "@/pages/imports";
 import Settings from "@/pages/settings";
 import ProfilePage from "@/pages/profile";
 import GetStarted from "@/pages/get-started";
@@ -342,6 +343,9 @@ function ClerkProviderWithRoutes() {
             </Route>
             <Route path="/scan">
               <ProtectedShell><Scan /></ProtectedShell>
+            </Route>
+            <Route path="/imports">
+              <ProtectedShell><ImportsPage /></ProtectedShell>
             </Route>
             <Route path="/receipts/:id">
               <ProtectedShell><ReceiptDetail /></ProtectedShell>

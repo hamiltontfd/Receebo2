@@ -90,7 +90,7 @@ describe("offline messaging", () => {
 });
 
 describe("navigation privacy", () => {
-  it.each(["/", "/search", "/scan", "/receipts/42", "/privacy", "/terms"])("caches the shell for %s", (path) => {
+  it.each(["/", "/search", "/imports", "/scan", "/receipts/42", "/privacy", "/terms"])("caches the shell for %s", (path) => {
     expect(isAppNavigation(path, "/")).toBe(true);
     expect(isAppNavigation(`/receebo${path}`, "/receebo/")).toBe(true);
   });
