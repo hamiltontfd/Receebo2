@@ -132,6 +132,7 @@ describe("Microsoft Graph client", () => {
   it("lists last-90-day candidates across pages and filters in code", async () => {
     const now = Date.parse("2026-10-26T12:00:00Z");
     const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(200, { id: "JUNK" }))
       .mockResolvedValueOnce(jsonResponse(200, {
         value: [
           { id: "1", subject: "Your Amazon.es order", from: { emailAddress: { address: "auto-confirm@amazon.es" } } },
@@ -147,22 +148,28 @@ describe("Microsoft Graph client", () => {
       }));
     const ids = await listOutlookCandidateIds("AT", { fetchImpl, now });
     expect(ids).toEqual(["1", "3"]);
-    const firstUrl = decodeURIComponent(fetchImpl.mock.calls[0]![0] as string);
+    expect(fetchImpl.mock.calls[0]![0]).toBe("https://graph.microsoft.com/v1.0/me/mailFolders/junkemail?$select=id");
+    const firstUrl = decodeURIComponent(fetchImpl.mock.calls[1]![0] as string);
     expect(firstUrl).toContain("/me/messages?$filter=receivedDateTime ge 2026-07-28T12:00:00.000Z");
     expect(firstUrl).toContain("$orderby=receivedDateTime desc");
-    expect(fetchImpl.mock.calls[1]![0]).toBe("https://graph.microsoft.com/v1.0/me/messages?$skiptoken=abc");
-    expect(fetchImpl.mock.calls[0]![1].headers.Authorization).toBe("Bearer AT");
+    expect(firstUrl).toContain("$select=id,subject,from,receivedDateTime,hasAttachments,parentFolderId");
+    expect(fetchImpl.mock.calls[2]![0]).toBe("https://graph.microsoft.com/v1.0/me/messages?$skiptoken=abc");
+    expect(fetchImpl.mock.calls[1]![1].headers.Authorization).toBe("Bearer AT");
   });
 
   it("lists only mail received since the given window start", async () => {
-    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse(200, { value: [] }));
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(200, { id: "JUNK" }))
+      .mockResolvedValueOnce(jsonResponse(200, { value: [] }));
     await listOutlookCandidateIds("AT", { fetchImpl, now: Date.parse("2026-10-28T12:00:00Z"), since: new Date("2026-10-28T07:00:00Z") });
-    const url = decodeURIComponent(fetchImpl.mock.calls[0]![0] as string);
+    const url = decodeURIComponent(fetchImpl.mock.calls[1]![0] as string);
     expect(url).toContain("$filter=receivedDateTime ge 2026-10-28T07:00:00.000Z");
   });
 
   it("returns the best purchase candidates first and never lists grocery/utility senders", async () => {
-    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse(200, {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(200, { id: "JUNK" }))
+      .mockResolvedValueOnce(jsonResponse(200, {
       value: [
         { id: "unknown", subject: "Fatura n.º 12", from: { emailAddress: { address: "billing@shop.pt" } } },
         { id: "edp", subject: "Fatura", from: { emailAddress: { name: "EDP Comercial", address: "faturas@edp.pt" } } },
@@ -175,7 +182,9 @@ describe("Microsoft Graph client", () => {
   });
 
   it("recurring suppliers: lists an 'on' utility sender, never an 'off' one", async () => {
-    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse(200, {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(200, { id: "JUNK" }))
+      .mockResolvedValueOnce(jsonResponse(200, {
       value: [
         { id: "edp", subject: "Fatura", from: { emailAddress: { name: "EDP Comercial", address: "faturas@edp.pt" } } },
         { id: "netflix", subject: "Your receipt", from: { emailAddress: { name: "Netflix", address: "info@account.netflix.com" } } },
@@ -195,7 +204,52 @@ describe("Microsoft Graph client", () => {
     }));
     const ids = await listOutlookCandidateIds("AT", { fetchImpl, maxCandidates: 60 });
     expect(ids).toHaveLength(60);
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    // 1 junk-folder lookup (no id in this mock, so no junk filter) + 2 pages
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("never lists messages from the Junk Email folder, keeps Deleted Items and other folders", async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes("/me/mailFolders/junkemail")) return jsonResponse(200, { id: "JUNK-ID" });
+      return jsonResponse(200, {
+        value: [
+          { id: "scam", parentFolderId: "JUNK-ID", subject: "Your order invoice", from: { emailAddress: { name: "Geek Squad's LLC", address: "x@gmail.com" } } },
+          { id: "inbox", parentFolderId: "INBOX-ID", subject: "Fatura n.º 12", from: { emailAddress: { address: "billing@shop.pt" } } },
+          { id: "deleted", parentFolderId: "DELETED-ID", subject: "Your Amazon.es order", from: { emailAddress: { address: "auto-confirm@amazon.es" } } },
+        ],
+      });
+    });
+    const ids = await listOutlookCandidateIds("AT", { fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect([...ids].sort()).toEqual(["deleted", "inbox"]);
+  });
+
+  it("an 'on' recurring sender in Junk Email is still skipped", async () => {
+    const fetchImpl = vi.fn(async (url: string) => url.includes("/mailFolders/junkemail")
+      ? jsonResponse(200, { id: "JUNK-ID" })
+      : jsonResponse(200, { value: [
+        { id: "edp-junk", parentFolderId: "JUNK-ID", subject: "Fatura", from: { emailAddress: { address: "faturas@edp.pt" } } },
+      ] }));
+    const ids = await listOutlookCandidateIds("AT", {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      senderDecision: () => "on",
+    });
+    expect(ids).toEqual([]);
+  });
+
+  it("keeps syncing (without the junk filter) and reports when the junk folder lookup fails", async () => {
+    const onJunkLookupFailed = vi.fn();
+    const fetchImpl = vi.fn(async (url: string) => url.includes("/mailFolders/junkemail")
+      ? jsonResponse(404, {})
+      : jsonResponse(200, { value: [
+        { id: "a", parentFolderId: "INBOX-ID", subject: "Fatura n.º 12", from: { emailAddress: { address: "billing@shop.pt" } } },
+      ] }));
+    const ids = await listOutlookCandidateIds("AT", {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onJunkLookupFailed,
+    });
+    expect(ids).toEqual(["a"]);
+    expect(onJunkLookupFailed).toHaveBeenCalledOnce();
+    expect(onJunkLookupFailed.mock.calls[0]![0]).toBeInstanceOf(OutlookGraphError);
   });
 
   it("reads a message with HTML body and only non-inline PDF file attachments", async () => {

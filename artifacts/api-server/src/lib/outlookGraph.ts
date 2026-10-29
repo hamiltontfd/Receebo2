@@ -224,6 +224,7 @@ interface GraphMessageListing {
   from?: GraphEmailAddress | null;
   receivedDateTime?: string;
   hasAttachments?: boolean;
+  parentFolderId?: string;
 }
 
 export function formatGraphSender(from: GraphEmailAddress | null | undefined): string | null {
@@ -245,11 +246,35 @@ export interface ListCandidatesOptions extends GraphClientOptions {
   maxScanned?: number;
   /** Max candidate IDs returned per run. */
   maxCandidates?: number;
+  /** Called when the Junk Email folder id cannot be resolved (listing goes on without the junk filter). */
+  onJunkLookupFailed?: (err: unknown) => void;
+}
+
+/**
+ * Id of the mailbox's Junk Email folder (well-known name `junkemail`), or
+ * null when it cannot be resolved. Never throws.
+ */
+export async function getOutlookJunkFolderId(
+  accessToken: string,
+  options: GraphClientOptions & { onError?: (err: unknown) => void } = {},
+): Promise<string | null> {
+  try {
+    const folder = await graphGet<{ id?: string }>(
+      accessToken,
+      "/me/mailFolders/junkemail?$select=id",
+      options,
+    );
+    return typeof folder?.id === "string" && folder.id ? folder.id : null;
+  } catch (err) {
+    options.onError?.(err);
+    return null;
+  }
 }
 
 /**
  * List likely receipt emails received since `since` (or in the last `days`
- * days) across all folders.
+ * days) across all folders except Junk Email (spam is never imported;
+ * Deleted Items and every other folder are kept).
  * Uses a receivedDateTime $filter (deterministic, sortable) and filters
  * subject/sender in code; follows @odata.nextLink.
  */
@@ -263,10 +288,17 @@ export async function listOutlookCandidateIds(
   const maxCandidates = options.maxCandidates ?? 200;
   const since = (options.since ?? new Date(now - days * 24 * 60 * 60 * 1000)).toISOString();
 
+  // Resolved once per run; messages in Junk Email are dropped client side
+  // (keeps the receivedDateTime $filter/$orderby pair valid for Graph).
+  const junkFolderId = await getOutlookJunkFolderId(accessToken, {
+    ...options,
+    onError: options.onJunkLookupFailed,
+  });
+
   let url: string | undefined =
     `/me/messages?$filter=${encodeURIComponent(`receivedDateTime ge ${since}`)}` +
     `&$orderby=${encodeURIComponent("receivedDateTime desc")}` +
-    `&$select=id,subject,from,receivedDateTime,hasAttachments&$top=50`;
+    `&$select=id,subject,from,receivedDateTime,hasAttachments,parentFolderId&$top=50`;
 
   const candidates: Array<{ id: string; score: number; order: number }> = [];
   let scanned = 0;
@@ -275,6 +307,7 @@ export async function listOutlookCandidateIds(
       await graphGet(accessToken, url, options);
     for (const message of page.value ?? []) {
       scanned++;
+      if (junkFolderId && message.parentFolderId === junkFolderId) continue;
       const from = formatGraphSender(message.from);
       const decision = options.senderDecision?.(from) ?? null;
       if (decision === "off") continue;

@@ -182,7 +182,12 @@ export const outlookProvider: MailProvider = {
   },
 
   listCandidateMessageIds: (accessToken, since, filter) =>
-    listOutlookCandidateIds(accessToken, { since, senderDecision: filter?.senderDecision }),
+    listOutlookCandidateIds(accessToken, {
+      since,
+      senderDecision: filter?.senderDecision,
+      onJunkLookupFailed: (err) =>
+        logger.warn({ err }, "Outlook sync: could not resolve the Junk Email folder; listing without the junk filter"),
+    }),
   getMessage: (accessToken, messageId) => getOutlookMessage(accessToken, messageId),
   downloadAttachment: (accessToken, messageId, attachmentId) =>
     downloadOutlookAttachment(accessToken, messageId, attachmentId),

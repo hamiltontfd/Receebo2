@@ -256,7 +256,8 @@ describe("Outlook routes", () => {
       expect(state.updates).toContainEqual(expect.objectContaining({
         accessToken: "enc(AT2)", refreshToken: "enc(RT2)", status: "active",
       }));
-      expect(String(remote.mock.calls[1]![0])).toContain("https://graph.microsoft.com/v1.0/me/messages?");
+      expect(String(remote.mock.calls[1]![0])).toContain("https://graph.microsoft.com/v1.0/me/mailFolders/junkemail");
+      expect(String(remote.mock.calls[2]![0])).toContain("https://graph.microsoft.com/v1.0/me/messages?");
     } finally {
       vi.unstubAllGlobals();
     }
