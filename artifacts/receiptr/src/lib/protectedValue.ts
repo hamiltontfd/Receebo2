@@ -1,6 +1,7 @@
 import type { Receipt } from "@workspace/api-client-react";
 import { deriveConsumerRights } from "./consumerRights";
 import { hasNoConsumerDates } from "./purchaseType";
+import { receiptListDay } from "./receiptDate";
 
 /**
  * Protected value (Stats tab). Read-only view over the receipts the app
@@ -265,6 +266,92 @@ export function worthKeeping(receipts: Receipt[], summary: ProtectedSummary, now
   }
   return recent;
 }
+
+export interface DurableKeepItem extends WorthKeepingItem {
+  merchant: string | null;
+  /** The day the receipt sorts by (purchase date, else day added; never later than added). YYYY-MM-DD. */
+  day: string;
+  /** "return" while the return window is open, "warranty" while a warranty runs, else "none". */
+  status: "return" | "warranty" | "none";
+  deadline: Date | null;
+  daysLeft: number | null;
+}
+
+/**
+ * Durable goods only: a library receipt (not processing, draft or "not a
+ * receipt") whose purchase type is goods or unknown (never subscription,
+ * digital, service or ticket) and that is not Groceries.
+ */
+export function isDurableReceipt(r: Receipt): boolean {
+  if (r.status === "processing" || r.status === "not_a_receipt" || r.isDraft) return false;
+  if (hasNoConsumerDates(r.purchaseType)) return false;
+  return (r.category ?? "") !== "Groceries";
+}
+
+/**
+ * "Worth keeping" on the Search home and its "See all" list: the notable items
+ * (durable goods over ~50 the AI flagged at extraction) of durable receipts.
+ * Order: items whose return window is still open first, then everything else;
+ * inside each group the most recent purchase first (same day as the list
+ * order), then the most valuable item. Captioned with the return / warranty
+ * date, else the merchant.
+ */
+export function durableKeeping(receipts: Receipt[], now: Date = new Date()): DurableKeepItem[] {
+  const today = startOfToday(now);
+  const out: DurableKeepItem[] = [];
+  for (const r of receipts) {
+    if (!isDurableReceipt(r)) continue;
+    const notable = (r.notableItems ?? []).filter((n) => n.name && (n.category ?? "") !== "Groceries");
+    if (notable.length === 0) continue;
+    const rights = deriveConsumerRights({
+      purchaseDate: r.purchaseDate,
+      deliveryDate: r.deliveryDate,
+      category: r.category,
+      currency: r.currency,
+      purchaseCountry: r.purchaseCountry,
+      isOnlinePurchase: r.isOnlinePurchase,
+      merchant: r.merchant,
+      warrantyText: r.warranty,
+      purchaseType: r.purchaseType,
+    });
+    let status: DurableKeepItem["status"] = "none";
+    let deadline: Date | null = null;
+    const rw = rights.returnWindow;
+    if (rw && daysBetween(today, rw.deadline) >= 0) {
+      status = "return";
+      deadline = rw.deadline;
+    } else {
+      const warranties = [rights.warranty?.expiry, rights.manufacturerWarranty?.expiry]
+        .filter((d): d is Date => d instanceof Date && daysBetween(today, d) >= 0);
+      if (warranties.length > 0) {
+        status = "warranty";
+        deadline = new Date(Math.max(...warranties.map((d) => d.getTime())));
+      }
+    }
+    const currency = (r.currency ?? "EUR").toUpperCase();
+    const caption = status === "none"
+      ? r.merchant ?? null
+      : protectionCaption({ bucket: status, deadline, currency }, now);
+    const day = receiptListDay(r);
+    for (const n of notable) {
+      out.push({
+        name: n.name, price: n.price ?? null, category: n.category ?? r.category ?? null,
+        receiptId: r.id, currency: r.currency ?? null, caption,
+        merchant: r.merchant ?? null, day, status, deadline,
+        daysLeft: deadline ? daysBetween(today, deadline) : null,
+      });
+    }
+  }
+  const rank = (i: DurableKeepItem) => (i.status === "return" ? 0 : 1);
+  return out.sort((a, b) =>
+    rank(a) - rank(b)
+    || b.day.localeCompare(a.day)
+    || (b.price ?? 0) - (a.price ?? 0)
+    || b.receiptId - a.receiptId);
+}
+
+/** Cards on the Search home before "See all". */
+export const HOME_KEEP_LIMIT = 10;
 
 /** "30 Oct", with the year when it isn't this year ("3 Mar 2028"). US style: "Oct 30". */
 export function formatShortDate(d: Date, now: Date = new Date(), us = false): string {

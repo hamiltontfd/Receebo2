@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
- * Horizontally scrollable row of highlight cards (receipt details).
+ * Horizontally scrollable row of cards (receipt details highlights, Worth keeping on the Search home).
  * Touch and trackpad scroll natively (also Shift + mouse wheel); with a mouse,
  * the arrow buttons (pointer devices only) and the thin scrollbar reach every
  * card, and the row can be focused and scrolled with the arrow keys. A soft
  * fade marks the side that has more cards.
  */
-export function HighlightsRow({ children, label = "Highlights" }: { children: ReactNode; label?: string }) {
+export function HighlightsRow({
+  children, label = "Highlights", idPrefix = "highlights", prevLabel = "Previous highlights", nextLabel = "More highlights",
+}: { children: ReactNode; label?: string; idPrefix?: string; prevLabel?: string; nextLabel?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ left: false, right: false });
 
@@ -55,7 +57,7 @@ export function HighlightsRow({ children, label = "Highlights" }: { children: Re
         role="region"
         aria-label={label}
         tabIndex={0}
-        data-testid="highlights-row"
+        data-testid={`${idPrefix}-row`}
         className="flex gap-3 overflow-x-auto overscroll-x-contain pb-2 px-5 scroll-px-5 snap-x snap-proximity focus-visible:outline-none [scrollbar-width:none] [@media(hover:hover)]:[scrollbar-width:thin]"
       >
         {children}
@@ -67,12 +69,12 @@ export function HighlightsRow({ children, label = "Highlights" }: { children: Re
         <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
       )}
       {edges.left && (
-        <button type="button" aria-label="Previous highlights" data-testid="highlights-prev" className={`${arrow} left-2`} onClick={() => page(-1)}>
+        <button type="button" aria-label={prevLabel} data-testid={`${idPrefix}-prev`} className={`${arrow} left-2`} onClick={() => page(-1)}>
           <ChevronLeft className="w-4 h-4" />
         </button>
       )}
       {edges.right && (
-        <button type="button" aria-label="More highlights" data-testid="highlights-next" className={`${arrow} right-2`} onClick={() => page(1)}>
+        <button type="button" aria-label={nextLabel} data-testid={`${idPrefix}-next`} className={`${arrow} right-2`} onClick={() => page(1)}>
           <ChevronRight className="w-4 h-4" />
         </button>
       )}

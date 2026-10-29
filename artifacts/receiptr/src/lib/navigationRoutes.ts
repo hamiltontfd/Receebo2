@@ -7,5 +7,5 @@ export const apiNavigationDenylist = [/\/api(?:\/|$)/];
 export function isAppNavigation(pathname: string, scopePath: string): boolean {
   if (!pathname.startsWith(scopePath)) return false;
   const path = pathname.slice(scopePath.length);
-  return /^(?:|search\/?|stats\/?|imports\/?|scan\/?|profile\/?|settings\/?|get-started\/?|privacy\/?|terms\/?|receipts\/\d+\/?)$/.test(path);
+  return /^(?:|search\/?|search\/worth-keeping\/?|stats\/?|imports\/?|scan\/?|profile\/?|settings\/?|get-started\/?|privacy\/?|terms\/?|receipts\/\d+\/?)$/.test(path);
 }

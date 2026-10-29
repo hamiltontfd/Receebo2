@@ -13,6 +13,7 @@ import ReceiptDetail from "@/pages/receipt-detail";
 import Scan from "@/pages/scan";
 import SearchPage from "@/pages/search";
 import StatsPage from "@/pages/stats";
+import WorthKeepingPage from "@/pages/worth-keeping";
 import ImportsPage from "@/pages/imports";
 import Settings from "@/pages/settings";
 import ProfilePage from "@/pages/profile";
@@ -340,6 +341,9 @@ function ClerkProviderWithRoutes() {
             <Route path="/sign-up/*?" component={SignUpPage} />
             <Route path="/privacy" component={PrivacyPolicy} />
             <Route path="/terms" component={TermsOfService} />
+            <Route path="/search/worth-keeping">
+              <ProtectedShell><WorthKeepingPage /></ProtectedShell>
+            </Route>
             <Route path="/search">
               <ProtectedShell><SearchPage /></ProtectedShell>
             </Route>

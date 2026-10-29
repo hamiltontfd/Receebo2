@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Receipt } from "@workspace/api-client-react";
 import {
-  classifyReceipt, deadlineUrgency, expiringChart, formatAmount, formatShortDate, summarizeProtected, worthKeeping,
+  classifyReceipt, deadlineUrgency, durableKeeping, expiringChart, isDurableReceipt, formatAmount, formatShortDate, summarizeProtected, worthKeeping,
 } from "./protectedValue";
 
 const NOW = new Date(2026, 9, 29, 9, 0, 0); // 29 Oct 2026
@@ -131,5 +131,49 @@ describe("formatting", () => {
     expect(deadlineUrgency(10, "warranty")).toBe("amber");
     expect(deadlineUrgency(30, "return")).toBe("none");
     expect(deadlineUrgency(null, "unknown")).toBe("none");
+  });
+});
+
+describe("durableKeeping (Search home row and See all)", () => {
+  const n = (name: string, price: number, category?: string) => ({ name, price, reason: "", ...(category ? { category } : {}) });
+  const laptop = rc({ createdAt: "2026-10-28T12:00:00Z", id: 20, purchaseDate: "2026-10-25", isOnlinePurchase: true, total: 899, notableItems: [n("Laptop", 899)] });
+  const tv = rc({ createdAt: "2026-10-28T12:00:00Z", id: 21, purchaseDate: "2026-10-20", isOnlinePurchase: true, total: 649, notableItems: [n("Smart TV", 599)] });
+  const chair = rc({ createdAt: "2026-10-28T12:00:00Z", id: 22, category: "Home", purchaseDate: "2026-10-27", isOnlinePurchase: false, total: 129, notableItems: [n("Desk chair", 129)] });
+  const vac = rc({ createdAt: "2026-10-28T12:00:00Z", id: 23, category: "Home", purchaseDate: "2024-01-10", isOnlinePurchase: false, total: 229, notableItems: [n("Cordless vacuum", 229)] });
+  const ancient = rc({ createdAt: "2026-10-28T12:00:00Z", id: 24, purchaseDate: "2020-01-01", isOnlinePurchase: false, total: 80, notableItems: [n("Old drill", 80)] });
+  const sub = rc({ createdAt: "2026-10-28T12:00:00Z", id: 25, purchaseType: "subscription", purchaseDate: "2026-10-28", total: 99, notableItems: [n("Annual plan", 99)] });
+  const service = rc({ createdAt: "2026-10-28T12:00:00Z", id: 26, purchaseType: "service", purchaseDate: "2026-10-28", total: 60, notableItems: [n("Repair", 60)] });
+  const grocery = rc({ createdAt: "2026-10-28T12:00:00Z", id: 27, category: "Groceries", purchaseDate: "2026-10-28", total: 120, notableItems: [n("Olive oil 5L", 60)] });
+  const mixed = rc({ createdAt: "2026-10-28T12:00:00Z", id: 28, category: "Home", purchaseDate: "2026-09-01", isOnlinePurchase: false, total: 300,
+    notableItems: [n("Coffee beans", 55, "Groceries"), n("Espresso machine", 245)] });
+  const draft = rc({ createdAt: "2026-10-28T12:00:00Z", id: 29, isDraft: true, purchaseDate: "2026-10-28", total: 500, notableItems: [n("Draft TV", 500)] });
+  const plain = rc({ createdAt: "2026-10-28T12:00:00Z", id: 30, purchaseDate: "2026-10-28", total: 40 }); // no notable items
+  const all = [ancient, sub, vac, tv, service, grocery, mixed, chair, laptop, draft, plain];
+
+  it("only durable goods: no subscriptions, services, groceries, drafts or receipts without notable items", () => {
+    expect([sub, service, grocery, draft].map(isDurableReceipt)).toEqual([false, false, false, false]);
+    expect(isDurableReceipt(rc({ id: 31, purchaseType: null }))).toBe(true);
+    const names = durableKeeping(all, NOW).map((i) => i.name);
+    expect(names).not.toContain("Annual plan");
+    expect(names).not.toContain("Repair");
+    expect(names).not.toContain("Olive oil 5L");
+    expect(names).not.toContain("Coffee beans");
+    expect(names).not.toContain("Draft TV");
+  });
+
+  it("open return windows first (most recent purchase first), then the rest by most recent purchase", () => {
+    const items = durableKeeping(all, NOW);
+    expect(items.map((i) => i.name)).toEqual(["Laptop", "Smart TV", "Desk chair", "Espresso machine", "Cordless vacuum", "Old drill"]);
+    expect(items.map((i) => i.status)).toEqual(["return", "return", "warranty", "warranty", "warranty", "none"]);
+    expect(items[1].caption).toBe("Return by 3 Nov");
+    expect(items[2].caption).toMatch(/^Warranty to /);
+    expect(items[5].caption).toBe("Store 24");
+  });
+
+  it("a receipt without a purchase date sorts by the day it was added", () => {
+    const undated = rc({ id: 40, purchaseDate: null, createdAt: "2026-10-26T10:00:00Z", total: 300, notableItems: [n("Speaker", 300)] });
+    const items = durableKeeping([chair, undated, vac], NOW);
+    expect(items[0].day >= items[1].day).toBe(true);
+    expect(items.find((i) => i.name === "Speaker")!.day).toBe("2026-10-26");
   });
 });

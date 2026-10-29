@@ -39,7 +39,7 @@ import {
 import { ReceiptSheet } from "@/components/ReceiptSheet";
 import { receiptListYear } from "@/lib/receiptDate";
 import { WorthKeepingCards } from "@/components/WorthKeepingCards";
-import { summarizeProtected, worthKeeping } from "@/lib/protectedValue";
+import { durableKeeping, HOME_KEEP_LIMIT } from "@/lib/protectedValue";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -465,12 +465,12 @@ export default function SearchPage() {
     [infiniteData],
   );
 
-  // "Worth keeping" on the home: the 2 best cards from the receipts already loaded
-  // (same rule as Stats: protected items first, by price, with their protection date).
-  const homeKeep = useMemo(() => {
-    const now = new Date();
-    return worthKeeping(allReceipts, summarizeProtected(allReceipts, now), now, 2);
-  }, [allReceipts]);
+  // "Worth keeping" right under the search field: durable goods from the receipts
+  // already loaded (no extra request), open return windows first, then the most
+  // recent purchases; up to 10 cards, the rest on /search/worth-keeping.
+  const homeKeepAll = useMemo(() => durableKeeping(allReceipts), [allReceipts]);
+  const homeKeep = homeKeepAll.slice(0, HOME_KEEP_LIMIT);
+  const homeKeepMore = homeKeepAll.length > HOME_KEEP_LIMIT || (!!hasNextPage && homeKeep.length > 0);
 
   // Search results (non-paginated, all matches)
   const { data: searchPage, isLoading: searchLoading } = useListReceipts(
@@ -525,6 +525,18 @@ export default function SearchPage() {
           className="pl-10 h-12 rounded-full bg-muted/50 border-transparent focus-visible:bg-background"
         />
       </div>
+
+      {/* Worth keeping: durable goods carousel (hidden while searching) */}
+      {!isSearching && query.length === 0 && (
+        <WorthKeepingCards
+          items={homeKeep}
+          onOpen={setSelectedId}
+          testId="search-worth-keeping"
+          layout="row"
+          seeAllHref="/search/worth-keeping"
+          hasMore={homeKeepMore}
+        />
+      )}
 
       {/* Category chips */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -604,8 +616,6 @@ export default function SearchPage() {
               </>
             ) : (
               <>
-                <WorthKeepingCards items={homeKeep} onOpen={setSelectedId} testId="search-worth-keeping" />
-
                 {allReceipts.length > 0 ? (
                   <section>
                     <motion.ul
