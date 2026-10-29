@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScrollText, Square, ChevronDown } from "lucide-react";
+import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScrollText, Square, ChevronDown, Zap, ZapOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
@@ -38,6 +38,7 @@ import {
 import { ACTIVE_REVIEW_KEY } from "@/components/PlanSelectionGate";
 import { subscribeToastAction } from "@/components/SubscribeToastAction";
 import { TRIAL_CAP_BUTTON, isTrialLimitMessage } from "@/lib/trialCopy";
+import { getLastTab, hasPendingUpload, takePendingUpload } from "@/lib/navState";
 
 function setActiveReview(id: number | null) {
   try {
@@ -87,6 +88,8 @@ function useCameraStream(enabled: boolean) {
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -105,6 +108,14 @@ function useCameraStream(enabled: boolean) {
           videoRef.current.play().catch(() => {});
         }
         setCameraReady(true);
+        // Flash only where the browser exposes a torch (most Android Chrome; not iOS Safari).
+        try {
+          const track = stream.getVideoTracks?.()[0];
+          const caps = track?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined;
+          setTorchSupported(caps?.torch === true);
+        } catch {
+          setTorchSupported(false);
+        }
       })
       .catch(() => {
         if (!cancelled) setCameraError(true);
@@ -114,10 +125,22 @@ function useCameraStream(enabled: boolean) {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       setCameraReady(false);
+      setTorchSupported(false);
+      setTorchOn(false);
     };
   }, [enabled]);
 
-  return { videoRef, cameraReady, cameraError };
+  const toggleTorch = useCallback(() => {
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    if (!track) return;
+    const next = !torchOn;
+    track
+      .applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] })
+      .then(() => setTorchOn(next))
+      .catch(() => setTorchSupported(false));
+  }, [torchOn]);
+
+  return { videoRef, cameraReady, cameraError, torchSupported, torchOn, toggleTorch };
 }
 
 export default function Scan() {
@@ -167,9 +190,14 @@ export default function Scan() {
       window.matchMedia("(min-width: 768px)").matches,
   );
   const [cameraRequested, setCameraRequested] = useState(false);
-  const cameraActive = phase === "capture" && !blockedReason && (!isDesktop || cameraRequested);
+  // A file chosen in the Add sheet's "Upload file" is handed over here; while it
+  // uploads, the camera stays off.
+  const [handoffActive, setHandoffActive] = useState(() => hasPendingUpload());
+  const cameraActive = phase === "capture" && !blockedReason && !handoffActive && (!isDesktop || cameraRequested);
+  // Phones get the full-screen camera (nav B); desktop keeps the in-page Scan.
+  const fullScreenCamera = phase === "capture" && !blockedReason && !handoffActive && !isDesktop;
 
-  const { videoRef, cameraReady, cameraError } = useCameraStream(cameraActive);
+  const { videoRef, cameraReady, cameraError, torchSupported, torchOn, toggleTorch } = useCameraStream(cameraActive);
 
   const [checkConfirmed, setCheckConfirmed] = useState(false);
   const [similarMatches, setSimilarMatches] = useState<SimilarReceiptMatch[] | null>(null);
@@ -389,10 +417,10 @@ export default function Scan() {
   }, [phase, receipt]);
 
   const uploadFile = useCallback(
-    async (blob: Blob, fileName: string, contentType: string) => {
+    async (blob: Blob, fileName: string, contentType: string): Promise<boolean> => {
       if (!navigator.onLine) {
         toast({ title: "Connection required", description: "Connect before uploading a receipt. Nothing was uploaded.", variant: "destructive" });
-        return;
+        return false;
       }
       setUploading(true);
       let reservedPath: string | undefined;
@@ -407,7 +435,7 @@ export default function Scan() {
         if (reason) {
           toast({ title: "Upload not available", description: reason, variant: "destructive",
             ...(isTrialLimitMessage(reason) ? { action: subscribeToastAction(setLocation) } : {}) });
-          return;
+          return false;
         }
         const { uploadURL, objectPath } = await customFetch<{
           uploadURL: string;
@@ -433,6 +461,7 @@ export default function Scan() {
         setActiveReview(created.id);
         setPhase("reading");
         void refreshBilling();
+        return true;
       } catch (err) {
         if (reservedPath) {
           try {
@@ -449,13 +478,14 @@ export default function Scan() {
           void refreshBilling();
           toast({ title: "Upload limit reached", description: quota, variant: "destructive",
             ...(isTrialLimitMessage(quota) ? { action: subscribeToastAction(setLocation) } : {}) });
-          return;
+          return false;
         }
         toast({
           title: "Upload failed",
           description: "Could not upload the receipt. Please try again.",
           variant: "destructive",
         });
+        return false;
       } finally {
         setUploading(false);
       }
@@ -496,6 +526,26 @@ export default function Scan() {
       uploadFile(blob, fileName, contentType);
     }
     e.target.value = "";
+  };
+
+  // Add sheet → Upload file: run the handed-over file through the same upload.
+  // On failure (toast already shown) go back to the tab the user came from.
+  useEffect(() => {
+    const file = takePendingUpload();
+    if (!file) return;
+    void (async () => {
+      const rawType = file.type || "application/octet-stream";
+      const { blob, contentType } = await compressImage(file, rawType);
+      const ok = await uploadFile(blob, compressedFileName(file.name, contentType), contentType);
+      setHandoffActive(false);
+      if (!ok) setLocation(getLastTab());
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const closeCamera = () => {
+    clearPanState();
+    setLocation(getLastTab());
   };
 
   const invalidateLists = () => {
@@ -599,7 +649,46 @@ export default function Scan() {
         </div>
       )}
 
-      {phase === "capture" && !blockedReason && (
+      {phase === "capture" && !blockedReason && handoffActive && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-12" data-testid="panel-handoff-upload">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Uploading your file…</p>
+        </div>
+      )}
+
+      {fullScreenCamera && (
+        <FullScreenCamera
+          videoRef={videoRef}
+          cameraReady={cameraReady}
+          cameraError={cameraError}
+          uploading={uploading}
+          trialUploadsLeft={trialUploadsLeft}
+          torchSupported={torchSupported}
+          torchOn={torchOn}
+          onToggleTorch={toggleTorch}
+          onClose={closeCamera}
+          onCapture={capturePhoto}
+          onUploadInstead={openFilePicker}
+          panoramicMode={panoramicMode}
+          onMode={(long) => { clearPanState(); setPanoramicMode(long); }}
+          panCapturing={panCapturing}
+          panFrameCount={panFrameCount}
+          panMaxFrames={PAN_MAX_FRAMES}
+          onStartPan={startPanCapture}
+          onStopPan={stopPanCapture}
+          panStitchedUrl={panStitchedUrl}
+          onUsePan={() => {
+            if (panStitchedBlob) {
+              uploadFile(panStitchedBlob, `scan-panoramic-${Date.now()}.jpg`, "image/jpeg");
+              clearPanState();
+            }
+          }}
+          canUsePan={!!panStitchedBlob}
+          onRetakePan={clearPanState}
+        />
+      )}
+
+      {phase === "capture" && !blockedReason && !handoffActive && isDesktop && (
         <div className="flex-1 flex flex-col gap-6">
           <div>
             <div>
@@ -819,7 +908,7 @@ export default function Scan() {
 
           )}
 
-          {(!isDesktop || cameraRequested) && !cameraError && (
+          {cameraRequested && !cameraError && (
             <Button
               variant="outline"
               className="rounded-full h-12"
@@ -1143,6 +1232,212 @@ export default function Scan() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Phone camera (nav B): full screen, edge to edge, no tab bar. X top-left
+ * (back to the previous tab), flash top-right when the device has a torch,
+ * shutter bottom centre with the PHOTO · LONG RECEIPT switch above it.
+ * Long receipt is the existing panoramic capture. No upload control here:
+ * upload lives in the Add sheet (the camera-unavailable fallback keeps one).
+ */
+function FullScreenCamera(props: {
+  videoRef: React.MutableRefObject<HTMLVideoElement | null>;
+  cameraReady: boolean;
+  cameraError: boolean;
+  uploading: boolean;
+  trialUploadsLeft: number | null;
+  torchSupported: boolean;
+  torchOn: boolean;
+  onToggleTorch: () => void;
+  onClose: () => void;
+  onCapture: () => void;
+  onUploadInstead: () => void;
+  panoramicMode: boolean;
+  onMode: (long: boolean) => void;
+  panCapturing: boolean;
+  panFrameCount: number;
+  panMaxFrames: number;
+  onStartPan: () => void;
+  onStopPan: () => void;
+  panStitchedUrl: string | null;
+  onUsePan: () => void;
+  canUsePan: boolean;
+  onRetakePan: () => void;
+}) {
+  const {
+    videoRef, cameraReady, cameraError, uploading, trialUploadsLeft, torchSupported, torchOn,
+    onToggleTorch, onClose, onCapture, onUploadInstead, panoramicMode, onMode, panCapturing,
+    panFrameCount, panMaxFrames, onStartPan, onStopPan, panStitchedUrl, onUsePan, canUsePan, onRetakePan,
+  } = props;
+
+  // Keep the active mode label centred over the shutter (Instagram-style).
+  const photoRef = useRef<HTMLButtonElement | null>(null);
+  const longRef = useRef<HTMLButtonElement | null>(null);
+  const [modeShift, setModeShift] = useState(0);
+  useLayoutEffect(() => {
+    const el = panoramicMode ? longRef.current : photoRef.current;
+    if (el) setModeShift(-(el.offsetLeft + el.offsetWidth / 2));
+  }, [panoramicMode]);
+
+  const safeTop = "env(safe-area-inset-top, 0px)";
+  const safeBottom = "env(safe-area-inset-bottom, 0px)";
+  const roundBtn = "absolute w-10 h-10 rounded-full bg-black/30 backdrop-blur-md text-white flex items-center justify-center z-10";
+
+  const closeButton = (
+    <button type="button" aria-label="Close camera" onClick={onClose} className={roundBtn} style={{ top: `calc(${safeTop} + 12px)`, left: 16 }} data-testid="button-camera-close">
+      <X className="w-[22px] h-[22px]" strokeWidth={2.2} />
+    </button>
+  );
+
+  if (panStitchedUrl) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex flex-col" data-testid="fullscreen-camera">
+        {closeButton}
+        <div className="flex-1 overflow-y-auto" style={{ paddingTop: `calc(${safeTop} + 64px)` }}>
+          <img src={panStitchedUrl} alt="Stitched panoramic receipt" className="w-full" />
+        </div>
+        <div className="flex gap-3 p-4 bg-black/80" style={{ paddingBottom: `calc(${safeBottom} + 16px)` }}>
+          <button
+            onClick={onUsePan}
+            disabled={uploading || !canUsePan}
+            className="flex-1 h-12 rounded-full bg-white text-black font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+          >
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Use this
+          </button>
+          <button
+            onClick={onRetakePan}
+            disabled={uploading}
+            className="flex-1 h-12 rounded-full border border-white/40 text-white font-semibold text-sm disabled:opacity-40"
+          >
+            Retake
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (cameraError) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black text-white flex flex-col items-center justify-center gap-4 p-8 text-center" data-testid="fullscreen-camera">
+        {closeButton}
+        <Camera className="w-10 h-10 opacity-60" />
+        <p className="text-sm opacity-80 max-w-xs">
+          Camera is not available. Upload a photo or PDF of your receipt instead.
+        </p>
+        <Button variant="secondary" className="rounded-full" onClick={onUploadInstead} disabled={uploading}>
+          <Upload className="w-4 h-4 mr-2" />
+          Upload receipt
+        </Button>
+      </div>
+    );
+  }
+
+  const corner = "absolute w-[30px] h-[30px] border-white/90 pointer-events-none z-[3]";
+  const cTop = `calc(${safeTop} + 76px)`;
+  const cBottom = `calc(${safeBottom} + 150px)`;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#0d0c0b] overflow-hidden" data-testid="fullscreen-camera">
+      <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-cover" />
+      {/* Soft vignette */}
+      <div aria-hidden className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 85% 70% at 50% 45%, transparent 55%, rgba(0,0,0,.55))" }} />
+
+      {closeButton}
+      {torchSupported && (
+        <button
+          type="button"
+          aria-label={torchOn ? "Turn flash off" : "Turn flash on"}
+          aria-pressed={torchOn}
+          onClick={onToggleTorch}
+          className={roundBtn}
+          style={{ top: `calc(${safeTop} + 12px)`, right: 16 }}
+          data-testid="button-camera-flash"
+        >
+          {torchOn ? <Zap className="w-5 h-5" strokeWidth={2} /> : <ZapOff className="w-5 h-5" strokeWidth={2} />}
+        </button>
+      )}
+
+      {/* 4 corner guides instead of a full frame */}
+      <div aria-hidden className={`${corner} border-t-[3px] border-l-[3px] rounded-tl-xl`} style={{ top: cTop, left: 36 }} />
+      <div aria-hidden className={`${corner} border-t-[3px] border-r-[3px] rounded-tr-xl`} style={{ top: cTop, right: 36 }} />
+      <div aria-hidden className={`${corner} border-b-[3px] border-l-[3px] rounded-bl-xl`} style={{ bottom: cBottom, left: 36 }} />
+      <div aria-hidden className={`${corner} border-b-[3px] border-r-[3px] rounded-br-xl`} style={{ bottom: cBottom, right: 36 }} />
+
+      {panoramicMode && panCapturing && (
+        <>
+          <div className="absolute inset-x-0 flex flex-col items-center gap-2 pointer-events-none z-[5]" style={{ top: `calc(${safeTop} + 64px)` }}>
+            <span className="bg-black/70 text-white text-xs font-medium px-3 py-1 rounded-full">
+              {panFrameCount} / {panMaxFrames} frames
+            </span>
+            <div className="w-32 h-1.5 rounded-full bg-white/20 overflow-hidden">
+              <div className="h-full bg-white rounded-full transition-all duration-300" style={{ width: `${(panFrameCount / panMaxFrames) * 100}%` }} />
+            </div>
+          </div>
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center pointer-events-none z-[5]">
+            <ChevronDown className="w-10 h-10 text-white/70 animate-bounce" />
+          </div>
+        </>
+      )}
+
+      {/* Bottom gradient, caption, mode switch, shutter */}
+      <div aria-hidden className="absolute inset-x-0 bottom-0 h-[270px] pointer-events-none z-[4]" style={{ background: "linear-gradient(180deg, transparent, rgba(0,0,0,.55) 35%, rgba(0,0,0,.88))" }} />
+
+      {(panoramicMode || trialUploadsLeft != null) && (
+        <p className="absolute inset-x-0 text-center text-xs text-white/90 z-[5] px-6" style={{ bottom: `calc(${safeBottom} + 142px)` }}>
+          {panoramicMode
+            ? panCapturing ? "Pan slowly downward — tap Stop when done" : "Tap the shutter, then pan slowly downward"
+            : <span data-testid="text-scan-trial-left">{trialUploadsLeft} of {TRIAL_UPLOAD_LIMIT} free receipts left</span>}
+        </p>
+      )}
+
+      {!panCapturing && (
+        <div
+          className="absolute left-1/2 flex gap-[22px] whitespace-nowrap text-[13px] font-semibold tracking-[0.06em] uppercase z-[5] transition-[margin] duration-200"
+          style={{ bottom: `calc(${safeBottom} + 116px)`, marginLeft: modeShift }}
+          role="radiogroup"
+          aria-label="Capture mode"
+        >
+          <button ref={photoRef} type="button" role="radio" aria-checked={!panoramicMode} onClick={() => onMode(false)}
+            className={`uppercase ${panoramicMode ? "text-white/55" : "text-white"}`} disabled={uploading}>
+            Photo
+          </button>
+          <button ref={longRef} type="button" role="radio" aria-checked={panoramicMode} onClick={() => onMode(true)}
+            className={`uppercase ${panoramicMode ? "text-white" : "text-white/55"}`} disabled={uploading || !cameraReady}>
+            Long receipt
+          </button>
+        </div>
+      )}
+
+      <div className="absolute left-1/2 -ml-[38px] z-[5]" style={{ bottom: `calc(${safeBottom} + 18px)` }}>
+        {panoramicMode && panCapturing ? (
+          <button
+            type="button"
+            aria-label="Stop panoramic capture"
+            onClick={onStopPan}
+            className="w-[76px] h-[76px] rounded-full border-4 border-red-400 bg-red-500/80 flex items-center justify-center"
+          >
+            <Square className="w-6 h-6 text-white fill-white" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label={panoramicMode ? "Start panoramic capture" : "Take photo"}
+            onClick={panoramicMode ? onStartPan : onCapture}
+            disabled={!cameraReady || uploading}
+            className="w-[76px] h-[76px] rounded-full border-4 border-white flex items-center justify-center disabled:opacity-40"
+            data-testid="button-shutter"
+          >
+            <span className={`w-[60px] h-[60px] rounded-full flex items-center justify-center ${panoramicMode ? "bg-white/90" : "bg-white"}`}>
+              {uploading && <Loader2 className="w-6 h-6 text-black animate-spin" />}
+              {!uploading && panoramicMode && <ScrollText className="w-6 h-6 text-black/70" />}
+            </span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
