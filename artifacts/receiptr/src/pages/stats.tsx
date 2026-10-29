@@ -220,10 +220,13 @@ function Groups({ summary, filter, onFilter }: { summary: ProtectedSummary; filt
             className={`w-full flex items-center gap-3 px-4 py-3.5 text-left ${filter === bucket ? "bg-secondary/60" : "hover:bg-secondary/40"} first:rounded-t-2xl last:rounded-b-2xl`}
             data-testid={`stats-group-${bucket}`}
           >
-            {dot}
-            <span className={`text-sm ${muted ? "text-muted-foreground" : ""}`}>{label}</span>
-            <span className="text-xs text-muted-foreground">{g.count}{muted ? " · not counted" : ""}</span>
-            <span className={`ml-auto font-mono text-sm font-semibold ${muted ? "text-muted-foreground" : ""}`}>
+            <span className="shrink-0 flex">{dot}</span>
+            {/* Label and count may wrap (count drops below the label on narrow phones); the amount never breaks. */}
+            <span className="min-w-0 flex-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+              <span className={`text-sm ${muted ? "text-muted-foreground" : ""}`}>{label}</span>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">{g.count}{muted ? " · not counted" : ""}</span>
+            </span>
+            <span className={`ml-auto shrink-0 whitespace-nowrap font-mono text-sm font-semibold ${muted ? "text-muted-foreground" : ""}`}>
               {formatAmount(g.amount, summary.primaryCurrency)}
             </span>
           </button>
