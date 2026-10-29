@@ -37,6 +37,7 @@ import {
   itemVariants,
 } from "@/components/PageTransition";
 import { ReceiptSheet } from "@/components/ReceiptSheet";
+import { receiptListYear } from "@/lib/receiptDate";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -603,8 +604,9 @@ export default function SearchPage() {
                       animate="visible"
                     >
                       {allReceipts.flatMap((r, i) => {
-                        const year = new Date(r.createdAt).getFullYear();
-                        const prevYear = i > 0 ? new Date(allReceipts[i - 1].createdAt).getFullYear() : null;
+                        // Same day the API sorts by (receipt date), so year breaks match the order.
+                        const year = receiptListYear(r);
+                        const prevYear = i > 0 ? receiptListYear(allReceipts[i - 1]) : null;
                         const showYearSep = prevYear !== null && year !== prevYear;
                         const nodes = [];
                         if (showYearSep) {
