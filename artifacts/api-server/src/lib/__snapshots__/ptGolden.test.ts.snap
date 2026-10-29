@@ -1,0 +1,1591 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PT golden outputs (must not change) > reminder copy, money and dates 1`] = `
+{
+  "dates": [
+    "27 Nov 2028",
+    "26 Oct 2026",
+    null,
+  ],
+  "money": [
+    "€1,299.99",
+    "US$1,299.99",
+    "£3.00",
+    "XYZ 5.00",
+    "5.00",
+  ],
+  "returnLaw": {
+    "body": "If you're not keeping it, start your return with Worten by 31 Oct 2026. Your receipt is saved in Receebo, so you'll have it if they ask.",
+    "footer": "You're getting this because return reminders are on.",
+    "itemLine": "Sony WH-1000XM5 headphones and Case · €1,299.99 · Worten, bought 12 Oct 2026",
+    "note": "Based on the 14-day withdrawal period for online purchases.",
+    "preheader": "Bought at Worten on 12 Oct 2026. Last day: 31 Oct 2026.",
+    "push": {
+      "body": "Sony WH-1000XM5 headphones · €1,299.99 · Worten",
+      "title": "Return window closes in 7 days",
+    },
+    "secondary": "Still happy with your Sony WH-1000XM5 headphones?",
+    "subject": "Return window for Sony WH-1000XM5 headphones (€1,299.99) closes in 7 days",
+    "title": "Sony WH-1000XM5 headphones: return window closes 31 Oct 2026",
+  },
+  "returnStore": {
+    "body": "If you're not keeping it, start your return with Best Buy by 31 Oct 2026. Your receipt is saved in Receebo, so you'll have it if they ask.",
+    "footer": "You're getting this because return reminders are on.",
+    "itemLine": "Sony WH-1000XM5 headphones and Case · US$1,299.99 · Best Buy, bought 12 Oct 2026",
+    "note": "Based on Best Buy's return policy. Conditions vary, so check your receipt or the store's site.",
+    "preheader": "Bought at Best Buy on 12 Oct 2026. Last day: 31 Oct 2026.",
+    "push": {
+      "body": "Sony WH-1000XM5 headphones · US$1,299.99 · Best Buy",
+      "title": "Return window closes tomorrow",
+    },
+    "secondary": "Still happy with your Sony WH-1000XM5 headphones?",
+    "subject": "Return window for Sony WH-1000XM5 headphones (US$1,299.99) closes tomorrow",
+    "title": "Sony WH-1000XM5 headphones: return window closes 31 Oct 2026",
+  },
+  "warrantyLegal": {
+    "body": "If something isn't working as it should, contact Worten before 12 Oct 2029. Your receipt is saved in Receebo as proof of purchase.",
+    "footer": "You're getting this because warranty reminders are on.",
+    "itemLine": "Sony WH-1000XM5 headphones and Case · €1,299.99 · Worten, bought 12 Oct 2026",
+    "note": "Your manufacturer warranty is separate and runs until 12 Oct 2028.",
+    "preheader": "Bought at Worten on 12 Oct 2026.",
+    "push": {
+      "body": "Sony WH-1000XM5 headphones · €1,299.99 · Worten",
+      "title": "Legal warranty ends 12 Oct 2029",
+    },
+    "secondary": null,
+    "subject": "Legal warranty for Sony WH-1000XM5 headphones (€1,299.99) ends on 12 Oct 2029",
+    "title": "Sony WH-1000XM5 headphones: legal warranty ends 12 Oct 2029",
+  },
+  "warrantyMaker": {
+    "body": "If something isn't working as it should, contact the manufacturer before 27 Nov 2028. Your receipt is saved in Receebo as proof of purchase.",
+    "footer": "You're getting this because warranty reminders are on.",
+    "itemLine": "Sony WH-1000XM5 headphones and Case · US$1,299.99 · Best Buy, bought 12 Oct 2026",
+    "note": null,
+    "preheader": "Bought at Best Buy on 12 Oct 2026.",
+    "push": {
+      "body": "Sony WH-1000XM5 headphones · US$1,299.99 · Best Buy",
+      "title": "Manufacturer warranty ends 27 Nov 2028",
+    },
+    "secondary": null,
+    "subject": "Manufacturer warranty for Sony WH-1000XM5 headphones (US$1,299.99) ends on 27 Nov 2028",
+    "title": "Sony WH-1000XM5 headphones: manufacturer warranty ends 27 Nov 2028",
+  },
+}
+`;
+
+exports[`PT golden outputs (must not change) > return windows and warranty end dates 1`] = `
+[
+  {
+    "input": "PT/EUR/Worten/true/Electronics/2026-11-01/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": 3,
+      "deadline": "2026-11-18",
+      "startsFrom": "delivery",
+    },
+    "warranty": {
+      "legal": "2029-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/true/Home/2026-10-20/goods",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": -12,
+      "deadline": "2026-11-03",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": "2029-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/true/Groceries/2026-11-10/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": 9,
+      "deadline": "2026-11-24",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/true/Other/2024-02-29/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": -976,
+      "deadline": "2024-03-14",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": "2027-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2029-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2029-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2027-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2029-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2029-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2027-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "PT/EUR/Worten/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Continente/true/Electronics/2026-11-01/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": 3,
+      "deadline": "2026-11-18",
+      "startsFrom": "delivery",
+    },
+    "warranty": {
+      "legal": "2029-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/EUR/Continente/true/Home/2026-10-20/goods",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": -12,
+      "deadline": "2026-11-03",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": "2029-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Continente/true/Groceries/2026-11-10/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": 9,
+      "deadline": "2026-11-24",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Continente/true/Other/2024-02-29/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": -976,
+      "deadline": "2024-03-14",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": "2027-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/EUR/Continente/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Continente/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2029-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/EUR/Continente/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2029-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Continente/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Continente/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2027-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/EUR/Continente/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Continente/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2029-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/EUR/Continente/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2029-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Continente/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Continente/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2027-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/EUR/Continente/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/true/Electronics/2026-11-01/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": 3,
+      "deadline": "2026-11-18",
+      "startsFrom": "delivery",
+    },
+    "warranty": {
+      "legal": "2028-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/true/Home/2026-10-20/goods",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": -12,
+      "deadline": "2026-11-03",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": "2028-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/true/Groceries/2026-11-10/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": 9,
+      "deadline": "2026-11-24",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/true/Other/2024-02-29/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": -976,
+      "deadline": "2024-03-14",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": "2026-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2028-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2028-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2026-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2028-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2028-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2026-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/EUR/Amazon/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/true/Electronics/2026-11-01/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": 3,
+      "deadline": "2026-11-18",
+      "startsFrom": "delivery",
+    },
+    "warranty": {
+      "legal": "2028-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/true/Home/2026-10-20/goods",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": -12,
+      "deadline": "2026-11-03",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": "2028-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/true/Groceries/2026-11-10/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": 9,
+      "deadline": "2026-11-24",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/true/Other/2024-02-29/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": -976,
+      "deadline": "2024-03-14",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": "2026-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2028-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2028-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2026-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2028-11-04",
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2028-10-20",
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": "2026-02-28",
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "DE/EUR/Zalando/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/true/Electronics/2026-11-01/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 7,
+      "daysRemaining": -4,
+      "deadline": "2026-11-11",
+      "startsFrom": "delivery",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/true/Home/2026-10-20/goods",
+    "returnWindow": {
+      "basis": "law",
+      "days": 7,
+      "daysRemaining": -19,
+      "deadline": "2026-10-27",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/true/Groceries/2026-11-10/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 7,
+      "daysRemaining": 2,
+      "deadline": "2026-11-17",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/true/Other/2024-02-29/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 7,
+      "daysRemaining": -983,
+      "deadline": "2024-03-07",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "BR/BRL/Magazine Luiza/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/true/Electronics/2026-11-01/null",
+    "returnWindow": {
+      "basis": "store",
+      "days": 15,
+      "daysRemaining": 4,
+      "deadline": "2026-11-19",
+      "startsFrom": "delivery",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/true/Home/2026-10-20/goods",
+    "returnWindow": {
+      "basis": "store",
+      "days": 15,
+      "daysRemaining": -11,
+      "deadline": "2026-11-04",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/true/Groceries/2026-11-10/null",
+    "returnWindow": {
+      "basis": "store",
+      "days": 15,
+      "daysRemaining": 10,
+      "deadline": "2026-11-25",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/true/Other/2024-02-29/null",
+    "returnWindow": {
+      "basis": "store",
+      "days": 15,
+      "daysRemaining": -975,
+      "deadline": "2024-03-15",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/USD/Best Buy/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Walmart/true/Electronics/2026-11-01/null",
+    "returnWindow": {
+      "basis": "store",
+      "days": 90,
+      "daysRemaining": 79,
+      "deadline": "2027-02-02",
+      "startsFrom": "delivery",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "US/USD/Walmart/true/Home/2026-10-20/goods",
+    "returnWindow": {
+      "basis": "store",
+      "days": 90,
+      "daysRemaining": 64,
+      "deadline": "2027-01-18",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Walmart/true/Groceries/2026-11-10/null",
+    "returnWindow": {
+      "basis": "store",
+      "days": 90,
+      "daysRemaining": 85,
+      "deadline": "2027-02-08",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Walmart/true/Other/2024-02-29/null",
+    "returnWindow": {
+      "basis": "store",
+      "days": 90,
+      "daysRemaining": -900,
+      "deadline": "2024-05-29",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "US/USD/Walmart/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Walmart/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "US/USD/Walmart/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Walmart/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Walmart/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "US/USD/Walmart/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Walmart/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "US/USD/Walmart/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Walmart/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Walmart/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "US/USD/Walmart/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/true/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/true/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/true/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/true/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "US/USD/Corner Shop/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/true/Electronics/2026-11-01/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 7,
+      "daysRemaining": -4,
+      "deadline": "2026-11-11",
+      "startsFrom": "delivery",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/true/Home/2026-10-20/goods",
+    "returnWindow": {
+      "basis": "law",
+      "days": 7,
+      "daysRemaining": -19,
+      "deadline": "2026-10-27",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/true/Groceries/2026-11-10/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 7,
+      "daysRemaining": 2,
+      "deadline": "2026-11-17",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/true/Other/2024-02-29/null",
+    "returnWindow": {
+      "basis": "law",
+      "days": 7,
+      "daysRemaining": -983,
+      "deadline": "2024-03-07",
+      "startsFrom": "purchase",
+    },
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/CAD/Canadian Tire/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/GBP/Argos/true/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/GBP/Argos/true/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/GBP/Argos/true/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/GBP/Argos/true/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/GBP/Argos/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/GBP/Argos/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/GBP/Argos/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/GBP/Argos/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/GBP/Argos/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/GBP/Argos/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/GBP/Argos/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/GBP/Argos/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/GBP/Argos/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/GBP/Argos/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/GBP/Argos/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/null/null/true/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/null/null/true/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/null/null/true/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/null/null/true/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/null/null/true/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/null/null/false/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/null/null/false/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/null/null/false/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/null/null/false/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/null/null/false/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/null/null/null/Electronics/2026-11-01/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2028-11-01",
+    },
+  },
+  {
+    "input": "null/null/null/null/Home/2026-10-20/goods",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/null/null/null/Groceries/2026-11-10/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+  {
+    "input": "null/null/null/null/Other/2024-02-29/null",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": "2025-02-28",
+    },
+  },
+  {
+    "input": "null/null/null/null/Electronics/2026-11-12/subscription",
+    "returnWindow": null,
+    "warranty": {
+      "legal": null,
+      "manufacturer": null,
+    },
+  },
+]
+`;
