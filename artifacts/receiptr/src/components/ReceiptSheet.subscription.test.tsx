@@ -19,6 +19,7 @@ vi.mock("@workspace/api-client-react", () => ({
   customFetch: () => new Promise(() => {}),
 }));
 import { ReceiptSheet } from "./ReceiptSheet";
+import { MarketContext, type MarketState } from "./MarketProvider";
 
 const base = {
   id: 5, userId: "u", status: "completed", isDraft: false, merchant: "Apple", purchaseDate: "2026-10-20",
@@ -28,13 +29,18 @@ const base = {
   contentType: "application/pdf", attachments: [], createdAt: "2026-10-20T10:00:00Z", updatedAt: "2026-10-20T10:00:00Z",
 };
 
-function mount(receipt: Record<string, unknown>) {
+function mount(receipt: Record<string, unknown>, region: "PT" | "US" = "PT") {
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   vi.stubGlobal("matchMedia", (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
   mocks.receipt = receipt;
   mocks.update.mockReset().mockResolvedValue({});
   const client = new QueryClient();
-  render(<QueryClientProvider client={client}><ReceiptSheet receiptId={5} open onClose={() => {}} /></QueryClientProvider>);
+  // Rules follow the account market (MarketProvider): US -> US rules, PT -> PT rules.
+  const market: MarketState = {
+    market: region, country: null, source: "account", confirmed: true, loading: false, saving: false, error: null,
+    choose: async () => {}, retry: () => {},
+  };
+  render(<QueryClientProvider client={client}><MarketContext.Provider value={market}><ReceiptSheet receiptId={5} open onClose={() => {}} /></MarketContext.Provider></QueryClientProvider>);
 }
 
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
@@ -75,3 +81,42 @@ describe("ReceiptSheet: 'This is a subscription'", () => {
     expect(mocks.update.mock.calls[0][0].data.purchaseType).toBe("goods");
   });
 });
+
+describe("ReceiptSheet: US accounts", () => {
+  const tv = {
+    ...base, merchant: "Best Buy", currency: "USD", purchaseCountry: "US", category: "Electronics", isOnlinePurchase: false,
+    purchaseDate: new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10), total: 1299.99,
+    products: [{ name: 'LG 65" OLED TV', quantity: 1, price: 1299.99 }], warranty: "2-year manufacturer warranty",
+    purchaseType: "goods", returnDays: null,
+  };
+  it("shows 'Returns & warranty' with the store window for an in-store purchase, no legal warranty or review marker", () => {
+    mount(tv, "US");
+    expect(screen.getByText("Returns & warranty")).toBeInTheDocument();
+    expect(screen.getByText(/Return by/)).toBeInTheDocument();
+    expect(screen.getByText(/Best Buy: 15 days \(store policy, checked Oct 27, 2026\)/)).toBeInTheDocument();
+    expect(screen.getByTestId("card-manufacturer-warranty")).toBeInTheDocument();
+    expect(screen.queryByText(/legal warranty/i)).toBeNull();
+    expect(screen.queryByText(/LEGAL REVIEW/)).toBeNull();
+    expect(screen.queryByText(/Consumer Rights/)).toBeNull();
+  });
+  it("edits the store window: suggestion from the table, saved as returnDays", async () => {
+    mount(tv, "US");
+    fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
+    expect(await screen.findByTestId("text-return-days-hint")).toHaveTextContent("Typical for Best Buy: 15 days");
+    fireEvent.change(screen.getByTestId("input-return-days"), { target: { value: "60" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save Changes/ }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+    expect(mocks.update.mock.calls[0][0].data.returnDays).toBe(60);
+  });
+  it("PT accounts never see or send the store window field", async () => {
+    mount(tv, "PT");
+    expect(screen.queryByText("Returns & warranty")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
+    await screen.findByTestId("switch-subscription");
+    expect(screen.queryByTestId("input-return-days")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Save Changes/ }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+    expect(mocks.update.mock.calls[0][0].data).not.toHaveProperty("returnDays");
+  });
+});
+

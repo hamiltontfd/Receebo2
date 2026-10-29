@@ -29,3 +29,16 @@ export async function migrateReceiptPurchaseType(): Promise<void> {
       ADD COLUMN IF NOT EXISTS purchase_type text,
       ADD COLUMN IF NOT EXISTS purchase_type_source text`);
 }
+
+/**
+ * receipts.return_days: the store's return window written by the user (US
+ * accounts). Additive, nullable; existing rows stay null. Idempotent startup migration.
+ */
+export async function migrateReceiptReturnDays(): Promise<void> {
+  await db.execute(sql`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS return_days integer`);
+  await db.execute(sql`
+    DO $$ BEGIN
+      ALTER TABLE receipts ADD CONSTRAINT receipts_return_days_check CHECK (return_days IS NULL OR return_days BETWEEN 0 AND 365);
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$`);
+}

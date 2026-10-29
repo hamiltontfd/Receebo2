@@ -74,4 +74,12 @@ describe("PT golden outputs (must not change)", () => {
       dates: [formatEmailDate("2028-11-27"), formatEmailDate(new Date("2026-10-26T23:30:00Z")), formatEmailDate("bogus")],
     }).toMatchSnapshot();
   });
+
+  it("an explicit PT region (and any non-US value) gives exactly the same return windows", () => {
+    for (const input of goldenInputs()) {
+      const expected = calcReturnWindow(input);
+      expect(calcReturnWindow({ ...input, region: "PT", returnDays: 99, itemNames: ["iPhone"] })).toEqual(expected);
+      expect(calcReturnWindow({ ...input, region: null })).toEqual(expected);
+    }
+  });
 });

@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import ipaddr from "ipaddr.js";
+import { logger } from "./logger";
 
 export type Market = "PT" | "BR" | "US";
 // EU members, not EEA, and not all countries that use EUR.
@@ -40,6 +41,44 @@ export function clientPublicIp(
     if (trusted(current)) return null;
   }
   return current.range() === "unicast" ? current.toString() : null;
+}
+
+/** Countries Receebo covers today (Hamilton 2 Nov 2026). EU members other than PT map to the PT/EU
+ * market for rules, but are not "covered": they see the uncovered-country notice. */
+export const COVERED_COUNTRIES: ReadonlySet<string> = new Set(["PT", "BR", "US"]);
+export function isCoveredCountry(country: string | null | undefined): boolean {
+  return !!country && COVERED_COUNTRIES.has(country.toUpperCase());
+}
+
+/**
+ * Dev/test only: pretend the request came from this ISO country (e.g. "US",
+ * "JP") because the workspace proxy never exposes a public client IP. Ignored
+ * when NODE_ENV is "production".
+ */
+export function devCountryOverride(env: NodeJS.ProcessEnv = process.env): string | null {
+  if (env.NODE_ENV === "production") return null;
+  const value = env.MARKET_DEV_COUNTRY?.trim().toUpperCase();
+  return value && /^[A-Z]{2}$/.test(value) ? value : null;
+}
+
+let loggedPeerShape = false;
+/**
+ * Server-side country for a request: dev override, else local GeoIP of the
+ * public client IP (only through MARKET_TRUSTED_PROXY_CIDRS). The IP is never
+ * stored or logged; once per process we log only the *kind* of untrusted peer
+ * address (e.g. "private", "linkLocal") so the operator can set the proxy CIDRs.
+ */
+export function requestCountry(req: { socket: { remoteAddress?: string }; headers: Record<string, string | string[] | undefined> }): { country: string | null; market: Market | null } {
+  const forced = devCountryOverride();
+  if (forced) return { country: forced, market: marketForCountry(forced) };
+  const ip = clientPublicIp(req.socket.remoteAddress, req.headers["x-forwarded-for"]);
+  if (!ip && !loggedPeerShape) {
+    loggedPeerShape = true;
+    const peer = parseIp(req.socket.remoteAddress ?? "");
+    // Range kind only (no address): helps decide MARKET_TRUSTED_PROXY_CIDRS at publish.
+    logger.info({ peerRange: peer ? peer.range() : "invalid", forwarded: req.headers["x-forwarded-for"] ? "present" : "absent" }, "Market GeoIP: no public client IP (set MARKET_TRUSTED_PROXY_CIDRS after verifying the proxy path)");
+  }
+  return suggestMarket(ip);
 }
 
 type Lookup = (ip: string) => { country: string } | null;

@@ -10,4 +10,9 @@ import type { AccountMarketMarket } from './accountMarketMarket';
 export interface AccountMarket {
   /** @nullable */
   market: AccountMarketMarket;
+  /**
+   * ISO country detected server-side from this request's IP (never stored); null when unknown.
+   * @nullable
+   */
+  country?: string | null;
 }

@@ -2,6 +2,12 @@ import { getAppLocale, type AppLocale } from "./locale";
 
 /** Display copy only. Keys are never persisted or sent as API enum values. */
 export const APP_COPY: Record<string, readonly [string, string?]> = {
+  // US mode (account market US): store return window field on receipt details.
+  "Store return window (optional)": ["Prazo de devolução da loja (opcional)"],
+  "Use {0} days": ["Usar {0} dias"],
+  "Typical for {0}: {1} days. Leave empty to use the store's policy. Check your receipt.": ["Habitual em {0}: {1} dias. Deixe vazio para usar a política da loja. Confirme no recibo.", "Padrão em {0}: {1} dias. Deixe vazio para usar a política da loja. Confira o recibo."],
+  "{0} has no fixed window for most items. Add one only if your receipt shows it.": ["{0} não tem prazo fixo para a maioria dos artigos. Adicione um só se o recibo o indicar.", "{0} não tem prazo fixo para a maioria dos itens. Adicione um só se o recibo mostrar."],
+  "We don't know this store's return window. Add it if you know it; online and in store.": ["Não sabemos o prazo de devolução desta loja. Adicione-o se o souber; vale online e em loja física.", "Não sabemos o prazo de devolução desta loja. Adicione se você souber; vale online e na loja física."],
   "Please wait {0} seconds, then try again. Your file and drafts are kept.": ["Aguarde {0} segundos e tente novamente. O ficheiro e os rascunhos são mantidos.", "Aguarde {0} segundos e tente novamente. O arquivo e os rascunhos são mantidos."],
   "Temporarily unavailable": ["Temporariamente indisponível"],
   "Retry saved file": ["Tentar novamente com o ficheiro guardado", "Tentar novamente com o arquivo salvo"],

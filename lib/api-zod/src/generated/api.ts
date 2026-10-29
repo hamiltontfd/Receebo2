@@ -50,7 +50,8 @@ export const GetMarketSuggestionResponse = zod.object({
 
 
 export const GetAccountMarketResponse = zod.object({
-  "market": zod.union([zod.literal('PT'),zod.literal('BR'),zod.literal('US'),zod.literal(null)]).nullable()
+  "market": zod.union([zod.literal('PT'),zod.literal('BR'),zod.literal('US'),zod.literal(null)]).nullable(),
+  "country": zod.string().nullish().describe('ISO country detected server-side from this request\'s IP (never stored); null when unknown.')
 })
 
 
@@ -60,7 +61,8 @@ export const UpdateAccountMarketBody = zod.object({
 })
 
 export const UpdateAccountMarketResponse = zod.object({
-  "market": zod.union([zod.literal('PT'),zod.literal('BR'),zod.literal('US'),zod.literal(null)]).nullable()
+  "market": zod.union([zod.literal('PT'),zod.literal('BR'),zod.literal('US'),zod.literal(null)]).nullable(),
+  "country": zod.string().nullish().describe('ISO country detected server-side from this request\'s IP (never stored); null when unknown.')
 })
 
 
@@ -153,6 +155,7 @@ export const ListReceiptsResponseItem = zod.object({
   "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
   "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
   "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
+  "returnDays": zod.number().int().min(0).max(365).nullish().describe('Store return window in days written by the user (US accounts). Wins over the store table. Null = not set.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -228,6 +231,7 @@ export const GetRecentReceiptsResponseItem = zod.object({
   "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
   "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
   "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
+  "returnDays": zod.number().int().min(0).max(365).nullish().describe('Store return window in days written by the user (US accounts). Wins over the store table. Null = not set.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -326,6 +330,7 @@ export const GetReceiptResponse = zod.object({
   "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
   "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
   "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
+  "returnDays": zod.number().int().min(0).max(365).nullish().describe('Store return window in days written by the user (US accounts). Wins over the store table. Null = not set.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),
@@ -358,6 +363,7 @@ export const UpdateReceiptBody = zod.object({
   "merchant": zod.string().optional(),
   "purchaseDate": zod.string().optional(),
   "deliveryDate": zod.string().nullish().describe('Delivery date (YYYY-MM-DD); null clears it.'),
+  "returnDays": zod.number().int().min(0).max(365).nullish().describe('Store return window in days (US accounts); null clears it.'),
   "total": zod.number().optional(),
   "currency": zod.string().optional(),
   "category": zod.string().optional(),
@@ -392,6 +398,7 @@ export const UpdateReceiptResponse = zod.object({
   "isOnlinePurchase": zod.boolean().nullish().describe('True if this is an e-commerce\/online\/distance purchase.'),
   "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
   "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
+  "returnDays": zod.number().int().min(0).max(365).nullish().describe('Store return window in days written by the user (US accounts). Wins over the store table. Null = not set.'),
   "products": zod.array(zod.object({
   "name": zod.string(),
   "quantity": zod.number().nullish(),

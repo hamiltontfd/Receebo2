@@ -21,7 +21,7 @@ describe("MarketSelector", () => {
   it("invites without blocking when unknown", () => {
     render(<MarketSelector />);
     expect(screen.getByTestId("status-market-unknown")).toBeTruthy();
-    expect(screen.getByText(/does not change the country of your purchases/)).toBeTruthy();
+    expect(screen.getByText(/doesn't change the country of your purchases/)).toBeTruthy();
   });
   it("shows an unconfirmed suggestion with confirm action", () => {
     Object.assign(state, { market: "BR", source: "suggestion" });

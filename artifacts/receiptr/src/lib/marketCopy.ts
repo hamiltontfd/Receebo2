@@ -12,7 +12,7 @@ const en = {
   suggestion: "Suggested from your approximate location. You can change it.",
   confirm: "Confirm",
   unknown: "Location unavailable. Choose your region, or keep browsing.",
-  disclaimer: "Your account market is a preference, not legal validation. It does not change the country of your purchases, receipt or subscription currency, or the app language. Brazil and United States documents are not locally approved yet; the existing terms continue to apply. If local location detection fails, your browser may contact country.is, which receives your IP address, to suggest a country. Receebo does not store that IP. See the Privacy Policy for details.",
+  disclaimer: "Your region decides which return and warranty rules Receebo shows. United States: each store's return policy, online and in store, plus the manufacturer's warranty. Portugal / European Union and Brazil: the European rules, for now. It doesn't change the country of your purchases, their currency, your subscription or the app language. We set it once from your approximate location: our server looks up your IP address in a local database and doesn't keep it. You can change it here any time.",
 };
 const pt: typeof en = {
   region: "Região",
@@ -26,7 +26,7 @@ const pt: typeof en = {
   suggestion: "Sugerido pela sua localização aproximada. Pode alterar.",
   confirm: "Confirmar",
   unknown: "Localização indisponível. Escolha a região ou continue a navegar.",
-  disclaimer: "O mercado da conta é uma preferência, não uma validação jurídica. Não altera o país das compras, a moeda dos recibos ou da assinatura, nem o idioma da aplicação. Os documentos do Brasil e dos Estados Unidos ainda não têm aprovação jurídica local; continuam a aplicar-se os termos existentes. Se a deteção local falhar, o navegador pode consultar country.is, que recebe o seu IP, para sugerir o país. O Receebo não guarda esse IP. Consulte a Política de Privacidade.",
+  disclaimer: "A região decide que regras de devolução e garantia o Receebo mostra. Estados Unidos: a política de devolução de cada loja, online e em loja física, e a garantia do fabricante. Portugal / União Europeia e Brasil: as regras europeias, por agora. Não altera o país das compras, a moeda, a subscrição nem o idioma da aplicação. Definimo-la uma vez a partir da sua localização aproximada: o nosso servidor consulta o seu IP numa base de dados local e não o guarda. Pode alterá-la aqui a qualquer momento.",
 };
 export function getMarketCopy(): typeof en {
   const locale = getAppLocale();
@@ -35,6 +35,6 @@ export function getMarketCopy(): typeof en {
     ...pt, saving: "Salvando",
     suggestion: "Sugerido pela sua localização aproximada. Você pode alterar.",
     unknown: "Localização indisponível. Escolha a região ou continue navegando.",
-    disclaimer: "O mercado da conta é uma preferência, não uma validação jurídica. Não altera o país das compras, a moeda dos recibos ou da assinatura, nem o idioma do aplicativo. Os documentos do Brasil e dos Estados Unidos ainda não têm aprovação jurídica local; os termos existentes continuam válidos. Se a detecção local falhar, o navegador pode consultar country.is, que recebe seu IP, para sugerir o país. O Receebo não armazena esse IP. Consulte a Política de Privacidade.",
+    disclaimer: "A região define quais regras de devolução e garantia o Receebo mostra. Estados Unidos: a política de devolução de cada loja, online e na loja física, e a garantia do fabricante. Portugal / União Europeia e Brasil: as regras europeias, por enquanto. Não muda o país das compras, a moeda, a assinatura nem o idioma do aplicativo. Definimos uma vez a partir da sua localização aproximada: nosso servidor consulta seu IP em uma base de dados local e não o armazena. Você pode alterar aqui a qualquer momento.",
   } : pt;
 }

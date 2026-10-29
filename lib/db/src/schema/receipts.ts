@@ -56,6 +56,11 @@ export const receiptsTable = pgTable("receipts", {
   purchaseType: text("purchase_type"),
   /** ai | hint | manual. A manual choice is never overwritten by the backfill. */
   purchaseTypeSource: text("purchase_type_source"),
+  /**
+   * Store return window in days written by the user (US accounts only for now).
+   * Wins over the US store table; ignored for PT accounts. Null = not set.
+   */
+  returnDays: integer("return_days"),
   returnReminderSent7dAt: timestamp("return_reminder_sent_7d_at", { withTimezone: true }),
   returnReminderSent2dAt: timestamp("return_reminder_sent_2d_at", { withTimezone: true }),
   returnPushSent2dAt: timestamp("return_push_sent_2d_at", { withTimezone: true }),

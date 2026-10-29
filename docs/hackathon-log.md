@@ -268,3 +268,7 @@ Technical details live in `docs/assistant-log.md`.
 - Tests: typecheck clean (web); web 48 files / 326 passed; API 407 passed, 2 skipped, 4 env-baseline failures (trialFunnel, outlookDailySweep).
 - Hamilton: "penso que o worth keeping deveria estar abaixo do found on your email": the row now sits right after Found in your email (search field → category chips → Found in your email → Worth keeping); with no Found in your email section it takes that place. search.worthKeeping.test.tsx (2).
 - Not pushed or published; Stripe, cron, secrets and production data untouched.
+
+## 2026-11-02 — Session 26: US mode v2 on the account market (Grok Bot, Hamilton: "O IP deve determinar o mercado, a lingua do browser deve determinar a lingua do app…")
+Branch `us-mode-v2` from origin/main 342cc5c (Replit prod mirror). The old `us-mode` branch (own `region` column) is kept for reference only; its region migration was NOT ported.
+- Step 1, market from IP + US rules on the market: golden PT tests (from 0260660); US rules (from 0e38afb) now read `user_preferences.market` (US -> US rules; PT, BR, null -> PT rules, unchanged). `GET /api/account/market` fills an empty market from the server-side GeoIP once and returns the detected country (not stored). Browser call to api.country.is removed; privacy bullet replaced by a server-side local lookup line; selector disclaimer rewritten (market now drives rules). Dev-only `MARKET_DEV_COUNTRY`. Prod needs a verified `MARKET_TRUSTED_PROXY_CIDRS`. Migration: `receipts.return_days` (additive). US rights copy in en, pt-PT, pt-BR.

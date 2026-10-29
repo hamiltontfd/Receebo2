@@ -21,7 +21,7 @@ import { migrateRecurringSuppliers } from "./lib/recurringSuppliers";
 import { migrateMailImportFailures } from "./lib/mailImportFailures";
 import { migrateAccountLifecycle } from "./lib/accountLifecycle";
 import { migrateAccountDeletionCodes } from "./lib/accountDeletionCode";
-import { migrateReceiptDeliveryDate, migrateReceiptWarrantyColumns, migrateReceiptPurchaseType } from "./lib/receiptColumns";
+import { migrateReceiptDeliveryDate, migrateReceiptWarrantyColumns, migrateReceiptPurchaseType, migrateReceiptReturnDays } from "./lib/receiptColumns";
 import { backfillWarrantyExpiries } from "./lib/warrantyExpiryStore";
 import { backfillPurchaseTypes, purchaseTypeBackfillMode } from "./lib/purchaseTypeBackfill";
 
@@ -132,6 +132,8 @@ async function runStartupMigrations(): Promise<void> {
     await migrateReceiptWarrantyColumns();
     // Purchase type: subscriptions/digital/tickets get no return or warranty dates
     await migrateReceiptPurchaseType();
+    // US mode: store return window written by the user (nullable, unused for PT)
+    await migrateReceiptReturnDays();
     // Daily job lock so restarts/extra instances don't rerun the sweep
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS scheduled_job_runs (

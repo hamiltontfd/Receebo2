@@ -49,6 +49,11 @@ export const AccountMarketMarket = {
 export interface AccountMarket {
   /** @nullable */
   market: AccountMarketMarket;
+  /**
+   * ISO country detected server-side from this request's IP (never stored); null when unknown.
+   * @nullable
+   */
+  country?: string | null;
 }
 
 export type MarketPreferenceInputMarket = typeof MarketPreferenceInputMarket[keyof typeof MarketPreferenceInputMarket];
@@ -258,6 +263,11 @@ export interface Receipt {
      * @nullable
      */
   purchaseTypeSource?: ReceiptPurchaseTypeSource;
+  /**
+   * Store return window in days written by the user (US accounts). Wins over the store table. Null = not set.
+   * @nullable
+   */
+  returnDays?: number | null;
   products?: ReceiptProduct[];
   /** Items flagged as notable (expensive or warranty-relevant). */
   notableItems?: NotableItem[];
@@ -312,6 +322,11 @@ export interface ReceiptUpdate {
      * @nullable
      */
   deliveryDate?: string | null;
+  /**
+   * Store return window in days (US accounts); null clears it.
+   * @nullable
+   */
+  returnDays?: number | null;
   total?: number;
   currency?: string;
   category?: string;

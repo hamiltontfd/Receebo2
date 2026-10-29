@@ -62,27 +62,23 @@ try {
     await localizedContext.close();
     console.log(`${locale} language remains independent of suggested BR market`);
   }
-  for (const [country, label] of [["US", "EUA"], ["DE", "PT / UE"], ["BR", "BR"], ["JP", "Região"]]) {
-    const fallbackContext = await browser.newContext({ locale: "pt-BR", viewport: { width: 375, height: 900 } });
-    const fallbackPage = await fallbackContext.newPage();
+  for (const [country, market, label] of [["US", "US", "EUA"], ["DE", "PT", "PT / UE"], ["BR", "BR", "BR"], ["JP", null, "Região"]]) {
+    const ctx = await browser.newContext({ locale: "pt-BR", viewport: { width: 375, height: 900 } });
+    const page = await ctx.newPage();
     let externalCalls = 0;
-    await fallbackPage.route("**/api/market/suggestion", (route) => route.fulfill({
-      contentType: "application/json", body: JSON.stringify({ country: null, market: null }),
+    // Server-side GeoIP only (2 Nov 2026): the browser never contacts a third-party location service.
+    await page.route("**/api/market/suggestion", (route) => route.fulfill({
+      contentType: "application/json", body: JSON.stringify({ country, market }),
     }));
-    await fallbackPage.route("https://api.country.is/", (route) => {
-      externalCalls++;
-      expect(route.request().headers()["cookie"]).toBeUndefined();
-      expect(route.request().headers()["referer"]).toBeUndefined();
-      return route.fulfill({ contentType: "application/json", body: JSON.stringify({ country }) });
-    });
-    await fallbackPage.goto(base, { waitUntil: "domcontentloaded" });
-    await expect(fallbackPage.getByTestId("select-market")).toBeEnabled();
-    await expect(fallbackPage.getByTestId("text-market-current")).toHaveText(label);
-    await expect(fallbackPage.locator("h1")).toContainText("Recibos.");
-    expect(externalCalls).toBe(1);
-    expect(await fallbackPage.evaluate(() => localStorage.getItem("receebo:visitorMarket"))).toBeNull();
-    await fallbackContext.close();
-    console.log(`Browser-side fallback ${country}: ${label}, language unchanged, no IP or confirmed choice stored`);
+    await page.route("**://api.country.is/**", (route) => { externalCalls++; return route.abort(); });
+    await page.goto(base, { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("select-market")).toBeEnabled();
+    await expect(page.getByTestId("text-market-current")).toHaveText(label);
+    await expect(page.locator("h1")).toContainText("Recibos.");
+    expect(externalCalls).toBe(0);
+    expect(await page.evaluate(() => localStorage.getItem("receebo:visitorMarket"))).toBeNull();
+    await ctx.close();
+    console.log(`Server suggestion ${country}: ${label}, language unchanged, no third-party lookup, nothing stored`);
   }
 } finally {
   await browser.close();

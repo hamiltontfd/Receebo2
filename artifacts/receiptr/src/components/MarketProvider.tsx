@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { useAuth } from "@clerk/react";
 import { customFetch, type AccountMarket, type MarketSuggestion } from "@workspace/api-client-react";
 import { lt } from "@/lib/landingLocale";
-import { lookupExternalMarket } from "@/lib/marketSuggestion";
 
 export type Market = "PT" | "BR" | "US";
 export const VISITOR_MARKET_KEY = "receebo:visitorMarket";
@@ -22,8 +21,10 @@ function readPendingVisitor(userId: string | null): Market | null {
     return isMarket(value) ? value : null;
   } catch { return null; }
 }
-type MarketState = {
+export type MarketState = {
   market: Market | null;
+  /** ISO country the server detected from this request's IP (never stored); null when unknown. */
+  country: string | null;
   source: "account" | "visitor" | "suggestion" | "unknown";
   confirmed: boolean;
   loading: boolean;
@@ -32,7 +33,9 @@ type MarketState = {
   choose: (market: Market) => Promise<void>;
   retry: () => void;
 };
-const Context = createContext<MarketState | null>(null);
+/** Exported for lib/region.ts (rules) and tests; components use useMarket(). */
+export const MarketContext = createContext<MarketState | null>(null);
+const Context = MarketContext;
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const request = <T,>(path: string, options?: RequestInit) =>
   customFetch<T>(`${base}/api/${path}`, { credentials: "include", ...options });
@@ -50,6 +53,7 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
   const pendingVisitor = useRef(readPendingVisitor(userId) ?? visitor);
   const [account, setAccount] = useState<Market | null>(null);
   const [suggestion, setSuggestion] = useState<Market | null>(null);
+  const [country, setCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,35 +109,39 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
       try {
         let chosen: Market | null = null;
         if (userId) {
-          let prefs = await request<AccountMarket>("account/market", { signal: abort.signal });
-          if (!current()) return;
-          if (!prefs.market && pendingVisitor.current) {
+          // A visitor's own landing choice is applied first (only if the account
+          // has none); otherwise the server fills an empty market from this
+          // request's IP, once. A saved market is never replaced.
+          let prefs: AccountMarket & { country?: string | null };
+          if (pendingVisitor.current) {
             prefs = await request<AccountMarket>("account/market", {
               method: "PATCH", signal: abort.signal,
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ market: pendingVisitor.current, onlyIfUnset: true }),
             });
+          } else {
+            prefs = await request<AccountMarket>("account/market", { signal: abort.signal });
           }
           if (!current()) return;
           chosen = prefs.market;
           setAccount(chosen);
+          setCountry(prefs.country ?? null);
           pendingVisitor.current = null;
           try { sessionStorage.removeItem(pendingKey(userId)); } catch { /* no storage */ }
         } else {
           chosen = readVisitorMarket();
           if (current()) setVisitor(chosen);
-        }
-        if (!chosen) {
-          let result: MarketSuggestion = { country: null, market: null };
-          try {
-            result = await request<MarketSuggestion>("market/suggestion", { signal: abort.signal });
-          } catch {
-            // A browser-side lookup can still work if the local API is unavailable.
-            // Account-read failures above must never take this fallback path.
+          // Server-side GeoIP only. No third-party lookup: the visitor's IP never
+          // leaves our server. Unknown stays unknown (manual choice remains).
+          if (!chosen) {
+            let result: MarketSuggestion = { country: null, market: null };
+            try {
+              result = await request<MarketSuggestion>("market/suggestion", { signal: abort.signal });
+            } catch { /* unknown */ }
+            if (!current() || abort.signal.aborted) return;
+            setCountry(result.country ?? null);
+            setSuggestion(isMarket(result.market) ? result.market : null);
           }
-          if (!current() || abort.signal.aborted) return;
-          if (!result.country) result = await lookupExternalMarket(abort.signal);
-          if (current()) setSuggestion(isMarket(result.market) ? result.market : null);
         }
       } catch {
         if (current()) setError(userId
@@ -187,7 +195,7 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
   const confirmed = ready ? (userId ? account : visitor) : null;
   const market = ready ? confirmed ?? suggestion : null;
   return <Context.Provider value={{
-    market, source: confirmed ? (userId ? "account" : "visitor") : suggestion ? "suggestion" : "unknown",
+    market, country, source: confirmed ? (userId ? "account" : "visitor") : suggestion ? "suggestion" : "unknown",
     confirmed: !!confirmed, loading, saving, error, choose,
     retry: () => {
       if (failedChoice.current) void choose(failedChoice.current);

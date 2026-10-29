@@ -56,4 +56,14 @@ describe("PT golden outputs of deriveConsumerRights (must not change)", () => {
       expect(rows).toMatchSnapshot();
     });
   }
+
+  it("an explicit PT region (and any non-US value) gives exactly the same output", () => {
+    for (const place of PLACES) for (const isOnlinePurchase of CHANNELS) for (const c of CASES) {
+      const input = { ...place, isOnlinePurchase, ...c, locale: "en" as const };
+      const expected = plain(deriveConsumerRights(input));
+      expect(plain(deriveConsumerRights({ ...input, region: "PT", returnDays: 99, itemNames: ["iPhone"] }))).toEqual(expected);
+      expect(plain(deriveConsumerRights({ ...input, region: null }))).toEqual(expected);
+      expect(plain(deriveConsumerRights({ ...input, region: "BR" }))).toEqual(expected);
+    }
+  });
 });

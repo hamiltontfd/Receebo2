@@ -81,3 +81,32 @@ describe("unknown purchase channel", () => {
     expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", merchant: "Amazon.es" })?.daysRemaining).toBe(14);
   });
 });
+
+describe("US accounts (region US)", () => {
+  const us = { region: "US", purchaseCountry: "US", currency: "USD", category: "Electronics" };
+  it("in-store purchases also get the store window (Best Buy 15 days from purchase)", () => {
+    const w = calcReturnWindow({ ...us, merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: "2026-03-01", deliveryDate: "2026-03-05" });
+    expect(w).toMatchObject({ basis: "store", days: 15, startsFrom: "purchase" });
+    expect(w?.deadlineDate.toISOString().slice(0, 10)).toBe("2026-03-16");
+  });
+  it("online: counts from delivery; Apple items at Amazon get 15 days", () => {
+    const w = calcReturnWindow({ ...us, merchant: "Amazon.com", isOnlinePurchase: true, purchaseDate: "2026-03-01", deliveryDate: "2026-03-03", itemNames: ["Apple AirPods Pro 2"] });
+    expect(w).toMatchObject({ basis: "store", days: 15, startsFrom: "delivery" });
+  });
+  it("the user's saved window wins; 0 days is allowed", () => {
+    expect(calcReturnWindow({ ...us, merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: iso(-5), returnDays: 30 })).toMatchObject({ basis: "user", days: 30, daysRemaining: 25 });
+    expect(calcReturnWindow({ ...us, merchant: "Unknown Shop", isOnlinePurchase: true, purchaseDate: iso(0), returnDays: 0 })).toMatchObject({ basis: "user", days: 0 });
+  });
+  it("unknown store, eBay, Costco everyday items and EU law: no window", () => {
+    expect(calcReturnWindow({ ...us, merchant: "Joe's Electronics", isOnlinePurchase: true, purchaseDate: iso(0) })).toBeNull();
+    expect(calcReturnWindow({ ...us, merchant: "eBay", isOnlinePurchase: true, purchaseDate: iso(0) })).toBeNull();
+    expect(calcReturnWindow({ ...us, category: "Home", merchant: "Costco", isOnlinePurchase: false, purchaseDate: iso(0), itemNames: ["Patio chair"] })).toBeNull();
+    // A EUR online receipt from a PT shop gets the EU 14 days on PT accounts but nothing on a US account.
+    expect(calcReturnWindow({ ...online, purchaseDate: iso(0) })?.days).toBe(14);
+    expect(calcReturnWindow({ ...online, region: "US", purchaseDate: iso(0) })).toBeNull();
+  });
+  it("holiday 2026 extension: Best Buy bought Nov 20 2026 → Jan 15 2027", () => {
+    expect(calcReturnWindow({ ...us, merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: "2026-11-20" })).toMatchObject({ basis: "store", holiday: true });
+    expect(calcReturnWindow({ ...us, merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: "2026-11-20" })?.deadlineDate.toISOString().slice(0, 10)).toBe("2027-01-15");
+  });
+});

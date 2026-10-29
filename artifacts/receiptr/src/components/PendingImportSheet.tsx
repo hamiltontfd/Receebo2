@@ -14,6 +14,7 @@ import { usePendingImportActions } from "@/hooks/usePendingImportActions";
 import { MAIL_PROVIDER_LABELS } from "@/lib/mailConnection";
 import { deriveConsumerRights } from "@/lib/consumerRights";
 import { useAppLocale } from "@/lib/locale";
+import { useAccountRegion } from "@/lib/region";
 import { hasNoConsumerDates, type PurchaseType } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
 import { TRIAL_CAP_BUTTON, TRIAL_CAP_MESSAGE, SUBSCRIBE_HREF } from "@/lib/trialCopy";
@@ -113,6 +114,7 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
   const data = detail.extraction;
   const provider = detail.provider ? MAIL_PROVIDER_LABELS[detail.provider] : appText("your email");
   const products = data.products ?? [];
+  const { region } = useAccountRegion();
   const rights = deriveConsumerRights({
     purchaseDate: data.purchaseDate,
     deliveryDate: data.deliveryDate,
@@ -124,6 +126,8 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
     warrantyText: data.warranty,
     purchaseType,
     locale: useAppLocale(),
+    region,
+    itemNames: [...(data.notableItems ?? []), ...products].map((i) => i?.name),
   });
   const noDates = hasNoConsumerDates(purchaseType);
   const suggested = (data.category ?? "Other") === category;

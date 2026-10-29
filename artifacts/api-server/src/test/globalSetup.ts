@@ -1,4 +1,4 @@
-import { migrateReceiptPurchaseType, migrateReceiptWarrantyColumns } from "../lib/receiptColumns";
+import { migrateReceiptPurchaseType, migrateReceiptReturnDays, migrateReceiptWarrantyColumns } from "../lib/receiptColumns";
 import { migrateMailImportFailures } from "../lib/mailImportFailures";
 import { migrateTrialAiReads } from "../lib/trialAiReads";
 import { migrateRecurringSuppliers } from "../lib/recurringSuppliers";
@@ -13,6 +13,7 @@ export default async function setup(): Promise<void> {
   await migrateActionRateLimits();
   await migrateReceiptWarrantyColumns();
   await migrateReceiptPurchaseType();
+  await migrateReceiptReturnDays();
   await migrateTrialAiReads();
   await migrateMailImportFailures();
   await migrateRecurringSuppliers();

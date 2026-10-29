@@ -5,15 +5,13 @@ import { MarketProvider, useMarket, VISITOR_MARKET_KEY } from "./MarketProvider"
 const mocks = vi.hoisted(() => ({
   auth: { userId: null as string | null, isLoaded: true },
   request: vi.fn(),
-  external: vi.fn(),
 }));
 vi.mock("@clerk/react", () => ({ useAuth: () => mocks.auth }));
 vi.mock("@workspace/api-client-react", () => ({ customFetch: (...args: unknown[]) => mocks.request(...args) }));
-vi.mock("@/lib/marketSuggestion", () => ({ lookupExternalMarket: (...args: unknown[]) => mocks.external(...args) }));
 function View() {
   const m = useMarket();
   return <div>
-    <output data-testid="market">{JSON.stringify({ market: m.market, source: m.source, confirmed: m.confirmed, loading: m.loading, saving: m.saving })}</output>
+    <output data-testid="market">{JSON.stringify({ market: m.market, country: m.country, source: m.source, confirmed: m.confirmed, loading: m.loading, saving: m.saving })}</output>
     <span>{m.error}</span>
     <button onClick={() => void m.choose("BR")}>Brazil</button>
     <button onClick={() => void m.choose("US")}>US</button>
@@ -31,47 +29,39 @@ function deferred<T>() {
 beforeEach(() => {
   mocks.auth = { userId: null, isLoaded: true };
   mocks.request.mockReset();
-  mocks.external.mockReset().mockRejectedValue(new Error("Unavailable"));
   localStorage.clear();
   sessionStorage.clear();
 });
 afterEach(cleanup);
 
 describe("market resolution and session isolation", () => {
-  it("preselects the external visitor country when local proxy addresses are unknown", async () => {
+  it("never contacts a third-party location service: unknown stays unknown", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
     mocks.request.mockResolvedValue({ country: null, market: null });
-    mocks.external.mockResolvedValue({ country: "DE", market: "PT" });
     view();
-    await waitFor(() => expect(state()).toMatchObject({ market: "PT", source: "suggestion", confirmed: false, loading: false }));
-    expect(mocks.external).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem(VISITOR_MARKET_KEY)).toBeNull();
+    await waitFor(() => expect(state()).toMatchObject({ market: null, source: "unknown", loading: false }));
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+    expect(mocks.request.mock.calls[0][0]).toMatch(/\/api\/market\/suggestion$/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
-  it("can use the external suggestion when the local suggestion API fails", async () => {
-    mocks.request.mockRejectedValue(new Error("Local API down"));
-    mocks.external.mockResolvedValue({ country: "US", market: "US" });
-    view();
-    await waitFor(() => expect(state()).toMatchObject({ market: "US", source: "suggestion", confirmed: false }));
-  });
-  it("never asks the external provider for a known unsupported local country", async () => {
+  it("a known unsupported country is exposed for the notice, with no market", async () => {
     mocks.request.mockResolvedValue({ country: "JP", market: null });
     view();
     await waitFor(() => expect(state().loading).toBe(false));
-    expect(mocks.external).not.toHaveBeenCalled();
-    expect(state().market).toBeNull();
+    expect(state()).toMatchObject({ market: null, country: "JP" });
   });
   it("never looks up location when an account read fails", async () => {
     mocks.auth.userId = "A";
     mocks.request.mockRejectedValue(new Error("Account unavailable"));
     view();
     await screen.findByText(/Could not load or save/);
-    expect(mocks.external).not.toHaveBeenCalled();
+    expect(mocks.request).toHaveBeenCalledTimes(1);
   });
-  it("does not let a late external suggestion overwrite manual choice", async () => {
+  it("does not let a late suggestion overwrite manual choice", async () => {
     const late = deferred<{ country: string; market: string }>();
-    mocks.request.mockResolvedValue({ country: null, market: null });
-    mocks.external.mockReturnValue(late.promise);
+    mocks.request.mockReturnValue(late.promise);
     view();
-    await waitFor(() => expect(mocks.external).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByText("Brazil"));
     await act(async () => late.resolve({ country: "US", market: "US" }));
     expect(state()).toMatchObject({ market: "BR", source: "visitor", confirmed: true });
@@ -96,7 +86,6 @@ describe("market resolution and session isolation", () => {
     const first = view();
     await waitFor(() => expect(state()).toMatchObject({ market: "BR", confirmed: true }));
     expect(mocks.request).not.toHaveBeenCalled();
-    expect(mocks.external).not.toHaveBeenCalled();
     first.unmount();
     view();
     await waitFor(() => expect(state().source).toBe("visitor"));
@@ -113,10 +102,12 @@ describe("market resolution and session isolation", () => {
   it("adopts only explicit visitor choice into an empty account", async () => {
     localStorage.setItem(VISITOR_MARKET_KEY, "BR");
     mocks.auth.userId = "new-account";
-    mocks.request.mockResolvedValueOnce({ market: null }).mockResolvedValueOnce({ market: "BR" });
+    mocks.request.mockResolvedValueOnce({ market: "BR", country: null });
     view();
     await waitFor(() => expect(state()).toMatchObject({ market: "BR", source: "account" }));
-    expect(JSON.parse(mocks.request.mock.calls[1][1].body)).toEqual({ market: "BR", onlyIfUnset: true });
+    // The visitor's own choice is sent first (before the server could fill it from the IP).
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(mocks.request.mock.calls[0][1].body)).toEqual({ market: "BR", onlyIfUnset: true });
     expect(localStorage.getItem(VISITOR_MARKET_KEY)).toBeNull();
   });
   it("existing account wins over visitor and IP, and works on another device", async () => {
@@ -125,23 +116,30 @@ describe("market resolution and session isolation", () => {
     mocks.request.mockResolvedValue({ market: "BR" });
     const first = view();
     await waitFor(() => expect(state()).toMatchObject({ market: "BR", source: "account" }));
+    // onlyIfUnset: the server keeps the existing BR (coalesce), the visitor's US is not applied.
     expect(mocks.request).toHaveBeenCalledTimes(1);
-    expect(mocks.external).not.toHaveBeenCalled();
+    expect(mocks.request.mock.calls[0][1].method).toBe("PATCH");
     first.unmount();
     localStorage.clear();
     sessionStorage.clear();
     view();
     await waitFor(() => expect(state()).toMatchObject({ market: "BR", confirmed: true }));
   });
-  it("does not adopt a suggestion into the account", async () => {
+  it("signed-in account without a market: the server fills it from the IP; the client never PATCHes a suggestion", async () => {
     mocks.request.mockResolvedValueOnce({ country: "US", market: "US" });
     const root = view();
     await waitFor(() => expect(state().source).toBe("suggestion"));
     mocks.auth.userId = "fresh-account";
-    mocks.request.mockResolvedValueOnce({ market: null }).mockResolvedValueOnce({ country: "BR", market: "BR" });
+    mocks.request.mockResolvedValueOnce({ market: "US", country: "US" });
     root.rerender(<MarketProvider><View /></MarketProvider>);
-    await waitFor(() => expect(state()).toMatchObject({ market: "BR", source: "suggestion" }));
+    await waitFor(() => expect(state()).toMatchObject({ market: "US", country: "US", source: "account", confirmed: true }));
     expect(mocks.request.mock.calls.every(([, opts]) => opts.method !== "PATCH")).toBe(true);
+  });
+  it("signed-in account in an uncovered country: no market, country kept for the notice", async () => {
+    mocks.auth.userId = "jp-account";
+    mocks.request.mockResolvedValueOnce({ market: null, country: "JP" });
+    view();
+    await waitFor(() => expect(state()).toMatchObject({ market: null, country: "JP", source: "unknown", loading: false }));
   });
   it("logout and another account never expose or adopt previous account preference", async () => {
     localStorage.setItem(VISITOR_MARKET_KEY, "BR");
@@ -161,7 +159,8 @@ describe("market resolution and session isolation", () => {
     await waitFor(() => expect(state()).toMatchObject({ market: "US", source: "account" }));
     await act(async () => geo.resolve({ market: "PT" }));
     expect(state().market).toBe("US");
-    expect(mocks.request.mock.calls.every(([, opts]) => opts.method !== "PATCH")).toBe(true);
+    // Only account A consumed the visitor choice; B never PATCHes.
+    expect(mocks.request.mock.calls.slice(1).every(([, opts]) => opts.method !== "PATCH")).toBe(true);
   });
   it("rejects late account hydration after an explicit save", async () => {
     mocks.auth.userId = "A";
@@ -192,16 +191,16 @@ describe("market resolution and session isolation", () => {
     await screen.findByText(/Could not load or save/);
     expect(localStorage.getItem(VISITOR_MARKET_KEY)).toBeNull();
     root.unmount();
-    mocks.request.mockResolvedValueOnce({ market: null }).mockResolvedValueOnce({ market: "BR" });
+    mocks.request.mockResolvedValueOnce({ market: "BR" });
     view();
     await waitFor(() => expect(state()).toMatchObject({ market: "BR", source: "account" }));
+    expect(JSON.parse(mocks.request.mock.calls.at(-1)![1].body)).toEqual({ market: "BR", onlyIfUnset: true });
     expect(sessionStorage.getItem("receebo:pendingVisitorMarket:A")).toBeNull();
   });
   it("failed GeoIP stays nonblocking and an explicit choice works offline", async () => {
     mocks.request.mockRejectedValue(new Error("unavailable"));
     view();
-    await screen.findByText(/Location unavailable/);
-    expect(state().market).toBeNull();
+    await waitFor(() => expect(state()).toMatchObject({ market: null, source: "unknown", loading: false }));
     fireEvent.click(screen.getByText("Brazil"));
     await waitFor(() => expect(state()).toMatchObject({ market: "BR", confirmed: true }));
   });

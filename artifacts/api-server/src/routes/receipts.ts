@@ -393,11 +393,12 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   // Only fields the body actually carries can change; the others stay undefined.
   const body = parsed.data as Record<string, unknown>;
   const current = existing as Record<string, unknown>;
-  const changed = (key: "purchaseDate" | "deliveryDate" | "isOnlinePurchase" | "purchaseCountry" | "merchant" | "currency" | "purchaseType") =>
+  const changed = (key: "purchaseDate" | "deliveryDate" | "isOnlinePurchase" | "purchaseCountry" | "merchant" | "currency" | "purchaseType" | "returnDays") =>
     body[key] !== undefined && body[key] !== current[key];
   // The subscription switch also re-arms (or, for subscriptions, ends) the reminders.
   const datesChanged = changed("purchaseDate") || changed("deliveryDate") || changed("isOnlinePurchase") ||
-    changed("purchaseCountry") || changed("merchant") || changed("currency") || changed("purchaseType");
+    changed("purchaseCountry") || changed("merchant") || changed("currency") || changed("purchaseType") ||
+    changed("returnDays");
   const manualAcceptance = parsed.data.isDraft === false && existing.status !== "completed";
   if (manualAcceptance && existing.status !== "failed") {
     res.status(409).json({ error: "Only a completed receipt or manually reviewed failed extraction can be saved" });

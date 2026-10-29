@@ -150,3 +150,45 @@ describe("subscriptions, digital purchases and tickets (no consumer dates)", () 
     expect(deriveConsumerRights({ ...base, purchaseType: "goods" }).warranty).not.toBeNull();
   });
 });
+
+describe("US accounts (region US)", () => {
+  const today = local(0);
+  const base = { region: "US", locale: "en" as const, currency: "USD", purchaseCountry: "US", category: "Electronics" };
+  it("Best Buy in store: store window with countdown, no legal warranty, no [LEGAL REVIEW NEEDED]", () => {
+    const r = deriveConsumerRights({ ...base, merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: local(-5), warrantyText: "2-year manufacturer warranty" });
+    expect(r.returnWindow).toMatchObject({ daysLeft: 10, startsFrom: "purchase" });
+    expect(r.returnWindow?.source).toMatch(/^Best Buy: 15 days \(store policy, checked Oct 27, 2026\)$/);
+    expect(r.warranty).toBeNull();
+    expect(r.manufacturerWarranty).toMatchObject({ months: 24 });
+    expect(r.legalReviewPending).toBe(false);
+    expect(r.notes).toContain("Check your receipt or the store's policy.");
+    expect(JSON.stringify(r)).not.toMatch(/LEGAL REVIEW|legal warranty|Decree|Directive|Consumer Rights|14 days/i);
+  });
+  it("a EUR receipt in a US account still gets no legal warranty and no 14 days", () => {
+    const r = deriveConsumerRights({ ...base, currency: "EUR", purchaseCountry: "PT", merchant: "Worten", isOnlinePurchase: true, purchaseDate: today });
+    expect(r.warranty).toBeNull();
+    expect(r.returnWindow).toBeNull();
+    expect(r.notes).toContain("We don't know this store's return window. Add it if you know it.");
+  });
+  it("the user's own window wins over the store table", () => {
+    const r = deriveConsumerRights({ ...base, merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: local(-5), returnDays: 60 });
+    expect(r.returnWindow).toMatchObject({ daysLeft: 55 });
+    expect(r.returnWindow?.source).toBe("Your store's window: 60 days (you saved it)");
+    expect(r.usReturn).toMatchObject({ kind: "user", days: 60 });
+  });
+  it("unknown store, eBay and Costco: notes only, never a guessed window", () => {
+    for (const merchant of ["Joe's Electronics", "eBay"]) {
+      const r = deriveConsumerRights({ ...base, merchant, isOnlinePurchase: true, purchaseDate: today });
+      expect(r.returnWindow).toBeNull();
+      expect(r.usReturn).toMatchObject({ kind: "store", store: { status: "unknown" } });
+    }
+    const costco = deriveConsumerRights({ ...base, category: "Home", merchant: "COSTCO WHSE", isOnlinePurchase: false, purchaseDate: today, itemNames: ["Patio chair"] });
+    expect(costco.returnWindow).toBeNull();
+    expect(costco.notes).toContain("No fixed return window at Costco for most items (satisfaction guarantee).");
+  });
+  it("subscriptions keep their note, without dates", () => {
+    const r = deriveConsumerRights({ ...base, merchant: "Apple", purchaseType: "subscription", purchaseDate: today });
+    expect(r).toMatchObject({ hasAny: true, returnWindow: null, warranty: null });
+    expect(r.notes[0]).toMatch(/^Subscription:/);
+  });
+});

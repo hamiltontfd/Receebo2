@@ -114,9 +114,11 @@ export interface ReminderMessage {
 export interface ReturnReminderInput extends ReminderPurchase {
   deadline: Date | string;
   daysRemaining: number;
-  /** "law": statutory withdrawal period of `windowDays`; "store": the retailer's policy. */
-  basis?: "law" | "store";
+  /** "law": statutory withdrawal period of `windowDays`; "store": the retailer's policy; "user": the user's own window (US). */
+  basis?: "law" | "store" | "user";
   windowDays?: number;
+  /** The store's holiday return extension set the deadline (US). */
+  holiday?: boolean;
 }
 
 export function renderReturnReminder(input: ReturnReminderInput): ReminderMessage {
@@ -137,7 +139,9 @@ export function renderReturnReminder(input: ReturnReminderInput): ReminderMessag
     `Last day: ${deadline}.`,
   ].filter(Boolean).join(" ");
   const note = input.basis === "store" && p.merchant
-    ? `Based on ${p.merchant}'s return policy. Conditions vary, so check your receipt or the store's site.`
+    ? `Based on ${p.merchant}'s ${input.holiday ? "holiday " : ""}return policy. Conditions vary, so check your receipt or the store's site.`
+    : input.basis === "user"
+      ? `Based on the ${input.windowDays ?? ""}-day return window you saved for this receipt.`.replace("the -day", "the")
     : input.basis === "law"
       ? `Based on the ${input.windowDays ?? 14}-day withdrawal period for online purchases.`
       : null;

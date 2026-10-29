@@ -552,6 +552,9 @@ components:
         market:
           type: ["string", "null"]
           enum: [PT, BR, US, null]
+        country:
+          type: ["string", "null"]
+          description: ISO country detected server-side from this request's IP (never stored); null when unknown.
     MarketPreferenceInput:
       type: object
       additionalProperties: false
@@ -673,6 +676,11 @@ components:
           type: ["string", "null"]
           enum: [ai, hint, manual, null]
           description: Where purchaseType came from. A manual choice is never overwritten.
+        returnDays:
+          type: ["integer", "null"]
+          minimum: 0
+          maximum: 365
+          description: Store return window in days written by the user (US accounts). Wins over the store table. Null = not set.
         products:
           type: array
           items:
@@ -748,6 +756,11 @@ components:
         deliveryDate:
           type: ["string", "null"]
           description: Delivery date (YYYY-MM-DD); null clears it.
+        returnDays:
+          type: ["integer", "null"]
+          minimum: 0
+          maximum: 365
+          description: Store return window in days (US accounts); null clears it.
         total:
           type: number
         currency:

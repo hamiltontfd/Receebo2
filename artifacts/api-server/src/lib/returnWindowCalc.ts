@@ -1,4 +1,5 @@
 import { hasNoConsumerDates } from "./purchaseType";
+import { addDaysIso, usReturnStart, usStoreReturnWindow } from "./usStorePolicies";
 
 /**
  * Server-side return window calculator.
@@ -90,8 +91,13 @@ export interface ReturnWindowResult {
   startsFrom: "delivery" | "purchase";
   /** Length of the window in days. */
   days: number;
-  /** "law": statutory withdrawal period; "store": the retailer's return policy. */
-  basis: "law" | "store";
+  /**
+   * "law": statutory withdrawal period; "store": the retailer's return policy;
+   * "user": the window the user wrote on the receipt (US accounts).
+   */
+  basis: "law" | "store" | "user";
+  /** US accounts: the store's holiday extension set the deadline. */
+  holiday?: boolean;
 }
 
 /**
@@ -119,9 +125,17 @@ export function calcReturnWindow(params: {
   merchant?: string | null;
   /** Subscriptions, digital purchases, tickets and services have no return window. */
   purchaseType?: string | null;
+  /** Account region. Anything but "US" (including missing) = PT rules, unchanged. */
+  region?: string | null;
+  /** US: the store window the user wrote (receipts.return_days); wins over the store table. */
+  returnDays?: number | null;
+  /** US: receipt category and item names, for the store table's exceptions. */
+  category?: string | null;
+  itemNames?: ReadonlyArray<string | null | undefined> | null;
 }): ReturnWindowResult | null {
   const { purchaseDate, purchaseCountry, isOnlinePurchase, currency, merchant } = params;
   if (hasNoConsumerDates(params.purchaseType)) return null;
+  if (params.region === "US") return calcUsReturnWindow({ ...params, purchaseDate });
 
   // Parse purchase date — treat as UTC midnight to avoid timezone shifts
   const purchaseDateObj = new Date(purchaseDate + "T00:00:00Z");
@@ -162,6 +176,40 @@ export function calcReturnWindow(params: {
   );
 
   return { deadlineDate, daysRemaining, startsFrom: start.from, days: returnDays, basis };
+}
+
+function daysUntil(deadlineIso: string): number {
+  const todayUtc = new Date();
+  todayUtc.setUTCHours(0, 0, 0, 0);
+  return Math.ceil((new Date(`${deadlineIso}T00:00:00Z`).getTime() - todayUtc.getTime()) / 86_400_000);
+}
+
+/**
+ * US accounts: no statutory withdrawal right. The user's own number wins;
+ * else the store table (8 stores, online and in store); unknown stores get no
+ * deadline and no reminder. The receipt's country and currency don't matter.
+ */
+function calcUsReturnWindow(params: {
+  purchaseDate: string;
+  deliveryDate?: string | null;
+  isOnlinePurchase?: boolean | null;
+  merchant?: string | null;
+  returnDays?: number | null;
+  category?: string | null;
+  itemNames?: ReadonlyArray<string | null | undefined> | null;
+}): ReturnWindowResult | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(params.purchaseDate) || Number.isNaN(new Date(`${params.purchaseDate}T00:00:00Z`).getTime())) return null;
+  if (typeof params.returnDays === "number" && Number.isInteger(params.returnDays) && params.returnDays >= 0) {
+    const start = usReturnStart(params);
+    const deadline = addDaysIso(start.date, params.returnDays);
+    return { deadlineDate: new Date(`${deadline}T00:00:00Z`), daysRemaining: daysUntil(deadline), startsFrom: start.from, days: params.returnDays, basis: "user" };
+  }
+  const s = usStoreReturnWindow(params);
+  if (s.status !== "window") return null;
+  return {
+    deadlineDate: new Date(`${s.deadline}T00:00:00Z`), daysRemaining: daysUntil(s.deadline),
+    startsFrom: s.startsFrom, days: s.days, basis: "store", holiday: s.holiday,
+  };
 }
 
 /** Delivery date edits: null clears it; otherwise a real YYYY-MM-DD not before the purchase. */

@@ -33,3 +33,10 @@ informed that an external service receives the visitor's IP.
 on the server (which would locate the server). Preserve preference priority,
 discard the returned IP, disclose the service and fail back to manual choice.
 This is a market suggestion, not permission for precise location or tracking.
+
+**Superseded 2 Nov 2026 (Hamilton, US mode):** "O IP deve determinar o mercado."
+The browser-side country.is fallback was removed so no visitor IP goes to a third
+party; the server's local GeoIP fills an empty account market once (never replaces
+one). Production needs a verified `MARKET_TRUSTED_PROXY_CIDRS`; otherwise the
+market stays unknown and the manual selector remains. Do not re-add country.is
+without asking Hamilton.

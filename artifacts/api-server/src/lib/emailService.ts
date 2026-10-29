@@ -348,9 +348,11 @@ export interface ReturnWindowReceipt extends ReminderPurchase {
   deadlineDate: Date;
   daysRemaining: number;
   originalFileName?: string;
-  /** "law" (statutory withdrawal period of windowDays) or "store" (retailer policy). */
-  basis?: "law" | "store";
+  /** "law" (statutory withdrawal period of windowDays), "store" (retailer policy) or "user" (the user's own window). */
+  basis?: "law" | "store" | "user";
   windowDays?: number;
+  /** The store's holiday return extension set the deadline (US). */
+  holiday?: boolean;
 }
 
 export async function sendReturnWindowEmail(

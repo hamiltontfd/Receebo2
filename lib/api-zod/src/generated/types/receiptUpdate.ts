@@ -29,6 +29,11 @@ export interface ReceiptUpdate {
      * @nullable
      */
   deliveryDate?: string | null;
+  /**
+   * Store return window in days (US accounts); null clears it.
+   * @nullable
+   */
+  returnDays?: number | null;
   total?: number;
   currency?: string;
   category?: string;

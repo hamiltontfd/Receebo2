@@ -97,7 +97,20 @@ switch these documents or claim legal approval.
 ## Account market (web/PWA only)
 - The three markets are `PT` (Portugal / European Union), `BR` and `US`.
   Market is independent of language, actual purchase country, receipt currency
-  and subscription currency. Choosing one never rewrites receipts or rules.
+  and subscription currency. Choosing one never rewrites stored receipts.
+- **Since 2 Nov 2026 (US mode, Hamilton): the market decides the consumer
+  rules.** `US` -> US rules (each store's return policy, online and in store,
+  `receipts.return_days` when the user saved one, manufacturer warranty only, no
+  legal warranty or statutory return right). `PT`, `BR` or null -> PT/EU rules,
+  exactly as before (BR follows PT for now). The receipt's purchase country and
+  currency still decide PT/EU/BR/CA rules *inside* the PT path. Server:
+  `lib/accountMarket.ts`; web: `lib/region.ts` (reads `MarketProvider`).
+- **IP decides the market (Hamilton, 2 Nov 2026).** `GET /api/account/market`
+  fills an empty account market from the server-side GeoIP of that request,
+  once (`coalesce`, a saved/manual market is never replaced) and returns the
+  detected `country` (never stored). A visitor's own landing choice is sent first
+  with `onlyIfUnset`, so it wins over the IP. Unknown or uncovered countries leave
+  the market empty (PT/EU rules) and show the uncovered-country notice.
 - Landing, signed-in home and account settings share the same selector.
   It is available in settings without an active subscription.
 - `GET/PATCH /api/account/market` require Clerk authentication (never a guest
@@ -153,32 +166,18 @@ switch these documents or claim legal approval.
   without changing any purchase country. UK, EEA-only countries, unsupported
   countries, private/reserved/invalid IPs and failed lookups return no market.
 
-### Authorized browser-side GeoIP fallback
-- After the owner authorized an external IP lookup, the browser uses
-  `https://api.country.is/` only when no confirmed account/browser preference
-  exists and the local suggestion cannot determine a country (including API
-  failure). A known but unsupported local country does not trigger another lookup.
-- The call must run in the **browser**, not the backend: otherwise it would
-  locate the server. Use only the caller endpoint, without an IP parameter,
-  credentials or referrer. No account identifier, receipt content or app cookie
-  is sent. As with any network request, country.is receives the caller's public IP.
-- Read only `country`; discard the returned IP and all other fields. Validate a
-  real ISO code and map the same EU/BR/US markets as the local database. A valid
-  unsupported country remains unknown, never PT.
-- Successful country/market results are cached in memory for ten minutes only
-  to avoid repeat calls on focus, not in local/session storage or server logs.
-  The cache is geographic data, never a confirmed account or visitor preference.
-  Requests have a three-second deadline and are cancelled on scope changes.
-- Blocked CORS, rate limits, ad blockers, invalid payloads and offline conditions
-  retain manual choice and recoverable retry. No lookup blocks navigation, saves
-  a suggestion as confirmation, or overrides a manual/account preference.
-- The provider is disclosed in the selector explanation and Privacy Policy.
-  No new legal consent version, local legal-document claims, or billing changes
-  were introduced. Public endpoint documentation: https://country.is/.
-- The local server endpoint's responses use `Cache-Control: private, no-store`. It has a bounded
-  global rate budget (600/minute/process), with no per-IP map or retained IP
-  keys. Exhaustion is a recoverable unavailable suggestion, not a default PT.
-  Neither this route nor its request serializer logs IPs or forwarding headers.
+### No browser-side GeoIP (removed 2 Nov 2026)
+- The `api.country.is` browser fallback was removed: no visitor IP is sent to a
+  third party. If the server cannot tell the country (no verified public client
+  IP), the market stays unknown and the manual selector remains.
+- Production needs `MARKET_TRUSTED_PROXY_CIDRS` set to the verified proxy
+  network(s) in front of the API, or every lookup stays unknown. Once per
+  process the API logs only the *kind* of untrusted peer address
+  ("Market GeoIP: no public client IP", `peerRange`), never the address.
+- Dev/test only: `MARKET_DEV_COUNTRY=US` (or any ISO code) pretends the request
+  came from that country. Ignored when `NODE_ENV=production`.
+- The suggestion endpoint keeps `Cache-Control: private, no-store` and its
+  bounded global rate budget (600/minute/process).
 
 ### Purchase country
 - Scan review, email-import review, receipt details and the receipt sheet expose
@@ -189,8 +188,9 @@ switch these documents or claim legal approval.
   confirmed country or an account preference.
 - Country correction uses the existing receipt update, warranty recalculation,
   reminder reset and cache invalidation paths. Existing legal tables are
-  unchanged. A PT purchase under a BR account still has PT rules; a BR purchase
-  under a US account still has the existing BR rules and legal-review caveats.
+  unchanged. A PT purchase under a BR account still has PT rules. Under a US
+  account every receipt follows the US rules (store policy, manufacturer
+  warranty), whatever its purchase country.
 
 ## Not done yet
 - pt-BR / en-US terms and privacy pages in the app.

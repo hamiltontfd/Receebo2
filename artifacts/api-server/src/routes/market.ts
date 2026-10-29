@@ -5,7 +5,9 @@ import { eq, sql } from "drizzle-orm";
 import { UpdateAccountMarketBody, UpdateAccountLanguageBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { lockUserDataMutation } from "../lib/userDataLock";
-import { clientPublicIp, suggestMarket } from "../lib/marketGeoip";
+import { requestCountry } from "../lib/marketGeoip";
+import { setMarketIfUnset } from "../lib/accountMarket";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 router.get("/account/language", requireAuth, async (req, res): Promise<void> => {
@@ -39,15 +41,30 @@ router.get("/market/suggestion", (_req, res, next) => {
   res.setHeader("Cache-Control", "private, no-store");
   next();
 }, suggestionLimit, (req, res) => {
-  const ip = clientPublicIp(req.socket.remoteAddress, req.headers["x-forwarded-for"]);
-  res.json(suggestMarket(ip));
+  res.json(requestCountry(req));
 });
 
+/**
+ * The account market, plus the country detected from this request (never
+ * stored). An account without a market gets the IP's market once (first write
+ * wins; a saved/manual market is never replaced). Unknown or uncovered
+ * countries leave it empty: PT/EU rules apply and the app shows the notice.
+ */
 router.get("/account/market", requireAuth, async (req, res): Promise<void> => {
   res.setHeader("Cache-Control", "private, no-store");
   const [prefs] = await db.select({ market: userPreferencesTable.market })
     .from(userPreferencesTable).where(eq(userPreferencesTable.userId, req.userId!));
-  res.json({ market: prefs?.market ?? null });
+  const detected = requestCountry(req);
+  let market = prefs?.market ?? null;
+  if (!market && detected.market) {
+    try {
+      market = await setMarketIfUnset(req.userId!, detected.market);
+      logger.info({ userId: req.userId, market }, "Account market set from server-side GeoIP");
+    } catch (err) {
+      logger.warn({ err, userId: req.userId }, "Could not save the detected market; leaving it unset");
+    }
+  }
+  res.json({ market, country: detected.country });
 });
 
 router.patch("/account/market", requireAuth, lockUserDataMutation(async (req, res): Promise<void> => {
@@ -66,6 +83,6 @@ router.patch("/account/market", requireAuth, lockUserDataMutation(async (req, re
         updatedAt: new Date(),
       },
     }).returning({ market: userPreferencesTable.market });
-  res.json(saved);
+  res.json({ ...saved, country: requestCountry(req).country });
 }));
 export default router;

@@ -13,7 +13,9 @@ import {
   Paperclip, FileText, ArrowLeft, Maximize2, X,
   Sparkles, Package, Shield, Star, Scale, RotateCcw, Clock,
 } from "lucide-react";
-import { deriveConsumerRights } from "@/lib/consumerRights";
+import { deriveConsumerRights, usRightsCopy } from "@/lib/consumerRights";
+import { useAccountRegion } from "@/lib/region";
+import { usStoreReturnWindow } from "@/lib/usStorePolicies";
 import { useAppLocale, formatLocaleDate } from "@/lib/locale";
 import { hasNoConsumerDates } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
@@ -84,6 +86,8 @@ const editFormSchema = z.object({
   currency: z.string().optional(),
   category: z.string().optional(),
   warranty: z.string().optional(),
+  /** US accounts: the store's return window in days ("" = use the store table). */
+  returnDays: z.string().regex(/^\d{0,3}$/, "Days, 0 to 365").refine((v) => v === "" || Number(v) <= 365, "Days, 0 to 365").optional(),
   isOnlinePurchase: z.boolean().nullable().optional(),
   purchaseCountry: z.string().nullable().optional(),
   purchaseType: z.enum(["goods", "subscription", "digital", "service", "ticket"]).nullable().optional(),
@@ -135,6 +139,8 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
 
   const updateReceipt = useUpdateReceipt();
   const deleteReceipt = useDeleteReceipt();
+  const { region, ready: regionReady } = useAccountRegion();
+  const isUs = region === "US";
 
   const form = useForm<EditFormValues>({
     resolver: zodResolver(editFormSchema),
@@ -146,6 +152,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
       currency: "USD",
       category: "",
       warranty: "",
+      returnDays: "",
       isOnlinePurchase: null,
       purchaseCountry: null,
       purchaseType: null,
@@ -162,6 +169,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
         currency: receipt.currency || "USD",
         category: receipt.category || "",
         warranty: receipt.warranty || "",
+        returnDays: receipt.returnDays != null ? String(receipt.returnDays) : "",
         isOnlinePurchase: receipt.isOnlinePurchase ?? null,
         purchaseCountry: receipt.purchaseCountry ?? null,
         purchaseType: receipt.purchaseType ?? null,
@@ -224,6 +232,8 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
           warranty: data.warranty,
           isOnlinePurchase: data.isOnlinePurchase,
           purchaseCountry: data.purchaseCountry ?? null,
+          // US accounts only: the store window the user wrote ("" clears it). PT requests are unchanged.
+          ...(isUs ? { returnDays: data.returnDays ? Number(data.returnDays) : null } : {}),
           // Only when the switch changed it: an untouched AI/hint type stays as detected.
           ...((data.purchaseType ?? null) !== (receipt?.purchaseType ?? null)
             ? { purchaseType: data.purchaseType ?? null }
@@ -628,6 +638,57 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             </FormItem>
                           )}
                         />
+                        {isUs && (
+                          <FormField
+                            control={form.control}
+                            name="returnDays"
+                            render={({ field }) => {
+                              const watched = form.watch(["merchant", "purchaseDate", "deliveryDate", "isOnlinePurchase", "category"]);
+                              const suggestion = watched[1]
+                                ? usStoreReturnWindow({
+                                    merchant: watched[0], purchaseDate: watched[1], deliveryDate: watched[2] || null,
+                                    isOnlinePurchase: watched[3], category: watched[4],
+                                    itemNames: [...(receipt.notableItems ?? []), ...(receipt.products ?? [])].map((i) => i.name),
+                                  })
+                                : { status: "unknown" as const };
+                              return (
+                                <FormItem className="p-4 space-y-1">
+                                  <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Store return window (optional)")}</FormLabel>
+                                  <div className="flex items-center gap-2">
+                                    <FormControl>
+                                      <Input
+                                        inputMode="numeric"
+                                        {...field}
+                                        value={field.value ?? ""}
+                                        placeholder={suggestion.status === "window" ? String(suggestion.days) : "e.g. 30"}
+                                        data-testid="input-return-days"
+                                        className="w-20 border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none"
+                                      />
+                                    </FormControl>
+                                    <span className="text-sm text-muted-foreground">{appText("days")}</span>
+                                    {suggestion.status === "window" && field.value !== String(suggestion.days) && (
+                                      <button
+                                        type="button"
+                                        className="ml-auto text-xs font-semibold underline underline-offset-4"
+                                        onClick={() => field.onChange(String(suggestion.days))}
+                                      >
+                                        {appText("Use {0} days", [suggestion.days])}
+                                      </button>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground" data-testid="text-return-days-hint">
+                                    {suggestion.status === "window"
+                                      ? appText("Typical for {0}: {1} days. Leave empty to use the store's policy. Check your receipt.", [`${suggestion.store.name}${suggestion.rule === "standard" ? "" : ` (${suggestion.rule})`}`, suggestion.days])
+                                      : suggestion.status === "no_fixed_window"
+                                        ? appText("{0} has no fixed window for most items. Add one only if your receipt shows it.", [suggestion.store.name])
+                                        : appText("We don't know this store's return window. Add it if you know it; online and in store.")}
+                                  </p>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        )}
                         <div className="flex items-center gap-2 mt-4">
                           <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
                             {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -728,7 +789,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                   )}
 
                   {/* ── Consumer Rights ── */}
-                  {!isEditing && (() => {
+                  {!isEditing && regionReady && (() => {
                     const rights = deriveConsumerRights({
                       purchaseDate: receipt.purchaseDate,
                       deliveryDate: receipt.deliveryDate,
@@ -740,6 +801,9 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       warrantyText: receipt.warranty,
                       purchaseType: receipt.purchaseType,
                       locale,
+                      region,
+                      returnDays: receipt.returnDays,
+                      itemNames: [...(receipt.notableItems ?? []), ...(receipt.products ?? [])].map((i) => i.name),
                     });
                     if (!rights.hasAny) return null;
 
@@ -754,7 +818,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
                           <Scale className="w-3.5 h-3.5" />
-                          {appText("Consumer Rights")}{rights.countryLabel ? ` · ${rights.countryLabel}` : ""}
+                          {isUs ? usRightsCopy(locale).panelTitle : <>{appText("Consumer Rights")}{rights.countryLabel ? ` · ${rights.countryLabel}` : ""}</>}
                         </p>
                         {!receipt.purchaseCountry && (
                           <p className="mb-2 text-xs text-muted-foreground">
@@ -836,7 +900,6 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                           )}
                           <p className="px-1 text-[11px] leading-4 text-muted-foreground">
                             {rights.disclaimer}
-                            {rights.legalReviewPending && <strong> {appText("[LEGAL REVIEW NEEDED]")}</strong>}
                           </p>
 
                         </div>

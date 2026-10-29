@@ -33,6 +33,7 @@ import { calcReturnWindow } from "./returnWindowCalc";
 import { renderReturnReminder, renderWarrantyReminder } from "./reminderCopy";
 import { runDataRetentionSweep } from "./accountLifecycle";
 import { syncWarrantyExpiries, warrantyInputColumns } from "./warrantyExpiryStore";
+import { accountRegionLookup } from "./accountMarket";
 
 const ORPHAN_AGE_THRESHOLD_DAYS = 7;
 const ORPHAN_AGE_THRESHOLD_MS = ORPHAN_AGE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
@@ -203,12 +204,16 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
   }
 
   const hasAccess = reminderAccessChecker();
+  const regionOf = accountRegionLookup();
   let sent = 0;
   let failed = 0;
   let skippedOptOut = 0;
   let skippedNoAccess = 0;
   for (const r of warrantyReceipts) {
-    const expiries = await syncWarrantyExpiries(r);
+    const stored = await syncWarrantyExpiries(r);
+    // US accounts have no legal warranty: only the manufacturer's is reminded
+    // (and never mentioned as "the other warranty"). Stored dates stay per receipt.
+    const expiries = stored.legal && (await regionOf(r.userId)) === "US" ? { ...stored, legal: null } : stored;
     const candidates: Array<{ kind: WarrantyKind; due: string; emailPrev: string | null; pushPrev: string | null }> = [];
     if (isDue(expiries.manufacturer)) {
       candidates.push({ kind: "manufacturer", due: expiries.manufacturer, emailPrev: r.warrantyReminderSentFor, pushPrev: r.manufacturerWarrantyPushSentFor });
@@ -475,6 +480,8 @@ export async function runReturnWindowSweep(): Promise<void> {
     returnReminderSent2dAt: Date | null;
     returnPushSent2dAt: Date | null;
     returnPushSent1dAt: Date | null;
+    returnDays: number | null;
+    category: string | null;
   }>;
 
   try {
@@ -497,6 +504,8 @@ export async function runReturnWindowSweep(): Promise<void> {
         returnReminderSent2dAt: receiptsTable.returnReminderSent2dAt,
         returnPushSent2dAt: receiptsTable.returnPushSent2dAt,
         returnPushSent1dAt: receiptsTable.returnPushSent1dAt,
+        returnDays: receiptsTable.returnDays,
+        category: receiptsTable.category,
       })
       .from(receiptsTable)
       .where(
@@ -530,9 +539,13 @@ export async function runReturnWindowSweep(): Promise<void> {
   let skippedOptOut = 0;
   let skippedNoAccess = 0;
   const hasAccess = reminderAccessChecker();
+  const regionOf = accountRegionLookup();
 
   for (const r of receipts) {
     if (!r.purchaseDate) continue;
+    // PT (default): today's rules. US: store table or the user's own window,
+    // online and in store (lib/usStorePolicies.ts).
+    const region = await regionOf(r.userId);
 
     const window = calcReturnWindow({
       purchaseDate: r.purchaseDate,
@@ -543,6 +556,12 @@ export async function runReturnWindowSweep(): Promise<void> {
       merchant: r.merchant,
       // Subscriptions, digital purchases and tickets have no return window.
       purchaseType: r.purchaseType,
+      region,
+      ...(region === "US" ? {
+        returnDays: r.returnDays,
+        category: r.category,
+        itemNames: [...(r.notableItems ?? []), ...(r.products ?? [])].map((i) => i?.name),
+      } : {}),
     });
 
     if (!window) continue;
@@ -558,6 +577,7 @@ export async function runReturnWindowSweep(): Promise<void> {
       deadlineDate,
       daysRemaining,
       basis: window.basis,
+      holiday: window.holiday,
       windowDays: window.days,
       originalFileName: r.originalFileName,
     };

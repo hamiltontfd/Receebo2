@@ -1,6 +1,7 @@
 import { formatLocaleDate, type AppLocale } from "./locale";
 import { rightsCopy } from "./rightsCopy";
 import { hasNoConsumerDates } from "./purchaseType";
+import { addDaysIso, usReturnStart, usStoreReturnWindow, type UsReturnSuggestion } from "./usStorePolicies";
 
 /**
  * Consumer rights derivation utility.
@@ -261,8 +262,19 @@ export interface ManufacturerWarrantyInfo {
   isExpired: boolean;
 }
 
+/**
+ * US accounts: where the return window comes from. "user" = the number the
+ * user saved (receipts.returnDays); "window"/"no_fixed_window"/"unknown" =
+ * the store table (lib/usStorePolicies.ts). Null for PT accounts.
+ */
+export type UsReturnInfo =
+  | { kind: "user"; days: number; store: UsReturnSuggestion }
+  | { kind: "store"; store: UsReturnSuggestion };
+
 export interface ConsumerRightsResult {
   hasAny: boolean;
+  /** US accounts only (null otherwise): the store table / user window behind the return window. */
+  usReturn?: UsReturnInfo | null;
   countryLabel: string | null;
   returnWindow: ReturnWindowInfo | null;
   warranty: StatutoryWarrantyInfo | null;
@@ -305,7 +317,14 @@ export function deriveConsumerRights(params: {
   /** Subscription / digital / ticket / service: no return window, no warranty, just a note. */
   purchaseType?: string | null;
   locale?: AppLocale;
+  /** Account region. Anything but "US" (including missing) = PT rules, unchanged. */
+  region?: string | null;
+  /** US: the store return window the user saved, in days (wins over the store table). */
+  returnDays?: number | null;
+  /** US: product and notable-item names (store-table exceptions: phones, Apple, TVs…). */
+  itemNames?: ReadonlyArray<string | null | undefined> | null;
 }): ConsumerRightsResult {
+  if (params.region === "US") return deriveUsConsumerRights(params);
   const { purchaseDate, category, currency, purchaseCountry, isOnlinePurchase, merchant } = params;
   const copy = rightsCopy(params.locale);
   const fmt = (d: Date) => fmtDate(d, params.locale);
@@ -448,4 +467,119 @@ export function deriveConsumerRights(params: {
     disclaimer: copy.disclaimer,
     legalReviewPending: rule?.legalReviewPending === true,
   };
+}
+
+// ── US accounts ──────────────────────────────────────────────────────────────
+
+/** US copy. Never "rights" or laws: store policy and the manufacturer's warranty only. en, pt-PT, pt-BR. */
+type WindowSuggestion = Extract<UsReturnSuggestion, { status: "window" }>;
+export function usRightsCopy(locale: AppLocale = "en") {
+  if (locale === "en") return {
+    panelTitle: "Returns & warranty",
+    countryLabel: "United States",
+    noFederalNote: "No federal minimum return right or warranty in the US. Your store's policy and the manufacturer's warranty apply.",
+    checkStoreNote: "Check your receipt or the store's policy.",
+    unknownStoreNote: "We don't know this store's return window. Add it if you know it.",
+    noFixedWindowNote: (store: string) => `No fixed return window at ${store} for most items (satisfaction guarantee).`,
+    storeSource: (s: WindowSuggestion, checked: string) =>
+      s.holiday
+        ? `${s.store.name} holiday returns (store policy, checked ${checked})`
+        : `${s.store.name}${s.rule === "standard" ? "" : ` (${s.rule})`}: ${s.days} days (store policy, checked ${checked})`,
+    userSource: (days: number) => `Your store's window: ${days} day${days === 1 ? "" : "s"} (you saved it)`,
+    disclaimer: "General information, not legal advice. Check with the store.",
+  };
+  const br = locale === "pt-BR";
+  return {
+    panelTitle: "Devoluções e garantia",
+    countryLabel: "Estados Unidos",
+    noFederalNote: br
+      ? "Nos EUA não há prazo mínimo federal de devolução nem garantia legal. Valem a política da loja e a garantia do fabricante."
+      : "Nos EUA não existe prazo mínimo federal de devolução nem garantia legal. Aplicam-se a política da loja e a garantia do fabricante.",
+    checkStoreNote: br ? "Confira o recibo ou a política da loja." : "Confirme no recibo ou na política da loja.",
+    unknownStoreNote: br
+      ? "Não sabemos o prazo de devolução desta loja. Adicione se você souber."
+      : "Não sabemos o prazo de devolução desta loja. Adicione-o se o souber.",
+    noFixedWindowNote: (store: string) => br
+      ? `A ${store} não tem prazo fixo de devolução para a maioria dos itens (garantia de satisfação).`
+      : `A ${store} não tem prazo fixo de devolução para a maioria dos artigos (garantia de satisfação).`,
+    storeSource: (s: WindowSuggestion, checked: string) =>
+      s.holiday
+        ? `Devoluções de fim de ano da ${s.store.name} (política da loja, ${br ? "conferida" : "verificada"} em ${checked})`
+        : `${s.store.name}${s.rule === "standard" ? "" : ` (${s.rule})`}: ${s.days} dias (política da loja, ${br ? "conferida" : "verificada"} em ${checked})`,
+    userSource: (days: number) => br
+      ? `Prazo da loja: ${days} dia${days === 1 ? "" : "s"} (você salvou)`
+      : `Prazo da loja: ${days} dia${days === 1 ? "" : "s"} (guardado por si)`,
+    disclaimer: br
+      ? "Informação geral, não é aconselhamento jurídico. Confirme com a loja."
+      : "Informação geral, não é aconselhamento jurídico. Confirme com a loja.",
+  };
+}
+/** @deprecated en copy; use usRightsCopy(locale). */
+export const US_RIGHTS_COPY = usRightsCopy("en");
+
+const isoToLocalDate = (iso: string) => new Date(`${iso}T00:00:00`);
+
+function returnInfo(deadline: Date, source: string, startsFrom: "delivery" | "purchase", fmtUs: (d: Date) => string): ReturnWindowInfo {
+  const daysLeft = daysFromNow(deadline);
+  const isExpired = daysLeft < 0;
+  const urgency: ReturnUrgency = isExpired ? "expired" : daysLeft <= 1 ? "red" : daysLeft <= 7 ? "amber" : "green";
+  return { deadline, daysLeft, isExpired, formattedDeadline: fmtUs(deadline), source, urgency, startsFrom };
+}
+
+/**
+ * US account: no legal warranty, no statutory return right. Return window from
+ * the user's own number, else the store table (online AND in store); unknown
+ * stores get a note, never a guess. The manufacturer's warranty as usual.
+ * The receipt's country and currency don't change any of this.
+ */
+function deriveUsConsumerRights(params: Parameters<typeof deriveConsumerRights>[0]): ConsumerRightsResult {
+  const locale = params.locale ?? "en";
+  const c = usRightsCopy(locale);
+  const fmtUs = (d: Date) => formatLocaleDate(d, locale);
+  const base: ConsumerRightsResult = {
+    hasAny: false, usReturn: null, countryLabel: c.countryLabel, returnWindow: null, warranty: null,
+    manufacturerWarranty: null, notes: [], disclaimer: c.disclaimer, legalReviewPending: false,
+  };
+  if (hasNoConsumerDates(params.purchaseType)) {
+    return { ...base, hasAny: true, notes: [rightsCopy(locale).noConsumerDatesNote(params.purchaseType)] };
+  }
+  const purchaseDate = params.purchaseDate;
+  if (!purchaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate) || isNaN(isoToLocalDate(purchaseDate).getTime())) return { ...base, countryLabel: null };
+
+  const store = usStoreReturnWindow({
+    merchant: params.merchant, purchaseDate, deliveryDate: params.deliveryDate,
+    isOnlinePurchase: params.isOnlinePurchase, category: params.category, itemNames: params.itemNames,
+  });
+  const checked = store.status === "unknown" ? "" : fmtUs(isoToLocalDate(store.store.checkedOn));
+  const notes: string[] = [c.noFederalNote];
+  let returnWindow: ReturnWindowInfo | null = null;
+  let usReturn: UsReturnInfo;
+  const userDays = params.returnDays;
+  if (typeof userDays === "number" && Number.isInteger(userDays) && userDays >= 0) {
+    const start = usReturnStart({ purchaseDate, deliveryDate: params.deliveryDate, isOnlinePurchase: params.isOnlinePurchase });
+    returnWindow = returnInfo(isoToLocalDate(addDaysIso(start.date, userDays)), c.userSource(userDays), start.from, fmtUs);
+    usReturn = { kind: "user", days: userDays, store };
+  } else {
+    usReturn = { kind: "store", store };
+    if (store.status === "window") {
+      returnWindow = returnInfo(isoToLocalDate(store.deadline), c.storeSource(store, checked), store.startsFrom, fmtUs);
+      notes.push(c.checkStoreNote);
+    } else if (store.status === "no_fixed_window") {
+      notes.push(c.noFixedWindowNote(store.store.name));
+    } else {
+      notes.push(c.unknownStoreNote);
+    }
+  }
+
+  let manufacturerWarranty: ManufacturerWarrantyInfo | null = null;
+  const months = parseManufacturerWarrantyMonths(params.warrantyText);
+  if (months != null) {
+    const expiry = addMonthsClamped(isoToLocalDate(purchaseDate), months);
+    const daysUntilExpiry = daysFromNow(expiry);
+    manufacturerWarranty = {
+      label: rightsCopy(locale).manufacturerWarranty(months), months, expiry,
+      formattedExpiry: fmtUs(expiry), daysUntilExpiry, isExpired: daysUntilExpiry < 0,
+    };
+  }
+  return { ...base, hasAny: true, usReturn, returnWindow, manufacturerWarranty, notes };
 }

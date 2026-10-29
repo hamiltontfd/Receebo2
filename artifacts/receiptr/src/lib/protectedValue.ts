@@ -55,7 +55,8 @@ function mainItemName(r: Receipt): string | null {
   return [...products].sort((a, b) => (b.price ?? 0) - (a.price ?? 0))[0].name;
 }
 
-export function classifyReceipt(r: Receipt, now: Date = new Date()): ClassifyResult {
+/** `region`: the account region ("US" = store windows online and in store, no legal warranty; else PT rules). */
+export function classifyReceipt(r: Receipt, now: Date = new Date(), region?: string | null): ClassifyResult {
   if (r.status === "processing" || r.status === "not_a_receipt" || r.isDraft) return { kind: "none" };
   if (hasNoConsumerDates(r.purchaseType)) return { kind: "excluded" };
   if (r.total == null || !(r.total > 0)) return { kind: "none" };
@@ -71,6 +72,10 @@ export function classifyReceipt(r: Receipt, now: Date = new Date()): ClassifyRes
     merchant: r.merchant,
     warrantyText: r.warranty,
     purchaseType: r.purchaseType,
+    ...(region === "US" ? {
+      region, returnDays: r.returnDays,
+      itemNames: [...(r.notableItems ?? []), ...(r.products ?? [])].map((i) => i.name),
+    } : {}),
   });
 
   const base = {
@@ -128,12 +133,12 @@ function pickPrimaryCurrency(entries: ProtectedEntry[]): string {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export function summarizeProtected(receipts: Receipt[], now: Date = new Date()): ProtectedSummary {
+export function summarizeProtected(receipts: Receipt[], now: Date = new Date(), region?: string | null): ProtectedSummary {
   const entries: ProtectedEntry[] = [];
   let excludedCount = 0;
   let expiredCount = 0;
   for (const r of receipts) {
-    const res = classifyReceipt(r, now);
+    const res = classifyReceipt(r, now, region);
     if (res.kind === "entry") entries.push(res.entry);
     else if (res.kind === "excluded") excludedCount++;
     else if (res.kind === "expired") expiredCount++;

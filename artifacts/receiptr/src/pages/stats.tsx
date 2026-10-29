@@ -14,6 +14,7 @@ import {
   deadlineUrgency, expiringChart, formatAmount, protectionCaption, summarizeProtected, worthKeeping,
   type Bucket, type ExpiringChart, type ProtectedEntry, type ProtectedSummary, type WorthKeepingItem,
 } from "@/lib/protectedValue";
+import { useAccountRegion } from "@/lib/region";
 
 const PAGE_SIZE = 50;
 const MAX_PAGES = 40;
@@ -53,7 +54,8 @@ export default function StatsPage() {
   const [showAll, setShowAll] = useState(false);
 
   const now = useMemo(() => new Date(), [receipts]); // eslint-disable-line react-hooks/exhaustive-deps
-  const summary = useMemo(() => summarizeProtected(receipts ?? [], now), [receipts, now]);
+  const { region } = useAccountRegion();
+  const summary = useMemo(() => summarizeProtected(receipts ?? [], now, region), [receipts, now, region]);
   const chart = useMemo(() => expiringChart(summary, days, now), [summary, days, now, locale]);
   const keep = useMemo(() => worthKeeping(receipts ?? [], summary, now), [receipts, summary, now, locale]);
 
