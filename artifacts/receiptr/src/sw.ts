@@ -65,8 +65,9 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title || "Receebo", {
       body: payload.body,
-      icon: `${self.registration.scope}icons/icon-192.png`,
-      badge: `${self.registration.scope}icons/icon-192.png`,
+      icon: `${self.registration.scope}icons/receebo-white-192.png`,
+      // Android tints the badge itself; it must be a white-on-transparent silhouette.
+      badge: `${self.registration.scope}icons/badge-96.png`,
       tag: payload.receiptId ? `return-window-${payload.receiptId}` : "receebo-reminder",
       data: { receiptId: payload.receiptId },
     }),

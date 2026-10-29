@@ -51,7 +51,8 @@ describe("preserved notification deep links", () => {
   it("includes the artifact scope and receipt in the notification", async () => {
     await send("push", { data: { json: () => ({ title: "Return reminder", receiptId: 42 }) } });
     expect(worker.registration.showNotification).toHaveBeenCalledWith("Return reminder", expect.objectContaining({
-      icon: "https://example.test/receebo/icons/icon-192.png",
+      icon: "https://example.test/receebo/icons/receebo-white-192.png",
+      badge: "https://example.test/receebo/icons/badge-96.png",
       data: { receiptId: 42 },
     }));
   });
