@@ -38,6 +38,8 @@ import {
 } from "@/components/PageTransition";
 import { ReceiptSheet } from "@/components/ReceiptSheet";
 import { receiptListYear } from "@/lib/receiptDate";
+import { WorthKeepingCards } from "@/components/WorthKeepingCards";
+import { summarizeProtected, worthKeeping } from "@/lib/protectedValue";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -463,6 +465,13 @@ export default function SearchPage() {
     [infiniteData],
   );
 
+  // "Worth keeping" on the home: the 2 best cards from the receipts already loaded
+  // (same rule as Stats: protected items first, by price, with their protection date).
+  const homeKeep = useMemo(() => {
+    const now = new Date();
+    return worthKeeping(allReceipts, summarizeProtected(allReceipts, now), now, 2);
+  }, [allReceipts]);
+
   // Search results (non-paginated, all matches)
   const { data: searchPage, isLoading: searchLoading } = useListReceipts(
     isSearching ? { q: debounced } : undefined,
@@ -595,6 +604,8 @@ export default function SearchPage() {
               </>
             ) : (
               <>
+                <WorthKeepingCards items={homeKeep} onOpen={setSelectedId} testId="search-worth-keeping" />
+
                 {allReceipts.length > 0 ? (
                   <section>
                     <motion.ul
