@@ -124,7 +124,7 @@ function Dashboard({
           <section data-testid="stats-expiring">
             <div className="flex items-center justify-between mb-1">
               <h2 className={sectionLabel}>
-                {filter === "unknown" ? "Unknown deadline" : filter === "warranty" ? "Warranty" : filter === "return" ? "Return window" : "Expiring soon"}
+                {filter === "unknown" ? "Return deadline unknown" : filter === "warranty" ? "Warranty" : filter === "return" ? "Return window" : "Expiring soon"}
               </h2>
               {(canViewAll || filter) && (
                 <button
@@ -204,7 +204,7 @@ function Groups({ summary, filter, onFilter }: { summary: ProtectedSummary; filt
   const rows: { bucket: Bucket; label: string; dot: React.ReactNode }[] = [
     { bucket: "return", label: "Return window", dot: <span className="w-2 h-2 rounded-full bg-[#121212]" /> },
     { bucket: "warranty", label: us ? "Manufacturer warranty" : "Warranty", dot: <span className="w-2 h-2 rounded-full" style={{ background: VIOLET }} /> },
-    { bucket: "unknown", label: "Unknown deadline", dot: <span className="w-2 h-2 rounded-full border border-muted-foreground/60" /> },
+    { bucket: "unknown", label: "Return deadline unknown", dot: <span className="w-2 h-2 rounded-full border border-muted-foreground/60" /> },
   ];
   return (
     <div className="rounded-2xl border divide-y" data-testid="stats-groups">

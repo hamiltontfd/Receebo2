@@ -9,7 +9,7 @@ import { hasNoConsumerDates } from "./purchaseType";
  *
  * - Each receipt counts once, in the bucket whose protection ends first:
  *   Return window while it is open, Warranty after that.
- * - "Unknown deadline": goods with no derivable deadline. Shown, not counted.
+ * - "Return deadline unknown": goods with no derivable deadline. Shown, not counted.
  * - Subscriptions, digital, services and tickets are excluded (purchase_type).
  */
 export type Bucket = "return" | "warranty" | "unknown";

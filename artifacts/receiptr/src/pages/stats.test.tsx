@@ -48,7 +48,7 @@ describe("/stats", () => {
     const groups = screen.getByTestId("stats-groups");
     expect(within(groups).getByTestId("stats-group-return")).toHaveTextContent("Return window1€649.00");
     expect(within(groups).getByTestId("stats-group-warranty")).toHaveTextContent("Warranty1€229.00");
-    expect(within(groups).getByTestId("stats-group-unknown")).toHaveTextContent("Unknown deadline1 · not counted€142.50");
+    expect(within(groups).getByTestId("stats-group-unknown")).toHaveTextContent("Return deadline unknown1 · not counted€142.50");
     expect(screen.getByTestId("stats-chart-total")).toHaveTextContent("€878.00");
     const soon = screen.getByTestId("stats-expiring");
     expect(within(soon).getAllByTestId("stats-row-deadline").map((n) => n.textContent)).toEqual(["Return by 3 Nov", "Warranty to 10 Jan 2027"]);
