@@ -21,13 +21,13 @@ function useIsDesktop() {
   return isDesktop;
 }
 import { format } from "date-fns";
-import { Search as SearchIcon, Loader2, ScanLine, Camera, Sparkles } from "lucide-react";
+import { Search as SearchIcon, Loader2, ScanLine, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { useListReceipts, useInfiniteListReceipts, useGetRecentReceipts } from "@workspace/api-client-react";
+import { useListReceipts, useInfiniteListReceipts } from "@workspace/api-client-react";
 import type { Receipt } from "@workspace/api-client-react";
 import { currencySymbol } from "@/lib/currency";
 import { CATEGORIES, categoryStyle, categoryIcon } from "@/lib/categories";
@@ -35,7 +35,6 @@ import {
   PageTransition,
   listVariants,
   itemVariants,
-  cardVariants,
 } from "@/components/PageTransition";
 import { ReceiptSheet } from "@/components/ReceiptSheet";
 
@@ -445,9 +444,6 @@ export default function SearchPage() {
 
   const isSearching = debounced.length > 0;
 
-  // Notable items grid — always fetches the 10 most recent for the "Worth keeping" section
-  const { data: recent, isLoading: recentLoading } = useGetRecentReceipts({ limit: 10 });
-
   // Full paginated list — powers the idle receipt list with infinite scroll
   const {
     data: infiniteData,
@@ -489,35 +485,6 @@ export default function SearchPage() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  const notableItems = useMemo(() => {
-    if (!recent) return [];
-    const items: {
-      name: string;
-      price: number | null;
-      category: string | null;
-      receiptId: number;
-      merchant: string | null;
-      currency: string | null;
-    }[] = [];
-    for (const r of recent) {
-      for (const n of r.notableItems ?? []) {
-        items.push({
-          name: n.name,
-          price: n.price ?? null,
-          category: n.category ?? null,
-          receiptId: r.id,
-          merchant: r.merchant ?? null,
-          currency: r.currency ?? null,
-        });
-        if (items.length === 3) break;
-      }
-      if (items.length === 3) break;
-    }
-    return items;
-  }, [recent]);
-
-  const showFab = true;
 
   return (
     <>
@@ -616,16 +583,8 @@ export default function SearchPage() {
             transition={{ duration: 0.18, ease }}
             className="flex flex-col gap-5"
           >
-            {(idleLoading && allReceipts.length === 0) || (recentLoading && notableItems.length === 0) ? (
+            {idleLoading && allReceipts.length === 0 ? (
               <>
-                <div className="space-y-2">
-                  <Skeleton className="h-3.5 w-28 rounded-full" />
-                  <div className="flex gap-3 overflow-hidden">
-                    {Array(3).fill(0).map((_, i) => (
-                      <Skeleton key={i} className="h-32 w-44 rounded-2xl shrink-0" />
-                    ))}
-                  </div>
-                </div>
                 <div className="space-y-3">
                   <Skeleton className="h-3.5 w-16 rounded-full" />
                   {Array(5).fill(0).map((_, i) => (
@@ -635,54 +594,6 @@ export default function SearchPage() {
               </>
             ) : (
               <>
-                {notableItems.length > 0 && (
-                  <section>
-                    <motion.h2
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.2 }}
-                      className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3"
-                    >
-                      Worth keeping
-                    </motion.h2>
-                    <motion.div
-                      className="grid grid-cols-2 gap-3"
-                      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-                      initial="hidden"
-                      animate="visible"
-                    >
-                      {notableItems.slice(0, 2).map((item, i) => (
-                        <motion.div key={i} variants={cardVariants} className="min-w-0">
-                          {(() => {
-                            const CardIcon = categoryIcon(item.category);
-                            return (
-                              <button
-                                onClick={() => setSelectedId(item.receiptId)}
-                                className="block w-full h-full rounded-2xl border border-border p-4 flex flex-col gap-2 hover:bg-secondary/50 transition-colors text-left"
-                              >
-                                <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
-                                  <CardIcon className="w-[1.1rem] h-[1.1rem]" />
-                                </span>
-                                <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
-                                {item.price != null && (
-                                  <p className="font-mono font-bold text-base">
-                                    {currencySymbol(item.currency)}{item.price.toFixed(2)}
-                                  </p>
-                                )}
-                                <div className="mt-auto flex flex-col gap-1">
-                                  {item.merchant && (
-                                    <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })()}
-                        </motion.div>
-                      ))}
-                    </motion.div>
-                  </section>
-                )}
-
                 {allReceipts.length > 0 ? (
                   <section>
                     <motion.ul
@@ -751,25 +662,6 @@ export default function SearchPage() {
       </AnimatePresence>
     </PageTransition>
 
-    {/* Floating scan button — mobile only, visible when there are receipts */}
-    <AnimatePresence>
-      {showFab && (
-        <motion.button
-          key="fab"
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0, opacity: 0 }}
-          whileTap={{ scale: 0.88 }}
-          transition={{ type: "spring", stiffness: 400, damping: 22 }}
-          onClick={() => setLocation("/scan")}
-          aria-label="Scan receipt"
-          className="md:hidden fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-foreground text-background flex items-center justify-center shadow-xl"
-          style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom) + var(--install-bar-h, 0px))" }}
-        >
-          <Camera className="w-6 h-6" />
-        </motion.button>
-      )}
-    </AnimatePresence>
     </>
   );
 }
