@@ -515,7 +515,12 @@ export async function syncMailboxClaimed(
         }
       }
 
-      const supplierRule = supplierRules.forReceipt(extraction.merchant, senderDomain(message.from)) ?? senderRule;
+      // Same type the pending item will store (AI, else sender/text hints).
+      const receiptType = resolvePurchaseType(extraction.purchaseType, {
+        ...extraction, from: message.from, subject: message.subject,
+      }).purchaseType;
+      const supplierRule =
+        supplierRules.forReceipt(extraction.merchant, senderDomain(message.from), receiptType) ?? senderRule;
       if (extraction.isReceipt && supplierRule?.status === "off") {
         logger.info({ userId, messageId }, `${label} sync: recurring supplier is off, discarding`);
         if (objectPath) await cleanupSyncObject(provider, userId, objectPath, "recurring supplier off");

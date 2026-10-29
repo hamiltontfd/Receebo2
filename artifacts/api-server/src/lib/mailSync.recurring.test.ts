@@ -155,4 +155,27 @@ describe("mail sync and recurring suppliers", () => {
     expect(await pendings(userId)).toHaveLength(0);
     expect(await isSeen(userId, "m-off2")).toBe(true);
   });
+
+  it("Apple 'on': an Apple subscription is auto-imported, a one-off App Store purchase stays pending", async () => {
+    const userId = newUser("owner");
+    await db.insert(recurringSuppliersTable).values({
+      userId, supplierKey: "apple", displayName: "Apple", kind: "subscription", status: "on", senderDomains: [],
+    });
+    const appleHtml = "<p>Your receipt from Apple. Order ID MXYZ123. Total 30,95 EUR. Thank you for your purchase.</p>";
+    const appleBase = {
+      ...edpExtraction, merchant: "Apple Distribution International Ltd.", category: "Entertainment",
+      summary: null, transactionNumber: "MXYZ123", total: 30.95,
+    };
+    extraction.text.mockResolvedValueOnce({ ...appleBase, purchaseType: null, products: [{ name: "Apple One Premium" }] });
+    const sub = await syncMailboxClaimed(userId, provider({ id: "m-apple-sub", from: "Apple <no_reply@email.apple.com>",
+      subject: "Your receipt from Apple", html: appleHtml }), { aiReadCap: false });
+    expect(sub).toMatchObject({ queued: 1, autoImported: 1 });
+
+    extraction.text.mockResolvedValueOnce({ ...appleBase, purchaseType: "digital", total: 4.99, products: [{ name: "Some Game" }] });
+    const oneOff = await syncMailboxClaimed(userId, provider({ id: "m-apple-app", from: "Apple <no_reply@email.apple.com>",
+      subject: "Your receipt from Apple", html: appleHtml }), { aiReadCap: false });
+    expect(oneOff).toMatchObject({ queued: 1, autoImported: 0 });
+    expect(await receipts(userId)).toHaveLength(1);
+    expect((await pendings(userId)).filter((x) => x.status === "pending")).toHaveLength(1);
+  });
 });

@@ -14,6 +14,12 @@
  *     or the same supplier charging a similar amount (±25% of the median) in
  *     3 or more different months.
  *
+ * Mixed stores (Apple, Google, Microsoft) sell one-off apps, media and
+ * hardware as well as subscriptions from the same sender: only their items
+ * typed "subscription" count, are offered "Always import", and are affected
+ * by an on/off decision. Their other receipts are never auto-imported or
+ * dropped by it.
+ *
  * Decisions (recurring_suppliers): on = import automatically ("Always
  * import" in the pending sheet/home card, or the Profile switch), off = stop
  * importing (Profile switch only); no row = undecided. Dismissing a pending
@@ -25,6 +31,7 @@ import {
   type PendingImportExtractionData, type RecurringSupplierRow,
 } from "@workspace/db";
 import { senderDomain as domainOfSender } from "./mailProviders/merchants";
+import { pendingPurchaseType } from "./pendingImportRanking";
 
 export type SupplierKind = "subscription" | "utility";
 export type SupplierDecision = "on" | "off";
@@ -77,6 +84,21 @@ const BRANDS: Brand[] = [
   { key: "hbo-max", kind: "subscription", name: /^hbo\b/i, domains: ["hbomax.com", "max.com"] },
   { key: "dropbox", kind: "subscription", name: /^dropbox\b/i, domains: ["dropbox.com"] },
 ];
+
+/**
+ * Stores whose receipts mix subscriptions with one-off purchases (see the
+ * header). One key for all their merchant names ("Apple Distribution
+ * International Ltd." and "Apple" are both "apple").
+ */
+const MIXED_STORES: Array<{ key: string; name: RegExp }> = [
+  { key: "apple", name: /^apple\b/i },
+  { key: "google", name: /^google\b/i },
+  { key: "microsoft", name: /^microsoft\b/i },
+];
+
+export function isMixedStoreKey(key: string | null | undefined): boolean {
+  return !!key && MIXED_STORES.some((m) => m.key === key);
+}
 
 /** Webmail, marketplaces and payment platforms: a sender domain that says nothing about the supplier. */
 const SHARED_DOMAINS = [
@@ -131,6 +153,8 @@ export function shortSupplierName(merchant: string | null | undefined): string |
 export function supplierKey(merchant: string | null | undefined, senderDomain?: string | null): string | null {
   const brand = brandByName(merchant) ?? (merchant ? null : brandByDomain(senderDomain));
   if (brand) return brand.key;
+  const mixed = merchant ? MIXED_STORES.find((m) => m.name.test(merchant.trim())) : undefined;
+  if (mixed) return mixed.key;
   const short = shortSupplierName(merchant);
   if (short) {
     const words = stripAccents(short).toLowerCase().split(/[^a-z0-9+]+/).filter(Boolean)
@@ -209,7 +233,9 @@ export function pendingSupplierItem(row: PendingLike): SupplierItem | null {
   const d = row.extractionData;
   if (!d) return null;
   return {
-    source: "pending", id: row.id, merchant: d.merchant, purchaseType: d.purchaseType ?? null,
+    // Stored type, else hints from the text (imports from before the purchase
+    // type existed): the same type the pending sheet shows.
+    source: "pending", id: row.id, merchant: d.merchant, purchaseType: pendingPurchaseType(d).purchaseType,
     category: d.category, summary: d.summary, productNames: (d.products ?? []).map((p) => p.name),
     senderDomain: d.senderDomain ?? null, purchaseDate: d.purchaseDate, total: d.total, currency: d.currency,
   };
@@ -229,6 +255,7 @@ export function buildSupplierViews(
   for (const item of items) {
     const key = supplierKey(item.merchant, item.senderDomain);
     if (!key) continue;
+    if (isMixedStoreKey(key) && item.purchaseType !== "subscription") continue;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(item);
   }
@@ -346,8 +373,15 @@ export async function rememberSupplierDomain(row: RecurringSupplierRow, domain: 
 export interface SupplierRules {
   /** Decision for a sender before any AI call (domain or brand name of the sender), or null. */
   forSender(from: string | null | undefined): RecurringSupplierRow | null;
-  /** Decision for an extracted receipt (merchant key, else sender). */
-  forReceipt(merchant: string | null | undefined, senderDomain: string | null | undefined): RecurringSupplierRow | null;
+  /**
+   * Decision for an extracted receipt (merchant key, else sender). Mixed
+   * stores: only for a receipt typed "subscription".
+   */
+  forReceipt(
+    merchant: string | null | undefined,
+    senderDomain: string | null | undefined,
+    purchaseType?: string | null,
+  ): RecurringSupplierRow | null;
 }
 
 function senderDisplayName(from: string | null | undefined): string {
@@ -369,8 +403,11 @@ export function buildSupplierRules(rows: readonly RecurringSupplierRow[]): Suppl
   };
   return {
     forSender,
-    forReceipt(merchant, senderDomain) {
+    forReceipt(merchant, senderDomain, purchaseType) {
       const key = supplierKey(merchant, senderDomain);
+      if (isMixedStoreKey(key)) {
+        return purchaseType === "subscription" ? decided.find((r) => r.supplierKey === key) ?? null : null;
+      }
       return (key ? decided.find((r) => r.supplierKey === key) : undefined) ??
         (senderDomain ? forSender(`<x@${senderDomain}>`) : null);
     },

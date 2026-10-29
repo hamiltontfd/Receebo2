@@ -36,7 +36,7 @@ import {
 import { PURCHASE_TYPES, type PurchaseType } from "../lib/purchaseType";
 import { refreshWarrantyExpiries } from "../lib/warrantyExpiryStore";
 import { approvePendingBatch, approvePendingInTx, checkApproveAccess } from "../lib/pendingApproval";
-import { loadSupplierOverview, pendingSupplierKey, type SupplierView } from "../lib/recurringSuppliers";
+import { isMixedStoreKey, loadSupplierOverview, pendingSupplierKey, type SupplierView } from "../lib/recurringSuppliers";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -307,6 +307,9 @@ function recurringFor(r: PendingImportRow, views?: Map<string, SupplierView>) {
   const key = views ? pendingSupplierKey(r) : null;
   const view = key ? views!.get(key) : undefined;
   if (!view) return null;
+  // Mixed stores (Apple…): only this store's subscription items are part of
+  // the supplier; a one-off App Store purchase keeps Accept.
+  if (isMixedStoreKey(key) && !view.pendingIds.includes(r.id)) return null;
   return {
     supplierKey: view.supplierKey,
     displayName: view.displayName,

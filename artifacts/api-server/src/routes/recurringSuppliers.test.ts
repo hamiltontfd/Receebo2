@@ -154,6 +154,27 @@ describe("pending list: recurring info", () => {
     const detail = await (await call(user, `/mail/pending/${a.id}`)).json();
     expect(detail.recurring).toMatchObject({ supplierKey: "netflix", status: "undecided" });
   });
+
+  it("Apple: an older pending subscription (no stored type) offers Always import; a one-off App Store purchase keeps Accept", async () => {
+    const user = newUser("owner");
+    const [sub, app] = await seed(user, [
+      { merchant: "Apple", total: 30.95, category: "Entertainment", senderDomain: "email.apple.com",
+        products: [{ name: "Apple One Premium Subscription", quantity: 1, price: 30.95 }] },
+      { merchant: "Apple", total: 4.99, category: "Entertainment", senderDomain: "email.apple.com", purchaseType: "digital",
+        products: [{ name: "Some Game", quantity: 1, price: 4.99 }] },
+    ]);
+    const body = await (await call(user, "/mail/pending?meta=1")).json();
+    const byId = Object.fromEntries(body.items.map((i: any) => [i.id, i]));
+    expect(byId[sub!.id].purchaseType).toBe("subscription");
+    expect(byId[sub!.id].recurring).toMatchObject({ supplierKey: "apple", kind: "subscription", status: "undecided", pendingCount: 1 });
+    expect(byId[app!.id].recurring).toBeNull();
+    const detail = await (await call(user, `/mail/pending/${sub!.id}`)).json();
+    expect(detail.recurring).toMatchObject({ supplierKey: "apple", status: "undecided" });
+    // Always import accepts the subscription only.
+    expect((await call(user, "/mail/recurring-suppliers/apple/always-import", { id: sub!.id })).status).toBe(200);
+    const left = await (await call(user, "/mail/pending?meta=1")).json();
+    expect(left.items.map((i: any) => i.id)).toEqual([app!.id]);
+  });
 });
 
 describe("POST /mail/recurring-suppliers/:key/always-import", () => {

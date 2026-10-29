@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { RecurringSupplierRow } from "@workspace/db";
 import {
-  buildSupplierRules, buildSupplierViews, looksRepeated, recurringKind, registrableDomain,
-  shortSupplierName, sortSupplierViews, supplierKey, type SupplierItem,
+  buildSupplierRules, buildSupplierViews, isMixedStoreKey, looksRepeated, pendingSupplierItem, recurringKind,
+  registrableDomain, shortSupplierName, sortSupplierViews, supplierKey, type SupplierItem,
 } from "./recurringSuppliers";
 
 const item = (over: Partial<SupplierItem>): SupplierItem => ({
@@ -99,5 +99,55 @@ describe("sync rules", () => {
 
   it("undecided rows never drive sync", () => {
     expect(buildSupplierRules([row({ status: "undecided" as any, senderDomains: ["edp.pt"] })]).forSender("<a@edp.pt>")).toBeNull();
+  });
+});
+
+describe("mixed stores (Apple, Google, Microsoft) and pending purchase types", () => {
+  const applePending = (id: number, over: Record<string, unknown>) => pendingSupplierItem({
+    id,
+    extractionData: {
+      merchant: "Apple", purchaseDate: "2026-10-20", total: 30.95, currency: "EUR", category: "Entertainment",
+      summary: null, ocrText: null, warranty: null, transactionNumber: null, products: [], ...over,
+    } as never,
+  })!;
+
+  it("a pending import from before purchase types existed uses the hint the sheet shows (Apple One → subscription)", () => {
+    const apple = applePending(7, { products: [{ name: "Apple One Premium Subscription" }] });
+    expect(apple.purchaseType).toBe("subscription");
+    const view = buildSupplierViews([apple], []).get("apple");
+    expect(view).toMatchObject({ kind: "subscription", status: "undecided", pendingIds: [7] });
+  });
+
+  it("one key for Apple's merchant names", () => {
+    expect(supplierKey("Apple Distribution International Ltd.")).toBe("apple");
+    expect(supplierKey("Apple")).toBe("apple");
+    expect(supplierKey("Google Payment Ireland Limited")).toBe("google");
+    expect(isMixedStoreKey("apple")).toBe(true);
+    expect(isMixedStoreKey("netflix")).toBe(false);
+  });
+
+  it("only subscription items belong to a mixed store's supplier", () => {
+    const sub = applePending(1, { products: [{ name: "iCloud+ 200 GB" }] });
+    const app = applePending(2, { purchaseType: "digital", products: [{ name: "Some Game" }] });
+    const hardware = item({ id: 3, merchant: "Apple", purchaseType: "goods", total: 1299 });
+    const views = buildSupplierViews([sub, app, hardware], []);
+    expect(views.get("apple")).toMatchObject({ pendingIds: [1], pendingCount: 1, receiptCount: 0 });
+    // Only one-off purchases: Apple is not a recurring supplier at all.
+    expect(buildSupplierViews([app, hardware], []).get("apple")).toBeUndefined();
+  });
+
+  it("an Apple decision applies to Apple subscriptions only", () => {
+    const rules = buildSupplierRules([
+      row({ supplierKey: "apple", displayName: "Apple", kind: "subscription", status: "on" }),
+      row({ id: 2, supplierKey: "google", displayName: "Google", kind: "subscription", status: "off" }),
+    ]);
+    expect(rules.forReceipt("Apple", "email.apple.com", "subscription")?.status).toBe("on");
+    expect(rules.forReceipt("Apple", "email.apple.com", "digital")).toBeNull();
+    expect(rules.forReceipt("Apple", "orders.apple.com", "goods")).toBeNull();
+    expect(rules.forReceipt("Apple", "email.apple.com", null)).toBeNull();
+    expect(rules.forReceipt("Google Payment Ireland", "google.com", "subscription")?.status).toBe("off");
+    expect(rules.forReceipt("Google Payment Ireland", "google.com", "digital")).toBeNull();
+    // Never decided before the AI read (apple.com is a shared sender domain).
+    expect(rules.forSender("Apple <no_reply@email.apple.com>")).toBeNull();
   });
 });
