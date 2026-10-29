@@ -15,6 +15,7 @@ import { deriveConsumerRights } from "@/lib/consumerRights";
 import { getAppLocale } from "@/lib/locale";
 import { hasNoConsumerDates } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
+import { HighlightsRow } from "@/components/HighlightsRow";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -622,7 +623,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                         <Star className="w-3.5 h-3.5" />
                         Highlights
                       </p>
-                      <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none -mx-5 px-5">
+                      <HighlightsRow>
                         {receipt.notableItems!.map((item, i) => {
                           const CardIcon = categoryIcon(item.category);
                           return (
@@ -643,7 +644,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             </div>
                           );
                         })}
-                      </div>
+                      </HighlightsRow>
                     </div>
                   )}
 
