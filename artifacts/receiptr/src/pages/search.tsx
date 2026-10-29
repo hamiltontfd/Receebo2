@@ -526,18 +526,6 @@ export default function SearchPage() {
         />
       </div>
 
-      {/* Worth keeping: durable goods carousel (hidden while searching) */}
-      {!isSearching && query.length === 0 && (
-        <WorthKeepingCards
-          items={homeKeep}
-          onOpen={setSelectedId}
-          testId="search-worth-keeping"
-          layout="row"
-          seeAllHref="/search/worth-keeping"
-          hasMore={homeKeepMore}
-        />
-      )}
-
       {/* Category chips */}
       <div className="flex items-center gap-2 flex-wrap">
         {CATEGORIES.map((cat) => (
@@ -558,6 +546,18 @@ export default function SearchPage() {
 
       {/* Pending email imports — signed-in users only */}
       {isSignedIn && !isGuest && <PendingImports />}
+
+      {/* Worth keeping: durable goods carousel, right after Found in your email (hidden while searching) */}
+      {!isSearching && query.length === 0 && (
+        <WorthKeepingCards
+          items={homeKeep}
+          onOpen={setSelectedId}
+          testId="search-worth-keeping"
+          layout="row"
+          seeAllHref="/search/worth-keeping"
+          hasMore={homeKeepMore}
+        />
+      )}
 
       {/* Content — animates between idle and search states */}
       <AnimatePresence mode="wait" initial={false}>
