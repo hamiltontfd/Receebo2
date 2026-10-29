@@ -185,3 +185,11 @@
   }
   .pwa-status button { min-height: 44px; }
 }
+
+/* Mobile bottom tab bar (nav B). Fixed bottom UI (install bar, sheets) sits above it. */
+@media (max-width: 767.98px) {
+  html[data-tabbar="1"] {
+    --tab-bar-h: calc(53px + max(8px, env(safe-area-inset-bottom)));
+    --install-bar-pb: 0px;
+  }
+}

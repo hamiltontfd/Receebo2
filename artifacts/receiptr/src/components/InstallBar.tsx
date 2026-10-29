@@ -68,7 +68,7 @@ export default function InstallBar() {
     canInstall: Boolean(installEvent) || isMobileDevice(),
   });
 
-  // Lets fixed bottom UI (the scan button) sit above the bar.
+  // Lets other fixed bottom UI sit above the bar.
   useEffect(() => {
     if (!visible) return;
     document.documentElement.style.setProperty("--install-bar-h", "3.5rem");
@@ -101,7 +101,8 @@ export default function InstallBar() {
     <>
       <div aria-hidden className="h-14 shrink-0" />
       <div role="region" aria-label={copy.title} data-testid="install-bar"
-        className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur shadow-[0_-4px_16px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
+        className="fixed inset-x-0 z-30 border-t bg-background/95 backdrop-blur shadow-[0_-4px_16px_rgba(0,0,0,0.06)]"
+        style={{ bottom: "var(--tab-bar-h, 0px)", paddingBottom: "var(--install-bar-pb, env(safe-area-inset-bottom))" }}>
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-3 px-3">
           <img src={`${import.meta.env.BASE_URL}logo-mark.svg`} alt="" className="h-8 w-8 shrink-0" />
           <p className="min-w-0 flex-1 truncate text-sm font-medium">{copy.bar}</p>

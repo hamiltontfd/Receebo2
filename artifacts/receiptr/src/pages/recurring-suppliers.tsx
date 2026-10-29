@@ -138,7 +138,7 @@ export default function RecurringSuppliersPage() {
 
   return (
     <div className="max-w-md mx-auto px-6 pt-6 pb-12 w-full">
-      <Link href="/profile" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+      <Link href="/profile" className="hidden md:inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="w-4 h-4" />
         Profile
       </Link>
