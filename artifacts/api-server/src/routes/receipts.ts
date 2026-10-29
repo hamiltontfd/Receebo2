@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, gt, ilike, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, trialUploadsTable } from "@workspace/db";
 import {
   CreateReceiptBody,
@@ -37,6 +37,7 @@ function normalizeCategoryPatch(value: string | null | undefined): string | unde
 
 import { deliveryDateError } from "../lib/returnWindowCalc";
 import { refreshWarrantyExpiries } from "../lib/warrantyExpiryStore";
+import { afterReceiptCursor, decodeReceiptCursor, encodeReceiptCursor, receiptListOrder } from "../lib/receiptOrder";
 const router: IRouter = Router();
 
 router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
@@ -66,13 +67,11 @@ router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
       sql`${receiptsTable.notableItems}::text ILIKE ${term}`,
     );
     if (search) conditions.push(search);
-  } else if (cursor) {
-    // Cursor pagination: fetch items older than the cursor timestamp
-    try {
-      conditions.push(lt(receiptsTable.createdAt, new Date(cursor)));
-    } catch {
-      // Invalid cursor — ignore, return from the top
-    }
+  } else {
+    // Cursor pagination: items after the last one of the previous page.
+    // An old or invalid cursor starts again from the top.
+    const after = decodeReceiptCursor(cursor);
+    if (after) conditions.push(afterReceiptCursor(after));
   }
 
   // For search: fetch all matches. For paginated: fetch limit+1 to detect next page.
@@ -82,7 +81,7 @@ router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
     .select()
     .from(receiptsTable)
     .where(and(...conditions))
-    .orderBy(desc(receiptsTable.createdAt))
+    .orderBy(...receiptListOrder)
     .limit(fetchLimit);
 
   if (isSearch) {
@@ -90,9 +89,7 @@ router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
   } else {
     const hasMore = rows.length > limit;
     const items = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore
-      ? (items[items.length - 1].createdAt as Date).toISOString()
-      : null;
+    const nextCursor = hasMore ? encodeReceiptCursor(items[items.length - 1]) : null;
     res.json({ items: ListReceiptsResponse.parse(items), nextCursor });
   }
 });
