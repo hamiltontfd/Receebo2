@@ -259,3 +259,11 @@ Technical details live in `docs/assistant-log.md`.
 - Tests: new poolErrors.test.ts (6). Typecheck clean (all projects); API 316 passed, 2 skipped; web 222 passed.
 - Dev API rebuilt and restarted (detached, PORT 8080); healthz 200 locally and on the dev URL.
 - Not pushed or published; Stripe, production secrets, deployment and production data untouched. Production gets this on the next publish.
+
+## 2026-10-29 — Session 25: receipts list by receipt date; Worth keeping row on the Search home (Grok Bot, Hamilton: bug reports after the 11:05 UTC publish, then "O Worth keeping deve aparecer na home (busca) e logo abaixo do campo de busca…")
+- cd2ceef API: GET /api/receipts (and search) ordered by receipt day: purchase date, else the day it was added, never later than the day added; ties by added time, id. Cursor `day_addedAt_id`. Hamilton approved both defaults (no date → day added; future date capped). receiptsOrder.test.ts (7, local PG).
+- c2e409d Web: Search list year breaks follow the same day.
+- fb60056 Web: shared WorthKeepingCards; Worth keeping back on the Search home (superseded by the next commit's row).
+- 9821310 Web: Worth keeping row right under the search field. Durable goods only: notable items (AI-flagged durable goods) of library receipts with purchase type goods/unknown (no subscription, digital, service or ticket), not Groceries (receipt or item). Open return window first, then the rest; each by receipt day (newest first), then price. Up to 10 cards in the highlights scroller, "See all" link + a last "See all" card when there are more. No extra request on the home (uses the loaded list pages). New /search/worth-keeping list (imports-screen style): every qualifying item over all receipts (Stats' cached query), "Return window open" group, then by month. Stats keeps its 2×2 grid.
+- Tests: typecheck clean (web); web 48 files / 326 passed; API 407 passed, 2 skipped, 4 env-baseline failures (trialFunnel, outlookDailySweep).
+- Not pushed or published; Stripe, cron, secrets and production data untouched.
