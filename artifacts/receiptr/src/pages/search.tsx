@@ -133,7 +133,7 @@ function DemoReceiptSheet({
         side={isDesktop ? "right" : "bottom"}
         className={
           isDesktop
-            ? "w-[520px] max-w-full p-0 flex flex-col overflow-hidden [&>button]:hidden"
+            ? "w-[576px] max-w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-2rem)] p-0 flex flex-col overflow-hidden [&>button]:hidden"
             : "h-[85dvh] p-0 flex flex-col overflow-hidden rounded-t-2xl"
         }
       >

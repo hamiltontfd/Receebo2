@@ -346,9 +346,10 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
       <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
         <SheetContent
           side={isDesktop ? "right" : "bottom"}
+          // Desktop: 576px (was capped at 384px by the sheet's sm:max-w-sm), never wider than the window.
           className={
             isDesktop
-              ? "w-[520px] max-w-full px-0 pt-0 pb-0 flex flex-col gap-0 overflow-hidden [&>button]:hidden"
+              ? "w-[576px] max-w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-2rem)] px-0 pt-0 pb-0 flex flex-col gap-0 overflow-hidden [&>button]:hidden"
               : "h-[85dvh] rounded-t-2xl px-0 pt-0 pb-0 flex flex-col gap-0 overflow-hidden"
           }
           style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}
