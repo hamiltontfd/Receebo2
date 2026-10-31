@@ -79,9 +79,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <nav className="flex items-center gap-1" aria-label="Main">
           {tabs.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href}>
+            <Link key={href} href={href} aria-current={location.startsWith(href) ? "page" : undefined}>
               <Button
-                variant={location.startsWith(href) ? "secondary" : "ghost"}
+                variant={location.startsWith(href) ? "default" : "ghost"}
                 size="sm"
                 className="rounded-full"
                 data-testid={`desktop-tab-${label.toLowerCase()}`}
