@@ -15,6 +15,41 @@ tags:
   - name: Storage
     description: Object storage upload and serving endpoints.
 paths:
+  /market/suggestion:
+    get:
+      operationId: getMarketSuggestion
+      responses:
+        "200":
+          description: Unconfirmed country suggestion from local GeoIP, or unknown.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketSuggestion"
+  /account/market:
+    get:
+      operationId: getAccountMarket
+      responses:
+        "200":
+          description: Confirmed account market; null means not chosen.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountMarket"
+    patch:
+      operationId: updateAccountMarket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarketPreferenceInput"
+      responses:
+        "200":
+          description: Saved preference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountMarket"
   /billing/trial-funnel:
     post:
       operationId: recordTrialFunnelInteraction
@@ -421,6 +456,33 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
+    AccountMarket:
+      type: object
+      required: [market]
+      properties:
+        market:
+          type: ["string", "null"]
+          enum: [PT, BR, US, null]
+    MarketPreferenceInput:
+      type: object
+      additionalProperties: false
+      required: [market]
+      properties:
+        market:
+          type: string
+          enum: [PT, BR, US]
+        onlyIfUnset:
+          type: boolean
+          description: Adopt a visitor choice atomically, without replacing an existing account choice.
+    MarketSuggestion:
+      type: object
+      required: [country, market]
+      properties:
+        country:
+          type: ["string", "null"]
+        market:
+          type: ["string", "null"]
+          enum: [PT, BR, US, null]
     TrialFunnelInteraction:
       type: object
       additionalProperties: false
@@ -580,6 +642,10 @@ components:
     ReceiptUpdate:
       type: object
       properties:
+        purchaseCountry:
+          type: ["string", "null"]
+          pattern: "^[A-Z]{2}$"
+          description: Actual ISO-3166-1 alpha-2 purchase country; null means unknown, never the account market.
         isOnlinePurchase:
           type: ["boolean", "null"]
         purchaseType:

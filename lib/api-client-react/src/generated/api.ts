@@ -23,6 +23,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccountMarket,
   AccountTrialStartResult,
   BillingAccessStatus,
   CheckSimilarReceiptParams,
@@ -31,10 +32,12 @@ import type {
   GuestClaimBody,
   HealthStatus,
   ListReceiptsParams,
+  MarketPreferenceInput,
+  MarketSuggestion,
   MerchantSpend,
   Receipt,
-  ReceiptInput,
   ReceiptPage,
+  ReceiptInput,
   ReceiptStats,
   ReceiptUpdate,
   SimilarReceiptMatch,
@@ -55,6 +58,213 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getGetMarketSuggestionUrl = () => {
+
+
+
+
+  return `/api/market/suggestion`
+}
+
+export const getMarketSuggestion = async ( options?: RequestInit): Promise<MarketSuggestion> => {
+
+  return customFetch<MarketSuggestion>(getGetMarketSuggestionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMarketSuggestionQueryKey = () => {
+    return [
+    `/api/market/suggestion`
+    ] as const;
+    }
+
+
+export const getGetMarketSuggestionQueryOptions = <TData = Awaited<ReturnType<typeof getMarketSuggestion>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMarketSuggestion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMarketSuggestionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMarketSuggestion>>> = ({ signal }) => getMarketSuggestion({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMarketSuggestion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMarketSuggestionQueryResult = NonNullable<Awaited<ReturnType<typeof getMarketSuggestion>>>
+export type GetMarketSuggestionQueryError = ErrorType<unknown>
+
+
+
+export function useGetMarketSuggestion<TData = Awaited<ReturnType<typeof getMarketSuggestion>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMarketSuggestion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMarketSuggestionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetAccountMarketUrl = () => {
+
+
+
+
+  return `/api/account/market`
+}
+
+export const getAccountMarket = async ( options?: RequestInit): Promise<AccountMarket> => {
+
+  return customFetch<AccountMarket>(getGetAccountMarketUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAccountMarketQueryKey = () => {
+    return [
+    `/api/account/market`
+    ] as const;
+    }
+
+
+export const getGetAccountMarketQueryOptions = <TData = Awaited<ReturnType<typeof getAccountMarket>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccountMarket>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAccountMarketQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccountMarket>>> = ({ signal }) => getAccountMarket({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAccountMarket>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAccountMarketQueryResult = NonNullable<Awaited<ReturnType<typeof getAccountMarket>>>
+export type GetAccountMarketQueryError = ErrorType<unknown>
+
+
+
+export function useGetAccountMarket<TData = Awaited<ReturnType<typeof getAccountMarket>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccountMarket>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAccountMarketQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateAccountMarketUrl = () => {
+
+
+
+
+  return `/api/account/market`
+}
+
+export const updateAccountMarket = async (marketPreferenceInput: MarketPreferenceInput, options?: RequestInit): Promise<AccountMarket> => {
+
+  return customFetch<AccountMarket>(getUpdateAccountMarketUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      marketPreferenceInput,)
+  }
+);}
+
+
+
+
+export const getUpdateAccountMarketMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountMarket>>, TError,{data: BodyType<MarketPreferenceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAccountMarket>>, TError,{data: BodyType<MarketPreferenceInput>}, TContext> => {
+
+const mutationKey = ['updateAccountMarket'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAccountMarket>>, {data: BodyType<MarketPreferenceInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAccountMarket(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAccountMarketMutationResult = NonNullable<Awaited<ReturnType<typeof updateAccountMarket>>>
+    export type UpdateAccountMarketMutationBody = BodyType<MarketPreferenceInput>
+    export type UpdateAccountMarketMutationError = ErrorType<unknown>
+
+    export const useUpdateAccountMarket = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountMarket>>, TError,{data: BodyType<MarketPreferenceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAccountMarket>>,
+        TError,
+        {data: BodyType<MarketPreferenceInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAccountMarketMutationOptions(options));
+    }
 
 export const getRecordTrialFunnelInteractionUrl = () => {
 

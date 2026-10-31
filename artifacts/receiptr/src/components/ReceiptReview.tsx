@@ -16,6 +16,7 @@ import { privateFileUrl } from "@/lib/privateFileUrl";
 import { formatMoney, formatPurchaseDate } from "@/lib/pendingImports";
 import { useToast } from "@/hooks/use-toast";
 import { usePwaUpdateBlocker } from "@/lib/pwa";
+import { PurchaseCountryField } from "@/components/PurchaseCountryField";
 
 interface ReviewFields {
   merchant: string;
@@ -23,6 +24,8 @@ interface ReviewFields {
   category: string;
   total: string;
   warranty: string;
+  /** "" = Unknown (null on save). */
+  purchaseCountry: string;
 }
 
 const label = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
@@ -51,6 +54,7 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
         category: receipt.category ?? "Other",
         total: receipt.total != null ? String(receipt.total) : "",
         warranty: receipt.warranty ?? "",
+        purchaseCountry: receipt.purchaseCountry ?? "",
       };
       setFields(f);
       setInitial(f);
@@ -74,6 +78,7 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
             purchaseDate: fields.purchaseDate,
             category: fields.category,
             warranty: fields.warranty,
+            purchaseCountry: fields.purchaseCountry || null,
             ...(total !== undefined && Number.isFinite(total) ? { total } : {}),
           },
         });
@@ -175,6 +180,12 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
               <Input id="review-warranty" value={fields.warranty} placeholder="None" onChange={(e) => set("warranty")(e.target.value)} className={field} />
             </div>
           </div>
+          <PurchaseCountryField
+            className="p-4"
+            id="review-purchase-country"
+            value={fields.purchaseCountry || null}
+            onChange={(v) => set("purchaseCountry")(v ?? "")}
+          />
         </div>
 
         {products.length > 0 && (

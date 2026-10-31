@@ -6,6 +6,7 @@ import { useGuestMode } from "@/components/GuestProvider";
 import { useOnboarding } from "@/lib/useOnboarding";
 import { OnboardingCard } from "@/components/OnboardingCard";
 import PendingImports from "@/components/PendingImports";
+import { MarketSelector } from "@/components/MarketSelector";
 import { useToast } from "@/hooks/use-toast";
 
 function useIsDesktop() {
@@ -513,6 +514,9 @@ export default function SearchPage() {
           onFocusSearch={() => searchInputRef.current?.focus()}
         />
       )}
+
+      {/* Account market is independent of search and receipt ordering. */}
+      {isSignedIn && !isGuest && <MarketSelector variant="compact" />}
 
       {/* Search input */}
       <div className="relative">

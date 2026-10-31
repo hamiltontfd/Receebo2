@@ -1,6 +1,58 @@
 import { cn } from "@/lib/utils";
 import { type Variants } from "framer-motion";
 import { Image } from "lucide-react";
+import { lt } from "@/lib/landingLocale";
+import {
+  providerNames,
+  inboxPhrase,
+  outlookAccountsNote,
+  OUTLOOK_ONLY_TITLE,
+  OUTLOOK_ONLY_BODY,
+  OUTLOOK_ONLY_FAQ,
+  type AvailableMailProvider,
+} from "@/lib/availableMailProviders";
+
+/* ── Localized mail-provider copy (English output identical to lib helpers) ── */
+export function lProviderNames(providers: AvailableMailProvider[]): string | null {
+  const en = providerNames(providers);
+  if (!en) return null;
+  const labels = providers.map((p) => p.label);
+  if (labels.length === 1) return labels[0];
+  const pt = `${labels.slice(0, -1).join(", ")} ou ${labels[labels.length - 1]}`;
+  return lt(en, pt);
+}
+
+export function lInboxPhrase(providers: AvailableMailProvider[]): string {
+  const names = lProviderNames(providers);
+  return lt(
+    inboxPhrase(providers),
+    names ? `o teu email ${names}` : "o teu email",
+    names ? `seu e-mail ${names}` : "seu e-mail",
+  );
+}
+
+export function lAccountsNote(providers: AvailableMailProvider[]): string | null {
+  const en = outlookAccountsNote(providers);
+  return en
+    ? lt(en, "Funciona com contas Outlook.com, Hotmail, Live e Microsoft 365.")
+    : null;
+}
+
+export const lOutlookOnlyTitle = () => lt(OUTLOOK_ONLY_TITLE, "Importar do Outlook");
+export const lOutlookOnlyBody = () =>
+  lt(
+    OUTLOOK_ONLY_BODY,
+    "Liga o teu email Outlook e o Receebo encontra os teus recibos por ti. Aprovas cada um antes de ser guardado. Para já, só Outlook; mais fornecedores de email a caminho.",
+    "Conecte seu e-mail Outlook e o Receebo encontra seus recibos para você. Você aprova cada um antes de ser salvo. Por enquanto, só Outlook; mais provedores de e-mail em breve.",
+  );
+export const lOutlookOnlyFaq = () => ({
+  q: lt(OUTLOOK_ONLY_FAQ.q, "Que fornecedores de email funcionam?", "Quais provedores de e-mail funcionam?"),
+  a: lt(
+    OUTLOOK_ONLY_FAQ.a,
+    "Para já, só o Outlook (incluindo contas Hotmail e Live). Para qualquer outro email, guarda o recibo ou a confirmação da encomenda em PDF e carrega-o.",
+    "Por enquanto, só o Outlook (incluindo contas Hotmail e Live). Para qualquer outro e-mail, salve o recibo ou a confirmação do pedido em PDF e envie.",
+  ),
+});
 
 /* ── Animation Variants ──────────────────────────────────────────────── */
 export const fadeInUp: Variants = {
@@ -86,7 +138,7 @@ export function VideoPlaceholder({ className }: { className?: string }) {
         <div className="w-0 h-0 ml-1 border-t-[7px] border-t-transparent border-l-[12px] border-l-muted-foreground/40 border-b-[7px] border-b-transparent" />
       </div>
       <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground/60">
-        Video Placeholder
+        {lt("Video Placeholder", "Vídeo")}
       </span>
     </div>
   );

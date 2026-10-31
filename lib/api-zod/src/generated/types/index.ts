@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accountMarket';
+export * from './accountMarketMarket';
 export * from './accountTrialStartResult';
 export * from './billingAccessStatus';
 export * from './billingAccessStatusAccessState';
@@ -16,6 +18,10 @@ export * from './getRecentReceiptsParams';
 export * from './guestClaimBody';
 export * from './healthStatus';
 export * from './listReceiptsParams';
+export * from './marketPreferenceInput';
+export * from './marketPreferenceInputMarket';
+export * from './marketSuggestion';
+export * from './marketSuggestionMarket';
 export * from './merchantSpend';
 export * from './notableItem';
 export * from './receipt';

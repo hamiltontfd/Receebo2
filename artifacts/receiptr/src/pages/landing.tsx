@@ -4,6 +4,9 @@ import { Link } from "wouter";
 import { motion, MotionConfig } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/react";
+import { MarketSelector } from "@/components/MarketSelector";
+import { lt } from "@/lib/landingLocale";
+import { getAppLocale } from "@/lib/locale";
 
 // Sections
 import HeroSection from "./landing/HeroSection";
@@ -33,6 +36,13 @@ function useScrolled(threshold = 40) {
 export default function Landing() {
   const { isSignedIn } = useAuth();
   const scrolled = useScrolled(40);
+  const locale = getAppLocale();
+
+  useEffect(() => {
+    const prev = document.documentElement.lang;
+    document.documentElement.lang = locale;
+    return () => { document.documentElement.lang = prev; };
+  }, [locale]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -55,19 +65,20 @@ export default function Landing() {
           />
 
           <motion.div
-            className="flex items-center gap-4"
+            className="flex items-center gap-2 sm:gap-4"
             initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
           >
-            <Link href="/sign-in" className="hidden sm:inline-block">
+            <MarketSelector variant="compact" className="-mr-1 sm:mr-0" />
+            <Link href="/sign-in" className="hidden md:inline-block">
               <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                 <Button
                   variant="outline"
                   size="sm"
                   className="rounded-full bg-white font-semibold text-sm text-foreground px-4 hover:bg-white/90"
                 >
-                  Sign in
+                  {lt("Sign in", "Entrar")}
                 </Button>
               </motion.div>
             </Link>
@@ -75,7 +86,7 @@ export default function Landing() {
             <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-nav-trial">
               <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                 <Button size="sm" className="rounded-full font-semibold text-sm px-4">
-                  {isSignedIn ? "Open app" : "Start free"}
+                  {isSignedIn ? lt("Open app", "Abrir app") : lt("Start free", "Começar grátis")}
                 </Button>
               </motion.div>
             </Link>
@@ -103,7 +114,7 @@ export default function Landing() {
               <div className="flex items-center gap-2.5">
                 <img src="/logo.svg" alt="Receebo" className="h-6 w-auto" />
                 <span className="text-sm text-muted-foreground">
-                  © {new Date().getFullYear()} Receebo. All rights reserved.
+                  © {new Date().getFullYear()} Receebo. {lt("All rights reserved.", "Todos os direitos reservados.")}
                 </span>
               </div>
               <div className="flex items-center gap-6 text-sm">
@@ -111,29 +122,29 @@ export default function Landing() {
                   href="/privacy"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Privacy
+                  {lt("Privacy", "Privacidade")}
                 </Link>
                 <Link
                   href="/terms"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Terms
+                  {lt("Terms", "Termos")}
                 </Link>
                 <Link
                   href="/sign-in"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Sign in
+                  {lt("Sign in", "Entrar")}
                 </Link>
                 <Link
                   href="/sign-up"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Sign up
+                  {lt("Sign up", "Criar conta")}
                 </Link>
               </div>
             </div>
-            <DisputeResolutionLine className="mt-5 text-xs text-muted-foreground text-center sm:text-left" />
+            <DisputeResolutionLine locale={locale === "en" ? "en" : "pt"} className="mt-5 text-xs text-muted-foreground text-center sm:text-left" />
           </div>
         </footer>
 

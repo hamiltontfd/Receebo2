@@ -12,6 +12,7 @@ import { spawn } from "child_process";
 import { fileURLToPath } from "node:url";
 import { billingOrigin } from "./lib/billingUrls";
 import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
+import { migrateAccountMarket } from "./lib/marketMigration";
 import { extendTrialsToCurrentDuration, uncountUnsavedTrialDrafts } from "./lib/accountTrial";
 import { migrateTrialAiReads } from "./lib/trialAiReads";
 import { migrateRecurringSuppliers } from "./lib/recurringSuppliers";
@@ -435,6 +436,7 @@ async function start(): Promise<void> {
   // Apply schema migrations synchronously before accepting requests
   await runStartupMigrations();
   await migrateTrialFunnel();
+  await migrateAccountMarket();
   try {
     // Uploads count only once saved: unsaved drafts counted under the old rule stop counting.
     const uncounted = await uncountUnsavedTrialDrafts();

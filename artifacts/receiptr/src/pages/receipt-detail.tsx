@@ -26,6 +26,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { ReceiptReview } from "@/components/ReceiptReview";
+import { PurchaseCountryField, PurchaseCountryValue } from "@/components/PurchaseCountryField";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { StoreFullscreen } from "@/components/StoreFullscreen";
 import { PageTransition, listVariants, itemVariants } from "@/components/PageTransition";
@@ -59,6 +60,7 @@ const editFormSchema = z.object({
   currency: z.string().optional(),
   category: z.string().optional(),
   warranty: z.string().optional(),
+  purchaseCountry: z.string().nullable().optional(),
 });
 
 type EditFormValues = z.infer<typeof editFormSchema>;
@@ -111,6 +113,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
       currency: "USD",
       category: "",
       warranty: "",
+      purchaseCountry: null,
     },
   });
 
@@ -123,6 +126,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
         currency: receipt.currency || "USD",
         category: receipt.category || "",
         warranty: receipt.warranty || "",
+        purchaseCountry: receipt.purchaseCountry ?? null,
       });
     }
   }, [receipt, isEditing, form]);
@@ -138,6 +142,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
           currency: data.currency,
           category: data.category,
           warranty: data.warranty,
+          purchaseCountry: data.purchaseCountry ?? null,
         },
       });
       setIsEditing(false);
@@ -411,6 +416,15 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                 </div>
                 <FormField
                   control={form.control}
+                  name="purchaseCountry"
+                  render={({ field }) => (
+                    <FormItem className="p-4">
+                      <PurchaseCountryField value={field.value} onChange={field.onChange} id="detail-purchase-country" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="warranty"
                   render={({ field }) => (
                     <FormItem className="p-4 space-y-1">
@@ -460,6 +474,10 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                 <span className="font-mono font-semibold">{receipt.transactionNumber}</span>
               </div>
             )}
+            <div className="p-4 flex items-center justify-between gap-4 text-sm">
+              <span className="text-muted-foreground font-medium">Purchase country</span>
+              <PurchaseCountryValue value={receipt.purchaseCountry} className="font-semibold text-right" />
+            </div>
             <div className="p-4 flex items-center justify-between gap-4 text-sm">
               <span className="text-muted-foreground font-medium">Warranty</span>
               <span className="font-semibold text-right">{receipt.warranty || "None"}</span>

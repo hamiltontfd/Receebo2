@@ -2,20 +2,21 @@ import { motion } from "framer-motion";
 import { Check, X } from "lucide-react";
 import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
 import { cn } from "@/lib/utils";
+import { lt } from "@/lib/landingLocale";
 
-const rows = [
-  "Search by product",
-  "Warranty tracking",
-  "Return window alerts",
-  "Consumer rights info",
-  "AI extraction",
-  "Fullscreen proof of purchase",
+const getRows = () => [
+  lt("Search by product", "Pesquisa por produto"),
+  lt("Warranty tracking", "Acompanhamento de garantias"),
+  lt("Return window alerts", "Alertas de prazo de devolução"),
+  lt("Consumer rights info", "Informação sobre direitos do consumidor", "Informações sobre direitos do consumidor"),
+  lt("AI extraction", "Extração com IA"),
+  lt("Fullscreen proof of purchase", "Comprovativo de compra em ecrã inteiro", "Comprovante de compra em tela cheia"),
 ];
 
-const columns = [
-  { label: "Photos", values: [false, false, false, false, false, false] },
-  { label: "Email", values: [false, false, false, false, false, false] },
-  { label: "Receebo", values: [true, true, true, true, true, true], highlight: true },
+const getColumns = () => [
+  { key: "photos", label: lt("Photos", "Fotos"), values: [false, false, false, false, false, false] },
+  { key: "email", label: lt("Email", "Email", "E-mail"), values: [false, false, false, false, false, false] },
+  { key: "receebo", label: "Receebo", values: [true, true, true, true, true, true], highlight: true },
 ];
 
 function CheckIcon({ value, highlight }: { value: boolean; highlight?: boolean }) {
@@ -42,6 +43,8 @@ function CheckIcon({ value, highlight }: { value: boolean; highlight?: boolean }
 }
 
 export default function ComparisonSection() {
+  const rows = getRows();
+  const columns = getColumns();
   return (
     <section className="py-24 lg:py-32">
       <div className="max-w-4xl mx-auto px-6">
@@ -54,16 +57,16 @@ export default function ComparisonSection() {
           className="text-center mb-12"
         >
           <motion.div variants={fadeInUp}>
-            <SectionLabel>Comparison</SectionLabel>
+            <SectionLabel>{lt("Comparison", "Comparação")}</SectionLabel>
           </motion.div>
           <motion.h2
             variants={fadeInUp}
             className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight"
           >
-            Why not just save photos?
+            {lt("Why not just save photos?", "Porque não guardar só fotos?", "Por que não salvar só fotos?")}
           </motion.h2>
           <motion.p variants={fadeInUp} className="text-muted-foreground mt-3 text-lg max-w-lg mx-auto">
-            Photos and email threads lose the details that matter most.
+            {lt("Photos and email threads lose the details that matter most.", "Fotos e conversas de email perdem os detalhes que mais importam.", "Fotos e conversas de e-mail perdem os detalhes que mais importam.")}
           </motion.p>
         </motion.div>
 

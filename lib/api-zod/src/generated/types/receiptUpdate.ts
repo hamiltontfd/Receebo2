@@ -9,6 +9,12 @@ import type { NotableItem } from './notableItem';
 import type { ReceiptUpdatePurchaseType } from './receiptUpdatePurchaseType';
 
 export interface ReceiptUpdate {
+  /**
+     * Actual ISO-3166-1 alpha-2 purchase country; null means unknown, never the account market.
+     * @nullable
+     * @pattern ^[A-Z]{2}$
+     */
+  purchaseCountry?: string | null;
   /** @nullable */
   isOnlinePurchase?: boolean | null;
   /**

@@ -2,31 +2,48 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
 import { AppCapture } from "./MarketingMedia";
+import { lt } from "@/lib/landingLocale";
 
-const FEATURES = [
+const getFeatures = () => [
   {
-    title: "Capture",
-    items: ["Scan paper receipts", "Upload PDF, JPG or PNG", "Import receipts from your inbox"],
+    title: lt("Capture", "Capturar"),
+    items: [
+      lt("Scan paper receipts", "Digitaliza recibos em papel", "Escaneie recibos em papel"),
+      lt("Upload PDF, JPG or PNG", "Carrega PDF, JPG ou PNG", "Envie PDF, JPG ou PNG"),
+      lt("Import receipts from your inbox", "Importa recibos do teu email", "Importe recibos do seu e-mail"),
+    ],
     image: "capture-poster.webp",
-    alt: "Receebo's real review form displaying Casa Lumen Electrónica, 23 October 2026 and a €649 total from a fictional receipt.",
+    alt: lt("Receebo's real review form displaying Casa Lumen Electrónica, 23 October 2026 and a €649 total from a fictional receipt.", "Formulário real de revisão do Receebo com Casa Lumen Electrónica, 23 de outubro de 2026 e um total de €649 de um recibo fictício."),
   },
   {
-    title: "Find",
-    items: ["Search by product", "Search by merchant", "Search by brand or category"],
+    title: lt("Find", "Encontrar"),
+    items: [
+      lt("Search by product", "Pesquisa por produto", "Pesquise por produto"),
+      lt("Search by merchant", "Pesquisa por loja", "Pesquise por loja"),
+      lt("Search by brand or category", "Pesquisa por marca ou categoria", "Pesquise por marca ou categoria"),
+    ],
     image: "find-poster.webp",
-    alt: "A search for TV in the real Receebo interface finds the fictional Casa Lumen Electrónica purchase.",
+    alt: lt("A search for TV in the real Receebo interface finds the fictional Casa Lumen Electrónica purchase.", "Uma pesquisa por TV na interface real do Receebo encontra a compra fictícia na Casa Lumen Electrónica."),
   },
   {
-    title: "Protect",
-    items: ["Warranty reminders", "Return window alerts", "Consumer rights info"],
+    title: lt("Protect", "Proteger"),
+    items: [
+      lt("Warranty reminders", "Lembretes de garantia"),
+      lt("Return window alerts", "Alertas de prazo de devolução"),
+      lt("Consumer rights info", "Informação sobre direitos do consumidor", "Informações sobre direitos do consumidor"),
+    ],
     image: "protection.webp",
-    alt: "Actual consumer-rights information for the sample Portugal purchase: the 3-year legal warranty and the 2-year manufacturer warranty, each with its own end date.",
+    alt: lt("Actual consumer-rights information for the sample Portugal purchase: the 3-year legal warranty and the 2-year manufacturer warranty, each with its own end date.", "Informação real sobre direitos do consumidor para a compra de exemplo em Portugal: a garantia legal de 3 anos e a garantia do fabricante de 2 anos, cada uma com a sua data de fim."),
   },
   {
-    title: "Prove",
-    items: ["Fullscreen receipt view", "Download as PDF", "Share proof of purchase"],
+    title: lt("Prove", "Comprovar"),
+    items: [
+      lt("Fullscreen receipt view", "Recibo em ecrã inteiro", "Recibo em tela cheia"),
+      lt("Download as PDF", "Descarregar em PDF", "Baixar em PDF"),
+      lt("Share proof of purchase", "Partilhar comprovativo de compra", "Compartilhar comprovante de compra"),
+    ],
     image: "show-to-store.webp",
-    alt: "Receebo's full-screen Show to store view displaying the fictional Casa Lumen Electrónica receipt for a €649 55-inch 4K Smart TV.",
+    alt: lt("Receebo's full-screen Show to store view displaying the fictional Casa Lumen Electrónica receipt for a €649 55-inch 4K Smart TV.", "Vista de ecrã inteiro do Receebo para mostrar na loja, com o recibo fictício da Casa Lumen Electrónica de uma Smart TV 4K de 55 polegadas por €649.", "Visualização em tela cheia do Receebo para mostrar na loja, com o recibo fictício da Casa Lumen Electrónica de uma Smart TV 4K de 55 polegadas por €649."),
   },
 ];
 
@@ -56,6 +73,7 @@ export default function WhyReceeboSection() {
     setActive(idx);
   };
 
+  const FEATURES = getFeatures();
   const feature = FEATURES[active];
 
   return (
@@ -70,15 +88,15 @@ export default function WhyReceeboSection() {
           className="mb-12"
         >
           <motion.div variants={fadeInUp}>
-            <SectionLabel>Why Receebo</SectionLabel>
+            <SectionLabel>{lt("Why Receebo", "Porquê o Receebo", "Por que o Receebo")}</SectionLabel>
           </motion.div>
           <motion.h2
             variants={fadeInUp}
             className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight max-w-2xl"
           >
-            Forgot where or when?
+            {lt("Forgot where or when?", "Esqueceste onde ou quando?", "Esqueceu onde ou quando?")}
             <br />
-            We got you.
+            {lt("We got you.", "Nós ajudamos.")}
           </motion.h2>
         </motion.div>
 
@@ -94,7 +112,7 @@ export default function WhyReceeboSection() {
           <div className="flex border-b border-border">
             {FEATURES.map((f, i) => (
               <button
-                key={f.title}
+                key={i}
                 onClick={() => goTo(i)}
                 aria-pressed={i === active}
                 className="relative flex-1 py-4 text-sm font-semibold transition-colors focus-visible:outline-none"
@@ -162,7 +180,7 @@ export default function WhyReceeboSection() {
                               ? "hsl(var(--foreground))"
                               : "hsl(var(--foreground) / 0.15)",
                         }}
-                        aria-label={`Go to ${FEATURES[i].title}`}
+                        aria-label={`${lt("Go to", "Ir para")} ${FEATURES[i].title}`}
                       />
                     ))}
                   </div>

@@ -13,6 +13,7 @@ import mailRouter from "./mail";
 import recurringSuppliersRouter from "./recurringSuppliers";
 import pushRouter from "./push";
 import accountRouter from "./account";
+import marketRouter from "./market";
 import cronRouter from "./cron";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
 import { requireProductAccess } from "../middlewares/productAccess";
@@ -39,5 +40,6 @@ router.use(mailRouter);
 router.use(recurringSuppliersRouter);
 router.use(pushRouter);
 router.use(accountRouter);
+router.use(marketRouter);
 
 export default router;

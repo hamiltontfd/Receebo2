@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { lt } from "@/lib/landingLocale";
 
 // 30 s promo with burned-in captions, so it reads fine while muted.
 // One <video> is rendered for the current viewport (9:16 on narrow screens,
 // 16:9 from md up), so phones never download the desktop cut or vice versa.
 const WIDE_QUERY = "(min-width: 768px)";
-const TITLE = "Receebo in 30 seconds";
 
 export const promoMedia = (file: string) => `${import.meta.env.BASE_URL}media/${file}`;
 
@@ -27,6 +27,7 @@ function useIsWide() {
 }
 
 export default function PromoVideoSection() {
+  const TITLE = lt("Receebo in 30 seconds", "Receebo em 30 segundos");
   const reduce = useReducedMotion();
   const wide = useIsWide();
   const ratio = wide ? "16x9" : "9x16";
@@ -136,7 +137,7 @@ export default function PromoVideoSection() {
               <button
                 type="button"
                 onClick={togglePlay}
-                aria-label={`Play video: ${TITLE}`}
+                aria-label={`${lt("Play video", "Reproduzir vídeo")}: ${TITLE}`}
                 className="group absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
               >
                 <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/95 shadow-lg motion-safe:transition-transform motion-safe:group-hover:scale-110">
@@ -147,14 +148,14 @@ export default function PromoVideoSection() {
 
             <div className="absolute top-3 right-3 flex gap-2">
               {playing && (
-                <button type="button" onClick={togglePlay} aria-label="Pause video" className={btn}>
+                <button type="button" onClick={togglePlay} aria-label={lt("Pause video", "Pausar vídeo")} className={btn}>
                   <Pause className="h-4 w-4 fill-current" aria-hidden="true" />
                 </button>
               )}
               <button
                 type="button"
                 onClick={toggleSound}
-                aria-label={muted ? "Turn sound on" : "Turn sound off"}
+                aria-label={muted ? lt("Turn sound on", "Ligar o som") : lt("Turn sound off", "Desligar o som")}
                 aria-pressed={!muted}
                 className={btn}
               >
@@ -163,7 +164,7 @@ export default function PromoVideoSection() {
             </div>
           </div>
           <figcaption className="mt-3 text-[11px] text-muted-foreground text-center">
-            {TITLE}. Captions on screen, sound off until you turn it on. Fictional sample purchase.
+            {TITLE}. {lt("Captions on screen, sound off until you turn it on. Fictional sample purchase.", "Legendas no ecrã em inglês, som desligado até o ligares. Compra de exemplo fictícia.", "Legendas na tela em inglês, som desligado até você ligar. Compra de exemplo fictícia.")}
           </figcaption>
         </figure>
       </div>

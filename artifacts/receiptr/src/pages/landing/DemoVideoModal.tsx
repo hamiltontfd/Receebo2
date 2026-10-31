@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { marketingMedia } from "./MarketingMedia";
+import { lt } from "@/lib/landingLocale";
 
 interface DemoVideo {
   title: string;
@@ -39,7 +40,7 @@ export default function DemoVideoModal({
           }}
         >
           <div className="px-5 py-4 pr-12 border-b">
-            <DialogTitle className="text-lg font-bold">{demo.title} — Receebo demo</DialogTitle>
+            <DialogTitle className="text-lg font-bold">{demo.title} — {lt("Receebo demo", "demonstração do Receebo")}</DialogTitle>
           </div>
           <motion.div
             initial={reduce ? false : { opacity: 0, y: 12, scale: 0.98 }}
@@ -61,30 +62,30 @@ export default function DemoVideoModal({
               poster={marketingMedia(`${demo.clip}-poster.webp`)}
               width={960}
               height={640}
-              aria-label={`${demo.title}: real Receebo screen recording using sample data`}
+              aria-label={`${demo.title}: ${lt("real Receebo screen recording using sample data", "gravação de ecrã real do Receebo com dados de exemplo", "gravação de tela real do Receebo com dados de exemplo")}`}
               className="block w-full aspect-[3/2] max-h-[65dvh] object-contain bg-black"
               onError={() => setFailedClip(demo.clip)}
               onLoadedData={() => setFailedClip(null)}
             >
               <source src={marketingMedia(`${demo.clip}.webm`)} type="video/webm" />
               <source src={marketingMedia(`${demo.clip}.mp4`)} type="video/mp4" />
-              Your browser cannot play this clip. Read the demonstration description below.
+              {lt("Your browser cannot play this clip. Read the demonstration description below.", "O teu navegador não consegue reproduzir este vídeo. Lê a descrição da demonstração abaixo.", "Seu navegador não consegue reproduzir este vídeo. Leia a descrição da demonstração abaixo.")}
             </video>
           </motion.div>
           <div className="px-5 py-4 space-y-2">
             {failedClip === demo.clip && (
               <p role="alert" className="text-sm text-destructive">
-                This video couldn’t load. Check your connection and reopen the demo to retry.
+                {lt("This video couldn’t load. Check your connection and reopen the demo to retry.", "Não foi possível carregar este vídeo. Verifica a ligação e abre a demonstração de novo para tentar outra vez.", "Não foi possível carregar este vídeo. Verifique sua conexão e abra a demonstração de novo para tentar outra vez.")}
               </p>
             )}
             <DialogDescription className="text-sm leading-relaxed">
               {demo.description}
             </DialogDescription>
             <p className="text-xs text-muted-foreground">
-              Real Receebo screens. Fictional sample data and simulated extraction. Silent video.
+              {lt("Real Receebo screens. Fictional sample data and simulated extraction. Silent video.", "Ecrãs reais do Receebo, em inglês. Dados de exemplo fictícios e extração simulada. Vídeo sem som.", "Telas reais do Receebo, em inglês. Dados de exemplo fictícios e extração simulada. Vídeo sem som.")}
             </p>
             <DialogClose asChild>
-              <Button variant="outline" size="sm">Close video</Button>
+              <Button variant="outline" size="sm">{lt("Close video", "Fechar vídeo")}</Button>
             </DialogClose>
           </div>
         </DialogContent>

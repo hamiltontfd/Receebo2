@@ -5,6 +5,57 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+/**
+ * @nullable
+ */
+export type AccountMarketMarket = typeof AccountMarketMarket[keyof typeof AccountMarketMarket] | null;
+
+
+export const AccountMarketMarket = {
+  PT: 'PT',
+  BR: 'BR',
+  US: 'US',
+} as const;
+
+export interface AccountMarket {
+  /** @nullable */
+  market: AccountMarketMarket;
+}
+
+export type MarketPreferenceInputMarket = typeof MarketPreferenceInputMarket[keyof typeof MarketPreferenceInputMarket];
+
+
+export const MarketPreferenceInputMarket = {
+  PT: 'PT',
+  BR: 'BR',
+  US: 'US',
+} as const;
+
+export interface MarketPreferenceInput {
+  market: MarketPreferenceInputMarket;
+  /** Adopt a visitor choice atomically, without replacing an existing account choice. */
+  onlyIfUnset?: boolean;
+}
+
+/**
+ * @nullable
+ */
+export type MarketSuggestionMarket = typeof MarketSuggestionMarket[keyof typeof MarketSuggestionMarket] | null;
+
+
+export const MarketSuggestionMarket = {
+  PT: 'PT',
+  BR: 'BR',
+  US: 'US',
+} as const;
+
+export interface MarketSuggestion {
+  /** @nullable */
+  country: string | null;
+  /** @nullable */
+  market: MarketSuggestionMarket;
+}
+
 export type TrialFunnelInteractionEvent = typeof TrialFunnelInteractionEvent[keyof typeof TrialFunnelInteractionEvent];
 
 
@@ -212,6 +263,13 @@ export const ReceiptUpdatePurchaseType = {
 } as const;
 
 export interface ReceiptUpdate {
+  /**
+     * Actual ISO-3166-1 alpha-2 purchase country; null means unknown, never the account market.
+     * @nullable
+     * @pattern ^[A-Z]{2}$
+     */
+  purchaseCountry?: string | null;
+  /** @nullable */
   isOnlinePurchase?: boolean | null;
   /**
      * Manual purchase type (the "This is a subscription" switch). Null clears it.

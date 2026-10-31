@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { lt } from "@/lib/landingLocale";
 
 // Versioned public App Storage objects. No capture tooling or auth fixtures ship
 // with the website; only exported images and silent screen recordings.
@@ -13,7 +14,7 @@ const dimensions: Record<string, [number, number]> = {
 };
 
 export function AppCapture({
-  file, alt, className, caption = "Real Receebo screen · fictional sample data",
+  file, alt, className, caption,
 }: {
   file: string;
   alt: string;
@@ -33,7 +34,7 @@ export function AppCapture({
         className="block w-full min-h-0 object-contain rounded-xl shadow-sm border border-border/60 bg-white p-4 sm:p-5"
       />
       <figcaption className="text-center text-[11px] text-muted-foreground leading-relaxed shrink-0">
-        {caption}
+        {caption ?? lt("Real Receebo screen · fictional sample data", "Ecrã real do Receebo · dados de exemplo fictícios", "Tela real do Receebo · dados de exemplo fictícios")}
       </figcaption>
     </figure>
   );

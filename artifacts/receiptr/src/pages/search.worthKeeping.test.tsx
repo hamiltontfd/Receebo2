@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/components/MarketSelector", () => ({ MarketSelector: () => <div>Market selector</div> }));
 
 const state = vi.hoisted(() => ({ signedIn: true, pending: true }));
 vi.mock("@clerk/react", () => ({ useAuth: () => ({ isSignedIn: state.signedIn }) }));

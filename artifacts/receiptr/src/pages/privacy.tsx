@@ -124,6 +124,19 @@ export default function PrivacyPolicy() {
         </li>
         <li><strong>Resend:</strong> transactional and reminder email delivery.</li>
         <li>
+          <strong>Country (country.is):</strong> when no account market or
+          explicit browser choice is available and our local lookup cannot
+          determine your country, your browser contacts{" "}
+          <a href="https://country.is/" target="_blank" rel="noopener noreferrer">country.is</a>{" "}
+          to suggest an approximate market. The service receives your public
+          IP address as part of that network request. Receebo sends no account
+          identifier, receipt data or cookies with it, uses only the returned
+          country, and does not store the IP for this feature. This is not GPS
+          location. You can change or confirm the suggestion, and a saved market
+          preference takes priority. If the lookup fails, you can keep browsing
+          and choose a region manually.
+        </li>
+        <li>
           <strong>Browser push providers:</strong> Apple, Google, Mozilla, or
           another provider selected by your browser/device when you enable push
           notifications.

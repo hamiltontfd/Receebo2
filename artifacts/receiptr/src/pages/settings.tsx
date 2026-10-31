@@ -22,6 +22,7 @@ import { Check, Minus } from "lucide-react";
 import { PushNotificationSettings } from "@/components/PushNotificationSettings";
 import { PrivacyAndDataSettings } from "@/components/PrivacyAndDataSettings";
 import { MailConnections } from "@/components/MailConnections";
+import { MarketSelector } from "@/components/MarketSelector";
 import { MAIL_PROVIDER_LABELS, readMailOAuthResult } from "@/lib/mailConnection";
 
 const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
@@ -189,6 +190,9 @@ export default function Settings() {
             <span className="text-sm text-muted-foreground">
               {user?.fullName ?? "—"}
             </span>
+          </div>
+          <div className="pt-3 border-t">
+            <MarketSelector />
           </div>
         </div>
       </section>

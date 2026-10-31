@@ -7,6 +7,7 @@ import { pgTable, text, boolean, timestamp } from "drizzle-orm/pg-core";
  */
 export const userPreferencesTable = pgTable("user_preferences", {
   userId: text("user_id").primaryKey(),
+  market: text("market", { enum: ["PT", "BR", "US"] }),
   notificationsOptOut: boolean("notifications_opt_out").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })

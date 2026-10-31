@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { validPurchaseCountry } from "../lib/purchaseCountry";
 import { and, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, trialUploadsTable } from "@workspace/db";
 import {
@@ -368,6 +369,10 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   const parsed = UpdateReceiptBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  if (!validPurchaseCountry(parsed.data.purchaseCountry)) {
+    res.status(400).json({ error: "Choose a real ISO country or Unknown." });
     return;
   }
 

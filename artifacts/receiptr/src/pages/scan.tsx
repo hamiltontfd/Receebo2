@@ -21,6 +21,7 @@ import {
 } from "@workspace/api-client-react";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { currencySymbol } from "@/lib/currency";
+import { PurchaseCountryField } from "@/components/PurchaseCountryField";
 import { compressImage, compressedFileName } from "@/lib/compressImage";
 import { CATEGORIES, categoryStyle } from "@/lib/categories";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -205,7 +206,7 @@ export default function Scan() {
   const [dismissedIncomplete, setDismissedIncomplete] = useState(false);
 
   // Saved draft from a warning-card retake so edits survive re-scan
-  const savedFormDraftRef = useRef<{ merchant: string; purchaseDate: string; total: string; category: string; warranty: string } | null>(null);
+  const savedFormDraftRef = useRef<{ merchant: string; purchaseDate: string; total: string; category: string; warranty: string; purchaseCountry: string } | null>(null);
 
   // Panoramic mode
   const PAN_MAX_FRAMES = 12;
@@ -385,6 +386,7 @@ export default function Scan() {
     total: "",
     category: "",
     warranty: "",
+    purchaseCountry: "",
   });
 
   useEffect(() => {
@@ -395,6 +397,7 @@ export default function Scan() {
         total: receipt.total != null ? String(receipt.total) : "",
         category: receipt.category ?? "",
         warranty: receipt.warranty ?? "",
+        purchaseCountry: receipt.purchaseCountry ?? "",
       };
       // If the user hit "Retake" from the warning card, merge their saved edits
       // back in — the new scan's data takes priority for any field it filled;
@@ -408,6 +411,7 @@ export default function Scan() {
           total: fromScan.total || draft.total,
           category: fromScan.category || draft.category,
           warranty: fromScan.warranty || draft.warranty,
+          purchaseCountry: fromScan.purchaseCountry || draft.purchaseCountry,
         });
       } else {
         setForm(fromScan);
@@ -565,6 +569,7 @@ export default function Scan() {
           total: form.total !== "" ? Number(form.total) : undefined,
           category: form.category || undefined,
           warranty: form.warranty || undefined,
+          purchaseCountry: form.purchaseCountry || null,
           isDraft: false,
         },
       });
@@ -1113,6 +1118,13 @@ export default function Scan() {
                 </div>
               </div>
             </div>
+
+            <PurchaseCountryField
+              className="rounded-xl border p-4"
+              id="scan-purchase-country"
+              value={form.purchaseCountry || null}
+              onChange={(v) => setForm((f) => ({ ...f, purchaseCountry: v ?? "" }))}
+            />
 
             <div className="rounded-xl border p-4 space-y-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</p>

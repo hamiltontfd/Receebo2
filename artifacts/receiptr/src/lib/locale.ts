@@ -1,11 +1,12 @@
 /**
- * Locale scaffolding (en, pt-PT, pt-BR). The app UI is still English-only;
+ * Locale support (en, pt-PT, pt-BR). Screens adopt translated copy incrementally;
  * this module holds the rules so screens and emails can move over one at a
  * time. Spec: /workspace/receebo-email SPEC §2, docs/locales-and-rights.md.
  *
  * - The saved locale wins. Until there is a user setting, the only override is
  *   localStorage "receebo:locale" (for testing pt-BR/pt-PT screens).
  * - Browser/sign-up fallback: pt-BR → pt-BR, any other pt* → pt-PT, else en.
+ * - Without a saved override, browser language selects the UI locale.
  * - Money is EUR for everyone (the subscription), formatted per locale.
  *   Receipt amounts keep the receipt's own currency.
  */
@@ -20,14 +21,16 @@ export function resolveLocale(tag: string | null | undefined): AppLocale {
   return "en";
 }
 
-/** Current UI locale: explicit override only (default English until the app is translated). */
-export function getAppLocale(storage: Pick<Storage, "getItem"> | null = typeof localStorage === "undefined" ? null : localStorage): AppLocale {
+/** Browser language is independent of account market and purchase country. */
+export function getAppLocale(
+  storage: Pick<Storage, "getItem"> | null = typeof localStorage === "undefined" ? null : localStorage,
+  browserLanguage: string | null | undefined = typeof navigator === "undefined" ? undefined : navigator.languages?.[0] ?? navigator.language,
+): AppLocale {
   try {
     const saved = storage?.getItem(LOCALE_STORAGE_KEY);
-    return saved && (APP_LOCALES as readonly string[]).includes(saved) ? (saved as AppLocale) : "en";
-  } catch {
-    return "en";
-  }
+    if (saved && (APP_LOCALES as readonly string[]).includes(saved)) return saved as AppLocale;
+  } catch { /* Storage denial must not disable browser language detection. */ }
+  return resolveLocale(browserLanguage);
 }
 
 const PT_MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];

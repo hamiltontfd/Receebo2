@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/react";
 import { fadeInUp, stagger } from "./shared";
+import { lt } from "@/lib/landingLocale";
 
 export default function FinalCTASection() {
   const { isSignedIn } = useAuth();
@@ -29,12 +30,12 @@ export default function FinalCTASection() {
         >
           <motion.div variants={fadeInUp} className="space-y-4">
             <h2 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-[0.93] text-background">
-              Never lose a receipt
+              {lt("Never lose a receipt", "Nunca mais percas", "Nunca mais perca")}
               <br />
-              again.
+              {lt("again.", "um recibo.")}
             </h2>
             <p className="text-xl text-background/60 font-medium">
-              Receipts. Easy to find.
+              {lt("Receipts. Easy to find.", "Recibos. Fáceis de encontrar.")}
             </p>
           </motion.div>
 
@@ -45,7 +46,7 @@ export default function FinalCTASection() {
                   size="lg"
                   className="rounded-full h-14 px-10 text-base font-semibold bg-background text-foreground hover:bg-background/90 gap-2 shadow-lg"
                 >
-                  {isSignedIn ? "Open Receebo" : "Start free, no card needed"}
+                  {isSignedIn ? lt("Open Receebo", "Abrir o Receebo") : lt("Start free, no card needed", "Começa grátis, sem cartão", "Comece grátis, sem cartão")}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </motion.div>
@@ -53,7 +54,7 @@ export default function FinalCTASection() {
           </motion.div>
 
           <motion.p variants={fadeInUp} className="text-sm text-background/40">
-            15 days free · Up to 5 receipts · No card needed
+            {lt("15 days free · Up to 5 receipts · No card needed", "15 dias grátis · Até 5 recibos · Sem cartão")}
           </motion.p>
         </motion.div>
       </div>

@@ -8,6 +8,27 @@
 import * as zod from 'zod';
 
 
+export const GetMarketSuggestionResponse = zod.object({
+  "country": zod.string().nullable(),
+  "market": zod.union([zod.literal('PT'),zod.literal('BR'),zod.literal('US'),zod.literal(null)]).nullable()
+})
+
+
+export const GetAccountMarketResponse = zod.object({
+  "market": zod.union([zod.literal('PT'),zod.literal('BR'),zod.literal('US'),zod.literal(null)]).nullable()
+})
+
+
+export const UpdateAccountMarketBody = zod.object({
+  "market": zod.enum(['PT', 'BR', 'US']),
+  "onlyIfUnset": zod.boolean().optional().describe('Adopt a visitor choice atomically, without replacing an existing account choice.')
+})
+
+export const UpdateAccountMarketResponse = zod.object({
+  "market": zod.union([zod.literal('PT'),zod.literal('BR'),zod.literal('US'),zod.literal(null)]).nullable()
+})
+
+
 /**
  * @summary Record an authenticated paywall view or checkout cancellation, without user content
  */
@@ -292,7 +313,11 @@ export const UpdateReceiptParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateReceiptBodyPurchaseCountryRegExp = new RegExp('^[A-Z]{2}$');
+
+
 export const UpdateReceiptBody = zod.object({
+  "purchaseCountry": zod.string().regex(updateReceiptBodyPurchaseCountryRegExp).nullish().describe('Actual ISO-3166-1 alpha-2 purchase country; null means unknown, never the account market.'),
   "isOnlinePurchase": zod.boolean().nullish(),
   "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('Manual purchase type (the \"This is a subscription\" switch). Null clears it.'),
   "merchant": zod.string().optional(),

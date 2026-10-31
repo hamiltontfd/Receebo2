@@ -6,31 +6,32 @@ import { useAuth } from "@clerk/react";
 import { useCreateCheckout } from "@/hooks/useBilling";
 import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
 import { cn } from "@/lib/utils";
+import { lt } from "@/lib/landingLocale";
 
-const features = [
-  "Unlimited scans",
-  "Unlimited storage",
-  "AI extraction",
-  "Warranty tracking",
-  "Email imports",
-  "Return reminders",
-  "Priority processing",
+const getFeatures = () => [
+  lt("Unlimited scans", "Digitalizações ilimitadas"),
+  lt("Unlimited storage", "Armazenamento ilimitado"),
+  lt("AI extraction", "Extração com IA"),
+  lt("Warranty tracking", "Acompanhamento de garantias"),
+  lt("Email imports", "Importação de email", "Importação de e-mail"),
+  lt("Return reminders", "Lembretes de devolução"),
+  lt("Priority processing", "Processamento prioritário"),
 ];
 
-const plans = [
+const getPlans = () => [
   {
     key: "monthly" as const,
-    name: "Monthly",
+    name: lt("Monthly", "Mensal"),
     price: "€2.99",
-    period: "/month",
+    period: lt("/month", "/mês"),
     badge: null,
     highlight: false,
   },
   {
     key: "yearly" as const,
-    name: "Yearly",
+    name: lt("Yearly", "Anual"),
     price: "€24.99",
-    period: "/year",
+    period: lt("/year", "/ano"),
     badge: null,
     highlight: true,
   },
@@ -39,6 +40,8 @@ const plans = [
 export default function PricingSection() {
   const { isSignedIn } = useAuth();
   const checkout = useCreateCheckout();
+  const features = getFeatures();
+  const plans = getPlans();
 
   return (
     <section className="py-24 lg:py-32 bg-muted/20">
@@ -52,16 +55,16 @@ export default function PricingSection() {
           className="text-center mb-14"
         >
           <motion.div variants={fadeInUp}>
-            <SectionLabel>Pricing</SectionLabel>
+            <SectionLabel>{lt("Pricing", "Preços")}</SectionLabel>
           </motion.div>
           <motion.h2
             variants={fadeInUp}
             className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight"
           >
-            Simple, transparent pricing.
+            {lt("Simple, transparent pricing.", "Preços simples e transparentes.")}
           </motion.h2>
           <motion.p variants={fadeInUp} className="text-muted-foreground mt-3 text-lg">
-            15 days free, no card. Add up to 5 receipts. Subscribe only if you want to keep going.
+            {lt("15 days free, no card. Add up to 5 receipts. Subscribe only if you want to keep going.", "15 dias grátis, sem cartão. Adiciona até 5 recibos. Subscreve só se quiseres continuar.", "15 dias grátis, sem cartão. Adicione até 5 recibos. Assine só se quiser continuar.")}
           </motion.p>
         </motion.div>
 
@@ -134,7 +137,7 @@ export default function PricingSection() {
                     highlight ? "text-white/50" : "text-muted-foreground",
                   )}
                 >
-                  Founding price, charged when you subscribe
+                  {lt("Founding price, charged when you subscribe", "Preço de fundador, cobrado quando subscreves", "Preço de fundador, cobrado quando você assina")}
                 </p>
               </div>
 
@@ -166,7 +169,7 @@ export default function PricingSection() {
                       "border-white/30 text-white hover:bg-white/10 bg-white/10",
                   )}
                 >
-                  {checkout.isPending ? "Loading…" : `Subscribe ${price}${period}`}
+                  {checkout.isPending ? lt("Loading…", "A carregar…", "Carregando…") : lt(`Subscribe ${price}${period}`, `Subscrever ${price}${period}`, `Assinar ${price}${period}`)}
                 </Button>
               ) : (
                 <Link href="/sign-up">
@@ -178,7 +181,7 @@ export default function PricingSection() {
                         "border-white/30 text-white hover:bg-white/10 bg-white/10",
                     )}
                   >
-                    Start free, no card needed
+                    {lt("Start free, no card needed", "Começa grátis, sem cartão", "Comece grátis, sem cartão")}
                   </Button>
                 </Link>
               )}
@@ -194,7 +197,11 @@ export default function PricingSection() {
           viewport={VIEWPORT}
           className="text-center text-sm text-muted-foreground mt-8"
         >
-          Founding prices stay available for as long as your account exists, including if you cancel and resubscribe. Cancel renewal anytime.
+          {lt(
+            "Founding prices stay available for as long as your account exists, including if you cancel and resubscribe. Cancel renewal anytime.",
+            "Os preços de fundador mantêm-se disponíveis enquanto a tua conta existir, mesmo que canceles e voltes a subscrever. Cancela a renovação quando quiseres.",
+            "Os preços de fundador continuam disponíveis enquanto sua conta existir, mesmo se você cancelar e assinar de novo. Cancele a renovação quando quiser.",
+          )}
         </motion.p>
       </div>
     </section>

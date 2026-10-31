@@ -16,6 +16,7 @@ import { getAppLocale } from "@/lib/locale";
 import { hasNoConsumerDates } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
 import { HighlightsRow } from "@/components/HighlightsRow";
+import { PurchaseCountryField, PurchaseCountryValue } from "@/components/PurchaseCountryField";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -82,6 +83,7 @@ const editFormSchema = z.object({
   category: z.string().optional(),
   warranty: z.string().optional(),
   isOnlinePurchase: z.boolean().nullable().optional(),
+  purchaseCountry: z.string().nullable().optional(),
   purchaseType: z.enum(["goods", "subscription", "digital", "service", "ticket"]).nullable().optional(),
 });
 
@@ -142,6 +144,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
       category: "",
       warranty: "",
       isOnlinePurchase: null,
+      purchaseCountry: null,
       purchaseType: null,
     },
   });
@@ -157,6 +160,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
         category: receipt.category || "",
         warranty: receipt.warranty || "",
         isOnlinePurchase: receipt.isOnlinePurchase ?? null,
+        purchaseCountry: receipt.purchaseCountry ?? null,
         purchaseType: receipt.purchaseType ?? null,
       });
     }
@@ -216,6 +220,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
           category: data.category,
           warranty: data.warranty,
           isOnlinePurchase: data.isOnlinePurchase,
+          purchaseCountry: data.purchaseCountry ?? null,
           // Only when the switch changed it: an untouched AI/hint type stays as detected.
           ...((data.purchaseType ?? null) !== (receipt?.purchaseType ?? null)
             ? { purchaseType: data.purchaseType ?? null }
@@ -531,6 +536,15 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                         </div>
                         <FormField
                           control={form.control}
+                          name="purchaseCountry"
+                          render={({ field }) => (
+                            <FormItem className="p-4">
+                              <PurchaseCountryField value={field.value} onChange={field.onChange} id="sheet-purchase-country" />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
                           name="isOnlinePurchase"
                           render={({ field }) => (
                             <FormItem className="p-4 space-y-1">
@@ -685,6 +699,13 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     </div>
                   )}
 
+                  {!isEditing && (
+                    <div className="flex items-center justify-between gap-4 text-sm">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Purchase country</span>
+                      <PurchaseCountryValue value={receipt.purchaseCountry} className="font-semibold text-right" />
+                    </div>
+                  )}
+
                   {/* ── Warranty ── */}
                   {!isEditing && receipt.warranty && (
                     <div>
@@ -725,6 +746,11 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                           <Scale className="w-3.5 h-3.5" />
                           Consumer Rights{rights.countryLabel ? ` · ${rights.countryLabel}` : ""}
                         </p>
+                        {!receipt.purchaseCountry && (
+                          <p className="mb-2 text-xs text-muted-foreground">
+                            Purchase country is unknown. This guidance may use the receipt currency or merchant as an estimate, not a confirmed country.
+                          </p>
+                        )}
                         <div className="space-y-2">
 
                           {/* Return window */}

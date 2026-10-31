@@ -15,3 +15,5 @@
 - [Login navigation](login-navigation.md) — login must be a dismissible modal over the landing page, including in the installed web app.
 - [Founding customer offer](founding-trial-policy.md) — no-card account trials and legacy Stripe trials are distinct; founding eligibility lasts while the account exists.
 - [Stripe sync schema](stripe-sync-schema.md) — newer invoice fields may remain only in raw JSON; inspect projections and use raw-payload fixtures.
+- [Market GeoIP proxy trust](market-proxy-trust.md) — internal-only proxy paths cannot establish visitor country; verify production topology independently and keep unknown/manual choice.
+- [Expo dependency watcher](expo-dependency-watcher.md) — workspace package installs can invalidate Metro watches on transient pnpm folders; verify mobile startup after shared installs.

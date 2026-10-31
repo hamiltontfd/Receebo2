@@ -12,10 +12,13 @@ describe("locale scaffolding", () => {
     expect(resolveLocale("en-US")).toBe("en");
     expect(resolveLocale(undefined)).toBe("en");
   });
-  it("stays English unless a supported locale was saved", () => {
-    expect(getAppLocale({ getItem: () => null })).toBe("en");
+  it("uses browser language independently of market, with explicit locale override", () => {
+    expect(getAppLocale({ getItem: () => null }, "en-US")).toBe("en");
+    expect(getAppLocale({ getItem: () => null }, "pt-BR")).toBe("pt-BR");
+    expect(getAppLocale(null, "pt-PT")).toBe("pt-PT");
     expect(getAppLocale({ getItem: () => "pt-BR" })).toBe("pt-BR");
-    expect(getAppLocale({ getItem: () => "fr" })).toBe("en");
+    expect(getAppLocale({ getItem: () => "fr" }, "pt-PT")).toBe("pt-PT");
+    expect(getAppLocale({ getItem: () => { throw new Error("Denied"); } }, "pt-BR")).toBe("pt-BR");
   });
   it("formats dates per the email spec", () => {
     const d = new Date(2026, 11, 12);

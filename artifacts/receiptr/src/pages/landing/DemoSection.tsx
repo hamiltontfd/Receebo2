@@ -4,32 +4,46 @@ import { Play } from "lucide-react";
 import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
 import { marketingMedia } from "./MarketingMedia";
 import DemoVideoModal from "./DemoVideoModal";
+import { lt } from "@/lib/landingLocale";
 
-const demos = [
+const getDemos = () => [
   {
-    title: "Capture",
-    body: "Scan, upload or import receipts in seconds.",
+    title: lt("Capture", "Capturar"),
+    body: lt("Scan, upload or import receipts in seconds.", "Digitaliza, carrega ou importa recibos em segundos.", "Escaneie, envie ou importe recibos em segundos."),
     clip: "capture",
-    description: "A sample receipt image is selected, its extracted merchant, date and €649 total are reviewed, and the purchase is saved. Extraction responses are simulated for this recording.",
+    description: lt(
+      "A sample receipt image is selected, its extracted merchant, date and €649 total are reviewed, and the purchase is saved. Extraction responses are simulated for this recording.",
+      "É escolhida a imagem de um recibo de exemplo, o comerciante, a data e o total de €649 extraídos são revistos e a compra é guardada. As respostas da extração são simuladas nesta gravação.",
+      "É escolhida a imagem de um recibo de exemplo, a loja, a data e o total de €649 extraídos são revisados e a compra é salva. As respostas da extração são simuladas nesta gravação.",
+    ),
   },
   {
-    title: "Find",
-    body: "Search products, stores or brands and instantly find the receipt you need.",
+    title: lt("Find", "Encontrar"),
+    body: lt("Search products, stores or brands and instantly find the receipt you need.", "Pesquisa produtos, lojas ou marcas e encontra logo o recibo de que precisas.", "Pesquise produtos, lojas ou marcas e encontre na hora o recibo de que precisa."),
     clip: "find",
-    description: "Typing “TV” filters the sample library to Casa Lumen Electrónica. Opening the result shows the purchased item and the original receipt.",
+    description: lt(
+      "Typing “TV” filters the sample library to Casa Lumen Electrónica. Opening the result shows the purchased item and the original receipt.",
+      "Escrever “TV” filtra a biblioteca de exemplo para a Casa Lumen Electrónica. Abrir o resultado mostra o artigo comprado e o recibo original.",
+      "Digitar “TV” filtra a biblioteca de exemplo para a Casa Lumen Electrónica. Abrir o resultado mostra o item comprado e o recibo original.",
+    ),
   },
   {
-    title: "Protect",
-    body: "View available warranty and return information.",
+    title: lt("Protect", "Proteger"),
+    body: lt("View available warranty and return information.", "Consulta a informação disponível sobre garantias e devoluções.", "Veja as informações disponíveis sobre garantias e devoluções."),
     clip: "protect",
-    description: "The sample in-store TV purchase shows the Portugal 3-year legal warranty and the 2-year manufacturer warranty side by side, each with its own end date. Dates depend on purchase details; eligibility and exclusions must be checked with the seller.",
+    description: lt(
+      "The sample in-store TV purchase shows the Portugal 3-year legal warranty and the 2-year manufacturer warranty side by side, each with its own end date. Dates depend on purchase details; eligibility and exclusions must be checked with the seller.",
+      "A compra de exemplo de uma TV em loja mostra lado a lado a garantia legal de 3 anos em Portugal e a garantia do fabricante de 2 anos, cada uma com a sua data de fim. As datas dependem dos detalhes da compra; a elegibilidade e as exclusões devem ser confirmadas com o vendedor.",
+      "A compra de exemplo de uma TV em loja mostra lado a lado a garantia legal de 3 anos em Portugal e a garantia do fabricante de 2 anos, cada uma com sua data de término. As datas dependem dos detalhes da compra; a elegibilidade e as exclusões devem ser confirmadas com o vendedor.",
+    ),
   },
 ];
 
 export default function DemoSection() {
-  const [activeDemo, setActiveDemo] = useState<(typeof demos)[number] | null>(null);
+  const [activeDemo, setActiveDemo] = useState<ReturnType<typeof getDemos>[number] | null>(null);
   const [videoOpen, setVideoOpen] = useState(false);
   const reduce = useReducedMotion();
+  const demos = getDemos();
   const showDemo = (demo: (typeof demos)[number]) => {
     setActiveDemo(demo);
     setVideoOpen(true);
@@ -47,17 +61,20 @@ export default function DemoSection() {
           className="text-center mb-16"
         >
           <motion.div variants={fadeInUp}>
-            <SectionLabel>In action</SectionLabel>
+            <SectionLabel>{lt("In action", "Em ação")}</SectionLabel>
           </motion.div>
           <motion.h2
             variants={fadeInUp}
             className="text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight"
           >
-            See Receebo in action
+            {lt("See Receebo in action", "Vê o Receebo em ação", "Veja o Receebo em ação")}
           </motion.h2>
           <motion.p variants={fadeInUp} className="text-sm text-muted-foreground mt-4 max-w-2xl mx-auto">
-            Real app recordings with fictional sample data and simulated extraction.
-            No live email connection is shown.
+            {lt(
+              "Real app recordings with fictional sample data and simulated extraction. No live email connection is shown.",
+              "Gravações reais da app, em inglês, com dados de exemplo fictícios e extração simulada. Não é mostrada nenhuma ligação real a email.",
+              "Gravações reais do app, em inglês, com dados de exemplo fictícios e extração simulada. Nenhuma conexão real de e-mail é mostrada.",
+            )}
           </motion.p>
         </motion.div>
 
@@ -73,7 +90,7 @@ export default function DemoSection() {
             const { title, body, clip, description } = demo;
             return (
             <motion.div
-              key={title}
+              key={clip}
               variants={fadeInUp}
               whileHover={reduce ? undefined : { y: -4, transition: { duration: 0.2 } }}
               className="bg-background rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col"
@@ -82,7 +99,7 @@ export default function DemoSection() {
                 type="button"
                 data-demo={clip}
                 onClick={() => showDemo(demo)}
-                aria-label={`Play ${title} demo`}
+                aria-label={lt(`Play ${title} demo`, `Reproduzir demonstração: ${title}`)}
                 aria-haspopup="dialog"
                 className="group relative block w-full aspect-video overflow-hidden bg-muted/20 border-b border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground"
               >
@@ -106,10 +123,10 @@ export default function DemoSection() {
                 <h3 className="font-bold text-lg tracking-tight">{title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
                 <details className="text-xs text-muted-foreground mt-2">
-                  <summary className="cursor-pointer font-medium text-foreground">What this demo shows</summary>
+                  <summary className="cursor-pointer font-medium text-foreground">{lt("What this demo shows", "O que esta demonstração mostra")}</summary>
                   <p id={`${clip}-description`} className="mt-2 leading-relaxed">{description}</p>
                   <button type="button" onClick={() => showDemo(demo)} className="inline-block mt-2 underline">
-                    Watch {title.toLowerCase()} video
+                    {lt(`Watch ${title.toLowerCase()} video`, `Ver vídeo: ${title.toLowerCase()}`)}
                   </button>
                 </details>
               </div>
