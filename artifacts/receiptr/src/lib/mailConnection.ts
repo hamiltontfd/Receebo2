@@ -1,3 +1,5 @@
+import { customFetch } from "@workspace/api-client-react";
+
 export type MailProviderId = "gmail" | "outlook";
 
 export const MAIL_PROVIDER_LABELS: Record<MailProviderId, string> = {
@@ -98,12 +100,10 @@ export async function disconnectMailProvider(
 }
 
 export async function syncMail(base: string): Promise<MailSyncResult> {
-  const res = await fetch(`${base}api/mail/sync`, {
+  return customFetch<MailSyncResult>(`${base}api/mail/sync`, {
     method: "POST",
     credentials: "include",
   });
-  if (!res.ok) throw new Error("Sync failed");
-  return res.json() as Promise<MailSyncResult>;
 }
 
 /** Reads ?gmail=… / ?outlook=… after the OAuth redirect back to Settings. */

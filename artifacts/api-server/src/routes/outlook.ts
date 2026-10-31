@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db, pendingImportsTable } from "@workspace/db";
 import { and, eq, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { manualSyncRateLimiter } from "../middlewares/actionRateLimiter";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
 import { lockUserDataMutation, withUserDataLock } from "../lib/userDataLock";
 import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
@@ -147,7 +148,7 @@ router.get("/outlook/callback", async (req, res): Promise<void> => {
 });
 
 // POST /outlook/sync — manual trigger
-router.post("/outlook/sync", requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
+router.post("/outlook/sync", requireAuth, manualSyncRateLimiter, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
   if (!outlookEnabled() || !isOutlookConfigured()) {
     notFound(res);
     return;

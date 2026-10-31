@@ -1,3 +1,4 @@
+import { actionWaitMessage, receiptPollInterval } from "@/lib/actionLimit";
 import { appText, categoryText } from "@/lib/appCopy";
 import { useAppLocale } from "@/lib/locale";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -158,6 +159,7 @@ export default function Scan() {
   const [phase, setPhase] = useState<Phase>("capture");
   const [receiptId, setReceiptId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [retryFile, setRetryFile] = useState<{ blob: Blob; fileName: string; contentType: string } | null>(null);
   const [stepsDone, setStepsDone] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -321,8 +323,7 @@ export default function Scan() {
     query: {
       enabled: receiptId != null && phase === "reading",
       queryKey: getGetReceiptQueryKey(receiptId ?? 0),
-      refetchInterval: (query) =>
-        query.state.data?.status === "processing" ? 1500 : false,
+      refetchInterval: receiptPollInterval,
     },
   });
 
@@ -430,6 +431,7 @@ export default function Scan() {
         return false;
       }
       setUploading(true);
+      setRetryFile({ blob, fileName, contentType });
       let reservedPath: string | undefined;
       try {
         // Fresh server check right before uploading, so quota used on another
@@ -467,6 +469,7 @@ export default function Scan() {
         setReceiptId(created.id);
         setActiveReview(created.id);
         setPhase("reading");
+        setRetryFile(null);
         void refreshBilling();
         return true;
       } catch (err) {
@@ -489,7 +492,7 @@ export default function Scan() {
         }
         toast({
           title: appText("Upload failed"),
-          description: appText("Could not upload the receipt. Please try again."),
+          description: actionWaitMessage(err) ?? appText("Could not upload the receipt. Please try again."),
           variant: "destructive",
         });
         return false;
@@ -543,9 +546,9 @@ export default function Scan() {
     void (async () => {
       const rawType = file.type || "application/octet-stream";
       const { blob, contentType } = await compressImage(file, rawType);
-      const ok = await uploadFile(blob, compressedFileName(file.name, contentType), contentType);
+      await uploadFile(blob, compressedFileName(file.name, contentType), contentType);
       setHandoffActive(false);
-      if (!ok) setLocation(getLastTab());
+      // Keep the file here on failure; retry only when the user requests it.
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -636,6 +639,14 @@ export default function Scan() {
 
   return (
     <div className="flex-1 flex flex-col max-w-lg w-full mx-auto px-5 py-6">
+      {retryFile && !uploading && (
+        <Button variant="outline" className={fullScreenCamera
+          ? "fixed top-20 left-1/2 -translate-x-1/2 z-[60]"
+          : "mb-4"} onClick={() =>
+          void uploadFile(retryFile.blob, retryFile.fileName, retryFile.contentType)}>
+          {appText("Retry saved file")}
+        </Button>
+      )}
       <input
         ref={fileInputRef}
         type="file"

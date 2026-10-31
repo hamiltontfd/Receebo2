@@ -18,6 +18,16 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
 let _guestId: string | null = null;
+const actionCooldowns = new Map<string, { until: number; error: ApiError }>();
+export function clearActionCooldowns(): void { actionCooldowns.clear(); }
+
+function actionScope(url: string, method: string): string | null {
+  const path = new URL(url, "https://local.invalid").pathname;
+  if (method === "POST" && /\/api\/storage\/uploads\/request-url$/.test(path)) return "upload";
+  if (method === "POST" && /\/api\/(mail|gmail|outlook)\/sync$/.test(path)) return "sync";
+  if (method === "GET" && /\/api\/(?:receipts(?:\/|$)|(?:gmail|mail)\/pending(?:\/|$)|storage\/objects\/)/.test(path)) return "read";
+  return null;
+}
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -46,6 +56,7 @@ export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
 }
 
 export function setGuestId(id: string | null): void {
+  if (_guestId !== id) clearActionCooldowns();
   _guestId = id;
 }
 
@@ -369,12 +380,33 @@ export async function customFetch<T = unknown>(
   }
 
   const requestInfo = { method, url: resolveUrl(input) };
+  const scope = actionScope(requestInfo.url, method);
+  const cooldown = scope ? actionCooldowns.get(scope) : undefined;
+  if (cooldown && cooldown.until > Date.now()) {
+    const seconds = Math.max(1, Math.ceil((cooldown.until - Date.now()) / 1000));
+    const headers = new Headers(cooldown.error.headers);
+    headers.set("Retry-After", String(seconds));
+    throw new ApiError(new Response(null, { status: cooldown.error.status, headers }),
+      cooldown.error.data, requestInfo);
+  }
+  if (scope) actionCooldowns.delete(scope);
 
   const response = await fetch(input, { ...init, method, headers });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);
-    throw new ApiError(response, errorData, requestInfo);
+    const error = new ApiError(response, errorData, requestInfo);
+    if (scope && (response.status === 429 || (response.status === 503 &&
+      (errorData as { code?: string } | null)?.code === "ACTION_LIMIT_UNAVAILABLE"))) {
+      const raw = response.headers.get("Retry-After");
+      const seconds = raw && /^\d+$/.test(raw) ? Number(raw)
+        : raw ? Math.ceil((Date.parse(raw) - Date.now()) / 1000) : 60;
+      actionCooldowns.set(scope, {
+        until: Date.now() + (Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, 86400) : 60) * 1000,
+        error,
+      });
+    }
+    throw error;
   }
 
   return (await parseSuccessBody(response, responseType, requestInfo)) as T;

@@ -3,7 +3,11 @@ import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from "@clerk/r
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect, Link } from "wouter";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { QueryCache, QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { clearActionCooldowns, temporaryActionError } from "@workspace/api-client-react";
+import { actionWaitMessage } from "@/lib/actionLimit";
+import { appText } from "@/lib/appCopy";
+import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -303,6 +307,7 @@ function ClerkQueryClientCacheInvalidator() {
         prevUserIdRef.current !== userId
       ) {
         queryClient.clear();
+        clearActionCooldowns();
       }
       prevUserIdRef.current = userId;
     });
@@ -314,7 +319,16 @@ function ClerkQueryClientCacheInvalidator() {
 
 // Mutations must fail offline, not pause and silently execute on reconnect.
 const queryClient = new QueryClient({
-  defaultOptions: { mutations: { networkMode: "always", retry: false } },
+  queryCache: new QueryCache({
+    onError: (error) => {
+      const description = actionWaitMessage(error);
+      if (description) toast({ title: appText("Temporarily unavailable"), description, variant: "destructive" });
+    },
+  }),
+  defaultOptions: {
+    mutations: { networkMode: "always", retry: false },
+    queries: { retry: (attempt, error) => !temporaryActionError(error) && attempt < 3 },
+  },
 });
 
 function ClerkProviderWithRoutes() {

@@ -19,7 +19,8 @@ vi.mock("@/hooks/useBilling", async () => {
     useRefreshBilling: () => vi.fn(),
   };
 });
-vi.mock("@workspace/api-client-react", () => ({
+vi.mock("@workspace/api-client-react", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@workspace/api-client-react")>(),
   useCreateReceipt: () => ({ mutateAsync: mocks.create }),
   useUpdateReceipt: () => ({ mutateAsync: mocks.update }),
   useDeleteReceipt: () => ({ mutateAsync: mocks.remove }),
@@ -30,7 +31,6 @@ vi.mock("@workspace/api-client-react", () => ({
   getListReceiptsQueryKey: () => ["receipts"],
   getGetReceiptStatsQueryKey: () => ["stats"],
   getGetRecentReceiptsQueryKey: () => ["recent"],
-  ApiError: class ApiError extends Error { status = 0; data = null; },
 }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock("@/lib/compressImage", () => ({
@@ -125,13 +125,14 @@ describe("Add sheet → Upload file handoff", () => {
     }));
     expect(mocks.getUserMedia).not.toHaveBeenCalled();
   });
-  it("goes back to the previous tab when the handed-over upload fails", async () => {
+  it("keeps the handed-over file for an explicit retry when uploading fails", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false })));
     rememberTab("/search");
     setPendingUpload(new File(["file"], "receipt.jpg", { type: "image/jpeg" }));
     const { loc } = mount();
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Upload failed" })));
-    await waitFor(() => expect(loc.history?.at(-1)).toBe("/search"));
+    expect(loc.history?.at(-1)).not.toBe("/search");
+    expect(screen.getByRole("button", { name: "Retry saved file" })).toBeVisible();
     expect(mocks.create).not.toHaveBeenCalled();
   });
 });

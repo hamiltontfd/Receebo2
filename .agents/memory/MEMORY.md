@@ -19,3 +19,4 @@
 - [Expo dependency watcher](expo-dependency-watcher.md) — workspace package installs can invalidate Metro watches on transient pnpm folders; verify mobile startup after shared installs.
 - [Direção das versões nativas](native-app-direction.md) — Web/PWA é a referência; futuras versões iOS e Android serão apenas uma casca do mesmo PWA para as lojas.
 - [Language preference boundaries](language-preference-boundaries.md) — visitors use browser language automatically; manual selection belongs only in signed-in settings, never on the homepage.
+- [Automation trust boundaries](automation-trust-boundaries.md) — Clerk availability is not verified tenant state; unverified proxy IPs cannot safely identify guests.

@@ -10,6 +10,11 @@ const state = vi.hoisted(() => ({
   updates: [] as Record<string, unknown>[],
   inserts: [] as Record<string, unknown>[],
 }));
+// Provider behavior is isolated here; real shared budgets have their own
+// PostgreSQL + HTTP tests in actionLimits.test.ts.
+vi.mock("../lib/actionRateLimit", () => ({
+  consumeAction: async () => ({ allowed: true, retryAfter: 60 }),
+}));
 
 vi.mock("google-auth-library", () => ({
   OAuth2Client: class {

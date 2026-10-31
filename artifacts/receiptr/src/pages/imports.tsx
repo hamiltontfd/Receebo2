@@ -1,3 +1,4 @@
+import { actionWaitMessage } from "@/lib/actionLimit";
 import { useMemo, useState } from "react";
 import { appText, categoryText } from "@/lib/appCopy";
 import { useAppLocale } from "@/lib/locale";
@@ -158,7 +159,7 @@ export default function ImportsPage() {
         toast({ title: appText("No new receipts found") });
       }
     },
-    onError: () => toast({ title: appText("Sync failed"), description: appText("Could not reach your inbox. Try again shortly."), variant: "destructive" }),
+    onError: (error) => toast({ title: appText("Sync failed"), description: actionWaitMessage(error) ?? appText("Could not reach your inbox. Try again shortly."), variant: "destructive" }),
   });
 
   const exitSelect = () => { setSelecting(false); setSelected(new Set()); };

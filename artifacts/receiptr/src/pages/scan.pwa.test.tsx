@@ -18,7 +18,8 @@ vi.mock("@/hooks/useBilling", async () => {
     useRefreshBilling: () => vi.fn(),
   };
 });
-vi.mock("@workspace/api-client-react", () => ({
+vi.mock("@workspace/api-client-react", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@workspace/api-client-react")>(),
   useCreateReceipt: () => ({ mutateAsync: mocks.create }),
   useUpdateReceipt: () => ({ mutateAsync: mocks.update }),
   useDeleteReceipt: () => ({ mutateAsync: mocks.remove }),
@@ -29,7 +30,6 @@ vi.mock("@workspace/api-client-react", () => ({
   getListReceiptsQueryKey: () => ["receipts"],
   getGetReceiptStatsQueryKey: () => ["stats"],
   getGetRecentReceiptsQueryKey: () => ["recent"],
-  ApiError: class ApiError extends Error { status = 0; data = null; },
 }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock("@/lib/compressImage", () => ({
@@ -37,6 +37,7 @@ vi.mock("@/lib/compressImage", () => ({
   compressedFileName: (name: string) => name,
 }));
 import Scan from "./scan";
+import { ApiError } from "@workspace/api-client-react";
 import { hasPwaWork } from "@/lib/pwa";
 beforeEach(() => {
   vi.clearAllMocks();
@@ -91,6 +92,25 @@ describe("upload paths with PWA safeguards", () => {
     expect(mocks.customFetch).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it("keeps a rate-limited file, reports the wait, and retries only on request", async () => {
+    const response = new Response(JSON.stringify({ code: "ACTION_RATE_LIMITED" }), {
+      status: 429, headers: { "Retry-After": "45", "Content-Type": "application/json" },
+    });
+    mocks.customFetch.mockRejectedValueOnce(new ApiError(response, { code: "ACTION_RATE_LIMITED" },
+      { method: "POST", url: "/api/storage/uploads/request-url" }));
+    const result = mount();
+    const file = new File(["file"], "receipt.pdf", { type: "application/pdf" });
+    fireEvent.change(result.container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
+      description: expect.stringContaining("45 seconds"),
+    })));
+    expect(mocks.customFetch).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Retry saved file" }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    expect(fetch).toHaveBeenCalledWith("https://uploads.test/signed", expect.objectContaining({ body: file }));
   });
   it("keeps camera opt-in, capture and track cleanup intact", async () => {
     const result = mount();

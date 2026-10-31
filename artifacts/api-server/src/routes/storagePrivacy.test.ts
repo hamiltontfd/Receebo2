@@ -4,6 +4,9 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ owned: true, authenticated: true, download: vi.fn() }));
+vi.mock("../lib/actionRateLimit", () => ({
+  consumeAction: async () => ({ allowed: true, retryAfter: 60 }),
+}));
 vi.mock("../lib/subscriptionStatus", () => ({
   getSubscriptionStatus: async () => ({ canUseApp: true, canUpload: true }),
 }));

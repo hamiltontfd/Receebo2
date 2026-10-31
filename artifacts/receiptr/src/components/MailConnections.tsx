@@ -1,4 +1,5 @@
 import { appText } from "@/lib/appCopy";
+import { actionWaitMessage } from "@/lib/actionLimit";
 import { useAppLocale, getAppLocale } from "@/lib/locale";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Loader2, Mail, PlugZap, RefreshCw } from "lucide-react";
@@ -95,10 +96,10 @@ function ProviderCard({
         toast({ title: appText("No new receipts found") });
       }
     },
-    onError: () =>
+    onError: (error) =>
       toast({
         title: appText("Sync failed"),
-        description: appText("Could not reach your inbox. Try again shortly."),
+        description: actionWaitMessage(error) ?? appText("Could not reach your inbox. Try again shortly."),
         variant: "destructive",
       }),
   });

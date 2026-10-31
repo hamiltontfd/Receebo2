@@ -6,6 +6,7 @@ import {
 } from "@workspace/db";
 import { eq, and, count, ne, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { manualSyncRateLimiter, receiptReadRateLimiter } from "../middlewares/actionRateLimiter";
 import {
   buildGmailOAuthUrl,
   exchangeCodeAndStore,
@@ -275,7 +276,7 @@ router.delete("/gmail/disconnect", requireAuth, lockUserDataMutation(async (req,
 // ---------------------------------------------------------------------------
 // POST /gmail/sync  — manual trigger
 // ---------------------------------------------------------------------------
-router.post("/gmail/sync", requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
+router.post("/gmail/sync", requireAuth, manualSyncRateLimiter, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
   if (!gmailEnabled()) {
     notFound(res);
     return;
@@ -387,7 +388,7 @@ function parseCategoryOverride(body: unknown): string | undefined | null {
 // ---------------------------------------------------------------------------
 // GET /mail/pending  — list pending imports, ranked
 // ---------------------------------------------------------------------------
-router.get(["/gmail/pending", "/mail/pending"], requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
+router.get(["/gmail/pending", "/mail/pending"], requireAuth, receiptReadRateLimiter, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
   try {
     const rows = rankPendingImports(await selectUserPending(req.userId!));
     const views = await loadSupplierOverview(req.userId!, rows);
@@ -407,7 +408,7 @@ router.get(["/gmail/pending", "/mail/pending"], requireAuth, requireCurrentLegal
 // ---------------------------------------------------------------------------
 // GET /mail/pending/:id  — read-only details for the pending sheet
 // ---------------------------------------------------------------------------
-router.get(["/gmail/pending/:id", "/mail/pending/:id"], requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
+router.get(["/gmail/pending/:id", "/mail/pending/:id"], requireAuth, receiptReadRateLimiter, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id <= 0) {
     res.status(400).json({ error: "Invalid id" });

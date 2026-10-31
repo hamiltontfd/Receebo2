@@ -1,3 +1,4 @@
+import { actionWaitMessage } from "@/lib/actionLimit";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { appText, categoryText } from "@/lib/appCopy";
 import { useAppLocale, formatLocaleDate } from "@/lib/locale";
@@ -459,6 +460,7 @@ export default function SearchPage() {
     data: infiniteData,
     isLoading: idleLoading,
     isError: idleError,
+    error: libraryError,
     refetch: retryLibrary,
     isFetchingNextPage,
     hasNextPage,
@@ -482,7 +484,7 @@ export default function SearchPage() {
   const homeKeepMore = homeKeepAll.length > HOME_KEEP_LIMIT || (!!hasNextPage && homeKeep.length > 0);
 
   // Search results (non-paginated, all matches)
-  const { data: searchPage, isLoading: searchLoading, isError: searchError, refetch: retrySearch } = useListReceipts(
+  const { data: searchPage, isLoading: searchLoading, isError: searchError, error: searchFailure, refetch: retrySearch } = useListReceipts(
     isSearching ? { q: debounced } : undefined,
     { query: { enabled: isSearching } },
   );
@@ -495,7 +497,7 @@ export default function SearchPage() {
     if (!el) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage && !idleError) {
           fetchNextPage();
         }
       },
@@ -503,13 +505,13 @@ export default function SearchPage() {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, idleError]);
 
   return (
     <>
     {(isSearching ? searchError : idleError) && (
       <div role="alert" className="mx-auto max-w-lg p-5 text-sm">
-        {appText("Could not load receipts.")}{" "}
+        {actionWaitMessage(isSearching ? searchFailure : libraryError) ?? appText("Could not load receipts.")}{" "}
         <button type="button" className="underline" onClick={() => void (isSearching ? retrySearch() : retryLibrary())}>{appText("Try again")}</button>
       </div>
     )}

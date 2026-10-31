@@ -1,3 +1,4 @@
+import { actionWaitMessage, receiptPollInterval } from "@/lib/actionLimit";
 import { appText, categoryText } from "@/lib/appCopy";
 import { useAppLocale, formatLocaleDate } from "@/lib/locale";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -88,6 +89,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
   const [isEditing, setIsEditing] = useState(false);
   const [showStore, setShowStore] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [retryAttachment, setRetryAttachment] = useState<File | null>(null);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
   usePwaUpdateBlocker(isEditing || isUploading || deletingAttachmentId !== null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,12 +97,11 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
   const createAttachment = useCreateAttachment();
   const deleteAttachmentMutation = useDeleteAttachment();
 
-  const { data: receipt, isLoading, isError } = useGetReceipt(receiptId, {
+  const { data: receipt, isLoading, isError, error: receiptError } = useGetReceipt(receiptId, {
     query: {
       enabled: receiptId > 0,
       queryKey: getGetReceiptQueryKey(receiptId),
-      refetchInterval: (query) =>
-        query.state.data?.status === "processing" ? 2000 : false,
+      refetchInterval: receiptPollInterval,
     },
   });
 
@@ -198,6 +199,11 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    await uploadAttachment(file);
+  };
+
+  const uploadAttachment = async (file: File) => {
+    setRetryAttachment(file);
     setIsUploading(true);
     try {
       const uploadInfo = await customFetch<{ uploadURL: string; objectPath: string }>(
@@ -222,8 +228,9 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
         },
       });
       toast({ title: appText("File attached"), description: appText("{0} added to this receipt.", [file.name]) });
-    } catch {
-      toast({ title: appText("Upload failed"), description: appText("Could not attach the file."), variant: "destructive" });
+      setRetryAttachment(null);
+    } catch (error) {
+      toast({ title: appText("Upload failed"), description: actionWaitMessage(error) ?? appText("Could not attach the file."), variant: "destructive" });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -257,15 +264,15 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
     );
   }
 
-  if (isError || !receipt) {
+  if (!receipt) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center px-8 py-20 text-center">
         <div className="w-16 h-16 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-4">
           <AlertTriangle className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-bold mb-2">{appText("Receipt not found")}</h2>
+        <h2 className="text-2xl font-bold mb-2">{appText(actionWaitMessage(receiptError) ? "Temporarily unavailable" : "Receipt not found")}</h2>
         <p className="text-muted-foreground mb-6">
-          {appText("The receipt you're looking for doesn't exist or you don't have access to it.")}
+          {actionWaitMessage(receiptError) ?? appText("The receipt you're looking for doesn't exist or you don't have access to it.")}
         </p>
         <Button className="rounded-full" onClick={() => setLocation("/search")}>
           {appText("Return to Library")}
@@ -564,6 +571,11 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                 }
                 {appText(isUploading ? "Uploading..." : "Attach file")}
               </button>
+              {retryAttachment && !isUploading && (
+                <Button variant="outline" onClick={() => void uploadAttachment(retryAttachment)}>
+                  {appText("Retry saved file")}
+                </Button>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"

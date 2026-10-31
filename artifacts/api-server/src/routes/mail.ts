@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, gmailConnectionsTable, pendingImportsTable } from "@workspace/db";
 import { and, count, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { manualSyncRateLimiter } from "../middlewares/actionRateLimiter";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
 import { mailLogger as logger } from "../lib/logger";
 import {
@@ -123,7 +124,7 @@ const syncers: Record<MailProviderId, (userId: string) => Promise<{ checked: num
 };
 
 // POST /mail/sync — sync every enabled + configured + connected provider
-router.post("/mail/sync", requireAuth, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
+router.post("/mail/sync", requireAuth, manualSyncRateLimiter, requireCurrentLegalAcceptance, async (req, res): Promise<void> => {
   try {
     const providers = (await providerStatuses(req.userId!)).filter(
       (p) => p.enabled && p.configured && p.connected,

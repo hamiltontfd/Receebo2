@@ -4,3 +4,5 @@ export * from "./attachments";
 export * from "./billing";
 export { setBaseUrl, setAuthTokenGetter, setGuestId, customFetch, ApiError } from "./custom-fetch";
 export type { AuthTokenGetter } from "./custom-fetch";
+export { temporaryActionError, retryAfterSeconds } from "./action-cooldown";
+export { clearActionCooldowns } from "./custom-fetch";

@@ -19,6 +19,7 @@ import {
   CheckSimilarReceiptResponseItem,
 } from "@workspace/api-zod";
 import { requireAuthOrGuest } from "../middlewares/guestAuth";
+import { receiptReadRateLimiter } from "../middlewares/actionRateLimiter";
 import { enqueueExtraction } from "../lib/extractionQueue";
 import { logger } from "../lib/logger";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -41,7 +42,7 @@ import { refreshWarrantyExpiries } from "../lib/warrantyExpiryStore";
 import { afterReceiptCursor, decodeReceiptCursor, encodeReceiptCursor, receiptListOrder } from "../lib/receiptOrder";
 const router: IRouter = Router();
 
-router.get("/receipts", requireAuthOrGuest, async (req, res): Promise<void> => {
+router.get("/receipts", requireAuthOrGuest, receiptReadRateLimiter, async (req, res): Promise<void> => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const isSearch = q.length > 0;
 
@@ -179,7 +180,7 @@ router.post("/receipts", requireAuthOrGuest, lockUserDataMutation(async (req, re
   res.status(201).json(GetReceiptResponse.parse(receipt!));
 }));
 
-router.get("/receipts/stats", requireAuthOrGuest, async (req, res): Promise<void> => {
+router.get("/receipts/stats", requireAuthOrGuest, receiptReadRateLimiter, async (req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(receiptsTable)
@@ -233,7 +234,7 @@ router.get("/receipts/stats", requireAuthOrGuest, async (req, res): Promise<void
   );
 });
 
-router.get("/receipts/recent", requireAuthOrGuest, async (req, res): Promise<void> => {
+router.get("/receipts/recent", requireAuthOrGuest, receiptReadRateLimiter, async (req, res): Promise<void> => {
   const parsed = GetRecentReceiptsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -259,6 +260,7 @@ router.get("/receipts/recent", requireAuthOrGuest, async (req, res): Promise<voi
 router.get(
   "/receipts/merchant-breakdown",
   requireAuthOrGuest,
+  receiptReadRateLimiter,
   async (req, res): Promise<void> => {
     const rows = await db
       .select()
@@ -291,7 +293,7 @@ router.get(
   },
 );
 
-router.get("/receipts/check-similar", requireAuthOrGuest, async (req, res): Promise<void> => {
+router.get("/receipts/check-similar", requireAuthOrGuest, receiptReadRateLimiter, async (req, res): Promise<void> => {
   const parsed = CheckSimilarReceiptQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -329,7 +331,7 @@ router.get("/receipts/check-similar", requireAuthOrGuest, async (req, res): Prom
   res.json(rows.map((r) => CheckSimilarReceiptResponseItem.parse(r)));
 });
 
-router.get("/receipts/:id", requireAuthOrGuest, async (req, res): Promise<void> => {
+router.get("/receipts/:id", requireAuthOrGuest, receiptReadRateLimiter, async (req, res): Promise<void> => {
   const params = GetReceiptParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

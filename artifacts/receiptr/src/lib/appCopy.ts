@@ -2,6 +2,9 @@ import { getAppLocale, type AppLocale } from "./locale";
 
 /** Display copy only. Keys are never persisted or sent as API enum values. */
 export const APP_COPY: Record<string, readonly [string, string?]> = {
+  "Please wait {0} seconds, then try again. Your file and drafts are kept.": ["Aguarde {0} segundos e tente novamente. O ficheiro e os rascunhos são mantidos.", "Aguarde {0} segundos e tente novamente. O arquivo e os rascunhos são mantidos."],
+  "Temporarily unavailable": ["Temporariamente indisponível"],
+  "Retry saved file": ["Tentar novamente com o ficheiro guardado", "Tentar novamente com o arquivo salvo"],
   "Could not load receipts.": ["Não foi possível carregar os recibos."],
   "Could not load imports.": ["Não foi possível carregar as importações."],
   "Could not load notification preferences.": ["Não foi possível carregar as preferências de notificação."],

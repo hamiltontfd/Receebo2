@@ -17,7 +17,8 @@ export const guestSessionRateLimiter = rateLimit({
     error:
       "Too many guest sessions created from this IP. Please try again later.",
   },
-  // Trust the reverse-proxy IP forwarding already set on the Express app.
-  // This is scoped to this middleware so it doesn't affect other routes.
+  // Express trust proxy remains false: use the socket peer, NOT caller-supplied
+  // forwarding headers. Unverified shared proxies may group visitors together.
+  // Do not enable blanket trust to fix that; verify ingress CIDRs first.
   skipSuccessfulRequests: false,
 });
