@@ -39,15 +39,11 @@ export default function Landing() {
       <div className="min-h-dvh bg-background text-foreground overflow-x-hidden">
 
         {/* ── Nav ─────────────────────────────────────────────────────── */}
-        <motion.header
-          className="fixed top-0 left-0 right-0 z-50 px-6 flex items-center justify-between backdrop-blur-xl transition-all duration-300 h-16"
-          animate={{
-            backgroundColor: scrolled
-              ? "hsl(0 0% 100% / 0.94)"
-              : "hsl(0 0% 100% / 0)",
-            borderBottomWidth: scrolled ? "1px" : "0px",
-            borderBottomColor: "hsl(0 0% 91%)",
-          }}
+        <header
+          // Keep the glass surface constant: CSS transition-all competing with
+          // Motion's background/border animation caused unstable compositing.
+          className={`fixed top-0 left-0 right-0 z-50 isolate px-6 flex items-center justify-between bg-white/85 backdrop-blur-xl border-b transition-[border-color] duration-300 h-16 ${scrolled ? "border-border" : "border-transparent"}`}
+          style={{ transform: "translateZ(0)" }}
         >
           <motion.img
             src="/logo.svg"
@@ -84,7 +80,7 @@ export default function Landing() {
               </motion.div>
             </Link>
           </motion.div>
-        </motion.header>
+        </header>
 
         {/* ── Page Sections ───────────────────────────────────────────── */}
         <main>
