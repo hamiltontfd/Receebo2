@@ -7,10 +7,22 @@ needs a lawyer before it ships. Sources: `/workspace/receebo/consumer-rules-br-u
 `/workspace/receebo-site-ptBR.md`, email spec §2.
 
 ## Locales (`artifacts/receiptr/src/lib/locale.ts`)
+- Language preference scope (web/PWA): explicit English, Português (Portugal),
+  Português (Brasil), or automatic browser language. Applies immediately to
+  already-localized landing, market controls, installation/import notices and
+  consumer-rights copy, plus the language control itself. Other app screens,
+  authentication, legal documents, emails, recordings and native mobile are not
+  translated by this setting; the control discloses this partial coverage.
+- Signed-in preferences are stored per account, available without subscription.
+  Null means automatic browser language. Visitors save only to this browser.
+  Visitor choices are never imported into accounts; accounts never write their
+  language into browser-wide storage. Signing out restores the visitor choice.
+  Language never changes market, purchase country, receipt/subscription currency,
+  or the legal rules applied to a purchase.
 - `en`, `pt-PT`, `pt-BR`. Fallback: pt-BR → pt-BR, other pt → pt-PT, else en.
-- `getAppLocale()` reads the browser's first preferred language, independently
-  of market and purchase country. The existing supported
-  `localStorage["receebo:locale"]` override is preserved.
+- `getAppLocale()` reads the active account language (or browser language in
+  automatic mode), independently of market and purchase country. Signed-out
+  visitors retain the existing `localStorage["receebo:locale"]` preference.
 - The public landing page, including FAQ, pricing, navigation and media
   explanations, and shared market selectors have English, pt-PT and pt-BR copy.
   Consumer-rights copy also uses that locale. Screenshot/video content remains

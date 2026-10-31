@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accountLanguage';
+export * from './accountLanguageLanguage';
 export * from './accountMarket';
 export * from './accountMarketMarket';
 export * from './accountTrialStartResult';

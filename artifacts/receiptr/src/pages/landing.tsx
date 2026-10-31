@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/react";
 import { MarketSelector } from "@/components/MarketSelector";
 import { lt } from "@/lib/landingLocale";
-import { getAppLocale } from "@/lib/locale";
+import { useAppLocale } from "@/lib/locale";
+import { LanguageSelector } from "@/components/LanguageSelector";
 
 // Sections
 import HeroSection from "./landing/HeroSection";
@@ -36,13 +37,7 @@ function useScrolled(threshold = 40) {
 export default function Landing() {
   const { isSignedIn } = useAuth();
   const scrolled = useScrolled(40);
-  const locale = getAppLocale();
-
-  useEffect(() => {
-    const prev = document.documentElement.lang;
-    document.documentElement.lang = locale;
-    return () => { document.documentElement.lang = prev; };
-  }, [locale]);
+  const locale = useAppLocale();
 
   return (
     <MotionConfig reducedMotion="user">
@@ -71,6 +66,7 @@ export default function Landing() {
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
           >
             <MarketSelector variant="compact" className="-mr-1 sm:mr-0" />
+            <div className="hidden sm:block"><LanguageSelector compact /></div>
             <Link href="/sign-in" className="hidden md:inline-block">
               <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                 <Button
@@ -95,6 +91,7 @@ export default function Landing() {
 
         {/* ── Page Sections ───────────────────────────────────────────── */}
         <main>
+          <div className="sm:hidden px-6 pt-20 flex justify-end"><LanguageSelector /></div>
           <HeroSection />
           <PromoVideoSection />
           <DemoSection />

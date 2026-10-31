@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/components/MarketSelector", () => ({ MarketSelector: () => <div>Market selector</div> }));
+vi.mock("@/components/LanguageSelector", () => ({ LanguageSelector: () => <div>Language selector</div> }));
 
 const mocks = vi.hoisted(() => ({
   billing: {} as Record<string, unknown>, portal: vi.fn(), toast: vi.fn(),

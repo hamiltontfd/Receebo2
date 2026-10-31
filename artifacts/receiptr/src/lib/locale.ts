@@ -3,16 +3,37 @@
  * this module holds the rules so screens and emails can move over one at a
  * time. Spec: /workspace/receebo-email SPEC §2, docs/locales-and-rights.md.
  *
- * - The saved locale wins. Until there is a user setting, the only override is
- *   localStorage "receebo:locale" (for testing pt-BR/pt-PT screens).
+ * - Account language wins while signed in; null uses browser language.
+ * - Signed-out visitors use localStorage "receebo:locale", then browser language.
  * - Browser/sign-up fallback: pt-BR → pt-BR, any other pt* → pt-PT, else en.
  * - Without a saved override, browser language selects the UI locale.
  * - Money is EUR for everyone (the subscription), formatted per locale.
  *   Receipt amounts keep the receipt's own currency.
  */
+import { useSyncExternalStore } from "react";
+
 export type AppLocale = "en" | "pt-PT" | "pt-BR";
 export const APP_LOCALES: readonly AppLocale[] = ["en", "pt-PT", "pt-BR"];
 export const LOCALE_STORAGE_KEY = "receebo:locale";
+let accountOverride: AppLocale | null | undefined;
+const listeners = new Set<() => void>();
+export function notifyLocaleChange() {
+  listeners.forEach((listener) => listener());
+}
+/** undefined = visitor; null = account using automatic browser language. */
+export function setAccountLocale(language: AppLocale | null | undefined) {
+  accountOverride = language;
+  notifyLocaleChange();
+}
+export function useAppLocale(): AppLocale {
+  return useSyncExternalStore((listener) => {
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
+  }, getAppLocale);
+}
+export function isAppLocale(value: unknown): value is AppLocale {
+  return typeof value === "string" && (APP_LOCALES as readonly string[]).includes(value);
+}
 
 export function resolveLocale(tag: string | null | undefined): AppLocale {
   const value = (tag ?? "").trim().toLowerCase().replace("_", "-");
@@ -26,6 +47,10 @@ export function getAppLocale(
   storage: Pick<Storage, "getItem"> | null = typeof localStorage === "undefined" ? null : localStorage,
   browserLanguage: string | null | undefined = typeof navigator === "undefined" ? undefined : navigator.languages?.[0] ?? navigator.language,
 ): AppLocale {
+  // Explicit arguments keep this helper usable for deterministic formatting/tests.
+  if (arguments.length === 0 && accountOverride !== undefined) {
+    return accountOverride ?? resolveLocale(browserLanguage);
+  }
   try {
     const saved = storage?.getItem(LOCALE_STORAGE_KEY);
     if (saved && (APP_LOCALES as readonly string[]).includes(saved)) return saved as AppLocale;

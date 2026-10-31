@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { Loader2, Info, Globe, ChevronDown, Check, AlertCircle } from "lucide-react";
 import { useMarket } from "@/components/MarketProvider";
+import { useAppLocale } from "@/lib/locale";
 import { getMarketCopy } from "@/lib/marketCopy";
 import {
   DropdownMenu,
@@ -31,6 +32,7 @@ interface MarketSelectorProps {
 }
 
 export function MarketSelector({ variant = "full", className = "" }: MarketSelectorProps) {
+  useAppLocale();
   const { market, source, confirmed, loading, saving, error, choose, retry } = useMarket();
   const copy = getMarketCopy();
   const id = useId();

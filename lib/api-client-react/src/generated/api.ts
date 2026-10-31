@@ -23,6 +23,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccountLanguage,
   AccountMarket,
   AccountTrialStartResult,
   BillingAccessStatus,
@@ -58,6 +59,142 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getGetAccountLanguageUrl = () => {
+
+
+
+
+  return `/api/account/language`
+}
+
+export const getAccountLanguage = async ( options?: RequestInit): Promise<AccountLanguage> => {
+
+  return customFetch<AccountLanguage>(getGetAccountLanguageUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAccountLanguageQueryKey = () => {
+    return [
+    `/api/account/language`
+    ] as const;
+    }
+
+
+export const getGetAccountLanguageQueryOptions = <TData = Awaited<ReturnType<typeof getAccountLanguage>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccountLanguage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAccountLanguageQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccountLanguage>>> = ({ signal }) => getAccountLanguage({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAccountLanguage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAccountLanguageQueryResult = NonNullable<Awaited<ReturnType<typeof getAccountLanguage>>>
+export type GetAccountLanguageQueryError = ErrorType<unknown>
+
+
+
+export function useGetAccountLanguage<TData = Awaited<ReturnType<typeof getAccountLanguage>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccountLanguage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAccountLanguageQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateAccountLanguageUrl = () => {
+
+
+
+
+  return `/api/account/language`
+}
+
+export const updateAccountLanguage = async (accountLanguage: AccountLanguage, options?: RequestInit): Promise<AccountLanguage> => {
+
+  return customFetch<AccountLanguage>(getUpdateAccountLanguageUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      accountLanguage,)
+  }
+);}
+
+
+
+
+export const getUpdateAccountLanguageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountLanguage>>, TError,{data: BodyType<AccountLanguage>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAccountLanguage>>, TError,{data: BodyType<AccountLanguage>}, TContext> => {
+
+const mutationKey = ['updateAccountLanguage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAccountLanguage>>, {data: BodyType<AccountLanguage>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAccountLanguage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAccountLanguageMutationResult = NonNullable<Awaited<ReturnType<typeof updateAccountLanguage>>>
+    export type UpdateAccountLanguageMutationBody = BodyType<AccountLanguage>
+    export type UpdateAccountLanguageMutationError = ErrorType<unknown>
+
+    export const useUpdateAccountLanguage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountLanguage>>, TError,{data: BodyType<AccountLanguage>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAccountLanguage>>,
+        TError,
+        {data: BodyType<AccountLanguage>},
+        TContext
+      > => {
+      return useMutation(getUpdateAccountLanguageMutationOptions(options));
+    }
 
 export const getGetMarketSuggestionUrl = () => {
 

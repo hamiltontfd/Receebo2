@@ -8,6 +8,20 @@
 import * as zod from 'zod';
 
 
+export const GetAccountLanguageResponse = zod.object({
+  "language": zod.union([zod.literal('en'),zod.literal('pt-PT'),zod.literal('pt-BR'),zod.literal(null)]).nullable()
+})
+
+
+export const UpdateAccountLanguageBody = zod.object({
+  "language": zod.union([zod.literal('en'),zod.literal('pt-PT'),zod.literal('pt-BR'),zod.literal(null)]).nullable()
+})
+
+export const UpdateAccountLanguageResponse = zod.object({
+  "language": zod.union([zod.literal('en'),zod.literal('pt-PT'),zod.literal('pt-BR'),zod.literal(null)]).nullable()
+})
+
+
 export const GetMarketSuggestionResponse = zod.object({
   "country": zod.string().nullable(),
   "market": zod.union([zod.literal('PT'),zod.literal('BR'),zod.literal('US'),zod.literal(null)]).nullable()

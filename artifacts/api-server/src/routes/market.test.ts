@@ -67,6 +67,18 @@ function call(path: string, user: string | null, body?: object) {
 }
 
 describe("market API with real PostgreSQL", () => {
+  it("language requires an account, rejects invalid values and blocks account deletion", async () => {
+    expect((await call("/account/language", null)).status).toBe(401);
+    expect((await call("/account/language", null, { language: "en" })).status).toBe(401);
+    expect((await fetch(`${base}/account/language`, { headers: { "x-guest-id": "guest" } })).status).toBe(401);
+    expect((await call("/account/language", "deleting-fixture", { language: "en" })).status).toBe(423);
+    for (const body of [{}, { language: "fr" }, { language: "PT" }, { language: 1 }, { language: "en", market: "BR" }]) {
+      expect((await call("/account/language", A, body)).status).toBe(400);
+    }
+    const response = await call("/account/language", A);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toEqual({ language: null });
+  });
   it("public suggestion is uncached and rejects query/header supplied IPs from the private peer", async () => {
     const response = await fetch(`${base}/market/suggestion?ip=8.8.8.8`, {
       headers: { "x-forwarded-for": "8.8.8.8", "cf-connecting-ip": "8.8.8.8", "x-real-ip": "8.8.8.8" },
@@ -126,6 +138,24 @@ describe("market API with real PostgreSQL", () => {
     for (const purchaseCountry of ["EU", "ZZ", "pt", "", "BRA", 4]) {
       expect((await call(`/receipts/${receiptId}`, A, { purchaseCountry })).status).toBe(400);
     }
+  });
+  it("persists and resets language independently, without changing purchases or other preferences", async () => {
+    const [receiptBefore] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receiptId));
+    const [prefsBefore] = await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, A));
+    for (const language of ["pt-BR", "pt-PT", "en", null]) {
+      const saved = await call("/account/language", A, { language });
+      expect(saved.status).toBe(200);
+      expect(await saved.json()).toEqual({ language });
+      expect(await (await call("/account/language", A)).json()).toEqual({ language });
+    }
+    const [prefsAfter] = await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, A));
+    expect(prefsAfter.market).toBe(prefsBefore.market);
+    expect(prefsAfter.notificationsOptOut).toBe(prefsBefore.notificationsOptOut);
+    expect((await db.select().from(receiptsTable).where(eq(receiptsTable.id, receiptId)))[0]).toEqual(receiptBefore);
+    await call("/account/language", A, { language: "pt-BR" });
+    expect(await (await call("/account/language", B)).json()).toEqual({ language: null });
+    await call("/account/market", A, { market: "US" });
+    expect(await (await call("/account/language", A)).json()).toEqual({ language: "pt-BR" });
   });
   it("preserves actual EU country and rearms/recalculates existing rules and reminders", async () => {
     const response = await call(`/receipts/${receiptId}`, A, { purchaseCountry: "DE" });

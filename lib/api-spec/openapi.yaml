@@ -15,6 +15,31 @@ tags:
   - name: Storage
     description: Object storage upload and serving endpoints.
 paths:
+  /account/language:
+    get:
+      operationId: getAccountLanguage
+      responses:
+        "200":
+          description: Account language; null means automatic browser language.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountLanguage"
+    patch:
+      operationId: updateAccountLanguage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountLanguage"
+      responses:
+        "200":
+          description: Saved account language.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountLanguage"
   /market/suggestion:
     get:
       operationId: getMarketSuggestion
@@ -456,6 +481,14 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
+    AccountLanguage:
+      type: object
+      additionalProperties: false
+      required: [language]
+      properties:
+        language:
+          type: ["string", "null"]
+          enum: [en, pt-PT, pt-BR, null]
     AccountMarket:
       type: object
       required: [market]

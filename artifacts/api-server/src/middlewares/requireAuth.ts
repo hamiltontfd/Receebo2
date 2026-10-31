@@ -14,6 +14,7 @@ declare global {
 
 const LEGAL_EXEMPT_PATHS = new Set([
   "/account/market",
+  "/account/language",
   "/legal/acceptance",
   "/account",
   "/account/export",

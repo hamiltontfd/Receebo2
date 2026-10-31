@@ -23,6 +23,7 @@ import { PushNotificationSettings } from "@/components/PushNotificationSettings"
 import { PrivacyAndDataSettings } from "@/components/PrivacyAndDataSettings";
 import { MailConnections } from "@/components/MailConnections";
 import { MarketSelector } from "@/components/MarketSelector";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { MAIL_PROVIDER_LABELS, readMailOAuthResult } from "@/lib/mailConnection";
 
 const BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "") + "/";
@@ -193,6 +194,9 @@ export default function Settings() {
           </div>
           <div className="pt-3 border-t">
             <MarketSelector />
+          </div>
+          <div className="pt-3 border-t">
+            <LanguageSelector />
           </div>
         </div>
       </section>

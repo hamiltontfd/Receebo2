@@ -8,6 +8,23 @@
 /**
  * @nullable
  */
+export type AccountLanguageLanguage = typeof AccountLanguageLanguage[keyof typeof AccountLanguageLanguage] | null;
+
+
+export const AccountLanguageLanguage = {
+  en: 'en',
+  'pt-PT': 'pt-PT',
+  'pt-BR': 'pt-BR',
+} as const;
+
+export interface AccountLanguage {
+  /** @nullable */
+  language: AccountLanguageLanguage;
+}
+
+/**
+ * @nullable
+ */
 export type AccountMarketMarket = typeof AccountMarketMarket[keyof typeof AccountMarketMarket] | null;
 
 

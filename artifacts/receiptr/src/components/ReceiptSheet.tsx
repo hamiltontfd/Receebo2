@@ -12,7 +12,7 @@ import {
   Sparkles, Package, Shield, Star, Scale, RotateCcw, Clock,
 } from "lucide-react";
 import { deriveConsumerRights } from "@/lib/consumerRights";
-import { getAppLocale } from "@/lib/locale";
+import { useAppLocale } from "@/lib/locale";
 import { hasNoConsumerDates } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
 import { HighlightsRow } from "@/components/HighlightsRow";
@@ -103,6 +103,7 @@ interface ReceiptSheetProps {
 }
 
 export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
+  const locale = useAppLocale();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isDesktop = useIsDesktop();
@@ -729,7 +730,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       merchant: receipt.merchant,
                       warrantyText: receipt.warranty,
                       purchaseType: receipt.purchaseType,
-                      locale: getAppLocale(),
+                      locale,
                     });
                     if (!rights.hasAny) return null;
 

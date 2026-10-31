@@ -12,7 +12,7 @@ import { BILLING_QUERY_KEY, isAtTrialCap, type BillingStatus } from "@/hooks/use
 import { usePendingImportActions } from "@/hooks/usePendingImportActions";
 import { MAIL_PROVIDER_LABELS } from "@/lib/mailConnection";
 import { deriveConsumerRights } from "@/lib/consumerRights";
-import { getAppLocale } from "@/lib/locale";
+import { useAppLocale } from "@/lib/locale";
 import { hasNoConsumerDates, type PurchaseType } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
 import { TRIAL_CAP_BUTTON, TRIAL_CAP_MESSAGE, SUBSCRIBE_HREF } from "@/lib/trialCopy";
@@ -122,7 +122,7 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
     merchant: data.merchant,
     warrantyText: data.warranty,
     purchaseType,
-    locale: getAppLocale(),
+    locale: useAppLocale(),
   });
   const noDates = hasNoConsumerDates(purchaseType);
   const suggested = (data.category ?? "Other") === category;

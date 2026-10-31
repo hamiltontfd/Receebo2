@@ -11,7 +11,7 @@ import {
 import {
   INSTALL_COPY, installPlatform, isMobileDevice, readDismissedAt, saveDismissedAt, shouldShowInstallBar,
 } from "@/lib/installPrompt";
-import { getAppLocale } from "@/lib/locale";
+import { useAppLocale } from "@/lib/locale";
 
 /** iOS Share glyph (square with an up arrow), drawn inline. */
 function ShareIcon() {
@@ -41,7 +41,7 @@ export default function InstallBar() {
   const { data: recent } = useGetRecentReceipts({ limit: 1 }, {
     query: { queryKey: getGetRecentReceiptsQueryKey({ limit: 1 }), enabled: Boolean(isSignedIn) },
   });
-  const copy = INSTALL_COPY[getAppLocale()];
+  const copy = INSTALL_COPY[useAppLocale()];
   const platform = installPlatform();
 
   useEffect(() => {

@@ -25,6 +25,7 @@ import AppShell from "@/components/AppShell";
 import AuthModal from "@/components/AuthModal";
 import PwaStatus from "@/components/PwaStatus";
 import { MarketProvider } from "@/components/MarketProvider";
+import { LanguageProvider } from "@/components/LanguageProvider";
 import InstallBar from "@/components/InstallBar";
 import { PlanSelectionGate } from "@/components/PlanSelectionGate";
 import { LEGAL_ACCEPTED_EVENT, LegalConsentGate } from "@/components/LegalConsentGate";
@@ -331,6 +332,7 @@ function ClerkProviderWithRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
         <MarketProvider>
         <TooltipProvider>
           <ClerkQueryClientCacheInvalidator />
@@ -376,6 +378,7 @@ function ClerkProviderWithRoutes() {
           <Toaster />
         </TooltipProvider>
         </MarketProvider>
+        </LanguageProvider>
       </QueryClientProvider>
     </ClerkProvider>
   );
