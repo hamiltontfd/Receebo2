@@ -1,3 +1,4 @@
+import { appText, categoryText } from "@/lib/appCopy";
 import { useEffect, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -71,7 +72,7 @@ function ViewOriginalButton({ url }: { url: string }) {
       className="inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1.5 text-xs font-semibold shrink-0 disabled:opacity-50"
     >
       <FileText className="w-3.5 h-3.5" />
-      View original
+      {appText("View original")}
     </button>
   );
 }
@@ -94,7 +95,7 @@ function RecurringInfoCard({ recurring }: { recurring: PendingRecurring }) {
         {others >= 1 && (
           <p className="text-xs font-medium mt-1.5 flex items-center gap-1.5" data-testid="pending-recurring-count">
             <Layers className="w-3 h-3" aria-hidden />
-            Also adds {others} more waiting here.
+            {appText("Also adds")} {others} {appText("more waiting here.")}
           </p>
         )}
       </div>
@@ -110,7 +111,7 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
   onPurchaseType: (t: PurchaseType) => void;
 }) {
   const data = detail.extraction;
-  const provider = detail.provider ? MAIL_PROVIDER_LABELS[detail.provider] : "your email";
+  const provider = detail.provider ? MAIL_PROVIDER_LABELS[detail.provider] : appText("your email");
   const products = data.products ?? [];
   const rights = deriveConsumerRights({
     purchaseDate: data.purchaseDate,
@@ -136,9 +137,9 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
           <Mail className="w-4 h-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold leading-tight">Found in {provider}</p>
+          <p className="text-sm font-semibold leading-tight">{appText("Found in")} {provider}</p>
           <p className="text-xs text-muted-foreground">
-            Found {formatPurchaseDate(detail.createdAt)}
+            {appText("Found")} {formatPurchaseDate(detail.createdAt)}
           </p>
         </div>
         <ViewOriginalButton url={detail.originalUrl} />
@@ -146,25 +147,25 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
 
       <div className="rounded-2xl border px-4 py-3">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Category")}</p>
           {suggested && (
             <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-              <Sparkles className="w-3 h-3" /> Suggested
+              <Sparkles className="w-3 h-3" /> {appText("Suggested")}
             </span>
           )}
         </div>
         <Select value={category} onValueChange={onCategory}>
           <SelectTrigger
-            aria-label="Category"
+            aria-label={appText("Category")}
             data-testid="pending-category"
             className="border-0 px-0 h-auto py-1 font-medium shadow-none focus:ring-0 [&>svg]:ml-1 justify-between"
           >
-            <SelectValue placeholder="Select category" />
+            <SelectValue placeholder={appText("Select category")} />
           </SelectTrigger>
           <SelectContent>
             {CATEGORIES.map((cat) => (
               <SelectItem key={cat} value={cat}>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{cat}</span>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{categoryText(cat)}</span>
               </SelectItem>
             ))}
           </SelectContent>
@@ -172,10 +173,10 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
         {!recurring && (<>
         <div className="flex items-center justify-between gap-3 pt-2 mt-2 border-t">
           <label htmlFor="pending-switch-subscription" className="text-sm font-medium flex items-center gap-2">
-            This is a subscription
+            {appText("This is a subscription")}
             {noDates && purchaseType && (
               <span data-testid="pending-purchase-type" className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                {NO_DATES_BADGE[purchaseType]}
+                {appText(NO_DATES_BADGE[purchaseType])}
               </span>
             )}
           </label>
@@ -195,7 +196,7 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
       {products.length > 0 && (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-            <Package className="w-3.5 h-3.5" /> Items · {products.length}
+            <Package className="w-3.5 h-3.5" /> {appText("Items ·")} {products.length}
           </p>
           <div className="rounded-2xl border divide-y">
             {products.map((p, i) => (
@@ -209,7 +210,7 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
             ))}
             {data.total != null && (
               <div className="px-4 py-3 flex items-baseline justify-between bg-muted/40 text-sm font-semibold">
-                <span>Total</span>
+                <span>{appText("Total")}</span>
                 <span className="font-mono">{formatMoney(data.total, data.currency)}</span>
               </div>
             )}
@@ -219,7 +220,7 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
 
       {data.notableItems.length > 0 && (
         <div className="rounded-2xl border border-foreground/20 bg-foreground/5 px-4 py-3" data-testid="pending-notable">
-          <p className="text-xs font-semibold uppercase tracking-wide mb-2">Worth keeping for</p>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-2">{appText("Worth keeping for")}</p>
           <ul className="space-y-1.5">
             {data.notableItems.map((n, i) => (
               <li key={i} className="text-sm">
@@ -235,14 +236,14 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
             <Scale className="w-3.5 h-3.5" />
-            Consumer Rights{rights.countryLabel ? ` · ${rights.countryLabel}` : ""}
+            {appText("Consumer Rights")}{rights.countryLabel ? ` · ${rights.countryLabel}` : ""}
           </p>
           <div className="rounded-xl border px-4 py-3 flex items-start gap-3 bg-violet-50 border-violet-200 text-violet-700">
             <Clock className="w-4 h-4 mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-semibold leading-tight">{rights.warranty.label}</p>
               <p className="text-xs mt-0.5 opacity-80">
-                Until {rights.warranty.formattedExpiry} · tracked once you accept
+                {appText("Until")} {rights.warranty.formattedExpiry} {appText("· tracked once you accept")}
               </p>
             </div>
           </div>
@@ -258,6 +259,7 @@ function SheetBody({ detail, category, onCategory, purchaseType, onPurchaseType 
  * saves it and opens the short review screen.
  */
 export function PendingImportSheet({ importId, open, onClose }: PendingImportSheetProps) {
+  useAppLocale();
   const isDesktop = useIsDesktop();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -336,11 +338,11 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
             <div className="w-10 h-1 bg-muted-foreground/25 rounded-full" />
           </div>
         )}
-        <SheetDescription className="sr-only">Receipt found in your email</SheetDescription>
+        <SheetDescription className="sr-only">{appText("Receipt found in your email")}</SheetDescription>
 
         {isLoading || (!detail && !isError) ? (
           <div className="px-5 py-4 space-y-4">
-            <SheetTitle className="sr-only">Loading</SheetTitle>
+            <SheetTitle className="sr-only">{appText("Loading")}</SheetTitle>
             <Skeleton className="h-10 w-2/3" />
             <Skeleton className="h-16 rounded-2xl" />
             <Skeleton className="h-16 rounded-2xl" />
@@ -348,11 +350,11 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
           </div>
         ) : isError || !detail || !data ? (
           <div className="flex flex-col items-center justify-center px-8 py-16 text-center">
-            <SheetTitle className="sr-only">Not found</SheetTitle>
+            <SheetTitle className="sr-only">{appText("Not found")}</SheetTitle>
             <AlertTriangle className="w-8 h-8 text-muted-foreground mb-3" />
-            <p className="font-semibold mb-1">This receipt is no longer waiting</p>
-            <p className="text-sm text-muted-foreground mb-5">It was already accepted or dismissed.</p>
-            <Button className="rounded-full" onClick={onClose}>Close</Button>
+            <p className="font-semibold mb-1">{appText("This receipt is no longer waiting")}</p>
+            <p className="text-sm text-muted-foreground mb-5">{appText("It was already accepted or dismissed.")}</p>
+            <Button className="rounded-full" onClick={onClose}>{appText("Close")}</Button>
           </div>
         ) : (
           <>
@@ -387,9 +389,9 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
             <div className="border-t px-5 py-3 shrink-0 space-y-2 bg-background">
               {atCap && (
                 <p className="text-xs text-amber-900 flex flex-wrap gap-1" data-testid="pending-sheet-trial-cap">
-                  {TRIAL_CAP_MESSAGE}
+                  {appText(TRIAL_CAP_MESSAGE)}
                   <a href={SUBSCRIBE_HREF} onClick={(e) => { e.preventDefault(); onClose(); setLocation(SUBSCRIBE_HREF); }} className="font-semibold underline">
-                    {TRIAL_CAP_BUTTON}
+                    {appText(TRIAL_CAP_BUTTON)}
                   </a>
                 </p>
               )}
@@ -401,7 +403,7 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
                   onClick={handleDismiss}
                 >
                   {dismiss.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Dismiss
+                  {appText("Dismiss")}
                 </Button>
                 {recurring ? (
                   <Button
@@ -411,7 +413,7 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
                     data-testid="pending-sheet-always-import"
                   >
                     {alwaysImport.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Repeat className="w-4 h-4 mr-2" />}
-                    Always import
+                    {appText("Always import")}
                   </Button>
                 ) : (
                   <Button
@@ -421,7 +423,7 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
                     data-testid="pending-sheet-accept"
                   >
                     {approve.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                    Accept
+                    {appText("Accept")}
                   </Button>
                 )}
               </div>

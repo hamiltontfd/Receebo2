@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 
@@ -8,6 +10,7 @@ interface StoreFullscreenProps {
 }
 
 export function StoreFullscreen({ fileUrl, onClose }: StoreFullscreenProps) {
+  useAppLocale();
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
@@ -32,11 +35,11 @@ export function StoreFullscreen({ fileUrl, onClose }: StoreFullscreenProps) {
       className="fixed inset-0 z-[9999] bg-black flex items-center justify-center cursor-pointer"
       onClick={onClose}
       role="button"
-      aria-label="Dismiss full-screen receipt view"
+      aria-label={appText("Dismiss full-screen receipt view")}
     >
       <motion.img
         src={fileUrl}
-        alt="Receipt"
+        alt={appText("Receipt")}
         className="max-w-full max-h-full object-contain select-none"
         draggable={false}
         initial={{ scale: 0.94, opacity: 0 }}
@@ -48,12 +51,12 @@ export function StoreFullscreen({ fileUrl, onClose }: StoreFullscreenProps) {
         style={{ top: "max(1rem, env(safe-area-inset-top))", right: "max(1rem, env(safe-area-inset-right))" }}
         className="absolute w-11 h-11 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-colors"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={appText("Close")}
       >
         <X className="w-5 h-5" />
       </button>
       <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-xs select-none">
-        Tap anywhere to dismiss
+        {appText("Tap anywhere to dismiss")}
       </p>
     </motion.div>
   );

@@ -1,7 +1,7 @@
 /**
- * Locale support (en, pt-PT, pt-BR). Screens adopt translated copy incrementally;
- * this module holds the rules so screens and emails can move over one at a
- * time. Spec: /workspace/receebo-email SPEC §2, docs/locales-and-rights.md.
+ * The single web/PWA language source (en, pt-PT, pt-BR), shared by application
+ * copy, selectors and consumer-rights display. Language never selects a market,
+ * purchase country or currency. Coverage: docs/locales-and-rights.md.
  *
  * - Account language wins while signed in; null uses browser language.
  * - Signed-out visitors always use browser language, ignoring legacy local overrides.

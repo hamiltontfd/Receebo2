@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale, getAppLocale } from "@/lib/locale";
 import { Link } from "wouter";
 import { ArrowLeft, Loader2, Package } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
@@ -20,7 +22,7 @@ export function groupKeepItems(items: DurableKeepItem[]): KeepGroup[] {
     const key = item.day.slice(0, 7);
     let g = byMonth.get(key);
     if (!g) {
-      g = { key, label: new Date(`${key}-01T00:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" }), items: [] };
+      g = { key, label: new Date(`${key}-01T00:00:00`).toLocaleDateString(getAppLocale(), { month: "long", year: "numeric" }), items: [] };
       byMonth.set(key, g);
       groups.push(g);
     }
@@ -73,10 +75,11 @@ function KeepRow({ item, onOpen }: { item: DurableKeepItem; onOpen: () => void }
 
 /** "See all" from the Worth keeping row on the Search home. */
 export default function WorthKeepingPage() {
+  const locale = useAppLocale();
   const { data: receipts, isLoading, isError } = useAllReceipts();
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const items = useMemo(() => durableKeeping(receipts ?? []), [receipts]);
-  const groups = useMemo(() => groupKeepItems(items), [items]);
+  const items = useMemo(() => durableKeeping(receipts ?? []), [receipts, locale]);
+  const groups = useMemo(() => groupKeepItems(items), [items, locale]);
 
   return (
     <>
@@ -85,39 +88,39 @@ export default function WorthKeepingPage() {
         <div className="flex items-center justify-between gap-2">
           <Link
             href="/search"
-            aria-label="Back"
+            aria-label={appText("Back")}
             className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center md:w-auto md:h-auto md:bg-transparent md:gap-1.5 md:text-sm md:text-muted-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="hidden md:inline">Home</span>
+            <span className="hidden md:inline">{appText("Home")}</span>
           </Link>
         </div>
 
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Worth keeping {!isLoading && <span className="text-muted-foreground font-medium">({items.length})</span>}
+            {appText("Worth keeping")} {!isLoading && <span className="text-muted-foreground font-medium">({items.length})</span>}
           </h1>
-          <p className="text-sm text-muted-foreground">Durable goods from your receipts. Open return windows first, then the most recent.</p>
+          <p className="text-sm text-muted-foreground">{appText("Durable goods from your receipts. Open return windows first, then the most recent.")}</p>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading…
+            <Loader2 className="w-4 h-4 animate-spin mr-2" /> {appText("Loading…")}
           </div>
         ) : isError ? (
-          <p className="text-sm text-muted-foreground py-10 text-center">Couldn't load your purchases. Check your connection and try again.</p>
+          <p className="text-sm text-muted-foreground py-10 text-center">{appText("Couldn't load your purchases. Check your connection and try again.")}</p>
         ) : items.length === 0 ? (
           <div className="rounded-2xl border px-4 py-6 text-center text-sm" data-testid="keep-empty">
             <Package className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
-            <p className="font-semibold">Nothing here yet.</p>
-            <p className="text-muted-foreground">Electronics, furniture and other durable goods from your receipts will show up here.</p>
+            <p className="font-semibold">{appText("Nothing here yet.")}</p>
+            <p className="text-muted-foreground">{appText("Electronics, furniture and other durable goods from your receipts will show up here.")}</p>
           </div>
         ) : (
           groups.map((group) => (
             <section key={group.key} data-testid={`keep-group-${group.key}`}>
               <div className="flex items-baseline justify-between mb-2 text-xs">
-                <h2 className="font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</h2>
-                <span className="text-muted-foreground">{group.items.length} item{group.items.length === 1 ? "" : "s"}</span>
+                <h2 className="font-semibold uppercase tracking-wide text-muted-foreground">{appText(group.label)}</h2>
+                <span className="text-muted-foreground">{appText("{0} item(s)", [group.items.length])}</span>
               </div>
               <ul className="flex flex-col gap-2">
                 {group.items.map((item, i) => (

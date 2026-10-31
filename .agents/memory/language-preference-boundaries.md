@@ -3,12 +3,13 @@ name: Language preference boundaries
 description: Why language selection is deliberately separate from market and visitor adoption.
 ---
 
-Web/PWA language selection has deliberately incremental translation coverage, not
-a promise that every screen, email, legal document or native screen is translated.
-Preserve the visible disclosure when expanding coverage.
+Web/PWA language selection is not a promise that original purchase data, external
+authentication content, legal documents, recordings or native screens are translated.
+Keep the visible disclosure specific to untranslated content when expanding coverage.
 
-**Why:** This feature establishes a real account preference without representing
-existing English-only flows or legal scaffolding as translated or approved.
+**Why:** The account preference must not represent third-party content or legal
+scaffolding as translated or approved. Original merchant/item/extracted text is
+purchase data, not interface copy to rewrite.
 
 **How to apply:** Extend translations explicitly by surface. Never use the selected
 language to rewrite purchase country, currency or legal jurisdiction.

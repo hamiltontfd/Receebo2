@@ -1,3 +1,4 @@
+import { appText } from "@/lib/appCopy";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -43,8 +44,8 @@ export function usePendingImportActions() {
     if (err instanceof TrialCapError) {
       void queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY });
       toast({
-        title: "Receipt not added",
-        description: TRIAL_CAP_MESSAGE,
+        title: appText("Receipt not added"),
+        description: appText(TRIAL_CAP_MESSAGE),
         variant: "destructive",
         action: subscribeToastAction(setLocation),
       });
@@ -58,7 +59,7 @@ export function usePendingImportActions() {
       refresh();
       return;
     }
-    toast({ title: "Something went wrong", description: fallback, variant: "destructive" });
+    toast({ title: appText("Something went wrong"), description: appText(fallback), variant: "destructive" });
   };
 
   const approve = useMutation({
@@ -67,7 +68,7 @@ export function usePendingImportActions() {
       removeFromCache(queryClient, [id]);
       refresh();
       void queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY });
-      toast({ title: "Receipt added to your library" });
+      toast({ title: appText("Receipt added to your library") });
     },
     onError: (err) => showError(err, "Could not approve receipt. Please try again."),
   });
@@ -77,7 +78,7 @@ export function usePendingImportActions() {
     onSuccess: (_result, id) => {
       removeFromCache(queryClient, [id]);
       refresh();
-      toast({ title: "Dismissed" });
+      toast({ title: appText("Dismissed") });
     },
     onError: (err) => showError(err, "Could not dismiss import."),
   });
@@ -89,12 +90,12 @@ export function usePendingImportActions() {
       refresh();
       void queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY });
       const n = result.approved.length;
-      const added = `${n} receipt${n === 1 ? "" : "s"} added`;
+      const added = appText("{0} receipt(s) added", [n]);
       if (result.code === "TRIAL_UPLOAD_LIMIT" && result.skipped.length > 0) {
         const rest = result.skipped.length;
         toast({
           title: added,
-          description: `Subscribe to add the other ${rest}. They stay here.`,
+          description: appText("Subscribe to add the other {0}. They stay here.", [rest]),
           action: subscribeToastAction(setLocation),
         });
         return;
@@ -112,13 +113,13 @@ export function usePendingImportActions() {
       const n = result.dismissed.length;
       if (result.failed.length > 0) {
         toast({
-          title: `Dismissed ${n}`,
-          description: `${result.failed.length} could not be removed. Try again in a moment.`,
+          title: appText("Dismissed {0}", [n]),
+          description: appText("{0} could not be removed. Try again in a moment.", [result.failed.length]),
           variant: "destructive",
         });
         return;
       }
-      toast({ title: n === 1 ? "Dismissed" : `Dismissed ${n}` });
+      toast({ title: n === 1 ? appText("Dismissed") : appText("Dismissed {0}", [n]) });
     },
     onError: (err) => showError(err, "Could not dismiss these imports."),
   });
@@ -131,13 +132,13 @@ export function usePendingImportActions() {
       refresh();
       void queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: RECURRING_QUERY_KEY });
-      const added = `${result.approved.length} added`;
+      const added = appText("{0} added", [result.approved.length]);
       toast({
-        title: `${result.supplier.displayName} receipts will now import automatically`,
-        description: result.skipped.length > 0 ? `${added} · ${result.skipped.length} still waiting` : added,
+        title: appText("{0} receipts will now import automatically", [result.supplier.displayName]),
+        description: result.skipped.length > 0 ? appText("{0} · {1} still waiting", [added, result.skipped.length]) : added,
         action: (
-          <ToastAction altText="Manage" onClick={() => setLocation("/profile/recurring")} data-testid="toast-action-manage">
-            Manage
+          <ToastAction altText={appText("Manage")} onClick={() => setLocation("/profile/recurring")} data-testid="toast-action-manage">
+            {appText("Manage")}
           </ToastAction>
         ),
       });

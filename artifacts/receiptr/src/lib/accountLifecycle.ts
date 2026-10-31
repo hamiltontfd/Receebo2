@@ -4,13 +4,15 @@
  * 60 days after access ended unless the user subscribes (server:
  * api-server/src/lib/accountLifecycle.ts, spec: docs/account-lifecycle.md).
  *
- * Translations (not wired up yet):
+ * Display translations are resolved through appCopy at render time:
  *   pt-PT: "Os seus recibos ficam guardados até {data} e depois são apagados. Subscreva antes disso para os manter."
  *          "Quer uma cópia? Escreva para contact@receebo.net."
  *   pt-BR: "Suas notas ficam guardadas até {data} e depois são apagadas. Assine antes disso para mantê-las."
  *          "Quer uma cópia? Escreva para contact@receebo.net."
  */
 import { hasAppAccess, resolveAccessState, type BillingStatus } from "@/hooks/useBilling";
+import { appText } from "./appCopy";
+import { getAppLocale } from "./locale";
 
 export const SUPPORT_EMAIL = "contact@receebo.net";
 export const FROZEN_COPY_NOTE = `Want a copy of your data? Email ${SUPPORT_EMAIL} and we'll send it to you.`;
@@ -27,7 +29,7 @@ export function formatDeletionDate(iso: string | null | undefined): string | nul
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString(getAppLocale() === "en" ? "en-GB" : getAppLocale(), { day: "numeric", month: "short", year: "numeric" });
 }
 
 /** One-line retention notice for the paywall, or null when not frozen. */
@@ -35,6 +37,6 @@ export function frozenRetentionNotice(b: BillingStatus | undefined | null): stri
   if (!isFrozenAccount(b)) return null;
   const date = formatDeletionDate(b!.dataDeletionAt);
   return date
-    ? `Your receipts are kept until ${date}, then permanently deleted. Subscribe before then to keep them.`
-    : "Your receipts are kept for 60 days after your access ended, then permanently deleted. Subscribe before then to keep them.";
+    ? appText("Your receipts are kept until {0}, then permanently deleted. Subscribe before then to keep them.", [date])
+    : appText("Your receipts are kept for 60 days after your access ended, then permanently deleted. Subscribe before then to keep them.");
 }

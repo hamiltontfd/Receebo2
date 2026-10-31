@@ -1,3 +1,5 @@
+import { getAppLocale, type AppLocale } from "./locale";
+import { appText } from "./appCopy";
 /** ISO 3166-1 alpha-2 codes for real countries and territories (no EU/XX pseudo codes). */
 export const ISO_COUNTRY_CODES = (
   "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ " +
@@ -11,15 +13,17 @@ export const ISO_COUNTRY_CODES = (
 
 const CODE_SET = new Set(ISO_COUNTRY_CODES);
 
-let displayNames: Intl.DisplayNames | null = null;
-function names(): Intl.DisplayNames | null {
-  if (displayNames) return displayNames;
+const displayNames = new Map<AppLocale, Intl.DisplayNames>();
+function names(locale: AppLocale): Intl.DisplayNames | null {
+  const cached = displayNames.get(locale);
+  if (cached) return cached;
   try {
-    displayNames = new Intl.DisplayNames(["en"], { type: "region" });
+    const result = new Intl.DisplayNames([locale], { type: "region" });
+    displayNames.set(locale, result);
+    return result;
   } catch {
-    displayNames = null;
+    return null;
   }
-  return displayNames;
 }
 
 /** Normalise a stored value to a valid ISO code, or null (Unknown). Never maps EU or infers. */
@@ -29,19 +33,21 @@ export function normalizeCountry(code: string | null | undefined): string | null
   return CODE_SET.has(up) ? up : null;
 }
 
-export function countryName(code: string | null | undefined): string {
+export function countryName(code: string | null | undefined, locale: AppLocale = getAppLocale()): string {
   const c = normalizeCountry(code);
-  if (!c) return code ? code.toUpperCase() : "Unknown";
-  return names()?.of(c) ?? c;
+  if (!c) return code ? code.toUpperCase() : appText("Unknown", [], locale);
+  return names(locale)?.of(c) ?? c;
 }
 
 export interface CountryOption { code: string; name: string }
 
-let cached: CountryOption[] | null = null;
-export function countryOptions(): CountryOption[] {
-  if (!cached) {
-    cached = ISO_COUNTRY_CODES.map((code) => ({ code, name: countryName(code) }))
-      .sort((a, b) => a.name.localeCompare(b.name, "en"));
+const cached = new Map<AppLocale, CountryOption[]>();
+export function countryOptions(locale: AppLocale = getAppLocale()): CountryOption[] {
+  let options = cached.get(locale);
+  if (!options) {
+    options = ISO_COUNTRY_CODES.map((code) => ({ code, name: countryName(code, locale) }))
+      .sort((a, b) => a.name.localeCompare(b.name, locale));
+    cached.set(locale, options);
   }
-  return cached;
+  return options;
 }

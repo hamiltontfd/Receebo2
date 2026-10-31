@@ -1,4 +1,6 @@
 import { useClerk, useUser } from "@clerk/react";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale, formatLocaleDate } from "@/lib/locale";
 import { useLocation, Link } from "wouter";
 import { LogOut, CreditCard, ChevronRight, UserCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,7 @@ function Initials({ name, email }: { name: string | null; email: string | null }
 }
 
 export default function ProfilePage() {
+  const locale = useAppLocale();
   const { user } = useUser();
   const { signOut } = useClerk();
   const [, setLocation] = useLocation();
@@ -52,8 +55,8 @@ export default function ProfilePage() {
     portal.mutate(undefined, {
       onError: () =>
         toast({
-          title: "Something went wrong",
-          description: "Could not open the billing portal. Please try again.",
+          title: appText("Something went wrong"),
+          description: appText("Could not open the billing portal. Please try again."),
           variant: "destructive",
         }),
     });
@@ -65,7 +68,7 @@ export default function ProfilePage() {
 
   const formatDate = (iso: string | null | undefined) => {
     if (!iso) return null;
-    return format(new Date(iso), "MMMM d, yyyy");
+    return formatLocaleDate(new Date(iso), locale);
   };
 
   // ── Guest view ─────────────────────────────────────────────────────────────
@@ -77,9 +80,9 @@ export default function ProfilePage() {
             <UserCircle2 className="w-10 h-10 text-muted-foreground" />
           </div>
           <div>
-            <p className="font-bold text-lg">Guest</p>
+            <p className="font-bold text-lg">{appText("Guest")}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Your receipts are stored locally. Create an account to save them.
+              {appText("Your receipts are stored locally. Create an account to save them.")}
             </p>
           </div>
         </div>
@@ -87,12 +90,12 @@ export default function ProfilePage() {
         <div className="flex flex-col gap-3">
           <Link href="/sign-up">
             <Button size="lg" className="w-full rounded-full">
-              Create a free account
+              {appText("Create a free account")}
             </Button>
           </Link>
           <Link href="/sign-in">
             <Button variant="outline" size="lg" className="w-full rounded-full">
-              Sign in
+              {appText("Sign in")}
             </Button>
           </Link>
         </div>
@@ -104,7 +107,7 @@ export default function ProfilePage() {
           >
             <div className="flex items-center gap-3">
               <LogOut className="w-4 h-4" />
-              <span>Exit guest mode</span>
+              <span>{appText("Exit guest mode")}</span>
             </div>
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -134,13 +137,13 @@ export default function ProfilePage() {
       {/* ── Subscription ── */}
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-          Subscription
+          {appText("Subscription")}
         </h2>
 
         <div className="border rounded-xl divide-y">
           {/* Plan row */}
           <div className="flex items-center justify-between px-4 py-3.5">
-            <span className="text-sm font-medium">Current plan</span>
+            <span className="text-sm font-medium">{appText("Current plan")}</span>
             {billingLoading ? (
               <Skeleton className="h-5 w-20 rounded-full" />
             ) : (
@@ -150,9 +153,9 @@ export default function ProfilePage() {
 
           {!billingLoading && (accessState === "account_trial" || accessState === "trial_exhausted" || accessState === "trial_expired") && (
             <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-sm font-medium">Free receipts used</span>
+              <span className="text-sm font-medium">{appText("Free receipts used")}</span>
               <span className="text-sm text-muted-foreground font-mono" data-testid="text-profile-trial-uploads">
-                {Math.min(billing?.trialUploadsUsed ?? 0, TRIAL_UPLOAD_LIMIT)} of {TRIAL_UPLOAD_LIMIT}
+                {Math.min(billing?.trialUploadsUsed ?? 0, TRIAL_UPLOAD_LIMIT)} {appText("of")} {TRIAL_UPLOAD_LIMIT}
               </span>
             </div>
           )}
@@ -160,7 +163,7 @@ export default function ProfilePage() {
           {/* Trial end date */}
           {!billingLoading && (accessState === "legacy_stripe_trial" || accessState === "account_trial" || accessState === "trial_exhausted") && billing?.trialEndAt && (
             <div className="flex items-center justify-between px-4 py-3.5">
-              <span className="text-sm font-medium">Trial ends</span>
+              <span className="text-sm font-medium">{appText("Trial ends")}</span>
               <span className="text-sm text-muted-foreground">
                 {formatDate(billing.trialEndAt)}
               </span>
@@ -171,7 +174,7 @@ export default function ProfilePage() {
           {!billingLoading && accessState === "paid" && billing?.currentPeriodEnd && (
             <div className="flex items-center justify-between px-4 py-3.5">
               <span className="text-sm font-medium">
-                {billing.cancelAtPeriodEnd ? "Access until" : "Next billing date"}
+                {appText(billing.cancelAtPeriodEnd ? "Access until" : "Next billing date")}
               </span>
               <span className="text-sm text-muted-foreground">
                 {formatDate(billing.currentPeriodEnd)}
@@ -183,7 +186,7 @@ export default function ProfilePage() {
           {!billingLoading && accessState === "paid" && billing?.cancelAtPeriodEnd && (
             <div className="px-4 py-3.5">
               <p className="text-xs text-muted-foreground">
-                Your subscription is cancelled and will not renew.
+                {appText("Your subscription is cancelled and will not renew.")}
               </p>
             </div>
           )}
@@ -200,12 +203,12 @@ export default function ProfilePage() {
                   disabled={portal.isPending}
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
-                  {portal.isPending ? "Loading…" : "Manage subscription"}
+                  {appText(portal.isPending ? "Loading…" : "Manage subscription")}
                 </Button>
               ) : canSubscribe ? (
                 <Link href="/settings#upgrade-plans" className="w-full" data-testid="link-profile-upgrade">
                   <span className="inline-flex h-9 w-full items-center justify-center rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground">
-                    {accessState === "account_trial" ? "Upgrade now" : "Subscribe"}
+                    {appText(accessState === "account_trial" ? "Upgrade now" : "Subscribe")}
                   </span>
                 </Link>
               ) : null}
@@ -215,7 +218,7 @@ export default function ProfilePage() {
 
         {isPro && (
           <p className="text-xs text-muted-foreground mt-2 text-center">
-            Cancel anytime from the Stripe billing portal.
+            {appText("Cancel anytime from the Stripe billing portal.")}
           </p>
         )}
       </section>
@@ -226,12 +229,12 @@ export default function ProfilePage() {
       {/* ── Account actions ── */}
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-          Account
+          {appText("Account")}
         </h2>
         <div className="border rounded-xl divide-y">
           <Link href="/settings">
             <button className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-secondary/50 transition-colors rounded-t-xl">
-              <span className="font-medium">Settings</span>
+              <span className="font-medium">{appText("Settings")}</span>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </button>
           </Link>
@@ -241,7 +244,7 @@ export default function ProfilePage() {
           >
             <div className="flex items-center gap-2.5">
               <LogOut className="w-4 h-4" />
-              <span className="font-medium">Sign out</span>
+              <span className="font-medium">{appText("Sign out")}</span>
             </div>
             <ChevronRight className="w-4 h-4 opacity-50" />
           </button>

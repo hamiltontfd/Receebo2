@@ -1,4 +1,6 @@
 import { OwnerAccessNotice } from "@/components/OwnerAccessNotice";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useUser } from "@clerk/react";
@@ -65,6 +67,7 @@ function useNotificationPreferences() {
 // ─── Plan badge ───────────────────────────────────────────────────────────────
 
 export function AccessBadge({ billing }: { billing: BillingStatus | undefined }) {
+  useAppLocale();
   const state = resolveAccessState(billing);
   const labels: Record<AccessState, string> = {
     paid: "Pro",
@@ -89,7 +92,7 @@ export function AccessBadge({ billing }: { billing: BillingStatus | undefined })
             : "inline-flex items-center rounded-full bg-secondary text-muted-foreground text-xs font-semibold px-3 py-1"
       }
     >
-      {labels[state]}
+      {appText(labels[state])}
     </span>
   );
 }
@@ -97,6 +100,7 @@ export function AccessBadge({ billing }: { billing: BillingStatus | undefined })
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Settings() {
+  const locale = useAppLocale();
   const { user } = useUser();
   const [location] = useLocation();
   const queryClient = useQueryClient();
@@ -119,18 +123,18 @@ export default function Settings() {
     const mailResult = readMailOAuthResult(window.location.search);
     if (mailResult?.result === "connected") {
       const label = MAIL_PROVIDER_LABELS[mailResult.provider];
-      toast({ title: `${label} connected`, description: "Your inbox will be scanned shortly." });
+      toast({ title: appText("{0} connected", [label]), description: appText("Your inbox will be scanned shortly.") });
       void queryClient.invalidateQueries({ queryKey: ["mail"] });
       window.history.replaceState({}, "", window.location.pathname);
     } else if (mailResult?.result === "error") {
       toast({
-        title: `${MAIL_PROVIDER_LABELS[mailResult.provider]} connection failed`,
-        description: "Please try again. Make sure to allow the requested permissions.",
+        title: appText("{0} connection failed", [MAIL_PROVIDER_LABELS[mailResult.provider]]),
+        description: appText("Please try again. Make sure to allow the requested permissions."),
         variant: "destructive",
       });
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("checkout") === "success") {
-      toast({ title: "Subscription activated", description: "Your plan has been updated." });
+      toast({ title: appText("Subscription activated"), description: appText("Your plan has been updated.") });
       queryClient.invalidateQueries({ queryKey: ["billing", "subscription"] });
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("checkout") === "cancel") {
@@ -153,7 +157,7 @@ export default function Settings() {
 
   const formatDate = (iso: string | null) => {
     if (!iso) return null;
-    return new Date(iso).toLocaleDateString("en-US", {
+    return new Date(iso).toLocaleDateString(locale === "en" ? "en-US" : locale, {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -162,7 +166,7 @@ export default function Settings() {
 
   const formatDateTime = (iso: string | null) => {
     if (!iso) return null;
-    return new Date(iso).toLocaleString("en-US", {
+    return new Date(iso).toLocaleString(locale === "en" ? "en-US" : locale, {
       month: "short",
       day: "numeric",
       hour: "2-digit",
@@ -172,22 +176,22 @@ export default function Settings() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10 w-full">
-      <h1 className="text-2xl font-extrabold tracking-tight mb-8">Settings</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight mb-8">{appText("Settings")}</h1>
 
       {/* Account */}
       <section className="mb-10">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-          Account
+          {appText("Account")}
         </h2>
         <div className="border rounded-xl p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Email</span>
+            <span className="text-sm font-medium">{appText("Email")}</span>
             <span className="text-sm text-muted-foreground">
               {user?.primaryEmailAddress?.emailAddress ?? "—"}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Name</span>
+            <span className="text-sm font-medium">{appText("Name")}</span>
             <span className="text-sm text-muted-foreground">
               {user?.fullName ?? "—"}
             </span>
@@ -204,7 +208,7 @@ export default function Settings() {
       {/* Connected accounts */}
       <section className="mb-10">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-          Connected accounts
+          {appText("Connected accounts")}
         </h2>
 
         <MailConnections />
@@ -213,7 +217,7 @@ export default function Settings() {
       {/* Subscription */}
       <section className="mb-10">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-          Subscription
+          {appText("Subscription")}
         </h2>
 
         {isLoading ? (
@@ -224,36 +228,36 @@ export default function Settings() {
         ) : (
           <div className="border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Current plan</span>
+              <span className="text-sm font-medium">{appText("Current plan")}</span>
               <AccessBadge billing={billing} />
             </div>
 
             {billing?.paymentAttention && (
               <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" data-testid="payment-attention">
-                <p className="font-semibold">Your renewal payment needs attention</p>
+                <p className="font-semibold">{appText("Your renewal payment needs attention")}</p>
                 <p className="mt-1">
                   {isOwner
-                    ? "Your Owner access is unchanged, but your subscription has an outstanding payment."
+                    ? appText("Your Owner access is unchanged, but your subscription has an outstanding payment.")
                     : billing.canUseApp && billing.currentPeriodEnd
-                      ? `Your Pro access continues until ${formatDateTime(billing.currentPeriodEnd)}. Update your payment details before then to avoid losing access.`
-                      : "Your Pro access has ended. Update your payment details and settle the outstanding invoice to restore access."}
-                  {" "}Stripe may retry your payment. Use the button below to open Stripe's secure billing portal.
+                      ? appText("Your Pro access continues until {0}. Update your payment details before then to avoid losing access.", [formatDateTime(billing.currentPeriodEnd)!])
+                      : appText("Your Pro access has ended. Update your payment details and settle the outstanding invoice to restore access.")}
+                  {" "}{appText("Stripe may retry your payment. Use the button below to open Stripe's secure billing portal.")}
                 </p>
               </div>
             )}
 
             {(accessState === "account_trial" || accessState === "trial_exhausted" || accessState === "trial_expired") && (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Free receipts used</span>
+                <span className="text-sm font-medium">{appText("Free receipts used")}</span>
                 <span className="text-sm text-muted-foreground font-mono" data-testid="text-trial-uploads-used">
-                  {Math.min(billing?.trialUploadsUsed ?? 0, TRIAL_UPLOAD_LIMIT)} of {TRIAL_UPLOAD_LIMIT}
+                  {Math.min(billing?.trialUploadsUsed ?? 0, TRIAL_UPLOAD_LIMIT)} {appText("of")} {TRIAL_UPLOAD_LIMIT}
                 </span>
               </div>
             )}
 
             {(accessState === "account_trial" || accessState === "trial_exhausted" || accessState === "trial_expired") && billing?.trialEndAt && (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{accessState === "trial_expired" ? "Trial ended" : "Trial ends"}</span>
+                <span className="text-sm font-medium">{appText(accessState === "trial_expired" ? "Trial ended" : "Trial ends")}</span>
                 <span className="text-sm text-muted-foreground" data-testid="text-trial-end">
                   {formatDateTime(billing.trialEndAt)}
                 </span>
@@ -262,7 +266,7 @@ export default function Settings() {
 
             {accessState === "legacy_stripe_trial" && billing?.trialEndAt && (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Trial ends</span>
+                <span className="text-sm font-medium">{appText("Trial ends")}</span>
                 <span className="text-sm text-muted-foreground">
                   {formatDate(billing.trialEndAt)}
                 </span>
@@ -272,7 +276,7 @@ export default function Settings() {
             {accessState === "paid" && billing?.currentPeriodEnd && (
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">
-                  {billing.cancelAtPeriodEnd ? "Access until" : "Next billing date"}
+                  {appText(billing.cancelAtPeriodEnd ? "Access until" : "Next billing date")}
                 </span>
                 <span className="text-sm text-muted-foreground">
                   {formatDate(billing.currentPeriodEnd)}
@@ -293,15 +297,15 @@ export default function Settings() {
                   portal.mutate(undefined, {
                     onError: () =>
                       toast({
-                        title: "Something went wrong",
-                        description: "Could not open the billing portal. Please try again.",
+                        title: appText("Something went wrong"),
+                        description: appText("Could not open the billing portal. Please try again."),
                         variant: "destructive",
                       }),
                   })
                 }
                 disabled={portal.isPending}
               >
-                {portal.isPending ? "Loading..." : billing?.paymentAttention ? "Update payment details" : "Manage subscription"}
+                {appText(portal.isPending ? "Loading..." : billing?.paymentAttention ? "Update payment details" : "Manage subscription")}
               </Button>
             ) : (
               showPlans && (
@@ -313,7 +317,7 @@ export default function Settings() {
                     document.getElementById("upgrade-plans")?.scrollIntoView({ behavior: "smooth" });
                   }}
                 >
-                  {accessState === "account_trial" ? "Upgrade now" : "Subscribe"}
+                  {appText(accessState === "account_trial" ? "Upgrade now" : "Subscribe")}
                 </Button>
               )
             )}
@@ -324,17 +328,22 @@ export default function Settings() {
       {/* Notifications */}
       <section className="mb-10">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-          Notifications
+          {appText("Notifications")}
         </h2>
         <div className="border rounded-xl p-5 space-y-3">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium">Email reminders</p>
+              <p className="text-sm font-medium">{appText("Email reminders")}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Warranty reminders (about 30 days before expiry) and return-window reminders (7 and 2 days before the deadline).
+                {appText("Warranty reminders (about 30 days before expiry) and return-window reminders (7 and 2 days before the deadline).")}
               </p>
             </div>
-            {notifQuery.isLoading || notifOptOut === null ? (
+            {notifQuery.isError ? (
+              <div role="alert" className="text-xs text-destructive">
+                {appText("Could not load notification preferences.")}{" "}
+                <button type="button" className="underline" onClick={() => void notifQuery.refetch()}>{appText("Try again")}</button>
+              </div>
+            ) : notifQuery.isLoading || notifOptOut === null ? (
               <Skeleton className="h-6 w-10 rounded-full" />
             ) : (
               <Switch
@@ -347,8 +356,8 @@ export default function Settings() {
                     onError: () => {
                       setNotifOptOut(notifOptOut);
                       toast({
-                        title: "Something went wrong",
-                        description: "Could not update notification preferences. Please try again.",
+                        title: appText("Something went wrong"),
+                        description: appText("Could not update notification preferences. Please try again."),
                         variant: "destructive",
                       });
                     },
@@ -370,18 +379,18 @@ export default function Settings() {
       {/* Plan comparison */}
       <section className="mb-10">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-          Plan features
+          {appText("Plan features")}
         </h2>
         <div className="border rounded-xl overflow-hidden">
           <div className="grid grid-cols-3 px-5 py-3 bg-secondary/50 text-xs font-semibold border-b">
-            <span className="text-muted-foreground">Feature</span>
-            <span className="text-center text-muted-foreground">Free trial</span>
+            <span className="text-muted-foreground">{appText("Feature")}</span>
+            <span className="text-center text-muted-foreground">{appText("Free trial")}</span>
             <span className="text-center">Pro</span>
           </div>
           {[
-            { feature: "Receipt uploads", free: `Up to ${TRIAL_UPLOAD_LIMIT}`, pro: "Unlimited", freeHighlight: false, proHighlight: false },
+            { feature: "Receipt uploads", free: appText("Up to {0}", [TRIAL_UPLOAD_LIMIT]), pro: "Unlimited", freeHighlight: false, proHighlight: false },
             { feature: "AI receipt extraction", free: true, pro: true, freeHighlight: false, proHighlight: false },
-                        { feature: "Access period", free: `${TRIAL_DAYS} days`, pro: "While subscribed", freeHighlight: false, proHighlight: false },
+            { feature: "Access period", free: appText("{0} days", [TRIAL_DAYS]), pro: "While subscribed", freeHighlight: false, proHighlight: false },
             { feature: "Natural-language search", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Warranty reminders", free: true, pro: true, freeHighlight: false, proHighlight: false },
             { feature: "Email auto-import", free: true, pro: true, freeHighlight: false, proHighlight: false },
@@ -404,13 +413,13 @@ export default function Settings() {
               }
               return (
                 <span className={`text-center text-xs ${isProCol ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
-                  {val}
+                  {appText(val)}
                 </span>
               );
             };
             return (
               <div key={feature} className="grid grid-cols-3 items-center px-5 py-3 text-sm border-b last:border-b-0">
-                <span className="font-medium">{feature}</span>
+                <span className="font-medium">{appText(feature)}</span>
                 {renderCell(free, false)}
                 {renderCell(pro, true)}
               </div>
@@ -422,12 +431,12 @@ export default function Settings() {
       {showPlans && (
         <section id="upgrade-plans" className="scroll-mt-20">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-            {accessState === "account_trial" ? "Upgrade now" : "Subscribe"}
+            {appText(accessState === "account_trial" ? "Upgrade now" : "Subscribe")}
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
             {accessState === "account_trial"
-              ? "Subscribing ends your free trial and starts your paid plan today."
-              : "Pick a plan to keep scanning and searching your receipts."}
+              ? appText("Subscribing ends your free trial and starts your paid plan today.")
+              : appText("Pick a plan to keep scanning and searching your receipts.")}
           </p>
           <PlanChoice founding={founding} />
           <FoundingNote founding={founding} className="mt-4 !text-left" />

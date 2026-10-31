@@ -1,3 +1,4 @@
+import { appText } from "@/lib/appCopy";
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/react";
@@ -203,8 +204,8 @@ export function useCreateCheckout() {
     onError: () => {
       toast({
         variant: "destructive",
-        title: "Couldn't start checkout",
-        description: "Something went wrong on our side. Nothing was charged. Please try again.",
+        title: appText("Couldn't start checkout"),
+        description: appText("Something went wrong on our side. Nothing was charged. Please try again."),
       });
     },
   });

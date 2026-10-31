@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, ScanLine, Search, X } from "lucide-react";
 import { useLocation } from "wouter";
@@ -16,6 +18,7 @@ export function OnboardingCard({
   dismiss,
   onFocusSearch,
 }: OnboardingCardProps) {
+  useAppLocale();
   const [, setLocation] = useLocation();
   const [celebrating, setCelebrating] = useState(false);
   const [gone, setGone] = useState(false);
@@ -68,7 +71,7 @@ export function OnboardingCard({
                   exit={{ opacity: 0 }}
                   className="text-sm font-semibold"
                 >
-                  🎉 You&apos;re all set!
+                  {appText("🎉 You're all set!")}
                 </motion.p>
               ) : (
                 <motion.p
@@ -78,13 +81,13 @@ export function OnboardingCard({
                   exit={{ opacity: 0 }}
                   className="text-sm font-semibold"
                 >
-                  Getting started
+                  {appText("Getting started")}
                 </motion.p>
               )}
             </AnimatePresence>
             <button
               onClick={dismiss}
-              aria-label="Dismiss onboarding"
+              aria-label={appText("Dismiss onboarding")}
               className="text-muted-foreground hover:text-foreground transition-colors -mr-1"
             >
               <X className="w-4 h-4" />
@@ -95,13 +98,13 @@ export function OnboardingCard({
           <div className="flex flex-col gap-2">
             <StepRow
               icon={<ScanLine className="w-4 h-4" />}
-              label="Scan your first receipt"
+              label={appText("Scan your first receipt")}
               done={step1Done}
               onClick={() => !step1Done && setLocation("/scan")}
             />
             <StepRow
               icon={<Search className="w-4 h-4" />}
-              label="Search for an item"
+              label={appText("Search for an item")}
               done={step2Done}
               onClick={() => !step2Done && onFocusSearch()}
             />

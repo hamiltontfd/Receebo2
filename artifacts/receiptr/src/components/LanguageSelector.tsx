@@ -26,9 +26,9 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
     </select>
     {!compact && <p id={`${id}-help`} className="text-xs text-muted-foreground">
       {lt(
-        "Language is independent of market, purchase country and currency. Translation is partial; other app screens remain in English.",
-        "O idioma é independente da região, do país da compra e da moeda. A tradução é parcial; as restantes páginas da aplicação continuam em inglês.",
-        "O idioma é independente da região, do país da compra e da moeda. A tradução é parcial; as outras telas do aplicativo continuam em inglês.",
+        "Language changes the web/PWA interface, not market, purchase country or currency. Original receipt data, legal documents, recordings and external sign-in content are not translated by this selector.",
+        "O idioma altera a interface web/PWA, não a região, o país da compra ou a moeda. Os dados originais dos recibos, documentos legais, gravações e conteúdos externos de início de sessão não são traduzidos por este seletor.",
+        "O idioma altera a interface web/PWA, não a região, o país da compra ou a moeda. Os dados originais dos recibos, documentos legais, gravações e conteúdos externos de login não são traduzidos por este seletor.",
       )}
     </p>}
     {saving && <p role="status">{lt("Saving…", "A guardar…", "Salvando…")}</p>}

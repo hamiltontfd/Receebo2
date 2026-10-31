@@ -1,4 +1,6 @@
 import { motion } from "framer-motion";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCreateCheckout, MONTHLY_PRICE, YEARLY_PRICE } from "@/hooks/useBilling";
@@ -26,6 +28,7 @@ const fadeUp = {
  * first charge happens immediately — there is no Stripe trial.
  */
 export function PlanChoice({ founding }: { founding: boolean }) {
+  useAppLocale();
   const checkout = useCreateCheckout();
   const plans = [
     { key: "monthly" as const, name: "Monthly", price: MONTHLY_PRICE, period: "/ month", highlight: false },
@@ -52,21 +55,21 @@ export function PlanChoice({ founding }: { founding: boolean }) {
         >
           <div>
             <p className="font-bold text-lg tracking-tight">
-              {founding ? `Founding ${p.name}` : `Pro ${p.name}`}
+              {appText(`${founding ? "Founding" : "Pro"} ${p.name}`)}
             </p>
             <div className="flex items-baseline gap-1 mt-2">
               <span className="text-4xl font-bold font-mono tracking-tight">{p.price}</span>
-              <span className={p.highlight ? "text-sm opacity-70" : "text-sm text-muted-foreground"}>{p.period}</span>
+              <span className={p.highlight ? "text-sm opacity-70" : "text-sm text-muted-foreground"}>{appText(p.period)}</span>
             </div>
             <p className={p.highlight ? "text-xs opacity-60 mt-1" : "text-xs text-muted-foreground mt-1"}>
-              Charged today, renews {p.key === "monthly" ? "monthly" : "yearly"} until cancelled
+              {appText("Charged today, renews")} {appText(p.key === "monthly" ? "monthly" : "yearly")} {appText("until cancelled")}
             </p>
           </div>
           <ul className="space-y-2 flex-1 text-xs font-mono">
             {PAID_FEATURES.map((f) => (
               <li key={f} className={p.highlight ? "flex items-center gap-2 opacity-80" : "flex items-center gap-2 text-muted-foreground"}>
                 <Check className={p.highlight ? "w-3.5 h-3.5 shrink-0" : "w-3.5 h-3.5 shrink-0 text-foreground"} />
-                {f}
+                {appText(f)}
               </li>
             ))}
           </ul>
@@ -82,7 +85,7 @@ export function PlanChoice({ founding }: { founding: boolean }) {
             onClick={() => checkout.mutate(p.key)}
             data-testid={`button-subscribe-${p.key}`}
           >
-            {pending === p.key ? <Loader2 className="w-4 h-4 animate-spin" /> : `Subscribe ${p.price}${p.period.replace(" ", "")}`}
+            {pending === p.key ? <Loader2 className="w-4 h-4 animate-spin" /> : `${appText("Subscribe")} ${p.price}${appText(p.period)}`}
           </Button>
         </motion.div>
       ))}
@@ -91,12 +94,13 @@ export function PlanChoice({ founding }: { founding: boolean }) {
 }
 
 export function FoundingNote({ founding, className = "" }: { founding: boolean; className?: string }) {
+  useAppLocale();
   return (
     <p className={`text-xs text-muted-foreground text-center leading-relaxed ${className}`} data-testid="text-founding-note">
       {founding
-        ? "Founding prices apply for as long as your account exists, including if you cancel and resubscribe later. "
+        ? appText("Founding prices apply for as long as your account exists, including if you cancel and resubscribe later. ")
         : ""}
-      You're charged when you subscribe. Cancel renewal anytime from the billing portal.
+      {appText("You're charged when you subscribe. Cancel renewal anytime from the billing portal.")}
     </p>
   );
 }

@@ -1,6 +1,8 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { act } from "@testing-library/react";
+import { setAccountLocale } from "@/lib/locale";
 
 const mocks = vi.hoisted(() => ({ navigate: vi.fn(), update: vi.fn(), toast: vi.fn() }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mocks.toast }) }));
@@ -13,7 +15,7 @@ vi.mock("@workspace/api-client-react", () => ({
     isLoading: false, isError: false,
     data: {
       id: 5, merchant: "Casa Lumen", purchaseDate: "2026-10-25", total: 349, currency: "EUR",
-      category: "Electronics", warranty: "2-year manufacturer", objectPath: "/objects/uploads/x",
+      category: "Electronics", purchaseCountry: "BR", purchaseType: "goods", warranty: "2-year manufacturer", objectPath: "/objects/uploads/x",
       originalFileName: "email.pdf", products: [{ name: "Soundbar", quantity: 1, price: 329 }],
     },
   }),
@@ -28,9 +30,29 @@ import { ReceiptReview } from "./ReceiptReview";
 function mount(doneHref = "/imports") {
   render(<QueryClientProvider client={new QueryClient()}><ReceiptReview receiptId={5} doneHref={doneHref} /></QueryClientProvider>);
 }
-afterEach(() => { mocks.navigate.mockReset(); mocks.update.mockReset(); });
+afterEach(() => { mocks.navigate.mockReset(); mocks.update.mockReset(); setAccountLocale(undefined); });
 
 describe("ReceiptReview (after accepting an email import)", () => {
+  it("updates language immediately while retaining edits and canonical purchase fields", async () => {
+    setAccountLocale("en");
+    mount();
+    fireEvent.change(await screen.findByLabelText("Merchant"), { target: { value: "Edited merchant" } });
+    act(() => setAccountLocale("pt-PT"));
+    expect(screen.getByText("Adicionado aos seus recibos")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Edited merchant")).toBeInTheDocument();
+    expect(screen.getByLabelText("País da compra")).toHaveValue("BR");
+    act(() => setAccountLocale("pt-BR"));
+    expect(screen.getByText("Adicionado aos seus recibos")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Edited merchant")).toBeInTheDocument();
+    expect(screen.getByLabelText("País da compra")).toHaveValue("BR");
+    fireEvent.click(screen.getByTestId("review-done"));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
+      id: 5, data: expect.objectContaining({
+        merchant: "Edited merchant", category: "Electronics", purchaseCountry: "BR",
+        purchaseDate: "2026-10-25", total: 349,
+      }),
+    })));
+  });
   it("shows the 'Added to your receipts' banner and the edit card", async () => {
     mount();
     expect(await screen.findByText("Added to your receipts")).toBeInTheDocument();

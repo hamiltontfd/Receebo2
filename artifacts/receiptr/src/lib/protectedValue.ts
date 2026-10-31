@@ -1,4 +1,6 @@
 import type { Receipt } from "@workspace/api-client-react";
+import { appText } from "./appCopy";
+import { getAppLocale, formatLocaleMoney } from "./locale";
 import { deriveConsumerRights } from "./consumerRights";
 import { hasNoConsumerDates } from "./purchaseType";
 import { receiptListDay } from "./receiptDate";
@@ -198,7 +200,7 @@ export function expiringChart(summary: ProtectedSummary, days: 30 | 60 | 90, now
     const start = new Date(today);
     start.setDate(start.getDate() + i * 7);
     const m = start.getMonth();
-    bars.push({ start, returnAmount: 0, warrantyAmount: 0, monthLabel: m !== prevMonth ? MONTHS[m] : null });
+    bars.push({ start, returnAmount: 0, warrantyAmount: 0, monthLabel: m !== prevMonth ? new Intl.DateTimeFormat(getAppLocale(), { month: "short" }).format(start) : null });
     prevMonth = m;
   }
   // A month that only covers the first bar would crowd the next label ("Oct Nov").
@@ -355,6 +357,10 @@ export const HOME_KEEP_LIMIT = 10;
 
 /** "30 Oct", with the year when it isn't this year ("3 Mar 2028"). US style: "Oct 30". */
 export function formatShortDate(d: Date, now: Date = new Date(), us = false): string {
+  const locale = getAppLocale();
+  if (locale !== "en") return new Intl.DateTimeFormat(locale, {
+    day: "numeric", month: "short", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" as const } : {}),
+  }).format(d);
   const day = d.getDate();
   const mon = MONTHS[d.getMonth()];
   const year = d.getFullYear() !== now.getFullYear() ? ` ${d.getFullYear()}` : "";
@@ -365,7 +371,7 @@ export function protectionCaption(e: Pick<ProtectedEntry, "bucket" | "deadline" 
   if (!e.deadline) return null;
   const us = e.currency === "USD";
   const date = formatShortDate(e.deadline, now, us);
-  return e.bucket === "return" ? `Return by ${date}` : `Warranty to ${date}`;
+  return appText(e.bucket === "return" ? "Return by {0}" : "Warranty to {0}", [date]);
 }
 
 /** Same urgency colours as the receipt sheet: red ≤3 days, amber ≤14 days. */
@@ -379,6 +385,7 @@ export function deadlineUrgency(daysLeft: number | null, bucket: Bucket): "red" 
 /** "€2,431.80" / "$349.00"; never converted. */
 export function formatAmount(amount: number, currency: string | null | undefined): string {
   const c = (currency ?? "EUR").toUpperCase();
+  if (getAppLocale() !== "en") return formatLocaleMoney(amount, getAppLocale(), c);
   const sym = c === "EUR" ? "\u20AC" : c === "USD" ? "$" : c === "GBP" ? "\u00A3" : c === "BRL" ? "R$" : `${c} `;
   return `${sym}${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

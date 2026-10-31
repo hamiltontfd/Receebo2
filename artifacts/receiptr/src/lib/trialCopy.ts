@@ -3,7 +3,9 @@
  * Keep in sync with api-server/src/lib/accountTrial.ts (TRIAL_LIMIT,
  * TRIAL_DURATION_DAYS, TRIAL_CAP_MESSAGE).
  *
- * Translations (not wired up yet; the app is English-only today):
+ * Canonical English messages also identify server errors; translate only when
+ * displaying them with appText, never before isTrialLimitMessage comparisons.
+ * Display translations:
  *   pt-PT: "Já usou os seus 5 recibos grátis. Subscreva para adicionar mais." / "Subscrever"
  *   pt-BR: "Você já usou suas 5 notas grátis. Assine para adicionar mais." / "Assinar"
  */

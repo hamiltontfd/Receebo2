@@ -1,3 +1,5 @@
+import { appText } from "./appCopy";
+import { getAppLocale, formatLocaleDate, formatLocaleMoney } from "./locale";
 import type { MailProviderId } from "@/lib/mailConnection";
 import { SYNC_IN_PROGRESS_CODE, SYNC_IN_PROGRESS_COPY } from "@/lib/mailImportCopy";
 import { TRIAL_CAP_MESSAGE } from "@/lib/trialCopy";
@@ -66,7 +68,7 @@ export function undecidedRecurring(item: Pick<PendingImportItem, "recurring"> | 
 
 /** "{Supplier} looks like a subscription" / "… a recurring bill". */
 export function recurringTitle(r: Pick<PendingRecurring, "displayName" | "kind">): string {
-  return `${r.displayName} looks like ${r.kind === "utility" ? "a recurring bill" : "a subscription"}`;
+  return appText(r.kind === "utility" ? "{0} looks like a recurring bill" : "{0} looks like a subscription", [r.displayName]);
 }
 
 export interface PendingTotal {
@@ -220,6 +222,7 @@ export async function bulkDismissPending(ids: number[]): Promise<BulkDismissResu
 
 export function formatMoney(amount: number | null | undefined, currency: string | null | undefined): string {
   if (amount === null || amount === undefined) return "";
+  if (getAppLocale() !== "en") return formatLocaleMoney(amount, getAppLocale(), currency ?? "USD");
   return `${currencySymbol(currency)}${amount.toFixed(2)}`;
 }
 
@@ -227,7 +230,7 @@ export function formatMoney(amount: number | null | undefined, currency: string 
 export function itemsSummary(item: Pick<PendingImportItem, "firstItemName" | "productCount" | "summary">): string | null {
   if (item.firstItemName) {
     const more = (item.productCount ?? 1) - 1;
-    return more > 0 ? `${item.firstItemName} + ${more} more` : item.firstItemName;
+    return more > 0 ? appText("{0} + {1} more", [item.firstItemName, more]) : item.firstItemName;
   }
   return item.summary;
 }
@@ -237,14 +240,14 @@ export function formatPurchaseDate(iso: string | null | undefined): string | nul
   if (!iso) return null;
   const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T00:00:00`) : new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return formatLocaleDate(d, getAppLocale());
 }
 
 /** "1 item" / "3 items": the number of receipt lines, never summed quantities or weights. */
 export function itemCountLabel(item: Pick<PendingImportItem, "productCount" | "itemCount">): string | null {
   const n = item.productCount ?? item.itemCount;
   if (typeof n !== "number" || !Number.isInteger(n) || n < 1) return null;
-  return `${n} item${n === 1 ? "" : "s"}`;
+  return appText("{0} item(s)", [n]);
 }
 
 export interface PendingMonthGroup {
@@ -265,8 +268,8 @@ export function groupByMonth(items: PendingImportItem[]): PendingMonthGroup[] {
     let group = groups.get(key);
     if (!group) {
       const label = key === "unknown"
-        ? "No date"
-        : new Date(`${key}-01T00:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        ? appText("No date")
+        : new Date(`${key}-01T00:00:00`).toLocaleDateString(getAppLocale(), { month: "long", year: "numeric" });
       group = { key, label, items: [], totals: [] };
       groups.set(key, group);
     }

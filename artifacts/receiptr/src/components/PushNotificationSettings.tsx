@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { appText, appError } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { Bell, BellOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +13,7 @@ import {
 type Status = "loading" | "unsupported" | "blocked" | "disabled" | "enabled";
 
 export function PushNotificationSettings() {
+  useAppLocale();
   const [status, setStatus] = useState<Status>("loading");
   const [message, setMessage] = useState("");
   const [isPending, setIsPending] = useState(false);
@@ -48,14 +51,14 @@ export function PushNotificationSettings() {
       await enablePushNotifications();
       setStatus("enabled");
       toast({
-        title: "Push notifications enabled",
-        description: "We'll alert this device before a return window closes.",
+        title: appText("Push notifications enabled"),
+        description: appText("We'll alert this device before a return window closes."),
       });
     } catch (error) {
       const description =
         error instanceof Error ? error.message : "Could not enable notifications.";
-      if (Notification.permission === "denied") setStatus("blocked");
-      toast({ title: "Notifications not enabled", description, variant: "destructive" });
+      if (typeof Notification !== "undefined" && Notification.permission === "denied") setStatus("blocked");
+      toast({ title: appText("Notifications not enabled"), description: appError(description, "Could not enable notifications."), variant: "destructive" });
     } finally {
       setIsPending(false);
     }
@@ -66,11 +69,11 @@ export function PushNotificationSettings() {
     try {
       await disablePushNotifications();
       setStatus("disabled");
-      toast({ title: "Push notifications disabled" });
+      toast({ title: appText("Push notifications disabled") });
     } catch (error) {
       toast({
-        title: "Something went wrong",
-        description: error instanceof Error ? error.message : "Could not disable notifications.",
+        title: appText("Something went wrong"),
+        description: appError(error instanceof Error ? error.message : null, "Could not disable notifications."),
         variant: "destructive",
       });
     } finally {
@@ -89,11 +92,11 @@ export function PushNotificationSettings() {
           )}
         </div>
         <div>
-          <p className="text-sm font-medium">Push notifications</p>
+          <p className="text-sm font-medium">{appText("Push notifications")}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {status === "enabled"
+            {appText(status === "enabled"
               ? "This device will receive return-window reminders."
-              : message || "Get reminders on this device, even when Receebo is closed."}
+              : message || "Get reminders on this device, even when Receebo is closed.")}
           </p>
         </div>
       </div>
@@ -108,7 +111,7 @@ export function PushNotificationSettings() {
           disabled={isPending}
           onClick={() => void disable()}
         >
-          {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Disable"}
+          {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : appText("Disable")}
         </Button>
       ) : status === "disabled" ? (
         <Button
@@ -117,7 +120,7 @@ export function PushNotificationSettings() {
           disabled={isPending}
           onClick={() => void enable()}
         >
-          {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Enable"}
+          {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : appText("Enable")}
         </Button>
       ) : null}
     </div>

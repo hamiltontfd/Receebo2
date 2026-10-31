@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, Mail, ScanLine } from "lucide-react";
@@ -43,6 +45,7 @@ export function useAllReceipts() {
 const sectionLabel = "text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground";
 
 export default function StatsPage() {
+  const locale = useAppLocale();
   const { data: receipts, isLoading, isError } = useAllReceipts();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [days, setDays] = useState<30 | 60 | 90>(90);
@@ -51,8 +54,8 @@ export default function StatsPage() {
 
   const now = useMemo(() => new Date(), [receipts]); // eslint-disable-line react-hooks/exhaustive-deps
   const summary = useMemo(() => summarizeProtected(receipts ?? [], now), [receipts, now]);
-  const chart = useMemo(() => expiringChart(summary, days, now), [summary, days, now]);
-  const keep = useMemo(() => worthKeeping(receipts ?? [], summary, now), [receipts, summary, now]);
+  const chart = useMemo(() => expiringChart(summary, days, now), [summary, days, now, locale]);
+  const keep = useMemo(() => worthKeeping(receipts ?? [], summary, now), [receipts, summary, now, locale]);
 
   return (
     <>
@@ -66,12 +69,12 @@ export default function StatsPage() {
             <Skeleton className="h-56 rounded-2xl" />
           </div>
         ) : isError ? (
-          <p className="text-sm text-muted-foreground py-16 text-center">Couldn't load your purchases. Check your connection and try again.</p>
+          <p className="text-sm text-muted-foreground py-16 text-center">{appText("Couldn't load your purchases. Check your connection and try again.")}</p>
         ) : summary.receiptCount === 0 ? (
           <EmptyCard />
         ) : summary.entries.length === 0 && summary.expiredCount === 0 ? (
           <div className="rounded-2xl border p-6 text-center text-sm text-muted-foreground" data-testid="stats-no-dated">
-            No purchases with a return window or warranty yet.
+            {appText("No purchases with a return window or warranty yet.")}
             <Footnote />
           </div>
         ) : (
@@ -125,7 +128,7 @@ function Dashboard({
           <section data-testid="stats-expiring">
             <div className="flex items-center justify-between mb-1">
               <h2 className={sectionLabel}>
-                {filter === "unknown" ? "Return deadline unknown" : filter === "warranty" ? "Warranty" : filter === "return" ? "Return window" : "Expiring soon"}
+                {appText(filter === "unknown" ? "Return deadline unknown" : filter === "warranty" ? "Warranty" : filter === "return" ? "Return window" : "Expiring soon")}
               </h2>
               {(canViewAll || filter) && (
                 <button
@@ -134,7 +137,7 @@ function Dashboard({
                   className="text-xs text-muted-foreground inline-flex items-center gap-0.5 hover:text-foreground"
                   data-testid="stats-view-all"
                 >
-                  {filter && !canViewAll ? "Show all" : showAll ? "Show less" : "View all"}
+                  {appText(filter && !canViewAll ? "Show all" : showAll ? "Show less" : "View all")}
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               )}
@@ -156,7 +159,7 @@ function Dashboard({
 function Hero({ summary, nothing }: { summary: ProtectedSummary; nothing: boolean }) {
   return (
     <div data-testid="stats-hero">
-      <p className={sectionLabel}>Protected value</p>
+      <p className={sectionLabel}>{appText("Protected value")}</p>
       <p
         className={`font-mono font-bold text-[34px] leading-[42px] tracking-[-0.02em] mt-1 ${nothing ? "text-muted-foreground/60" : ""}`}
         data-testid="stats-total"
@@ -168,7 +171,7 @@ function Hero({ summary, nothing }: { summary: ProtectedSummary; nothing: boolea
           {summary.otherTotals.map((t) => `+ ${formatAmount(t.amount, t.currency)}`).join("  ")}
         </p>
       )}
-      {nothing && <p className="text-sm text-muted-foreground mt-2">Nothing protected right now.</p>}
+      {nothing && <p className="text-sm text-muted-foreground mt-2">{appText("Nothing protected right now.")}</p>}
     </div>
   );
 }
@@ -197,8 +200,8 @@ function Groups({ summary, filter, onFilter }: { summary: ProtectedSummary; filt
             <span className="shrink-0 flex">{dot}</span>
             {/* Label and count may wrap (count drops below the label on narrow phones); the amount never breaks. */}
             <span className="min-w-0 flex-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-              <span className={`text-sm ${muted ? "text-muted-foreground" : ""}`}>{label}</span>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">{g.count}{muted ? " · not counted" : ""}</span>
+              <span className={`text-sm ${muted ? "text-muted-foreground" : ""}`}>{appText(label)}</span>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">{g.count}{muted ? appText(" · not counted") : ""}</span>
             </span>
             <span className={`ml-auto shrink-0 whitespace-nowrap font-mono text-sm font-semibold ${muted ? "text-muted-foreground" : ""}`}>
               {formatAmount(g.amount, summary.primaryCurrency)}
@@ -217,10 +220,10 @@ function Chart({ chart, days, onDays, currency }: { chart: ExpiringChart; days: 
     <div className="rounded-2xl border p-4" data-testid="stats-chart">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium">Expiring in {days} days</p>
+          <p className="text-sm font-medium">{appText("Expiring in {0} days", [days])}</p>
           <p className="font-mono font-bold text-lg mt-0.5" data-testid="stats-chart-total">{formatAmount(chart.total, currency)}</p>
         </div>
-        <div className="flex rounded-full bg-secondary p-0.5 text-xs" role="group" aria-label="Chart range">
+        <div className="flex rounded-full bg-secondary p-0.5 text-xs" role="group" aria-label={appText("Chart range")}>
           {([30, 60, 90] as const).map((d) => (
             <button
               key={d}
@@ -259,8 +262,8 @@ function Chart({ chart, days, onDays, currency }: { chart: ExpiringChart; days: 
         ))}
       </div>
       <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#121212]" />Return <span className="font-mono font-semibold text-foreground">{formatAmount(chart.returnTotal, currency)}</span></span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: VIOLET }} />Warranty <span className="font-mono font-semibold text-foreground">{formatAmount(chart.warrantyTotal, currency)}</span></span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#121212]" />{appText("Return")} <span className="font-mono font-semibold text-foreground">{formatAmount(chart.returnTotal, currency)}</span></span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: VIOLET }} />{appText("Warranty")} <span className="font-mono font-semibold text-foreground">{formatAmount(chart.warrantyTotal, currency)}</span></span>
       </div>
     </div>
   );
@@ -269,7 +272,7 @@ function Chart({ chart, days, onDays, currency }: { chart: ExpiringChart; days: 
 function SoonRow({ e, onOpen, now }: { e: ProtectedEntry; onOpen: (id: number) => void; now: Date }) {
   const Icon = categoryIcon(e.category);
   const urgency = deadlineUrgency(e.daysLeft, e.bucket);
-  const caption = protectionCaption(e, now) ?? "No deadline";
+  const caption = protectionCaption(e, now) ?? appText("No deadline");
   const color = urgency === "red" ? "text-red-600" : urgency === "amber" ? "text-amber-600" : "text-muted-foreground";
   return (
     <li>
@@ -293,7 +296,7 @@ function SoonRow({ e, onOpen, now }: { e: ProtectedEntry; onOpen: (id: number) =
 function Footnote({ align = "center" }: { align?: "center" | "left" }) {
   return (
     <p className={`text-xs text-muted-foreground mt-2 ${align === "center" ? "text-center" : ""}`} data-testid="stats-exclusion-note">
-      Subscriptions, services and tickets aren't counted.
+      {appText("Subscriptions, services and tickets aren't counted.")}
     </p>
   );
 }
@@ -305,16 +308,16 @@ function EmptyCard() {
         <ScanLine className="w-6 h-6 text-muted-foreground" />
       </span>
       <div className="space-y-1">
-        <p className="font-semibold">Nothing protected yet</p>
-        <p className="text-sm text-muted-foreground">Add a receipt to see its return window and warranty here.</p>
+        <p className="font-semibold">{appText("Nothing protected yet")}</p>
+        <p className="text-sm text-muted-foreground">{appText("Add a receipt to see its return window and warranty here.")}</p>
       </div>
       <div className="flex flex-col gap-2 w-full max-w-xs">
         <Link href="/scan" className="inline-flex h-11 items-center justify-center rounded-full bg-foreground px-6 text-sm font-semibold text-background">
-          Scan a receipt
+          {appText("Scan a receipt")}
         </Link>
         <Link href="/imports" className="inline-flex h-11 items-center justify-center gap-2 rounded-full border px-6 text-sm font-semibold">
           <Mail className="w-4 h-4" />
-          Import from Outlook
+          {appText("Import from Outlook")}
         </Link>
       </div>
     </div>

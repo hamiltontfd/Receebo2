@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { motion } from "framer-motion";
 import { AlertTriangle, Loader2, RotateCw } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -66,7 +68,7 @@ function FullScreenSkeleton({ label }: { label?: string }) {
         <div className="h-6 w-2/3 mx-auto rounded-lg bg-muted animate-pulse" />
         <div className="h-4 w-1/2 mx-auto rounded-lg bg-muted animate-pulse" />
       </div>
-      {label && <p className="text-sm text-muted-foreground">{label}</p>}
+      {label && <p className="text-sm text-muted-foreground">{appText(label)}</p>}
     </div>
   );
 }
@@ -80,11 +82,11 @@ function GateHeader() {
         className="text-sm text-muted-foreground hover:text-foreground transition-colors"
         data-testid="button-gate-signout"
       >
-        Sign out
+        {appText("Sign out")}
       </button>
       <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Receebo" className="h-7 w-auto" />
       <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground transition-colors w-16 text-right" data-testid="link-gate-settings">
-        Settings
+        {appText("Settings")}
       </Link>
     </header>
   );
@@ -98,11 +100,11 @@ function ErrorScreen({ title, body, onRetry, retrying }: { title: string; body: 
         <span className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center">
           <AlertTriangle className="w-5 h-5 text-muted-foreground" />
         </span>
-        <h1 className="text-xl font-extrabold tracking-tight">{title}</h1>
-        <p className="text-sm text-muted-foreground max-w-sm">{body}</p>
+        <h1 className="text-xl font-extrabold tracking-tight">{appText(title)}</h1>
+        <p className="text-sm text-muted-foreground max-w-sm">{appText(body)}</p>
         <Button className="rounded-full gap-2" onClick={onRetry} disabled={retrying} data-testid="button-billing-retry">
           {retrying ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
-          Try again
+          {appText("Try again")}
         </Button>
       </main>
     </div>
@@ -113,12 +115,12 @@ const PAYWALL_COPY: Partial<Record<AccessState, { eyebrow: string; title: string
   trial_exhausted: {
     // Not normally shown: at the cap the app stays viewable until day 15.
     eyebrow: "Trial complete",
-    title: `You've used your ${TRIAL_UPLOAD_LIMIT} free receipts.`,
+    title: "You've used your {0} free receipts.",
     body: "Your receipts are kept safe. Subscribe to keep scanning and searching them.",
   },
   trial_expired: {
     eyebrow: "Trial ended",
-    title: `Your ${TRIAL_DAYS}-day free trial has ended.`,
+    title: "Your {0}-day free trial has ended.",
     body: "Your receipts are kept safe. Subscribe to keep scanning and searching them.",
   },
   subscription_required: {
@@ -134,6 +136,7 @@ const PAYWALL_COPY: Partial<Record<AccessState, { eyebrow: string; title: string
  * shows an explicit paid plan choice otherwise. Fails closed on errors.
  */
 export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
+  useAppLocale();
   const billingQuery = useBillingStatus();
   const { data: billing, isLoading, isError, refetch, isFetching } = billingQuery;
   const startTrial = useStartTrial();
@@ -200,7 +203,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
         />
       );
     }
-    return <FullScreenSkeleton label={`Setting up your ${TRIAL_DAYS}-day free trial`} />;
+    return <FullScreenSkeleton label={appText("Setting up your {0}-day free trial", [TRIAL_DAYS])} />;
   }
 
   if (hasAppAccess(billing)) return <>{children}</>;
@@ -209,7 +212,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-background text-foreground" data-testid="status-activating">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Activating your subscription</p>
+        <p className="text-sm text-muted-foreground">{appText("Activating your subscription")}</p>
       </div>
     );
   }
@@ -231,7 +234,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
             transition={{ duration: 0.35 }}
             className="mb-6 max-w-md w-full rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground text-center"
           >
-            Your payment is taking longer than expected to confirm. Try refreshing in a moment before paying again.
+            {appText("Your payment is taking longer than expected to confirm. Try refreshing in a moment before paying again.")}
           </motion.div>
         )}
 
@@ -241,14 +244,14 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           className="text-center mb-10 max-w-md"
         >
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">{copy.eyebrow}</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">{appText(copy.eyebrow)}</p>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight" data-testid="text-paywall-title">
-            {copy.title}
+            {appText(copy.title, [state === "trial_exhausted" ? TRIAL_UPLOAD_LIMIT : TRIAL_DAYS])}
           </h1>
-          <p className="mt-3 text-muted-foreground text-sm leading-relaxed">{copy.body}</p>
+          <p className="mt-3 text-muted-foreground text-sm leading-relaxed">{appText(copy.body)}</p>
           {frozenRetentionNotice(billing) && (
             <p className="mt-3 text-muted-foreground text-xs leading-relaxed" data-testid="text-paywall-retention">
-              {frozenRetentionNotice(billing)} {FROZEN_COPY_NOTE}
+              {frozenRetentionNotice(billing)} {appText(FROZEN_COPY_NOTE)}
             </p>
           )}
           {reviewId != null && (
@@ -257,7 +260,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
               className="inline-block mt-4 text-sm font-semibold underline underline-offset-4"
               data-testid="link-review-last-receipt"
             >
-              Review your last uploaded receipt
+              {appText("Review your last uploaded receipt")}
             </Link>
           )}
         </motion.div>

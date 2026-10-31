@@ -1,3 +1,5 @@
+import { appText, appError } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { useState } from "react";
 import { usePwaUpdateBlocker } from "@/lib/pwa";
 import { useClerk } from "@clerk/react";
@@ -30,14 +32,25 @@ const API_BASE = `${BASE_PATH}/api`;
 
 async function responseError(response: Response, fallback: string) {
   try {
-    const body = (await response.json()) as { error?: string };
-    return body.error || fallback;
+    const body = (await response.json()) as { error?: string; code?: string };
+    const deletionErrors: Record<string, string> = {
+      deletion_code_no_email: "We couldn't find an email address for this account. Email contact@receebo.net to delete it.",
+      deletion_code_rate_limited: "Please wait before requesting another code.",
+      deletion_code_send_failed: "We couldn't send the code. Try again in a minute.",
+      deletion_code_required: "Enter the 6-digit code we emailed you.",
+      deletion_code_missing: "Request a new code to confirm deletion.",
+      deletion_code_expired: "That code has expired. Request a new one.",
+      deletion_code_too_many_attempts: "Too many wrong codes. Request a new one.",
+      deletion_code_invalid: "That code isn't right. Check the email and try again.",
+    };
+    return (body.code && deletionErrors[body.code]) || body.error || fallback;
   } catch {
     return fallback;
   }
 }
 
 export function PrivacyAndDataSettings() {
+  useAppLocale();
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -110,18 +123,15 @@ export function PrivacyAndDataSettings() {
       anchor.remove();
       URL.revokeObjectURL(url);
       toast({
-        title: "Data export downloaded",
+        title: appText("Data export downloaded"),
         description:
-          "Your JSON export contains your account, receipt, email connection, preference, and subscription records.",
+          appText("Your JSON export contains your account, receipt, email connection, preference, and subscription records."),
       });
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Export failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Could not prepare your data export.",
+        title: appText("Export failed"),
+        description: appError(error instanceof Error ? error.message : null, "Could not prepare your data export."),
       });
     } finally {
       setExporting(false);
@@ -159,11 +169,8 @@ export function PrivacyAndDataSettings() {
       setCodeError(error instanceof Error ? error.message : "Could not delete your account.");
       toast({
         variant: "destructive",
-        title: "Account was not deleted",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Could not delete your account.",
+        title: appText("Account was not deleted"),
+        description: appError(error instanceof Error ? error.message : null, "Could not delete your account."),
       });
     }
   };
@@ -171,7 +178,7 @@ export function PrivacyAndDataSettings() {
   return (
     <section className="mb-10">
       <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-        Privacy and data
+        {appText("Privacy and data")}
       </h2>
       <div className="overflow-hidden rounded-xl border divide-y">
         <div className="p-5">
@@ -180,21 +187,20 @@ export function PrivacyAndDataSettings() {
               <ShieldCheck className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-sm font-medium">Legal documents</p>
+              <p className="text-sm font-medium">{appText("Legal documents")}</p>
               <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-                Review how Receebo handles your data and the terms that apply to
-                the service.
+                {appText("Review how Receebo handles your data and the terms that apply to the service.")}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link href="/privacy">
                   <Button variant="outline" size="sm" className="h-8 rounded-full text-xs">
-                    Privacy Policy
+                    {appText("Privacy Policy")}
                     <ExternalLink className="ml-1.5 h-3 w-3" />
                   </Button>
                 </Link>
                 <Link href="/terms">
                   <Button variant="outline" size="sm" className="h-8 rounded-full text-xs">
-                    Terms of Service
+                    {appText("Terms of Service")}
                     <ExternalLink className="ml-1.5 h-3 w-3" />
                   </Button>
                 </Link>
@@ -205,11 +211,11 @@ export function PrivacyAndDataSettings() {
 
         <div className="flex items-center justify-between gap-4 p-5">
           <div>
-            <p className="text-sm font-medium">Download your data</p>
+            <p className="text-sm font-medium">{appText("Download your data")}</p>
             <p className="mt-0.5 text-xs leading-5 text-muted-foreground" data-testid="text-export-description">
               {frozen
-                ? FROZEN_EXPORT_NOTE
-                : "Export your account and structured receipt data as a JSON file. Receipt images and attachments remain downloadable from each receipt."}
+                ? appText(FROZEN_EXPORT_NOTE)
+                : appText("Export your account and structured receipt data as a JSON file. Receipt images and attachments remain downloadable from each receipt.")}
             </p>
           </div>
           {!frozen && <Button
@@ -225,17 +231,16 @@ export function PrivacyAndDataSettings() {
               <Download className="h-4 w-4" />
             )}
             <span className="ml-2 hidden sm:inline">
-              {exporting ? "Preparing…" : "Download"}
+              {appText(exporting ? "Preparing…" : "Download")}
             </span>
           </Button>}
         </div>
 
         <div className="flex items-center justify-between gap-4 p-5">
           <div>
-            <p className="text-sm font-medium text-destructive">Delete account</p>
+            <p className="text-sm font-medium text-destructive">{appText("Delete account")}</p>
             <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-              Permanently remove your Receebo account, receipts, attachments,
-              email connections, and notification subscriptions.
+              {appText("Permanently remove your Receebo account, receipts, attachments, email connections, and notification subscriptions.")}
             </p>
           </div>
           <AlertDialog
@@ -254,28 +259,25 @@ export function PrivacyAndDataSettings() {
                 className="shrink-0 rounded-full border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
-                <span className="ml-2 hidden sm:inline">Delete</span>
+                <span className="ml-2 hidden sm:inline">{appText("Delete")}</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete your Receebo account?</AlertDialogTitle>
+                <AlertDialogTitle>{appText("Delete your Receebo account?")}</AlertDialogTitle>
                 <AlertDialogDescription className="space-y-2">
                   <span className="block">
-                    This permanently deletes your receipts, extracted data,
-                    uploaded files, email connections, and preferences. Any known
-                    active Stripe subscription is cancelled first.
+                    {appText("This permanently deletes your receipts, extracted data, uploaded files, email connections, and preferences. Any known active Stripe subscription is cancelled first.")}
                   </span>
                   <span className="block">
-                    Stripe may retain invoice and payment records where required
-                    by law. This action does not automatically issue a refund.
+                    {appText("Stripe may retain invoice and payment records where required by law. This action does not automatically issue a refund.")}
                   </span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               {codeSentTo === null ? (
                 <>
                   <label className="text-sm font-medium" htmlFor="delete-confirmation">
-                    Type DELETE to confirm
+                    {appText("Type DELETE to confirm")}
                   </label>
                   <input
                     id="delete-confirmation"
@@ -285,7 +287,7 @@ export function PrivacyAndDataSettings() {
                     className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                   />
                   <p className="text-xs leading-5 text-muted-foreground">
-                    We'll email you a 6-digit code to confirm it's you.
+                    {appText("We'll email you a 6-digit code to confirm it's you.")}
                   </p>
                 </>
               ) : (
@@ -294,7 +296,7 @@ export function PrivacyAndDataSettings() {
                     {deletionCodeSentMessage(codeSentTo)}
                   </p>
                   <label className="text-sm font-medium" htmlFor="delete-code">
-                    Enter the code
+                    {appText("Enter the code")}
                   </label>
                   <input
                     id="delete-code"
@@ -311,17 +313,17 @@ export function PrivacyAndDataSettings() {
                     disabled={sendingCode || deleting}
                     onClick={() => void requestDeletionCode()}
                   >
-                    {sendingCode ? "Sending…" : "Send a new code"}
+                    {appText(sendingCode ? "Sending…" : "Send a new code")}
                   </button>
                 </>
               )}
               {codeError && (
                 <p className="text-sm text-destructive" role="alert" data-testid="text-deletion-error">
-                  {codeError}
+                  {appError(codeError, codeSentTo === null ? "Could not send the code." : "Could not delete your account.")}
                 </p>
               )}
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={deleting}>Keep account</AlertDialogCancel>
+                <AlertDialogCancel disabled={deleting}>{appText("Keep account")}</AlertDialogCancel>
                 {codeSentTo === null ? (
                   <AlertDialogAction
                     disabled={confirmation !== "DELETE" || sendingCode}
@@ -332,7 +334,7 @@ export function PrivacyAndDataSettings() {
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     {sendingCode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {sendingCode ? "Sending…" : "Email me a code"}
+                    {appText(sendingCode ? "Sending…" : "Email me a code")}
                   </AlertDialogAction>
                 ) : (
                   <AlertDialogAction
@@ -344,7 +346,7 @@ export function PrivacyAndDataSettings() {
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {deleting ? "Deleting…" : "Permanently delete"}
+                    {appText(deleting ? "Deleting…" : "Permanently delete")}
                   </AlertDialogAction>
                 )}
               </AlertDialogFooter>
@@ -353,7 +355,7 @@ export function PrivacyAndDataSettings() {
         </div>
       </div>
       <p className="mt-3 text-xs leading-5 text-muted-foreground">
-        For another privacy request, email{" "}
+        {appText("For another privacy request, email")}{" "}
         <a
           className="font-medium text-foreground underline underline-offset-4"
           href="mailto:contact@receebo.net"

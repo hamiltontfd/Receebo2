@@ -1,3 +1,5 @@
+import { appText, categoryText } from "@/lib/appCopy";
+import { useAppLocale, formatLocaleDate } from "@/lib/locale";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRoute, Link, useLocation, useSearch } from "wouter";
@@ -78,6 +80,7 @@ export default function ReceiptDetail() {
 }
 
 function ReceiptDetailView({ receiptId }: { receiptId: number }) {
+  const locale = useAppLocale();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -150,22 +153,22 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetReceiptStatsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetRecentReceiptsQueryKey() });
-      toast({ title: "Receipt updated", description: "Your changes have been saved." });
+      toast({ title: appText("Receipt updated"), description: appText("Your changes have been saved.") });
     } catch {
-      toast({ title: "Error", description: "Failed to update receipt.", variant: "destructive" });
+      toast({ title: appText("Error"), description: appText("Failed to update receipt."), variant: "destructive" });
     }
   };
 
   const handleDelete = async () => {
     try {
       await deleteReceipt.mutateAsync({ id: receiptId });
-      toast({ title: "Receipt deleted", description: "Removed from your library." });
+      toast({ title: appText("Receipt deleted"), description: appText("Removed from your library.") });
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetReceiptStatsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetRecentReceiptsQueryKey() });
       setLocation("/search");
     } catch {
-      toast({ title: "Error", description: "Failed to delete receipt.", variant: "destructive" });
+      toast({ title: appText("Error"), description: appText("Failed to delete receipt."), variant: "destructive" });
     }
   };
 
@@ -175,14 +178,14 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
           receipt.total != null
             ? `${currencySymbol(receipt.currency)}${receipt.total.toFixed(2)}`
             : ""
-        } (${receipt.purchaseDate ? format(new Date(receipt.purchaseDate), "MMM d, yyyy") : ""})`
+        } (${receipt.purchaseDate ? formatLocaleDate(new Date(receipt.purchaseDate), locale) : ""})`
       : "";
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Receipt", text: summary });
+        await navigator.share({ title: appText("Receipt"), text: summary });
       } else {
         await navigator.clipboard.writeText(summary);
-        toast({ title: "Copied", description: "Purchase details copied to clipboard." });
+        toast({ title: appText("Copied"), description: appText("Purchase details copied to clipboard.") });
       }
     } catch {
     }
@@ -218,9 +221,9 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
           contentType: file.type || "application/octet-stream",
         },
       });
-      toast({ title: "File attached", description: `${file.name} added to this receipt.` });
+      toast({ title: appText("File attached"), description: appText("{0} added to this receipt.", [file.name]) });
     } catch {
-      toast({ title: "Upload failed", description: "Could not attach the file.", variant: "destructive" });
+      toast({ title: appText("Upload failed"), description: appText("Could not attach the file."), variant: "destructive" });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -231,9 +234,9 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
     setDeletingAttachmentId(attachmentId);
     try {
       await deleteAttachmentMutation.mutateAsync({ receiptId, attachmentId });
-      toast({ title: "File removed", description: "Attachment deleted." });
+      toast({ title: appText("File removed"), description: appText("Attachment deleted.") });
     } catch {
-      toast({ title: "Error", description: "Could not remove attachment.", variant: "destructive" });
+      toast({ title: appText("Error"), description: appText("Could not remove attachment."), variant: "destructive" });
     } finally {
       setDeletingAttachmentId(null);
     }
@@ -260,12 +263,12 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
         <div className="w-16 h-16 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-4">
           <AlertTriangle className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-bold mb-2">Receipt not found</h2>
+        <h2 className="text-2xl font-bold mb-2">{appText("Receipt not found")}</h2>
         <p className="text-muted-foreground mb-6">
-          The receipt you're looking for doesn't exist or you don't have access to it.
+          {appText("The receipt you're looking for doesn't exist or you don't have access to it.")}
         </p>
         <Button className="rounded-full" onClick={() => setLocation("/search")}>
-          Return to Library
+          {appText("Return to Library")}
         </Button>
       </div>
     );
@@ -288,7 +291,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
         <div>
           <Link href="/search" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {appText("Back")}
           </Link>
         </div>
 
@@ -300,7 +303,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
               return (
                 <div className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-2 py-1 mb-3">
                   <HeroIcon className="w-3.5 h-3.5" />
-                  <span className="text-xs font-semibold">{receipt.category || "Other"}</span>
+                  <span className="text-xs font-semibold">{categoryText(receipt.category || "Other")}</span>
                 </div>
               );
             })()}
@@ -310,12 +313,12 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
             <p className="text-sm opacity-70 mt-1">
               {receipt.merchant ? `${receipt.merchant} · ` : ""}
               {receipt.purchaseDate
-                ? format(new Date(receipt.purchaseDate), "MMM d, yyyy")
-                : format(new Date(receipt.createdAt), "MMM d, yyyy")}
+                ? formatLocaleDate(new Date(receipt.purchaseDate), locale)
+                : formatLocaleDate(new Date(receipt.createdAt), locale)}
             </p>
             {receipt.transactionNumber && (
               <p className="text-xs opacity-60 mt-1 font-mono">
-                Txn #{receipt.transactionNumber}
+                {appText("Txn #")}{receipt.transactionNumber}
               </p>
             )}
           </div>
@@ -325,7 +328,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
           {isProcessing && (
             <p className="text-sm opacity-80 flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              AI is extracting details...
+              {appText("AI is extracting details...")}
             </p>
           )}
         </div>
@@ -339,9 +342,9 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                   name="merchant"
                   render={({ field }) => (
                     <FormItem className="p-4 space-y-1">
-                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Merchant</FormLabel>
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Merchant")}</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="e.g. Apple Store" className="border-0 px-0 h-auto py-0 font-semibold focus-visible:ring-0 shadow-none" />
+                        <Input {...field} placeholder={appText("e.g. Apple Store")} className="border-0 px-0 h-auto py-0 font-semibold focus-visible:ring-0 shadow-none" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -353,7 +356,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                     name="purchaseDate"
                     render={({ field }) => (
                       <FormItem className="p-4 space-y-1">
-                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</FormLabel>
+                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Date")}</FormLabel>
                         <FormControl>
                           <Input type="date" {...field} className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
                         </FormControl>
@@ -366,17 +369,17 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                     name="category"
                     render={({ field }) => (
                       <FormItem className="p-4 space-y-1">
-                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</FormLabel>
+                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Category")}</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || undefined}>
                           <FormControl>
                             <SelectTrigger className="border-0 px-0 h-auto py-0 font-medium shadow-none focus:ring-0 [&>svg]:ml-1">
-                              <SelectValue placeholder="Select category" />
+                              <SelectValue placeholder={appText("Select category")} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {CATEGORIES.map((cat) => (
                               <SelectItem key={cat} value={cat}>
-                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{cat}</span>
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{categoryText(cat)}</span>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -392,7 +395,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                     name="total"
                     render={({ field }) => (
                       <FormItem className="p-4 space-y-1">
-                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</FormLabel>
+                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Total")}</FormLabel>
                         <FormControl>
                           <Input type="number" step="0.01" {...field} value={field.value ?? ""} className="border-0 px-0 h-auto py-0 font-mono font-semibold focus-visible:ring-0 shadow-none" />
                         </FormControl>
@@ -405,7 +408,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                     name="currency"
                     render={({ field }) => (
                       <FormItem className="p-4 space-y-1">
-                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Currency</FormLabel>
+                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Currency")}</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="USD" className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
                         </FormControl>
@@ -428,9 +431,9 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                   name="warranty"
                   render={({ field }) => (
                     <FormItem className="p-4 space-y-1">
-                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Warranty</FormLabel>
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Warranty")}</FormLabel>
                       <FormControl>
-                        <AutosizeTextarea {...field} placeholder="e.g. 2-year manufacturer warranty" minRows={3} className="border-0 px-0 shadow-none focus-visible:ring-0 resize-none" />
+                        <AutosizeTextarea {...field} placeholder={appText("e.g. 2-year manufacturer warranty")} minRows={3} className="border-0 px-0 shadow-none focus-visible:ring-0 resize-none" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -440,10 +443,10 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
               <div className="flex items-center gap-2 mt-4">
                 <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
                   {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Save Changes
+                  {appText("Save Changes")}
                 </Button>
                 <Button type="button" variant="outline" className="rounded-full" onClick={() => setIsEditing(false)} disabled={updateReceipt.isPending}>
-                  Cancel
+                  {appText("Cancel")}
                 </Button>
               </div>
             </form>
@@ -451,43 +454,43 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
         ) : (
           <div className="rounded-2xl border divide-y">
             <div className="p-4 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground font-medium">Category</span>
+              <span className="text-muted-foreground font-medium">{appText("Category")}</span>
               {receipt.category ? (
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${categoryStyle(receipt.category)}`}>
-                  {receipt.category}
+                  {categoryText(receipt.category)}
                 </span>
               ) : (
-                <span className="font-semibold text-muted-foreground">None</span>
+                <span className="font-semibold text-muted-foreground">{appText("None")}</span>
               )}
             </div>
             <div className="p-4 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground font-medium">Date</span>
+              <span className="text-muted-foreground font-medium">{appText("Date")}</span>
               <span className="font-semibold">
                 {receipt.purchaseDate
-                  ? format(new Date(receipt.purchaseDate), "MMMM d, yyyy")
-                  : "Unknown"}
+                  ? formatLocaleDate(new Date(receipt.purchaseDate), locale)
+                  : appText("Unknown")}
               </span>
             </div>
             {receipt.transactionNumber && (
               <div className="p-4 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground font-medium">Transaction #</span>
+                <span className="text-muted-foreground font-medium">{appText("Transaction #")}</span>
                 <span className="font-mono font-semibold">{receipt.transactionNumber}</span>
               </div>
             )}
             <div className="p-4 flex items-center justify-between gap-4 text-sm">
-              <span className="text-muted-foreground font-medium">Purchase country</span>
+              <span className="text-muted-foreground font-medium">{appText("Purchase country")}</span>
               <PurchaseCountryValue value={receipt.purchaseCountry} className="font-semibold text-right" />
             </div>
             <div className="p-4 flex items-center justify-between gap-4 text-sm">
-              <span className="text-muted-foreground font-medium">Warranty</span>
-              <span className="font-semibold text-right">{receipt.warranty || "None"}</span>
+              <span className="text-muted-foreground font-medium">{appText("Warranty")}</span>
+              <span className="font-semibold text-right">{receipt.warranty || appText("None")}</span>
             </div>
             <div className="p-4 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground font-medium">Items</span>
+              <span className="text-muted-foreground font-medium">{appText("Items")}</span>
               <span className="font-semibold">
                 {(() => {
                   const count = receipt.products?.reduce((s, p) => s + (p.quantity || 1), 0) ?? 0;
-                  return `${count} item${count === 1 ? "" : "s"}`;
+                  return appText("{0} item(s)", [count]);
                 })()}
               </span>
             </div>
@@ -502,10 +505,10 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
           <div className="rounded-2xl border p-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Purchased
+                {appText("Purchased")}
               </p>
               <p className="text-xs text-muted-foreground">
-                {receipt.products.reduce((sum, p) => sum + (p.quantity && p.quantity > 1 ? p.quantity : 1), 0)} items total
+                {receipt.products.reduce((sum, p) => sum + (p.quantity && p.quantity > 1 ? p.quantity : 1), 0)} {appText("items total")}
               </p>
             </div>
             <motion.ul
@@ -531,7 +534,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
         {receipt.summary && !isEditing && (
           <div className="rounded-2xl bg-secondary p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-              AI Summary
+              {appText("AI Summary")}
             </p>
             <p className="text-sm leading-relaxed">{receipt.summary}</p>
           </div>
@@ -548,7 +551,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
           <div className="rounded-2xl border divide-y">
             <div className="p-4 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Files
+                {appText("Files")}
               </p>
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -559,7 +562,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : <Paperclip className="w-3.5 h-3.5" />
                 }
-                {isUploading ? "Uploading..." : "Attach file"}
+                {appText(isUploading ? "Uploading..." : "Attach file")}
               </button>
               <input
                 ref={fileInputRef}
@@ -581,7 +584,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
                 download={receipt.originalFileName}
               >
-                View
+                {appText("View")}
               </a>
             </div>
 
@@ -600,14 +603,14 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
                     download={att.originalFileName}
                   >
-                    View
+                    {appText("View")}
                   </a>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <button
                         disabled={isDeleting}
                         className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50 shrink-0"
-                        aria-label="Remove attachment"
+                        aria-label={appText("Remove attachment")}
                       >
                         {isDeleting
                           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -617,18 +620,18 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Remove this file?</AlertDialogTitle>
+                        <AlertDialogTitle>{appText("Remove this file?")}</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will permanently delete <span className="font-medium">{att.originalFileName}</span> from this receipt.
+                          {appText("This will permanently delete")} <span className="font-medium">{att.originalFileName}</span> {appText("from this receipt.")}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>{appText("Cancel")}</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => handleDeleteAttachment(att.id)}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                          Remove
+                          {appText("Remove")}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -648,7 +651,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                 onClick={handleShowStore}
               >
                 <ScanLine className="w-4 h-4 mr-2" />
-                Show to store
+                {appText("Show to store")}
               </Button>
             )}
             <div className="flex items-center gap-2">
@@ -659,30 +662,30 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                 onClick={() => setIsEditing(true)}
               >
                 <Edit2 className="w-4 h-4 mr-2" />
-                Edit
+                {appText("Edit")}
               </Button>
               <Button variant="outline" className="flex-1 rounded-full" onClick={handleShare}>
                 <Share2 className="w-4 h-4 mr-2" />
-                Share
+                {appText("Share")}
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="outline" className="flex-1 rounded-full text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/10">
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
+                    {appText("Delete")}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this receipt?</AlertDialogTitle>
+                    <AlertDialogTitle>{appText("Delete this receipt?")}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. The receipt and all extracted data will be permanently removed.
+                      {appText("This action cannot be undone. The receipt and all extracted data will be permanently removed.")}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{appText("Cancel")}</AlertDialogCancel>
                     <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      Delete
+                      {appText("Delete")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

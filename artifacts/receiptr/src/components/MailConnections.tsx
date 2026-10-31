@@ -1,3 +1,5 @@
+import { appText } from "@/lib/appCopy";
+import { useAppLocale, getAppLocale } from "@/lib/locale";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Loader2, Mail, PlugZap, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,7 +29,7 @@ export function useMailStatus() {
 
 function formatDateTime(iso: string | null) {
   if (!iso) return null;
-  return new Date(iso).toLocaleString("en-US", {
+  return new Date(iso).toLocaleString(getAppLocale(), {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -54,8 +56,8 @@ function ProviderCard({
     onSuccess: (url) => window.location.assign(url),
     onError: () =>
       toast({
-        title: `${label} connection failed`,
-        description: `Could not start the ${label} connection. Please try again.`,
+        title: appText("{0} connection failed", [label]),
+        description: appText("Could not start the {0} connection. Please try again.", [label]),
         variant: "destructive",
       }),
   });
@@ -64,12 +66,12 @@ function ProviderCard({
     mutationFn: () => disconnectMailProvider(BASE, provider.id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["mail"] });
-      toast({ title: `${label} disconnected` });
+      toast({ title: appText("{0} disconnected", [label]) });
     },
     onError: () =>
       toast({
-        title: "Something went wrong",
-        description: `Could not disconnect ${label}. Please try again.`,
+        title: appText("Something went wrong"),
+        description: appText("Could not disconnect {0}. Please try again.", [label]),
         variant: "destructive",
       }),
   });
@@ -80,23 +82,23 @@ function ProviderCard({
       void queryClient.invalidateQueries({ queryKey: ["mail"] });
       if (result.needsReconnect?.length) {
         toast({
-          title: "Reconnect needed",
-          description: "Your email connection expired. Reconnect to keep importing receipts.",
+          title: appText("Reconnect needed"),
+          description: appText("Your email connection expired. Reconnect to keep importing receipts."),
           variant: "destructive",
         });
       } else if (result.queued > 0) {
         toast({
-          title: `Found ${result.queued} new receipt${result.queued > 1 ? "s" : ""}`,
-          description: "Check your pending imports.",
+          title: appText("Found {0} new receipt(s)", [result.queued]),
+          description: appText("Check your pending imports."),
         });
       } else {
-        toast({ title: "No new receipts found" });
+        toast({ title: appText("No new receipts found") });
       }
     },
     onError: () =>
       toast({
-        title: "Sync failed",
-        description: "Could not reach your inbox. Try again shortly.",
+        title: appText("Sync failed"),
+        description: appText("Could not reach your inbox. Try again shortly."),
         variant: "destructive",
       }),
   });
@@ -114,19 +116,19 @@ function ProviderCard({
             <p className="text-sm font-medium">{label}</p>
             {provider.connected ? (
               <p className="text-xs text-muted-foreground mt-0.5">
-                {provider.accountEmail ?? "Connected"}
+                {provider.accountEmail ?? appText("Connected")}
                 {!retired && provider.lastSyncedAt && (
-                  <> · Last synced {formatDateTime(provider.lastSyncedAt)}</>
+                  <> {appText("· Last synced")} {formatDateTime(provider.lastSyncedAt)}</>
                 )}
                 {!retired && pendingCount > 0 && (
                   <> ·{" "}
-                    <span className="font-semibold text-foreground">{pendingCount} pending</span>
+                    <span className="font-semibold text-foreground">{pendingCount} {appText("pending")}</span>
                   </>
                 )}
               </p>
             ) : (
               <p className="text-xs text-muted-foreground mt-0.5">
-                Auto-import receipts and order emails from your inbox
+                {appText("Auto-import receipts and order emails from your inbox")}
               </p>
             )}
           </div>
@@ -142,7 +144,7 @@ function ProviderCard({
                   className="rounded-full h-8 text-xs text-muted-foreground"
                   onClick={() => sync.mutate()}
                   disabled={busy}
-                  aria-label={`Sync ${label}`}
+                  aria-label={appText("Sync {0}", [label])}
                 >
                   {sync.isPending ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -158,7 +160,7 @@ function ProviderCard({
                 onClick={() => disconnect.mutate()}
                 disabled={busy}
               >
-                {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
+                {appText(disconnect.isPending ? "Disconnecting…" : "Disconnect")}
               </Button>
             </>
           ) : (
@@ -169,7 +171,7 @@ function ProviderCard({
               disabled={busy}
             >
               <PlugZap className="w-3 h-3" />
-              {connect.isPending ? "Connecting…" : `Connect ${label}`}
+              {connect.isPending ? appText("Connecting…") : appText("Connect {0}", [label])}
             </Button>
           )}
         </div>
@@ -183,7 +185,7 @@ function ProviderCard({
         >
           <p className="text-xs text-amber-900 flex items-start gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-            {label} stopped syncing because its access expired. Reconnect to keep importing receipts.
+            {label} {appText("stopped syncing because its access expired. Reconnect to keep importing receipts.")}
           </p>
           <Button
             size="sm"
@@ -191,7 +193,7 @@ function ProviderCard({
             onClick={() => connect.mutate()}
             disabled={busy}
           >
-            {connect.isPending ? "Connecting…" : "Reconnect"}
+            {appText(connect.isPending ? "Connecting…" : "Reconnect")}
           </Button>
         </div>
       )}
@@ -204,7 +206,7 @@ function ProviderCard({
 
       {retired && provider.connected && (
         <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
-          {label} import is no longer available. Disconnect to remove Receebo's access to this inbox.
+          {label} {appText("import is no longer available. Disconnect to remove Receebo's access to this inbox.")}
         </p>
       )}
     </div>
@@ -213,6 +215,7 @@ function ProviderCard({
 
 /** "Connected accounts" body: one card per visible mail provider. */
 export function MailConnections() {
+  useAppLocale();
   const { data, isLoading } = useMailStatus();
 
   if (isLoading) {
@@ -229,7 +232,7 @@ export function MailConnections() {
     return (
       <div className="border rounded-xl p-5" data-testid="mail-providers-empty">
         <p className="text-xs text-muted-foreground">
-          Automatic email import is coming soon. You can still upload or scan receipts.
+          {appText("Automatic email import is coming soon. You can still upload or scan receipts.")}
         </p>
       </div>
     );

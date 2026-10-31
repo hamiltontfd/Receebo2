@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { appText, categoryText } from "@/lib/appCopy";
+import { useAppLocale, formatLocaleDate } from "@/lib/locale";
 import { X } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@clerk/react";
@@ -129,6 +131,7 @@ function DemoReceiptSheet({
   onClose: () => void;
 }) {
   const isDesktop = useIsDesktop();
+  useAppLocale();
   if (!receipt) return null;
   const Icon = categoryIcon(receipt.category);
   return (
@@ -162,7 +165,7 @@ function DemoReceiptSheet({
             <button
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors shrink-0"
-              aria-label="Close"
+              aria-label={appText("Close")}
             >
               <X className="w-4 h-4" />
             </button>
@@ -172,7 +175,7 @@ function DemoReceiptSheet({
           <div className="rounded-2xl bg-foreground text-background p-6 space-y-3">
             <div className="inline-flex items-center gap-1.5 bg-white/15 rounded-lg px-2 py-1">
               <Icon className="w-3.5 h-3.5" />
-              <span className="text-xs font-semibold">{receipt.category}</span>
+              <span className="text-xs font-semibold">{categoryText(receipt.category)}</span>
             </div>
             <h2 className="text-2xl font-extrabold tracking-tight">{receipt.merchant}</h2>
             <p className="text-sm opacity-70">{receipt.date}</p>
@@ -182,7 +185,7 @@ function DemoReceiptSheet({
           </div>
 
           <div className="rounded-2xl border p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Purchased</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">{appText("Purchased")}</p>
             <ul className="space-y-2">
               {receipt.products.map((p, i) => (
                 <li key={i} className="flex justify-between text-sm">
@@ -194,13 +197,13 @@ function DemoReceiptSheet({
           </div>
 
           <div className="rounded-2xl bg-secondary p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">AI Summary</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{appText("AI Summary")}</p>
             <p className="text-sm leading-relaxed">{receipt.summary}</p>
           </div>
 
           <div className="rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground flex items-start gap-2">
             <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>This is sample data. Sign in to scan and store your own receipts.</span>
+            <span>{appText("This is sample data. Sign in to scan and store your own receipts.")}</span>
           </div>
         </div>
       </SheetContent>
@@ -209,6 +212,7 @@ function DemoReceiptSheet({
 }
 
 function DemoView({ onScan }: { onScan: () => void }) {
+  useAppLocale();
   const [selected, setSelected] = useState<DemoReceipt | null>(null);
   return (
     <>
@@ -222,19 +226,19 @@ function DemoView({ onScan }: { onScan: () => void }) {
       >
         <div className="flex items-center gap-2 rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
           <Sparkles className="w-4 h-4 shrink-0" />
-          <span>This is sample data. Scan a receipt to start your own library.</span>
+          <span>{appText("This is sample data. Scan a receipt to start your own library.")}</span>
           <button
             onClick={onScan}
             className="ml-auto shrink-0 text-foreground font-semibold underline underline-offset-2"
           >
-            Scan now
+            {appText("Scan now")}
           </button>
         </div>
 
         {notableDemoItems.length > 0 && (
           <section>
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-              Worth keeping
+              {appText("Worth keeping")}
             </h2>
             <div className="grid grid-cols-2 gap-3">
               {notableDemoItems.slice(0, 2).map((item, i) => {
@@ -262,7 +266,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
         )}
 
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Recent</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">{appText("Recent")}</h2>
           <ul className="divide-y divide-border">
             {DEMO_RECEIPTS.map((r) => {
               const Icon = categoryIcon(r.category);
@@ -296,6 +300,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
 }
 
 function ReceiptRow({ r, onOpen, query }: { r: Receipt; onOpen: (id: number) => void; query?: string }) {
+  const locale = useAppLocale();
   const Icon = categoryIcon(r.category);
 
   const matchingItems = useMemo(() => {
@@ -369,7 +374,7 @@ function ReceiptRow({ r, onOpen, query }: { r: Receipt; onOpen: (id: number) => 
             </p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="text-xs text-muted-foreground">
-                {format(new Date(r.purchaseDate || r.createdAt), "MMM d, yyyy")}
+                {formatLocaleDate(new Date(r.purchaseDate || r.createdAt), locale)}
               </span>
             </div>
           </div>
@@ -406,6 +411,7 @@ function ReceiptRow({ r, onOpen, query }: { r: Receipt; onOpen: (id: number) => 
 }
 
 export default function SearchPage() {
+  const locale = useAppLocale();
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [, setLocation] = useLocation();
@@ -430,8 +436,8 @@ export default function SearchPage() {
     window.history.replaceState(null, "", newUrl);
 
     toast({
-      title: "Subscription active",
-      description: "Thanks for subscribing. Unlimited scans are now available.",
+      title: appText("Subscription active"),
+      description: appText("Thanks for subscribing. Unlimited scans are now available."),
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -452,6 +458,8 @@ export default function SearchPage() {
   const {
     data: infiniteData,
     isLoading: idleLoading,
+    isError: idleError,
+    refetch: retryLibrary,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
@@ -469,12 +477,12 @@ export default function SearchPage() {
   // "Worth keeping" right under the search field: durable goods from the receipts
   // already loaded (no extra request), open return windows first, then the most
   // recent purchases; up to 10 cards, the rest on /search/worth-keeping.
-  const homeKeepAll = useMemo(() => durableKeeping(allReceipts), [allReceipts]);
+  const homeKeepAll = useMemo(() => durableKeeping(allReceipts), [allReceipts, locale]);
   const homeKeep = homeKeepAll.slice(0, HOME_KEEP_LIMIT);
   const homeKeepMore = homeKeepAll.length > HOME_KEEP_LIMIT || (!!hasNextPage && homeKeep.length > 0);
 
   // Search results (non-paginated, all matches)
-  const { data: searchPage, isLoading: searchLoading } = useListReceipts(
+  const { data: searchPage, isLoading: searchLoading, isError: searchError, refetch: retrySearch } = useListReceipts(
     isSearching ? { q: debounced } : undefined,
     { query: { enabled: isSearching } },
   );
@@ -499,6 +507,12 @@ export default function SearchPage() {
 
   return (
     <>
+    {(isSearching ? searchError : idleError) && (
+      <div role="alert" className="mx-auto max-w-lg p-5 text-sm">
+        {appText("Could not load receipts.")}{" "}
+        <button type="button" className="underline" onClick={() => void (isSearching ? retrySearch() : retryLibrary())}>{appText("Try again")}</button>
+      </div>
+    )}
     <ReceiptSheet
       receiptId={selectedId}
       open={selectedId !== null}
@@ -525,7 +539,7 @@ export default function SearchPage() {
           ref={searchInputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search purchases..."
+          placeholder={appText("Search purchases...")}
           className="pl-10 h-12 rounded-full bg-muted/50 border-transparent focus-visible:bg-background"
         />
       </div>
@@ -543,7 +557,7 @@ export default function SearchPage() {
                 : "border-transparent opacity-70 hover:opacity-100"
             }`}
           >
-            {cat}
+            {categoryText(cat)}
           </motion.button>
         ))}
       </div>
@@ -596,7 +610,7 @@ export default function SearchPage() {
                 animate={{ opacity: 1 }}
                 className="text-center py-16 text-muted-foreground text-sm"
               >
-                No purchases match your search.
+                {appText("No purchases match your search.")}
               </motion.div>
             )}
           </motion.div>
@@ -669,16 +683,16 @@ export default function SearchPage() {
                       <ScanLine className="w-9 h-9 text-muted-foreground" />
                     </div>
                     <div className="space-y-2 max-w-xs">
-                      <h2 className="text-xl font-extrabold tracking-tight">No receipts yet.</h2>
+                      <h2 className="text-xl font-extrabold tracking-tight">{appText("No receipts yet.")}</h2>
                       <p className="text-sm text-muted-foreground">
-                        Scan your first receipt to build your searchable purchase history.
+                        {appText("Scan your first receipt to build your searchable purchase history.")}
                       </p>
                     </div>
                     <Button
                       className="rounded-full h-12 px-8 font-semibold"
                       onClick={() => setLocation("/scan")}
                     >
-                      Scan Receipt
+                      {appText("Scan Receipt")}
                     </Button>
                   </motion.div>
                 ) : null}

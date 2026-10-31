@@ -1,3 +1,5 @@
+import { appText, categoryText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScrollText, Square, ChevronDown, Zap, ZapOff } from "lucide-react";
@@ -145,6 +147,7 @@ function useCameraStream(enabled: boolean) {
 }
 
 export default function Scan() {
+  useAppLocale();
   // Conservative: capture permission, image conversion, stitching, extraction,
   // retake drafts and review all belong to this session. Leave Scan to update.
   usePwaUpdateBlocker(true);
@@ -173,7 +176,7 @@ export default function Scan() {
   const preflightUpload = (): boolean => {
     const reason = billing ? uploadBlockedReason(billing) : "We couldn't confirm your plan. Check your connection and try again.";
     if (reason) {
-      toast({ title: "Upload not available", description: reason, variant: "destructive",
+      toast({ title: appText("Upload not available"), description: appText(reason), variant: "destructive",
         ...(isTrialLimitMessage(reason) ? { action: subscribeToastAction(setLocation) } : {}) });
       void billingQuery.refetch();
       return false;
@@ -423,7 +426,7 @@ export default function Scan() {
   const uploadFile = useCallback(
     async (blob: Blob, fileName: string, contentType: string): Promise<boolean> => {
       if (!navigator.onLine) {
-        toast({ title: "Connection required", description: "Connect before uploading a receipt. Nothing was uploaded.", variant: "destructive" });
+        toast({ title: appText("Connection required"), description: appText("Connect before uploading a receipt. Nothing was uploaded."), variant: "destructive" });
         return false;
       }
       setUploading(true);
@@ -437,7 +440,7 @@ export default function Scan() {
           ? "We couldn't confirm your plan. Check your connection and try again. Nothing was uploaded."
           : uploadBlockedReason(latest);
         if (reason) {
-          toast({ title: "Upload not available", description: reason, variant: "destructive",
+          toast({ title: appText("Upload not available"), description: appText(reason), variant: "destructive",
             ...(isTrialLimitMessage(reason) ? { action: subscribeToastAction(setLocation) } : {}) });
           return false;
         }
@@ -480,13 +483,13 @@ export default function Scan() {
         const quota = quotaErrorMessage(err);
         if (quota) {
           void refreshBilling();
-          toast({ title: "Upload limit reached", description: quota, variant: "destructive",
+          toast({ title: appText("Upload limit reached"), description: appText(quota), variant: "destructive",
             ...(isTrialLimitMessage(quota) ? { action: subscribeToastAction(setLocation) } : {}) });
           return false;
         }
         toast({
-          title: "Upload failed",
-          description: "Could not upload the receipt. Please try again.",
+          title: appText("Upload failed"),
+          description: appText("Could not upload the receipt. Please try again."),
           variant: "destructive",
         });
         return false;
@@ -575,7 +578,7 @@ export default function Scan() {
       });
       invalidateLists();
       queryClient.invalidateQueries({ queryKey: getGetReceiptQueryKey(receiptId) });
-      toast({ title: "Purchase saved", description: "Added to your library." });
+      toast({ title: appText("Purchase saved"), description: appText("Added to your library.") });
       setActiveReview(null);
       void refreshBilling();
       setLocation(`/receipts/${receiptId}`);
@@ -584,8 +587,8 @@ export default function Scan() {
       const quota = quotaErrorMessage(err);
       if (quota) void refreshBilling();
       toast({
-        title: quota ? "Upload limit reached" : "Error",
-        description: quota ?? "Failed to save the purchase.",
+        title: appText(quota ? "Upload limit reached" : "Error"),
+        description: appText(quota ?? "Failed to save the purchase."),
         variant: "destructive",
         ...(isTrialLimitMessage(quota) ? { action: subscribeToastAction(setLocation) } : {}),
       });
@@ -598,7 +601,7 @@ export default function Scan() {
         await deleteReceipt.mutateAsync({ id: receiptId });
         invalidateLists();
       } catch {
-        toast({ title: "Could not remove receipt", description: "Check your connection and try again.", variant: "destructive" });
+        toast({ title: appText("Could not remove receipt"), description: appText("Check your connection and try again."), variant: "destructive" });
         return;
       }
     }
@@ -622,7 +625,7 @@ export default function Scan() {
         await deleteReceipt.mutateAsync({ id: receiptId });
         invalidateLists();
       } catch {
-        toast({ title: "Could not discard receipt", description: "Check your connection and try again. The receipt has not been discarded.", variant: "destructive" });
+        toast({ title: appText("Could not discard receipt"), description: appText("Check your connection and try again. The receipt has not been discarded."), variant: "destructive" });
         return;
       }
     }
@@ -646,10 +649,10 @@ export default function Scan() {
           <span className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center">
             <AlertTriangle className="w-6 h-6 text-muted-foreground" />
           </span>
-          <h1 className="text-2xl font-extrabold tracking-tight">No uploads left</h1>
-          <p className="text-sm text-muted-foreground max-w-xs" data-testid="text-upload-blocked">{blockedReason}</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">{appText("No uploads left")}</h1>
+          <p className="text-sm text-muted-foreground max-w-xs" data-testid="text-upload-blocked">{appText(blockedReason)}</p>
           <Link href="/settings#upgrade-plans" className="inline-flex h-11 items-center rounded-full bg-foreground px-6 text-sm font-semibold text-background" data-testid="link-scan-subscribe">
-            {isAtTrialCap(billing) ? TRIAL_CAP_BUTTON : "See plans"}
+            {appText(isAtTrialCap(billing) ? TRIAL_CAP_BUTTON : "See plans")}
           </Link>
         </div>
       )}
@@ -657,7 +660,7 @@ export default function Scan() {
       {phase === "capture" && !blockedReason && handoffActive && (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-12" data-testid="panel-handoff-upload">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Uploading your file…</p>
+          <p className="text-sm text-muted-foreground">{appText("Uploading your file…")}</p>
         </div>
       )}
 
@@ -697,13 +700,13 @@ export default function Scan() {
         <div className="flex-1 flex flex-col gap-6">
           <div>
             <div>
-                <h1 className="text-2xl font-extrabold tracking-tight">Scan receipt</h1>
+                <h1 className="text-2xl font-extrabold tracking-tight">{appText("Scan receipt")}</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Place the receipt inside the frame, or upload a file.
+                  {appText("Place the receipt inside the frame, or upload a file.")}
                 </p>
                 {trialUploadsLeft != null && (
                   <p className="text-xs font-semibold text-muted-foreground mt-2" data-testid="text-scan-trial-left">
-                    {trialUploadsLeft} of {TRIAL_UPLOAD_LIMIT} free receipts left
+                    {trialUploadsLeft} {appText("of")} {TRIAL_UPLOAD_LIMIT} {appText("free receipts left")}
                   </p>
                 )}
               </div>
@@ -715,9 +718,9 @@ export default function Scan() {
                 <Upload className="w-6 h-6 text-muted-foreground" />
               </span>
               <div className="space-y-1 max-w-xs">
-                <p className="font-semibold">Upload a receipt</p>
+                <p className="font-semibold">{appText("Upload a receipt")}</p>
                 <p className="text-sm text-muted-foreground">
-                  JPG, PNG, or PDF. We'll read the details for you.
+                  {appText("JPG, PNG, or PDF. We'll read the details for you.")}
                 </p>
               </div>
               <Button
@@ -730,7 +733,7 @@ export default function Scan() {
                 ) : (
                   <Upload className="w-4 h-4 mr-2" />
                 )}
-                Upload receipt
+                {appText("Upload receipt")}
               </Button>
               <Button
                 variant="ghost"
@@ -739,7 +742,7 @@ export default function Scan() {
                 disabled={uploading}
               >
                 <Camera className="w-4 h-4 mr-2" />
-                Use camera instead
+                {appText("Use camera instead")}
               </Button>
             </div>
           ) : (
@@ -748,7 +751,7 @@ export default function Scan() {
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-background p-8 text-center">
                 <Camera className="w-10 h-10 opacity-60" />
                 <p className="text-sm opacity-80">
-                  Camera is not available. Upload a photo or PDF of your receipt instead.
+                  {appText("Camera is not available. Upload a photo or PDF of your receipt instead.")}
                 </p>
                 <Button
                   variant="secondary"
@@ -757,7 +760,7 @@ export default function Scan() {
                   disabled={uploading}
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload receipt
+                  {appText("Upload receipt")}
                 </Button>
               </div>
             ) : panStitchedUrl ? (
@@ -766,7 +769,7 @@ export default function Scan() {
                 <div className="flex-1 overflow-y-auto">
                   <img
                     src={panStitchedUrl}
-                    alt="Stitched panoramic receipt"
+                    alt={appText("Stitched panoramic receipt")}
                     className="w-full"
                   />
                 </div>
@@ -782,14 +785,14 @@ export default function Scan() {
                     className="flex-1 h-12 rounded-full bg-white text-black font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
                   >
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                    Use this
+                    {appText("Use this")}
                   </button>
                   <button
                     onClick={clearPanState}
                     disabled={uploading}
                     className="flex-1 h-12 rounded-full border border-white/40 text-white font-semibold text-sm disabled:opacity-40"
                   >
-                    Retake
+                    {appText("Retake")}
                   </button>
                 </div>
               </div>
@@ -809,7 +812,7 @@ export default function Scan() {
                     <div className="absolute top-4 inset-x-0 flex justify-center pointer-events-none">
                       <span className="bg-black/60 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
                         <ScrollText className="w-3.5 h-3.5" />
-                        Long receipt mode
+                        {appText("Long receipt mode")}
                       </span>
                     </div>
 
@@ -818,7 +821,7 @@ export default function Scan() {
                       <>
                         <div className="absolute top-14 inset-x-0 flex flex-col items-center gap-2 pointer-events-none">
                           <span className="bg-black/70 text-white text-xs font-medium px-3 py-1 rounded-full">
-                            {panFrameCount} / {PAN_MAX_FRAMES} frames
+                            {panFrameCount} / {PAN_MAX_FRAMES} {appText("frames")}
                           </span>
                           {/* Progress bar */}
                           <div className="w-32 h-1.5 rounded-full bg-white/20 overflow-hidden">
@@ -833,7 +836,7 @@ export default function Scan() {
                         </div>
                         <div className="absolute bottom-14 inset-x-0 flex items-center justify-center">
                           <button
-                            aria-label="Stop panoramic capture"
+                            aria-label={appText("Stop panoramic capture")}
                             onClick={stopPanCapture}
                             className="w-16 h-16 rounded-full border-4 border-red-400 bg-red-500/80 hover:bg-red-500 transition-colors flex items-center justify-center"
                           >
@@ -841,7 +844,7 @@ export default function Scan() {
                           </button>
                         </div>
                         <p className="absolute bottom-36 inset-x-0 text-center text-xs text-background/90">
-                          Pan slowly downward — tap Stop when done
+                          {appText("Pan slowly downward — tap Stop when done")}
                         </p>
                       </>
                     ) : (
@@ -849,16 +852,16 @@ export default function Scan() {
                       <>
                         <div className="absolute inset-8 border-2 border-background/80 rounded-xl pointer-events-none" />
                         <p className="absolute bottom-36 inset-x-0 text-center text-xs text-background/90">
-                          Tap Start, then pan the camera slowly downward
+                          {appText("Tap Start, then pan the camera slowly downward")}
                         </p>
                         <div className="absolute bottom-14 inset-x-0 flex items-center justify-center gap-6">
                           <button
-                            aria-label="Start panoramic capture"
+                            aria-label={appText("Start panoramic capture")}
                             onClick={startPanCapture}
                             disabled={!cameraReady || uploading}
                             className="px-8 h-14 rounded-full border-4 border-background bg-background/20 hover:bg-background/40 transition-colors disabled:opacity-40 text-background font-bold text-sm"
                           >
-                            Start
+                            {appText("Start")}
                           </button>
                         </div>
                       </>
@@ -871,7 +874,7 @@ export default function Scan() {
                           onClick={() => setPanoramicMode(false)}
                           className="text-background/60 text-xs underline"
                         >
-                          Switch to single shot
+                          {appText("Switch to single shot")}
                         </button>
                       </div>
                     )}
@@ -882,11 +885,11 @@ export default function Scan() {
                     {/* Framing guide */}
                     <div className="absolute inset-8 border-2 border-background/80 rounded-xl pointer-events-none" />
                     <p className="absolute bottom-36 inset-x-0 text-center text-xs text-background/90">
-                      Place the receipt inside the frame
+                      {appText("Place the receipt inside the frame")}
                     </p>
                     <div className="absolute bottom-14 inset-x-0 flex items-center justify-center gap-6">
                       <button
-                        aria-label="Capture receipt"
+                        aria-label={appText("Capture receipt")}
                         onClick={capturePhoto}
                         disabled={!cameraReady || uploading}
                         className="w-16 h-16 rounded-full border-4 border-background bg-background/20 hover:bg-background/40 transition-colors disabled:opacity-40 flex items-center justify-center"
@@ -902,7 +905,7 @@ export default function Scan() {
                         className="flex items-center gap-1.5 text-background/70 text-xs disabled:opacity-40 hover:text-background/90 transition-colors"
                       >
                         <ScrollText className="w-3.5 h-3.5" />
-                        Long receipt
+                        {appText("Long receipt")}
                       </button>
                     </div>
                   </>
@@ -921,7 +924,7 @@ export default function Scan() {
               disabled={uploading}
             >
               <Upload className="w-4 h-4 mr-2" />
-              Upload a file instead
+              {appText("Upload a file instead")}
             </Button>
           )}
         </div>
@@ -930,9 +933,9 @@ export default function Scan() {
       {phase === "reading" && (
         <div className="flex-1 flex flex-col gap-8 pt-4">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight">Reading receipt</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight">{appText("Reading receipt")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Receebo is turning the image into a purchase.
+              {appText("Receebo is turning the image into a purchase.")}
             </p>
           </div>
 
@@ -969,7 +972,7 @@ export default function Scan() {
                         found ? "text-foreground font-medium" : "text-destructive"
                       }
                     >
-                      {found ? step.label : step.notFoundLabel}
+                      {appText(found ? step.label : step.notFoundLabel)}
                     </span>
                   </li>
                 );
@@ -988,7 +991,7 @@ export default function Scan() {
                     <Check className="w-3 h-3" />
                   </span>
                   <span className={done ? "text-foreground font-medium" : "text-muted-foreground"}>
-                    {step.label}
+                    {appText(step.label)}
                   </span>
                 </li>
               );
@@ -1003,9 +1006,9 @@ export default function Scan() {
             <AlertTriangle className="w-8 h-8 text-destructive" />
           </div>
           <div className="space-y-2 max-w-xs">
-            <h1 className="text-xl font-extrabold tracking-tight">No receipt found</h1>
+            <h1 className="text-xl font-extrabold tracking-tight">{appText("No receipt found")}</h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Receebo only works with purchase receipts and invoices. Make sure your photo clearly shows the receipt, not a random photo or other document.
+              {appText("Receebo only works with purchase receipts and invoices. Make sure your photo clearly shows the receipt, not a random photo or other document.")}
             </p>
           </div>
           <div className="flex flex-col gap-3 w-full max-w-xs">
@@ -1014,14 +1017,14 @@ export default function Scan() {
               onClick={handleRetake}
             >
               <Camera className="w-4 h-4 mr-2" />
-              Try again
+              {appText("Try again")}
             </Button>
             <Button
               variant="ghost"
               className="rounded-full h-12 text-muted-foreground"
               onClick={() => setLocation("/")}
             >
-              Go back
+              {appText("Go back")}
             </Button>
           </div>
         </div>
@@ -1030,14 +1033,14 @@ export default function Scan() {
       {phase === "review" && (
         <div className="flex-1 flex flex-col gap-6">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight">Review</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight">{appText("Review")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Check the details before saving.
+              {appText("Check the details before saving.")}
             </p>
             {receipt?.status === "failed" && (
               <p className="text-sm text-destructive mt-2 flex items-center gap-2">
                 <X className="w-4 h-4" />
-                Automatic extraction failed. Enter the details manually.
+                {appText("Automatic extraction failed. Enter the details manually.")}
               </p>
             )}
           </div>
@@ -1048,12 +1051,12 @@ export default function Scan() {
                 <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                    This looks like a receipt you've already saved
+                    {appText("This looks like a receipt you've already saved")}
                   </p>
                   <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                     {similarMatches[0].merchant && similarMatches[0].purchaseDate
-                      ? `${similarMatches[0].merchant} on ${similarMatches[0].purchaseDate}`
-                      : similarMatches[0].merchant ?? similarMatches[0].purchaseDate ?? "Matching receipt found"}
+                      ? appText("{0} on {1}", [similarMatches[0].merchant, similarMatches[0].purchaseDate])
+                      : similarMatches[0].merchant ?? similarMatches[0].purchaseDate ?? appText("Matching receipt found")}
                   </p>
                 </div>
               </div>
@@ -1064,7 +1067,7 @@ export default function Scan() {
                   className="rounded-full text-xs border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50"
                   onClick={() => setDismissedDuplicate(true)}
                 >
-                  Save anyway
+                  {appText("Save anyway")}
                 </Button>
                 <Button
                   size="sm"
@@ -1074,7 +1077,7 @@ export default function Scan() {
                   disabled={deleteReceipt.isPending}
                 >
                   {deleteReceipt.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                  Discard
+                  {appText("Discard")}
                 </Button>
               </div>
             </div>
@@ -1082,18 +1085,18 @@ export default function Scan() {
 
           <div className="space-y-5">
             <div className="rounded-xl border p-4 space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Merchant</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Merchant")}</p>
               <Input
                 value={form.merchant}
                 onChange={(e) => setForm((f) => ({ ...f, merchant: e.target.value }))}
-                placeholder="e.g. Apple Store"
+                placeholder={appText("e.g. Apple Store")}
                 className="border-0 px-0 text-lg font-semibold focus-visible:ring-0 shadow-none"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-xl border p-4 space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Date")}</p>
                 <Input
                   type="date"
                   value={form.purchaseDate}
@@ -1102,7 +1105,7 @@ export default function Scan() {
                 />
               </div>
               <div className="rounded-xl border p-4 space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Total")}</p>
                 <div className="flex items-center gap-1">
                   <span className="font-mono font-semibold text-muted-foreground select-none">
                     {currencySymbol(receipt?.currency)}
@@ -1127,18 +1130,18 @@ export default function Scan() {
             />
 
             <div className="rounded-xl border p-4 space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Category")}</p>
               <Select
                 value={form.category || undefined}
                 onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
               >
                 <SelectTrigger className="border-0 px-0 h-auto py-0 font-medium shadow-none focus:ring-0 [&>svg]:ml-1">
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder={appText("Select category")} />
                 </SelectTrigger>
                 <SelectContent>
                   {CATEGORIES.map((cat) => (
                     <SelectItem key={cat} value={cat}>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{cat}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{categoryText(cat)}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1146,11 +1149,11 @@ export default function Scan() {
             </div>
 
             <div className="rounded-xl border p-4 space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Warranty</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Warranty")}</p>
               <AutosizeTextarea
                 value={form.warranty}
                 onChange={(e) => setForm((f) => ({ ...f, warranty: e.target.value }))}
-                placeholder="e.g. 2-year manufacturer warranty"
+                placeholder={appText("e.g. 2-year manufacturer warranty")}
                 minRows={3}
                 className="border-0 px-0 font-medium focus-visible:ring-0 shadow-none"
               />
@@ -1159,9 +1162,9 @@ export default function Scan() {
             {receipt?.products && receipt.products.length > 0 && (
               <div className="rounded-xl border p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Items</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Items")}</p>
                   <p className="text-xs text-muted-foreground">
-                    {receipt.products.reduce((sum, p) => sum + (p.quantity && p.quantity > 1 ? p.quantity : 1), 0)} items total
+                    {receipt.products.reduce((sum, p) => sum + (p.quantity && p.quantity > 1 ? p.quantity : 1), 0)} {appText("items total")}
                   </p>
                 </div>
                 <ul className="space-y-2">
@@ -1195,25 +1198,25 @@ export default function Scan() {
                   <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                      Receipt looks incomplete
+                      {appText("Receipt looks incomplete")}
                     </p>
                     <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                       {missingMerchant && missingTotal
-                        ? "Merchant name and total amount are missing"
+                        ? appText("Merchant name and total amount are missing")
                         : missingMerchant
-                          ? "Merchant name is missing"
-                          : "Total amount is missing"} — the top or bottom of the receipt may have been cut off. This could cause problems with warranty claims or merchant returns.
+                          ? appText("Merchant name is missing")
+                          : appText("Total amount is missing")} {appText("— the top or bottom of the receipt may have been cut off. This could cause problems with warranty claims or merchant returns.")}
                     </p>
                     <button
                       onClick={handleWarningRetake}
                       disabled={deleteReceipt.isPending}
                       className="mt-2 text-xs font-semibold text-amber-800 dark:text-amber-300 underline underline-offset-2 hover:opacity-70 transition-opacity disabled:opacity-40"
                     >
-                      Retake photo
+                      {appText("Retake photo")}
                     </button>
                   </div>
                   <button
-                    aria-label="Dismiss warning"
+                    aria-label={appText("Dismiss warning")}
                     onClick={() => setDismissedIncomplete(true)}
                     className="flex-shrink-0 text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 transition-colors"
                   >
@@ -1231,7 +1234,7 @@ export default function Scan() {
               disabled={updateReceipt.isPending}
             >
               {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Purchase
+              {appText("Save Purchase")}
             </Button>
             <Button
               variant="outline"
@@ -1239,7 +1242,7 @@ export default function Scan() {
               onClick={handleRetake}
               disabled={deleteReceipt.isPending}
             >
-              Retake
+              {appText("Retake")}
             </Button>
           </div>
         </div>
@@ -1299,7 +1302,7 @@ function FullScreenCamera(props: {
   const roundBtn = "absolute w-10 h-10 rounded-full bg-black/30 backdrop-blur-md text-white flex items-center justify-center z-10";
 
   const closeButton = (
-    <button type="button" aria-label="Close camera" onClick={onClose} className={roundBtn} style={{ top: `calc(${safeTop} + 12px)`, left: 16 }} data-testid="button-camera-close">
+    <button type="button" aria-label={appText("Close camera")} onClick={onClose} className={roundBtn} style={{ top: `calc(${safeTop} + 12px)`, left: 16 }} data-testid="button-camera-close">
       <X className="w-[22px] h-[22px]" strokeWidth={2.2} />
     </button>
   );
@@ -1309,7 +1312,7 @@ function FullScreenCamera(props: {
       <div className="fixed inset-0 z-50 bg-black flex flex-col" data-testid="fullscreen-camera">
         {closeButton}
         <div className="flex-1 overflow-y-auto" style={{ paddingTop: `calc(${safeTop} + 64px)` }}>
-          <img src={panStitchedUrl} alt="Stitched panoramic receipt" className="w-full" />
+          <img src={panStitchedUrl} alt={appText("Stitched panoramic receipt")} className="w-full" />
         </div>
         <div className="flex gap-3 p-4 bg-black/80" style={{ paddingBottom: `calc(${safeBottom} + 16px)` }}>
           <button
@@ -1318,14 +1321,14 @@ function FullScreenCamera(props: {
             className="flex-1 h-12 rounded-full bg-white text-black font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-            Use this
+            {appText("Use this")}
           </button>
           <button
             onClick={onRetakePan}
             disabled={uploading}
             className="flex-1 h-12 rounded-full border border-white/40 text-white font-semibold text-sm disabled:opacity-40"
           >
-            Retake
+            {appText("Retake")}
           </button>
         </div>
       </div>
@@ -1338,11 +1341,11 @@ function FullScreenCamera(props: {
         {closeButton}
         <Camera className="w-10 h-10 opacity-60" />
         <p className="text-sm opacity-80 max-w-xs">
-          Camera is not available. Upload a photo or PDF of your receipt instead.
+          {appText("Camera is not available. Upload a photo or PDF of your receipt instead.")}
         </p>
         <Button variant="secondary" className="rounded-full" onClick={onUploadInstead} disabled={uploading}>
           <Upload className="w-4 h-4 mr-2" />
-          Upload receipt
+          {appText("Upload receipt")}
         </Button>
       </div>
     );
@@ -1362,7 +1365,7 @@ function FullScreenCamera(props: {
       {torchSupported && (
         <button
           type="button"
-          aria-label={torchOn ? "Turn flash off" : "Turn flash on"}
+          aria-label={appText(torchOn ? "Turn flash off" : "Turn flash on")}
           aria-pressed={torchOn}
           onClick={onToggleTorch}
           className={roundBtn}
@@ -1383,7 +1386,7 @@ function FullScreenCamera(props: {
         <>
           <div className="absolute inset-x-0 flex flex-col items-center gap-2 pointer-events-none z-[5]" style={{ top: `calc(${safeTop} + 64px)` }}>
             <span className="bg-black/70 text-white text-xs font-medium px-3 py-1 rounded-full">
-              {panFrameCount} / {panMaxFrames} frames
+              {panFrameCount} / {panMaxFrames} {appText("frames")}
             </span>
             <div className="w-32 h-1.5 rounded-full bg-white/20 overflow-hidden">
               <div className="h-full bg-white rounded-full transition-all duration-300" style={{ width: `${(panFrameCount / panMaxFrames) * 100}%` }} />
@@ -1401,8 +1404,8 @@ function FullScreenCamera(props: {
       {(panoramicMode || trialUploadsLeft != null) && (
         <p className="absolute inset-x-0 text-center text-xs text-white/90 z-[5] px-6" style={{ bottom: `calc(${safeBottom} + 142px)` }}>
           {panoramicMode
-            ? panCapturing ? "Pan slowly downward — tap Stop when done" : "Tap the shutter, then pan slowly downward"
-            : <span data-testid="text-scan-trial-left">{trialUploadsLeft} of {TRIAL_UPLOAD_LIMIT} free receipts left</span>}
+            ? appText(panCapturing ? "Pan slowly downward — tap Stop when done" : "Tap the shutter, then pan slowly downward")
+            : <span data-testid="text-scan-trial-left">{trialUploadsLeft} {appText("of")} {TRIAL_UPLOAD_LIMIT} {appText("free receipts left")}</span>}
         </p>
       )}
 
@@ -1411,15 +1414,15 @@ function FullScreenCamera(props: {
           className="absolute left-1/2 flex gap-[22px] whitespace-nowrap text-[13px] font-semibold tracking-[0.06em] uppercase z-[5] transition-[margin] duration-200"
           style={{ bottom: `calc(${safeBottom} + 116px)`, marginLeft: modeShift }}
           role="radiogroup"
-          aria-label="Capture mode"
+          aria-label={appText("Capture mode")}
         >
           <button ref={photoRef} type="button" role="radio" aria-checked={!panoramicMode} onClick={() => onMode(false)}
             className={`uppercase ${panoramicMode ? "text-white/55" : "text-white"}`} disabled={uploading}>
-            Photo
+            {appText("Photo")}
           </button>
           <button ref={longRef} type="button" role="radio" aria-checked={panoramicMode} onClick={() => onMode(true)}
             className={`uppercase ${panoramicMode ? "text-white" : "text-white/55"}`} disabled={uploading || !cameraReady}>
-            Long receipt
+            {appText("Long receipt")}
           </button>
         </div>
       )}
@@ -1428,7 +1431,7 @@ function FullScreenCamera(props: {
         {panoramicMode && panCapturing ? (
           <button
             type="button"
-            aria-label="Stop panoramic capture"
+            aria-label={appText("Stop panoramic capture")}
             onClick={onStopPan}
             className="w-[76px] h-[76px] rounded-full border-4 border-red-400 bg-red-500/80 flex items-center justify-center"
           >
@@ -1437,7 +1440,7 @@ function FullScreenCamera(props: {
         ) : (
           <button
             type="button"
-            aria-label={panoramicMode ? "Start panoramic capture" : "Take photo"}
+            aria-label={appText(panoramicMode ? "Start panoramic capture" : "Take photo")}
             onClick={panoramicMode ? onStartPan : onCapture}
             disabled={!cameraReady || uploading}
             className="w-[76px] h-[76px] rounded-full border-4 border-white flex items-center justify-center disabled:opacity-40"

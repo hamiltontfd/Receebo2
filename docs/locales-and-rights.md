@@ -2,17 +2,24 @@
 
 Status: market preference and purchase-country editing are implemented on web/PWA.
 The public landing page and market selectors support browser-language copy.
-Other app screens are being localized incrementally; BR/US legal documents remain scaffolding. Everything marked [LEGAL REVIEW NEEDED]
+The web/PWA application interface is localized in en/pt-PT/pt-BR; BR/US legal documents remain scaffolding. Everything marked [LEGAL REVIEW NEEDED]
 needs a lawyer before it ships. Sources: `/workspace/receebo/consumer-rules-br-us.md`,
 `/workspace/receebo-site-ptBR.md`, email spec §2.
 
 ## Locales (`artifacts/receiptr/src/lib/locale.ts`)
 - Language preference scope (web/PWA): explicit English, Português (Portugal),
   Português (Brasil), or automatic browser language. Applies immediately to
-  already-localized landing, market controls, installation/import notices and
-  consumer-rights copy, plus the language control itself. Other app screens,
-  authentication, legal documents, emails, recordings and native mobile are not
-  translated by this setting; the control discloses this partial coverage.
+  landing, navigation, library/search, scanning/review, imports and recurring
+  suppliers, receipt details/attachments, statistics, profile, settings,
+  subscription gates, notifications, privacy/export/deletion, offline and error
+  states, installation notices and consumer-rights copy. Receipt PDF labels also
+  use this language. Shared app copy is in `appCopy.ts`, using the existing locale
+  source; translated labels never replace canonical category/API values.
+  External authentication, legal documents, recorded media, native mobile and
+  original receipt/merchant/item/AI-extracted content are outside this UI coverage.
+  Emails are a separate server localization surface, not changed by this work.
+  The selector discloses these boundaries rather than claiming those contents
+  are translated. Switching language does not remount forms or clear draft edits.
 - Signed-in preferences are stored per account, available without subscription.
   Null means automatic browser language. Visitors save only to this browser.
   Visitor choices are never imported into accounts; accounts never write their
@@ -156,7 +163,6 @@ switch these documents or claim legal approval.
   under a US account still has the existing BR rules and legal-review caveats.
 
 ## Not done yet
-- Saved user locale (DB column + settings switch) and translating the rest of the app.
 - pt-BR / en-US terms and privacy pages in the app.
-- Server emails per locale; return-window reminders still use the unsourced US retailer table.
+- Return-window reminder rules still need review of the unsourced US retailer table.
 - BR durable/non-durable classification beyond category.

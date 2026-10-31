@@ -1,3 +1,5 @@
+import { appText, categoryText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, CheckCircle2, FileText, Loader2, Package } from "lucide-react";
@@ -36,6 +38,7 @@ const field = "border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow
  * the receipt is already saved; this lets the user fix the basics and go on.
  */
 export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; doneHref: string }) {
+  useAppLocale();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -87,7 +90,7 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
         void queryClient.invalidateQueries({ queryKey: getGetReceiptStatsQueryKey() });
         void queryClient.invalidateQueries({ queryKey: getGetRecentReceiptsQueryKey() });
       } catch {
-        toast({ title: "Error", description: "Failed to update receipt.", variant: "destructive" });
+        toast({ title: appText("Error"), description: appText("Failed to update receipt."), variant: "destructive" });
         return;
       }
     }
@@ -106,8 +109,8 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
   if (isError || !receipt || !fields) {
     return (
       <div className="w-full max-w-lg mx-auto px-5 py-16 text-center">
-        <p className="font-semibold mb-4">Receipt not found</p>
-        <Button className="rounded-full" onClick={() => setLocation(doneHref)}>Back</Button>
+        <p className="font-semibold mb-4">{appText("Receipt not found")}</p>
+        <Button className="rounded-full" onClick={() => setLocation(doneHref)}>{appText("Back")}</Button>
       </div>
     );
   }
@@ -121,7 +124,7 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
         <button
           type="button"
           onClick={() => setLocation(doneHref)}
-          aria-label="Back"
+          aria-label={appText("Back")}
           className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -141,29 +144,29 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
       <div className="px-5 py-5 space-y-5 flex-1 pb-28">
         <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 flex items-center gap-2 text-sm font-semibold" role="status">
           <CheckCircle2 className="w-4 h-4 text-violet-700" />
-          Added to your receipts
+          {appText("Added to your receipts")}
         </div>
 
         <div className="rounded-2xl border divide-y">
           <div className="p-4 space-y-1">
-            <label className={label} htmlFor="review-merchant">Merchant</label>
+            <label className={label} htmlFor="review-merchant">{appText("Merchant")}</label>
             <Input id="review-merchant" value={fields.merchant} onChange={(e) => set("merchant")(e.target.value)} className={`${field} font-semibold`} />
           </div>
           <div className="grid grid-cols-2 divide-x">
             <div className="p-4 space-y-1">
-              <label className={label} htmlFor="review-date">Date</label>
+              <label className={label} htmlFor="review-date">{appText("Date")}</label>
               <Input id="review-date" type="date" value={fields.purchaseDate} onChange={(e) => set("purchaseDate")(e.target.value)} className={field} />
             </div>
             <div className="p-4 space-y-1">
-              <span className={label}>Category</span>
+              <span className={label}>{appText("Category")}</span>
               <Select value={fields.category} onValueChange={set("category")}>
-                <SelectTrigger aria-label="Category" className="border-0 px-0 h-auto py-0 font-medium shadow-none focus:ring-0 [&>svg]:ml-1">
-                  <SelectValue placeholder="Select" />
+                <SelectTrigger aria-label={appText("Category")} className="border-0 px-0 h-auto py-0 font-medium shadow-none focus:ring-0 [&>svg]:ml-1">
+                  <SelectValue placeholder={appText("Select")} />
                 </SelectTrigger>
                 <SelectContent>
                   {CATEGORIES.map((cat) => (
                     <SelectItem key={cat} value={cat}>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{cat}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{categoryText(cat)}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -172,12 +175,12 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
           </div>
           <div className="grid grid-cols-2 divide-x">
             <div className="p-4 space-y-1">
-              <label className={label} htmlFor="review-total">Total</label>
+              <label className={label} htmlFor="review-total">{appText("Total")}</label>
               <Input id="review-total" type="number" step="0.01" value={fields.total} onChange={(e) => set("total")(e.target.value)} className={`${field} font-mono font-semibold`} />
             </div>
             <div className="p-4 space-y-1">
-              <label className={label} htmlFor="review-warranty">Warranty</label>
-              <Input id="review-warranty" value={fields.warranty} placeholder="None" onChange={(e) => set("warranty")(e.target.value)} className={field} />
+              <label className={label} htmlFor="review-warranty">{appText("Warranty")}</label>
+              <Input id="review-warranty" value={fields.warranty} placeholder={appText("None")} onChange={(e) => set("warranty")(e.target.value)} className={field} />
             </div>
           </div>
           <PurchaseCountryField
@@ -191,7 +194,7 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
         {products.length > 0 && (
           <div>
             <p className={`${label} mb-2 flex items-center gap-1.5`}>
-              <Package className="w-3.5 h-3.5" /> Items · {products.length}
+              <Package className="w-3.5 h-3.5" /> {appText("Items ·")} {products.length}
             </p>
             <div className="rounded-2xl border divide-y">
               {products.map((p, i) => (
@@ -209,7 +212,7 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
 
         <div>
           <p className={`${label} mb-2 flex items-center gap-1.5`}>
-            <FileText className="w-3.5 h-3.5" /> Original receipt
+            <FileText className="w-3.5 h-3.5" /> {appText("Original receipt")}
           </p>
           <ReceiptPreview fileUrl={privateFileUrl(receipt.objectPath)} fileName={receipt.originalFileName} />
         </div>
@@ -218,7 +221,7 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
       <div className="sticky bottom-0 border-t bg-background px-5 py-3">
         <Button className="w-full rounded-full h-11" onClick={done} disabled={updateReceipt.isPending} data-testid="review-done">
           {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          Done
+          {appText("Done")}
         </Button>
       </div>
     </div>

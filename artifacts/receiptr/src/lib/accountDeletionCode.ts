@@ -1,3 +1,4 @@
+import { appText } from "./appCopy";
 /** Account deletion step 2: the 6-digit code emailed by POST /account/deletion-code. */
 
 /** Keeps digits only (pasting "482 913" works), max 6. */
@@ -11,5 +12,5 @@ export function isCompleteDeletionCode(value: string): boolean {
 
 // PLACEHOLDER COPY (marketing owns the final text).
 export function deletionCodeSentMessage(sentTo: string | null | undefined): string {
-  return `We emailed a 6-digit code to ${sentTo || "your email"}. It expires in 15 minutes.`;
+  return appText("We emailed a 6-digit code to {0}. It expires in 15 minutes.", [sentTo && sentTo !== "your email" ? sentTo : appText("your email")]);
 }

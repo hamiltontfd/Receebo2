@@ -1,3 +1,5 @@
+import { appText, categoryText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Check, X, Mail, Loader2, AlertTriangle, ChevronRight, Repeat } from "lucide-react";
@@ -56,7 +58,7 @@ export function PendingImportCard({
           type="button"
           onClick={onOpen}
           className="w-full text-left"
-          aria-label={`Review ${item.merchant ?? item.originalFileName}`}
+          aria-label={appText("Review {0}", [item.merchant ?? item.originalFileName])}
           data-testid="pending-card-open"
         >
           <div className="flex items-start gap-3">
@@ -73,7 +75,7 @@ export function PendingImportCard({
           </div>
           <div className="flex items-center gap-2 mt-3 min-w-0">
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${categoryStyle(item.category)}`}>
-              {item.category ?? "Other"}
+              {categoryText(item.category ?? "Other")}
             </span>
             {summary && <span className="text-sm truncate">{summary}</span>}
           </div>
@@ -93,31 +95,31 @@ export function PendingImportCard({
             className="flex-1 rounded-full h-10"
             disabled={busy}
             onClick={onDismiss}
-            title="Dismiss"
+            title={appText("Dismiss")}
           >
             <X className="w-4 h-4 mr-1.5" />
-            Dismiss
+            {appText("Dismiss")}
           </Button>
           {recurring ? (
             <Button
               className="flex-1 rounded-full h-10"
               disabled={atCap || busy}
               onClick={onAlwaysImport}
-              title={atCap ? TRIAL_CAP_MESSAGE : "Import this and future receipts automatically"}
+              title={appText(atCap ? TRIAL_CAP_MESSAGE : "Import this and future receipts automatically")}
               data-testid="pending-card-always-import"
             >
               <Repeat className="w-4 h-4 mr-1.5" />
-              Always import
+              {appText("Always import")}
             </Button>
           ) : (
             <Button
               className="flex-1 rounded-full h-10"
               disabled={atCap || busy}
               onClick={onAccept}
-              title={atCap ? TRIAL_CAP_MESSAGE : "Add to library"}
+              title={appText(atCap ? TRIAL_CAP_MESSAGE : "Add to library")}
             >
               <Check className="w-4 h-4 mr-1.5" />
-              Accept
+              {appText("Accept")}
             </Button>
           )}
         </div>
@@ -138,6 +140,7 @@ export function PendingImportCard({
  * compact "all caught up" line once the queue is empty.
  */
 export default function PendingImports() {
+  useAppLocale();
   // Read the billing status from the shared cache (fetched by the app shell).
   const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, enabled: false });
   const atCap = isAtTrialCap(billing);
@@ -154,7 +157,7 @@ export default function PendingImports() {
     return (
       <div className="flex items-center justify-center py-8 text-muted-foreground">
         <Loader2 className="w-4 h-4 animate-spin mr-2" />
-        <span className="text-sm">Checking inbox…</span>
+        <span className="text-sm">{appText("Checking inbox…")}</span>
       </div>
     );
   }
@@ -171,10 +174,10 @@ export default function PendingImports() {
     >
       <p className="flex items-start gap-1.5">
         <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-        {reconnectProviders.map((p) => p.label).join(" and ")} stopped syncing. Reconnect to keep importing receipts.
+        {reconnectProviders.map((p) => p.label).join(" / ")} {appText("stopped syncing. Reconnect to keep importing receipts.")}
       </p>
       <Link href="/settings" className="font-semibold underline shrink-0">
-        Reconnect
+        {appText("Reconnect")}
       </Link>
     </div>
   );
@@ -193,7 +196,7 @@ export default function PendingImports() {
         <div className="flex items-center gap-2">
           <Mail className="w-4 h-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold flex items-center">
-            Found in your email
+            {appText("Found in your email")}
             {count > 0 && (
               <span
                 className="ml-1.5 bg-foreground text-background text-xs font-bold rounded-full px-1.5 py-0.5 leading-none"
@@ -210,7 +213,7 @@ export default function PendingImports() {
             className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center"
             data-testid="link-view-all-imports"
           >
-            View all
+            {appText("View all")}
             <ChevronRight className="w-3.5 h-3.5" />
           </Link>
         )}
@@ -225,17 +228,17 @@ export default function PendingImports() {
             <Check className="w-4 h-4" />
           </span>
           <p>
-            <span className="font-semibold">You're all caught up.</span>{" "}
-            <span className="text-muted-foreground">New receipts from {providerNames} will show up here.</span>
+            <span className="font-semibold">{appText("You're all caught up.")}</span>{" "}
+            <span className="text-muted-foreground">{appText("New receipts from")} {providerNames} {appText("will show up here.")}</span>
           </p>
         </div>
       ) : (
         <>
           {atCap && (
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950" data-testid="pending-trial-cap">
-              <span>{TRIAL_CAP_MESSAGE}</span>
+              <span>{appText(TRIAL_CAP_MESSAGE)}</span>
               <Link href={SUBSCRIBE_HREF} className="font-semibold underline" data-testid="link-pending-subscribe">
-                {TRIAL_CAP_BUTTON}
+                {appText(TRIAL_CAP_BUTTON)}
               </Link>
             </div>
           )}

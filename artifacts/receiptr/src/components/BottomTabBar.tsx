@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { Link, useLocation } from "wouter";
 import { Camera, ChartNoAxesColumn, ChevronRight, Plus, Search, Upload } from "lucide-react";
 import { useBillingStatus, uploadBlockedReason } from "@/hooks/useBilling";
@@ -15,6 +17,7 @@ const ACTIVE = "#121212";
  * not a tab: it opens the Add sheet (Scan receipt / Upload file).
  */
 export function BottomTabBar({ pendingDot }: { pendingDot: boolean }) {
+  useAppLocale();
   const [location] = useLocation();
   const active = tabForPath(location);
   const [addOpen, setAddOpen] = useState(false);
@@ -30,7 +33,7 @@ export function BottomTabBar({ pendingDot }: { pendingDot: boolean }) {
       {/* In-flow spacer so page content never sits under the fixed bar. */}
       <div aria-hidden className="md:hidden shrink-0" style={{ height: "var(--tab-bar-h)" }} />
       <nav
-        aria-label="Main"
+        aria-label={appText("Main")}
         data-testid="bottom-tab-bar"
         className={`md:hidden fixed inset-x-0 bottom-0 bg-white border-t border-[#E6E6E6] flex px-2 pt-1.5 ${addOpen ? "z-[65]" : "z-40"}`}
         style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
@@ -43,7 +46,7 @@ export function BottomTabBar({ pendingDot }: { pendingDot: boolean }) {
         <div className="flex-1 flex flex-col items-center justify-end gap-1 h-[46px] text-[11px] leading-[14px] font-medium" style={{ color: INACTIVE }}>
           <button
             type="button"
-            aria-label={addOpen ? "Close add menu" : "Add receipt"}
+            aria-label={appText(addOpen ? "Close add menu" : "Add receipt")}
             aria-expanded={addOpen}
             aria-haspopup="dialog"
             data-testid="tab-add"
@@ -56,7 +59,7 @@ export function BottomTabBar({ pendingDot }: { pendingDot: boolean }) {
               style={{ transform: addOpen ? "rotate(45deg)" : "none" }}
             />
           </button>
-          <span className={addOpen ? "relative z-20 text-white font-semibold" : ""}>Add</span>
+          <span className={addOpen ? "relative z-20 text-white font-semibold" : ""}>{appText("Add")}</span>
         </div>
         <TabLink href="/stats" label="Stats" icon={ChartNoAxesColumn} on={active === "/stats"} dot={false} />
       </nav>
@@ -81,12 +84,12 @@ function TabLink({
         {dot && (
           <span
             data-testid="search-pending-dot"
-            aria-label="Purchases waiting in your email"
+            aria-label={appText("Purchases waiting in your email")}
             className="absolute -top-px -right-[3px] w-2 h-2 rounded-full bg-[#121212] shadow-[0_0_0_2px_#fff]"
           />
         )}
       </span>
-      {label}
+      {appText(label)}
     </Link>
   );
 }
@@ -97,6 +100,7 @@ function TabLink({
  * file is handed to /scan, which runs the existing upload and review flow.
  */
 export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useAppLocale();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const billingQuery = useBillingStatus();
@@ -118,7 +122,7 @@ export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void
     const billing = billingQuery.data;
     const reason = billing ? uploadBlockedReason(billing) : "We couldn't confirm your plan. Check your connection and try again.";
     if (reason) {
-      toast({ title: "Upload not available", description: reason, variant: "destructive",
+      toast({ title: appText("Upload not available"), description: appText(reason), variant: "destructive",
         ...(isTrialLimitMessage(reason) ? { action: subscribeToastAction(setLocation) } : {}) });
       void billingQuery.refetch?.();
       onClose();
@@ -157,7 +161,7 @@ export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Add a receipt"
+            aria-label={appText("Add a receipt")}
             data-testid="add-sheet"
             className="md:hidden fixed left-3 right-3 z-[70] bg-white rounded-3xl p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.12)] animate-in fade-in slide-in-from-bottom-2 duration-150"
             style={{ bottom: "calc(var(--tab-bar-h, 64px) + 20px)" }}
@@ -186,8 +190,8 @@ function AddRow({
         <Icon className="w-[22px] h-[22px]" strokeWidth={2} />
       </span>
       <span className="flex-1 min-w-0">
-        <span className="block text-base font-semibold leading-[22px] tracking-[-0.01em] text-[#121212]">{title}</span>
-        <span className="block text-[13px] leading-[18px] text-[#737373] mt-px">{sub}</span>
+        <span className="block text-base font-semibold leading-[22px] tracking-[-0.01em] text-[#121212]">{appText(title)}</span>
+        <span className="block text-[13px] leading-[18px] text-[#737373] mt-px">{appText(sub)}</span>
       </span>
       <ChevronRight className="w-[18px] h-[18px] text-[#C4C4C4] shrink-0" strokeWidth={2} />
     </button>

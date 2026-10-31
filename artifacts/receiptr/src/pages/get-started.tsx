@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { useAuth } from "@clerk/react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
@@ -25,6 +27,7 @@ const fadeUp = {
 };
 
 export default function GetStarted() {
+  useAppLocale();
   const { isSignedIn } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -45,13 +48,13 @@ export default function GetStarted() {
         <Link href="/">
           <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {appText("Back")}
           </button>
         </Link>
         <img src="/logo.svg" alt="Receebo" className="h-7 w-auto" />
         <Link href="/sign-in">
           <span className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Sign in
+            {appText("Sign in")}
           </span>
         </Link>
       </header>
@@ -65,17 +68,16 @@ export default function GetStarted() {
           className="text-center mb-10 max-w-md"
         >
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-            Start your free trial
+            {appText("Start your free trial")}
           </p>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
-            15 days free.<br />No card needed.
+            {appText("15 days free.")}<br />{appText("No card needed.")}
           </h1>
           <p className="mt-3 text-muted-foreground text-sm leading-relaxed">
-            Create an account and try Receebo for 15 days. Add up to {TRIAL_UPLOAD_LIMIT} receipts.
-            Nothing is charged unless you choose a plan.
+            {appText("Create an account and try Receebo for 15 days. Add up to")} {TRIAL_UPLOAD_LIMIT} {appText("receipts. Nothing is charged unless you choose a plan.")}
           </p>
           <Link href="/sign-up" className="inline-flex mt-6 h-11 items-center rounded-full bg-foreground px-7 text-sm font-semibold text-background" data-testid="link-get-started-signup">
-            Create free account
+            {appText("Create free account")}
           </Link>
         </motion.div>
 
@@ -91,26 +93,26 @@ export default function GetStarted() {
             className="border-2 border-border rounded-2xl p-6 flex flex-col gap-5 bg-background"
           >
             <div>
-              <p className="font-bold text-lg tracking-tight">Pro Monthly</p>
+              <p className="font-bold text-lg tracking-tight">{appText("Pro Monthly")}</p>
               <div className="flex items-baseline gap-1 mt-2">
                 <span className="text-4xl font-bold font-mono tracking-tight">€2.99</span>
-                <span className="text-sm text-muted-foreground">/ month</span>
+                <span className="text-sm text-muted-foreground">{appText("/ month")}</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Founding price, charged when you subscribe</p>
+              <p className="text-xs text-muted-foreground mt-1">{appText("Founding price, charged when you subscribe")}</p>
             </div>
 
             <ul className="space-y-2 flex-1 text-xs font-mono">
               {FEATURES.map((f) => (
                 <li key={f} className="flex items-center gap-2 text-muted-foreground">
                   <Check className="w-3.5 h-3.5 shrink-0 text-foreground" />
-                  {f}
+                  {appText(f)}
                 </li>
               ))}
             </ul>
 
             <Link href="/sign-up">
               <Button variant="outline" size="sm" className="w-full rounded-full font-semibold">
-                Start with the free trial
+                {appText("Start with the free trial")}
               </Button>
             </Link>
           </motion.div>
@@ -137,19 +139,19 @@ export default function GetStarted() {
             />
 
             <div>
-              <p className="font-bold text-lg tracking-tight mb-1">Pro Yearly</p>
+              <p className="font-bold text-lg tracking-tight mb-1">{appText("Pro Yearly")}</p>
               <div className="flex items-baseline gap-1 mt-2">
                 <span className="text-4xl font-bold font-mono tracking-tight">€24.99</span>
-                <span className="text-sm opacity-70">/ year</span>
+                <span className="text-sm opacity-70">{appText("/ year")}</span>
               </div>
-              <p className="text-xs opacity-60 mt-1">Founding price, charged when you subscribe</p>
+              <p className="text-xs opacity-60 mt-1">{appText("Founding price, charged when you subscribe")}</p>
             </div>
 
             <ul className="space-y-2 flex-1 text-xs font-mono">
               {FEATURES.map((f) => (
                 <li key={f} className="flex items-center gap-2 opacity-80">
                   <Check className="w-3.5 h-3.5 shrink-0 opacity-100" />
-                  {f}
+                  {appText(f)}
                 </li>
               ))}
             </ul>
@@ -159,7 +161,7 @@ export default function GetStarted() {
                 size="sm"
                 className="w-full rounded-full font-semibold bg-background text-foreground hover:bg-background/90"
               >
-                Start with the free trial
+                {appText("Start with the free trial")}
               </Button>
             </Link>
           </motion.div>
@@ -171,7 +173,7 @@ export default function GetStarted() {
           transition={{ delay: 0.5, duration: 0.4 }}
           className="mt-6 text-xs text-muted-foreground text-center"
         >
-          After the trial, choose a plan when you are ready. Founding prices stay available for as long as your account exists, including if you resubscribe later.
+          {appText("After the trial, choose a plan when you are ready. Founding prices stay available for as long as your account exists, including if you resubscribe later.")}
         </motion.p>
       </main>
     </div>

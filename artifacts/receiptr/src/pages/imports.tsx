@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { appText, categoryText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
@@ -64,7 +66,7 @@ function PendingRow({
           type="button"
           role="checkbox"
           aria-checked={selected}
-          aria-label={`Select ${item.merchant ?? item.originalFileName}`}
+              aria-label={appText("Select {0}", [item.merchant ?? item.originalFileName])}
           onClick={onToggle}
           className={`w-9 h-9 rounded-xl border-2 flex items-center justify-center shrink-0 ${
             selected ? "bg-foreground border-foreground text-background" : "border-muted-foreground/30"
@@ -87,7 +89,7 @@ function PendingRow({
           {meta && <p className="text-xs text-muted-foreground">{meta}</p>}
         </div>
         <span className={`inline-block mt-1.5 md:mt-0 text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(item.category)}`}>
-          {item.category ?? "Other"}
+          {categoryText(item.category ?? "Other")}
         </span>
       </button>
       <div className="flex flex-col md:flex-row md:items-center items-end gap-2 shrink-0">
@@ -96,8 +98,8 @@ function PendingRow({
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              title="Dismiss"
-              aria-label="Dismiss"
+              title={appText("Dismiss")}
+              aria-label={appText("Dismiss")}
               disabled={busy}
               onClick={onDismiss}
               className="w-8 h-8 rounded-full bg-secondary text-muted-foreground flex items-center justify-center disabled:opacity-50"
@@ -106,8 +108,8 @@ function PendingRow({
             </button>
             <button
               type="button"
-              title={atCap ? TRIAL_CAP_MESSAGE : "Add to library"}
-              aria-label="Accept"
+              title={appText(atCap ? TRIAL_CAP_MESSAGE : "Add to library")}
+              aria-label={appText("Accept")}
               disabled={busy || atCap}
               onClick={onAccept}
               className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center disabled:opacity-50"
@@ -123,9 +125,10 @@ function PendingRow({
 
 /** /imports: the whole "Found in your email" queue, grouped by month, with bulk actions. */
 export default function ImportsPage() {
+  const locale = useAppLocale();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data, isLoading } = usePendingImports();
+  const { data, isLoading, isError, refetch } = usePendingImports();
   const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, enabled: false });
   const { data: mailStatus } = useMailStatus();
   const { approve, dismiss, bulkApprove, bulkDismiss, busy } = usePendingImportActions();
@@ -137,7 +140,7 @@ export default function ImportsPage() {
 
   const items = data?.items ?? [];
   const count = data?.count ?? items.length;
-  const groups = useMemo(() => groupByMonth(items), [items]);
+  const groups = useMemo(() => groupByMonth(items), [items, locale]);
   const under = useMemo(() => itemsUnder(items), [items]);
   const slotsLeft = trialSlotsLeft(billing);
   const atCap = isAtTrialCap(billing);
@@ -148,14 +151,14 @@ export default function ImportsPage() {
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["mail"] });
       if (result.needsReconnect?.length) {
-        toast({ title: "Reconnect needed", description: "Your email connection expired. Reconnect it in Settings.", variant: "destructive" });
+        toast({ title: appText("Reconnect needed"), description: appText("Your email connection expired. Reconnect it in Settings."), variant: "destructive" });
       } else if (result.queued > 0) {
-        toast({ title: `Found ${result.queued} new receipt${result.queued > 1 ? "s" : ""}` });
+        toast({ title: appText("Found {0} new receipt(s)", [result.queued]) });
       } else {
-        toast({ title: "No new receipts found" });
+        toast({ title: appText("No new receipts found") });
       }
     },
-    onError: () => toast({ title: "Sync failed", description: "Could not reach your inbox. Try again shortly.", variant: "destructive" }),
+    onError: () => toast({ title: appText("Sync failed"), description: appText("Could not reach your inbox. Try again shortly."), variant: "destructive" }),
   });
 
   const exitSelect = () => { setSelecting(false); setSelected(new Set()); };
@@ -178,27 +181,31 @@ export default function ImportsPage() {
 
   return (
     <PageTransition className="flex-1 w-full max-w-lg md:max-w-3xl mx-auto px-5 py-6 flex flex-col gap-4 pb-32">
+      {isError && <div role="alert" className="text-sm">
+        {appText("Could not load imports.")}{" "}
+        <button type="button" className="underline" onClick={() => void refetch()}>{appText("Try again")}</button>
+      </div>}
       {selecting ? (
         <div className="flex items-center justify-between text-sm">
-          <button type="button" className="font-semibold" onClick={exitSelect}>Cancel</button>
-          <span className="text-muted-foreground" data-testid="selected-count">{k} selected</span>
+          <button type="button" className="font-semibold" onClick={exitSelect}>{appText("Cancel")}</button>
+          <span className="text-muted-foreground" data-testid="selected-count">{appText("{0} selected", [k])}</span>
           <button
             type="button"
             className="font-semibold"
             onClick={() => setSelected(allSelected ? new Set() : new Set(items.map((i) => i.id)))}
           >
-            {allSelected ? "Select none" : "Select all"}
+            {appText(allSelected ? "Select none" : "Select all")}
           </button>
         </div>
       ) : (
         <div className="flex items-center justify-between gap-2">
           <Link
             href="/search"
-            aria-label="Back"
+            aria-label={appText("Back")}
             className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center md:w-auto md:h-auto md:bg-transparent md:gap-1.5 md:text-sm md:text-muted-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="hidden md:inline">Home</span>
+            <span className="hidden md:inline">{appText("Home")}</span>
           </Link>
           <div className="flex items-center gap-2">
             <Button
@@ -207,14 +214,14 @@ export default function ImportsPage() {
               className="rounded-full text-muted-foreground"
               onClick={() => sync.mutate()}
               disabled={sync.isPending}
-              aria-label="Sync"
+              aria-label={appText("Sync")}
             >
               {sync.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             </Button>
             {items.length > 0 && (
               <Button variant="secondary" size="sm" className="rounded-full" onClick={() => setSelecting(true)}>
                 <ListChecks className="w-4 h-4 mr-1.5" />
-                Select
+                {appText("Select")}
               </Button>
             )}
           </div>
@@ -224,10 +231,10 @@ export default function ImportsPage() {
       <div className="md:flex md:items-end md:justify-between md:gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Found in your email <span className="text-muted-foreground font-medium">({count})</span>
+            {appText("Found in your email")} <span className="text-muted-foreground font-medium">({count})</span>
           </h1>
           <p className="text-sm text-muted-foreground">
-            {providers.length > 0 ? `From ${providers.join(" and ")}. ` : ""}Worth keeping first.
+            {providers.length > 0 ? appText("From {0}. ", [providers.join(" / ")]) : ""}{appText("Worth keeping first.")}
           </p>
         </div>
         {!selecting && under.length > 0 && (
@@ -239,27 +246,27 @@ export default function ImportsPage() {
             data-testid="dismiss-under-20"
           >
             <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-            Dismiss under €{DISMISS_UNDER_EUR}
+            {appText("Dismiss under €")}{DISMISS_UNDER_EUR}
           </Button>
         )}
       </div>
 
       {atCap && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950" data-testid="imports-trial-cap">
-          <span>{TRIAL_CAP_MESSAGE}</span>
-          <Link href={SUBSCRIBE_HREF} className="font-semibold underline">{TRIAL_CAP_BUTTON}</Link>
+          <span>{appText(TRIAL_CAP_MESSAGE)}</span>
+          <Link href={SUBSCRIBE_HREF} className="font-semibold underline">{appText(TRIAL_CAP_BUTTON)}</Link>
         </div>
       )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-10 text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading…
+          <Loader2 className="w-4 h-4 animate-spin mr-2" /> {appText("Loading…")}
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border px-4 py-6 text-center text-sm" data-testid="imports-empty">
           <Mail className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
-          <p className="font-semibold">You're all caught up.</p>
-          <p className="text-muted-foreground">New receipts from your email will show up here.</p>
+          <p className="font-semibold">{appText("You're all caught up.")}</p>
+          <p className="text-muted-foreground">{appText("New receipts from your email will show up here.")}</p>
         </div>
       ) : (
         groups.map((group) => (
@@ -267,7 +274,7 @@ export default function ImportsPage() {
             <div className="flex items-baseline justify-between mb-2 text-xs">
               <h2 className="font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</h2>
               <span className="text-muted-foreground">
-                {group.items.length} item{group.items.length === 1 ? "" : "s"}
+                {appText("{0} item(s)", [group.items.length])}
                 {group.totals.length > 0 && <> · <span className="font-mono font-semibold text-foreground">{formatTotals(group.totals)}</span></>}
               </span>
             </div>
@@ -297,8 +304,8 @@ export default function ImportsPage() {
             {slotsLeft !== null && (
               <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5" data-testid="trial-slots-note">
                 <Info className="w-3.5 h-3.5" />
-                Trial: {slotsLeft} of {TRIAL_RECEIPT_LIMIT} receipts left. The rest stay here.
-                <Link href={SUBSCRIBE_HREF} className="underline font-semibold text-foreground">Upgrade</Link>
+                {appText("Trial:")} {slotsLeft} {appText("of")} {TRIAL_RECEIPT_LIMIT} {appText("receipts left. The rest stay here.")}
+                <Link href={SUBSCRIBE_HREF} className="underline font-semibold text-foreground">{appText("Upgrade")}</Link>
               </p>
             )}
             <div className="flex items-center gap-2">
@@ -308,7 +315,7 @@ export default function ImportsPage() {
                 disabled={k === 0 || busy}
                 onClick={dismissSelected}
               >
-                Dismiss
+                {appText("Dismiss")}
               </Button>
               <Button
                 className="flex-[1.5] rounded-full h-11"
@@ -317,7 +324,7 @@ export default function ImportsPage() {
                 data-testid="accept-selected"
               >
                 {bulkApprove.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCheck className="w-4 h-4 mr-2" />}
-                {trialLimited ? `Accept up to ${slotsLeft}` : `Accept selected (${k})`}
+                {trialLimited ? appText("Accept up to {0}", [slotsLeft!]) : appText("Accept selected ({0})", [k])}
               </Button>
             </div>
           </div>
@@ -331,10 +338,10 @@ export default function ImportsPage() {
               <Trash2 className="w-4 h-4" />
             </span>
             <AlertDialogTitle>
-              Dismiss {under.length} item{under.length === 1 ? "" : "s"} under €{DISMISS_UNDER_EUR}?
+              {appText("Dismiss {0} item(s) under €{1}?", [under.length, DISMISS_UNDER_EUR])}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              They add up to {underTotal} and won't be added to your receipts. Your emails stay in your inbox.
+              {appText("They add up to")} {underTotal} {appText("and won't be added to your receipts. Your emails stay in your inbox.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <ul className="rounded-xl border divide-y max-h-56 overflow-y-auto text-sm" data-testid="dismiss-under-list">
@@ -352,7 +359,7 @@ export default function ImportsPage() {
             })}
           </ul>
           <AlertDialogFooter className="flex-row gap-2">
-            <AlertDialogCancel className="flex-1 rounded-full mt-0">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="flex-1 rounded-full mt-0">{appText("Cancel")}</AlertDialogCancel>
             <Button
               className="flex-1 rounded-full bg-[#DC2626] text-white hover:bg-[#DC2626]/90"
               disabled={bulkDismiss.isPending}
@@ -360,7 +367,7 @@ export default function ImportsPage() {
               data-testid="confirm-dismiss-under"
             >
               {bulkDismiss.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Dismiss {under.length}
+              {appText("Dismiss")} {under.length}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

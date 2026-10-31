@@ -1,3 +1,5 @@
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -11,6 +13,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 export function HighlightsRow({
   children, label = "Highlights", idPrefix = "highlights", prevLabel = "Previous highlights", nextLabel = "More highlights",
 }: { children: ReactNode; label?: string; idPrefix?: string; prevLabel?: string; nextLabel?: string }) {
+  useAppLocale();
   const ref = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ left: false, right: false });
 
@@ -55,7 +58,7 @@ export function HighlightsRow({
       <div
         ref={ref}
         role="region"
-        aria-label={label}
+        aria-label={appText(label)}
         tabIndex={0}
         data-testid={`${idPrefix}-row`}
         className="flex gap-3 overflow-x-auto overscroll-x-contain pb-2 px-5 scroll-px-5 snap-x snap-proximity focus-visible:outline-none [scrollbar-width:none] [@media(hover:hover)]:[scrollbar-width:thin]"
@@ -69,12 +72,12 @@ export function HighlightsRow({
         <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
       )}
       {edges.left && (
-        <button type="button" aria-label={prevLabel} data-testid={`${idPrefix}-prev`} className={`${arrow} left-2`} onClick={() => page(-1)}>
+        <button type="button" aria-label={appText(prevLabel)} data-testid={`${idPrefix}-prev`} className={`${arrow} left-2`} onClick={() => page(-1)}>
           <ChevronLeft className="w-4 h-4" />
         </button>
       )}
       {edges.right && (
-        <button type="button" aria-label={nextLabel} data-testid={`${idPrefix}-next`} className={`${arrow} right-2`} onClick={() => page(1)}>
+        <button type="button" aria-label={appText(nextLabel)} data-testid={`${idPrefix}-next`} className={`${arrow} right-2`} onClick={() => page(1)}>
           <ChevronRight className="w-4 h-4" />
         </button>
       )}

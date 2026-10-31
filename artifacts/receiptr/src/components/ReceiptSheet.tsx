@@ -1,3 +1,4 @@
+import { appText, categoryText } from "@/lib/appCopy";
 import { useState, useEffect, useRef } from "react";
 import { usePwaUpdateBlocker } from "@/lib/pwa";
 import { privateFileUrl } from "@/lib/privateFileUrl";
@@ -12,7 +13,7 @@ import {
   Sparkles, Package, Shield, Star, Scale, RotateCcw, Clock,
 } from "lucide-react";
 import { deriveConsumerRights } from "@/lib/consumerRights";
-import { useAppLocale } from "@/lib/locale";
+import { useAppLocale, formatLocaleDate } from "@/lib/locale";
 import { hasNoConsumerDates } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
 import { HighlightsRow } from "@/components/HighlightsRow";
@@ -187,7 +188,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
         return blobUrl;
       });
     } catch {
-      toast({ title: "Error", description: "Could not load image.", variant: "destructive" });
+      toast({ title: appText("Error"), description: appText("Could not load image."), variant: "destructive" });
     } finally {
       setIsOpeningStore(false);
     }
@@ -203,7 +204,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
       a.click();
       URL.revokeObjectURL(blobUrl);
     } catch {
-      toast({ title: "Error", description: "Could not download file.", variant: "destructive" });
+      toast({ title: appText("Error"), description: appText("Could not download file."), variant: "destructive" });
     }
   };
 
@@ -233,9 +234,9 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetReceiptStatsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetRecentReceiptsQueryKey() });
-      toast({ title: "Receipt updated", description: "Your changes have been saved." });
+      toast({ title: appText("Receipt updated"), description: appText("Your changes have been saved.") });
     } catch {
-      toast({ title: "Error", description: "Failed to update receipt.", variant: "destructive" });
+      toast({ title: appText("Error"), description: appText("Failed to update receipt."), variant: "destructive" });
     }
   };
 
@@ -243,13 +244,13 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
     if (!receiptId) return;
     try {
       await deleteReceipt.mutateAsync({ id: receiptId });
-      toast({ title: "Receipt deleted", description: "Removed from your library." });
+      toast({ title: appText("Receipt deleted"), description: appText("Removed from your library.") });
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetReceiptStatsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetRecentReceiptsQueryKey() });
       onClose();
     } catch {
-      toast({ title: "Error", description: "Failed to delete receipt.", variant: "destructive" });
+      toast({ title: appText("Error"), description: appText("Failed to delete receipt."), variant: "destructive" });
     }
   };
 
@@ -270,11 +271,11 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
         a.download = fileName;
         a.click();
         URL.revokeObjectURL(url);
-        toast({ title: "Downloaded", description: `${fileName} saved to your device.` });
+        toast({ title: appText("Downloaded"), description: appText("{0} saved to your device.", [fileName]) });
       }
     } catch (e) {
       if (e instanceof Error && e.name !== "AbortError") {
-        toast({ title: "Error", description: "Could not generate PDF.", variant: "destructive" });
+        toast({ title: appText("Error"), description: appText("Could not generate PDF."), variant: "destructive" });
       }
     }
   };
@@ -310,9 +311,9 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
           contentType,
         },
       });
-      toast({ title: "File attached", description: `${fileName} added to this receipt.` });
+      toast({ title: appText("File attached"), description: appText("{0} added to this receipt.", [fileName]) });
     } catch {
-      toast({ title: "Upload failed", description: "Could not attach the file.", variant: "destructive" });
+      toast({ title: appText("Upload failed"), description: appText("Could not attach the file."), variant: "destructive" });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -324,9 +325,9 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
     setDeletingAttachmentId(attachmentId);
     try {
       await deleteAttachmentMutation.mutateAsync({ receiptId, attachmentId });
-      toast({ title: "File removed", description: "Attachment deleted." });
+      toast({ title: appText("File removed"), description: appText("Attachment deleted.") });
     } catch {
-      toast({ title: "Error", description: "Could not remove attachment.", variant: "destructive" });
+      toast({ title: appText("Error"), description: appText("Could not remove attachment."), variant: "destructive" });
     } finally {
       setDeletingAttachmentId(null);
     }
@@ -383,11 +384,11 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                 <div className="w-16 h-16 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-4">
                   <AlertTriangle className="w-8 h-8" />
                 </div>
-                <h2 className="text-xl font-bold mb-2">Receipt not found</h2>
+                <h2 className="text-xl font-bold mb-2">{appText("Receipt not found")}</h2>
                 <p className="text-muted-foreground mb-6 text-sm">
-                  The receipt doesn't exist or you don't have access to it.
+                  {appText("The receipt doesn't exist or you don't have access to it.")}
                 </p>
-                <Button className="rounded-full" onClick={onClose}>Dismiss</Button>
+                <Button className="rounded-full" onClick={onClose}>{appText("Dismiss")}</Button>
               </div>
             ) : (
               <>
@@ -396,7 +397,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                   <button
                     onClick={onClose}
                     className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors shrink-0"
-                    aria-label="Close"
+                    aria-label={appText("Close")}
                   >
                     {isDesktop ? <X className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
                   </button>
@@ -417,8 +418,8 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {receipt.purchaseDate
-                        ? format(new Date(receipt.purchaseDate), "MMM d, yyyy")
-                        : format(new Date(receipt.createdAt), "MMM d, yyyy")}
+                        ? formatLocaleDate(new Date(receipt.purchaseDate), locale)
+                        : formatLocaleDate(new Date(receipt.createdAt), locale)}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
@@ -446,9 +447,9 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             name="merchant"
                             render={({ field }) => (
                               <FormItem className="p-4 space-y-1">
-                                <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Merchant</FormLabel>
+                                <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Merchant")}</FormLabel>
                                 <FormControl>
-                                  <Input {...field} placeholder="e.g. Apple Store" className="border-0 px-0 h-auto py-0 font-semibold focus-visible:ring-0 shadow-none" />
+                                  <Input {...field} placeholder={appText("e.g. Apple Store")} className="border-0 px-0 h-auto py-0 font-semibold focus-visible:ring-0 shadow-none" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -460,7 +461,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                               name="purchaseDate"
                               render={({ field }) => (
                                 <FormItem className="p-4 space-y-1">
-                                  <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</FormLabel>
+                                  <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Date")}</FormLabel>
                                   <FormControl>
                                     <Input type="date" {...field} className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
                                   </FormControl>
@@ -473,17 +474,17 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                               name="category"
                               render={({ field }) => (
                                 <FormItem className="p-4 space-y-1">
-                                  <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</FormLabel>
+                                  <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Category")}</FormLabel>
                                   <Select onValueChange={field.onChange} value={field.value || undefined}>
                                     <FormControl>
                                       <SelectTrigger className="border-0 px-0 h-auto py-0 font-medium shadow-none focus:ring-0 [&>svg]:ml-1">
-                                        <SelectValue placeholder="Select" />
+                                        <SelectValue placeholder={appText("Select")} />
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
                                       {CATEGORIES.map((cat) => (
                                         <SelectItem key={cat} value={cat}>
-                                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{cat}</span>
+                                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${categoryStyle(cat)}`}>{categoryText(cat)}</span>
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -499,7 +500,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                               name="total"
                               render={({ field }) => (
                                 <FormItem className="p-4 space-y-1">
-                                  <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</FormLabel>
+                                  <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Total")}</FormLabel>
                                   <FormControl>
                                     <Input type="number" step="0.01" {...field} value={field.value ?? ""} className="border-0 px-0 h-auto py-0 font-mono font-semibold focus-visible:ring-0 shadow-none" />
                                   </FormControl>
@@ -512,7 +513,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                               name="currency"
                               render={({ field }) => (
                                 <FormItem className="p-4 space-y-1">
-                                  <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Currency</FormLabel>
+                                  <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Currency")}</FormLabel>
                                   <FormControl>
                                     <Input {...field} placeholder="USD" className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
                                   </FormControl>
@@ -526,9 +527,9 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             name="warranty"
                             render={({ field }) => (
                               <FormItem className="p-4 space-y-1">
-                                <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Warranty</FormLabel>
+                                <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Warranty")}</FormLabel>
                                 <FormControl>
-                                  <AutosizeTextarea {...field} placeholder="e.g. 2-year manufacturer warranty" minRows={2} className="border-0 px-0 shadow-none focus-visible:ring-0 resize-none" />
+                                  <AutosizeTextarea {...field} placeholder={appText("e.g. 2-year manufacturer warranty")} minRows={2} className="border-0 px-0 shadow-none focus-visible:ring-0 resize-none" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -549,7 +550,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                           name="isOnlinePurchase"
                           render={({ field }) => (
                             <FormItem className="p-4 space-y-1">
-                              <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Purchase type</FormLabel>
+                              <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Purchase type")}</FormLabel>
                               <div className="flex gap-2 pt-0.5">
                                 <button
                                   type="button"
@@ -561,7 +562,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                                       : "bg-background border-border text-muted-foreground hover:text-foreground",
                                   ].join(" ")}
                                 >
-                                  🌐 Online
+                                  {appText("🌐 Online")}
                                 </button>
                                 <button
                                   type="button"
@@ -573,7 +574,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                                       : "bg-background border-border text-muted-foreground hover:text-foreground",
                                   ].join(" ")}
                                 >
-                                  🏪 In-store
+                                  {appText("🏪 In-store")}
                                 </button>
                               </div>
                             </FormItem>
@@ -587,7 +588,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             return (
                               <FormItem className="p-4 space-y-1">
                                 <div className="flex items-center justify-between gap-3">
-                                  <FormLabel htmlFor="switch-subscription" className="text-sm font-medium">This is a subscription</FormLabel>
+                                  <FormLabel htmlFor="switch-subscription" className="text-sm font-medium">{appText("This is a subscription")}</FormLabel>
                                   <FormControl>
                                     <Switch
                                       id="switch-subscription"
@@ -598,8 +599,8 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                                   </FormControl>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                  {checked && field.value && NO_DATES_TYPE_LABEL[field.value] ? `${NO_DATES_TYPE_LABEL[field.value]} ` : ""}
-                                  No return window, warranty or reminders for subscriptions, digital purchases and tickets.
+                                  {checked && field.value && NO_DATES_TYPE_LABEL[field.value] ? `${appText(NO_DATES_TYPE_LABEL[field.value])} ` : ""}
+                                  {appText("No return window, warranty or reminders for subscriptions, digital purchases and tickets.")}
                                 </p>
                               </FormItem>
                             );
@@ -610,11 +611,11 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                           name="deliveryDate"
                           render={({ field }) => (
                             <FormItem className="p-4 space-y-1">
-                              <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Delivered on (optional)</FormLabel>
+                              <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Delivered on (optional)")}</FormLabel>
                               <FormControl>
                                 <Input type="date" {...field} value={field.value ?? ""} data-testid="input-delivery-date" className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
                               </FormControl>
-                              <p className="text-xs text-muted-foreground">Online orders: the return window counts from delivery.</p>
+                              <p className="text-xs text-muted-foreground">{appText("Online orders: the return window counts from delivery.")}</p>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -622,10 +623,10 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                         <div className="flex items-center gap-2 mt-4">
                           <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
                             {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            Save Changes
+                            {appText("Save Changes")}
                           </Button>
                           <Button type="button" variant="outline" className="rounded-full" onClick={() => setIsEditing(false)} disabled={updateReceipt.isPending}>
-                            Cancel
+                            {appText("Cancel")}
                           </Button>
                         </div>
                       </form>
@@ -637,7 +638,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
                         <Star className="w-3.5 h-3.5" />
-                        Highlights
+                        {appText("Highlights")}
                       </p>
                       <HighlightsRow>
                         {receipt.notableItems!.map((item, i) => {
@@ -669,7 +670,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3.5">
                       <p className="text-xs font-semibold uppercase tracking-wide text-blue-400 mb-1.5 flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5" />
-                        Summary
+                        {appText("Summary")}
                       </p>
                       <p className="text-sm text-blue-900/70 leading-relaxed">{receipt.summary}</p>
                     </div>
@@ -680,7 +681,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
                         <Package className="w-3.5 h-3.5" />
-                        Items
+                        {appText("Items")}
                       </p>
                       <ul className="divide-y divide-border border border-border rounded-xl overflow-hidden">
                         {receipt.products.map((product, i) => (
@@ -688,7 +689,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             <div className="min-w-0">
                               <p className="text-sm font-medium truncate">{product.name}</p>
                               {product.quantity && product.quantity > 1 && (
-                                <p className="text-xs text-muted-foreground">Qty {product.quantity}</p>
+                                <p className="text-xs text-muted-foreground">{appText("Qty")} {product.quantity}</p>
                               )}
                             </div>
                             {product.price != null && (
@@ -702,7 +703,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
 
                   {!isEditing && (
                     <div className="flex items-center justify-between gap-4 text-sm">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Purchase country</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Purchase country")}</span>
                       <PurchaseCountryValue value={receipt.purchaseCountry} className="font-semibold text-right" />
                     </div>
                   )}
@@ -712,7 +713,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
                         <Shield className="w-3.5 h-3.5" />
-                        Warranty
+                        {appText("Warranty")}
                       </p>
                       <p className="text-sm text-muted-foreground leading-relaxed">{receipt.warranty}</p>
                     </div>
@@ -745,11 +746,11 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
                           <Scale className="w-3.5 h-3.5" />
-                          Consumer Rights{rights.countryLabel ? ` · ${rights.countryLabel}` : ""}
+                          {appText("Consumer Rights")}{rights.countryLabel ? ` · ${rights.countryLabel}` : ""}
                         </p>
                         {!receipt.purchaseCountry && (
                           <p className="mb-2 text-xs text-muted-foreground">
-                            Purchase country is unknown. This guidance may use the receipt currency or merchant as an estimate, not a confirmed country.
+                            {appText("Purchase country is unknown. This guidance may use the receipt currency or merchant as an estimate, not a confirmed country.")}
                           </p>
                         )}
                         <div className="space-y-2">
@@ -761,17 +762,17 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                               <div className="min-w-0">
                                 <p className="text-sm font-semibold leading-tight">
                                   {rights.returnWindow.isExpired
-                                    ? "Return window expired"
-                                    : `Return by ${rights.returnWindow.formattedDeadline}`}
+                                    ? appText("Return window expired")
+                                    : appText("Return by {0}", [rights.returnWindow.formattedDeadline])}
                                 </p>
                                 <p className="text-xs mt-0.5 opacity-80">
                                   {rights.returnWindow.isExpired
-                                    ? `Expired ${Math.abs(rights.returnWindow.daysLeft)} day${Math.abs(rights.returnWindow.daysLeft) !== 1 ? "s" : ""} ago`
+                                    ? appText("Expired {0} day(s) ago", [Math.abs(rights.returnWindow.daysLeft)])
                                     : rights.returnWindow.daysLeft === 0
-                                      ? "Last day to return"
-                                      : `${rights.returnWindow.daysLeft} day${rights.returnWindow.daysLeft !== 1 ? "s" : ""} left`}
+                                      ? appText("Last day to return")
+                                      : appText("{0} day(s) left", [rights.returnWindow.daysLeft])}
                                   {" · "}{rights.returnWindow.source}
-                                  {rights.returnWindow.startsFrom === "delivery" ? " · from delivery" : ""}
+                                  {rights.returnWindow.startsFrom === "delivery" ? appText(" · from delivery") : ""}
                                 </p>
                               </div>
                             </div>
@@ -784,17 +785,17 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                               <div className="min-w-0">
                                 <p className="text-sm font-semibold leading-tight">
                                   {rights.warranty.isExpired
-                                    ? `${rights.warranty.label} (expired)`
+                                    ? appText("{0} (expired)", [rights.warranty.label])
                                     : `${rights.warranty.label}`}
                                 </p>
                                 <p className="text-xs mt-0.5 opacity-80">
                                   {rights.warranty.kind === "complaint_deadline"
                                     ? rights.warranty.isExpired
-                                      ? `Apparent defects: deadline passed ${rights.warranty.formattedExpiry} · ${rights.warranty.citation}`
-                                      : `Apparent defects: report by ${rights.warranty.formattedExpiry} · ${rights.warranty.citation}`
+                                      ? appText("Apparent defects: deadline passed {0} · {1}", [rights.warranty.formattedExpiry, rights.warranty.citation])
+                                      : appText("Apparent defects: report by {0} · {1}", [rights.warranty.formattedExpiry, rights.warranty.citation])
                                     : rights.warranty.isExpired
-                                      ? `Expired ${rights.warranty.formattedExpiry}`
-                                      : `Valid until ${rights.warranty.formattedExpiry} · ${rights.warranty.citation}`}
+                                      ? appText("Expired {0}", [rights.warranty.formattedExpiry])
+                                      : appText("Valid until {0} · {1}", [rights.warranty.formattedExpiry, rights.warranty.citation])}
                                 </p>
                               </div>
                             </div>
@@ -813,8 +814,8 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                                 </p>
                                 <p className="text-xs mt-0.5 opacity-80">
                                   {rights.manufacturerWarranty.isExpired
-                                    ? `Expired ${rights.manufacturerWarranty.formattedExpiry}`
-                                    : `Until ${rights.manufacturerWarranty.formattedExpiry} · from the receipt`}
+                                    ? appText("Expired {0}", [rights.manufacturerWarranty.formattedExpiry])
+                                    : appText("Until {0} · from the receipt", [rights.manufacturerWarranty.formattedExpiry])}
                                 </p>
                               </div>
                             </div>
@@ -827,7 +828,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                           )}
                           <p className="px-1 text-[11px] leading-4 text-muted-foreground">
                             {rights.disclaimer}
-                            {rights.legalReviewPending && <strong> {"[LEGAL REVIEW NEEDED]"}</strong>}
+                            {rights.legalReviewPending && <strong> {appText("[LEGAL REVIEW NEEDED]")}</strong>}
                           </p>
 
                         </div>
@@ -854,7 +855,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                           disabled={isOpeningStore}
                         >
                           <ScanLine className="w-4 h-4 mr-2" />
-                          {isOpeningStore ? "Loading…" : "Show to store"}
+                          {appText(isOpeningStore ? "Loading…" : "Show to store")}
                         </Button>
                       )}
                     </div>
@@ -866,7 +867,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                           <Paperclip className="w-3.5 h-3.5" />
-                          Files
+                          {appText("Files")}
                         </p>
                         <button
                           onClick={() => fileInputRef.current?.click()}
@@ -906,7 +907,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             onClick={() => downloadFile(fileUrl, receipt.originalFileName)}
                             className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
                           >
-                            Download
+                            {appText("Download")}
                           </button>
                         </li>
 
@@ -933,14 +934,14 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                                 onClick={() => downloadFile(attUrl, att.originalFileName)}
                                 className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
                               >
-                                Download
+                                {appText("Download")}
                               </button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <button
                                     disabled={isDeleting}
                                     className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50 shrink-0"
-                                    aria-label="Remove attachment"
+                                    aria-label={appText("Remove attachment")}
                                   >
                                     {isDeleting
                                       ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -950,18 +951,18 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>Remove this file?</AlertDialogTitle>
+                                    <AlertDialogTitle>{appText("Remove this file?")}</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      This will permanently delete <span className="font-medium">{att.originalFileName}</span>.
+                                      {appText("This will permanently delete")} <span className="font-medium">{att.originalFileName}</span>.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogCancel>{appText("Cancel")}</AlertDialogCancel>
                                     <AlertDialogAction
                                       onClick={() => handleDeleteAttachment(att.id)}
                                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                     >
-                                      Remove
+                                      {appText("Remove")}
                                     </AlertDialogAction>
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
@@ -983,11 +984,11 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                         onClick={() => setIsEditing(true)}
                       >
                         <Edit2 className="w-4 h-4 mr-2" />
-                        Edit
+                        {appText("Edit")}
                       </Button>
                       <Button variant="outline" className="flex-1 rounded-full" onClick={handleShare}>
                         <Share2 className="w-4 h-4 mr-2" />
-                        Share
+                        {appText("Share")}
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -996,23 +997,23 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             className="flex-1 rounded-full text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/10"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
+                            {appText("Delete")}
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete this receipt?</AlertDialogTitle>
+                            <AlertDialogTitle>{appText("Delete this receipt?")}</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This action cannot be undone. The receipt and all extracted data will be permanently removed.
+                              {appText("This action cannot be undone. The receipt and all extracted data will be permanently removed.")}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogCancel>{appText("Cancel")}</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={handleDelete}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
-                              Delete
+                              {appText("Delete")}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>

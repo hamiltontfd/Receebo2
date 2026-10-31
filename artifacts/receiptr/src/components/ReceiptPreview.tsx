@@ -1,3 +1,5 @@
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { useState, useEffect, useCallback } from "react";
 import { ExternalLink, FileText } from "lucide-react";
 import { customFetch } from "@workspace/api-client-react";
@@ -17,6 +19,7 @@ interface ReceiptPreviewProps {
  * window.open synchronously (keeps mobile popup blockers happy).
  */
 export function ReceiptPreview({ fileUrl, fileName }: ReceiptPreviewProps) {
+  useAppLocale();
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -53,7 +56,7 @@ export function ReceiptPreview({ fileUrl, fileName }: ReceiptPreviewProps) {
           <FileText className="w-4 h-4 text-muted-foreground" />
         </span>
         <div className="min-w-0">
-          <p className="font-semibold text-sm">Original receipt</p>
+          <p className="font-semibold text-sm">{appText("Original receipt")}</p>
           <p className="text-xs text-muted-foreground truncate">{fileName}</p>
         </div>
       </div>
@@ -63,10 +66,10 @@ export function ReceiptPreview({ fileUrl, fileName }: ReceiptPreviewProps) {
         className="shrink-0 ml-2 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors disabled:opacity-40"
         onClick={handleOpen}
         disabled={!blobUrl}
-        aria-label="Open original receipt in new tab"
+        aria-label={appText("Open original receipt in new tab")}
       >
         <ExternalLink className="w-3.5 h-3.5" />
-        Open
+        {appText("Open")}
       </button>
     </div>
   );

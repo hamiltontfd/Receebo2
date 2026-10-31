@@ -1,3 +1,5 @@
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { Link } from "wouter";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import { HighlightsRow } from "@/components/HighlightsRow";
@@ -44,11 +46,12 @@ export function WorthKeepingCards({
   /** More qualifying items than the cards shown. */
   hasMore?: boolean;
 }) {
+  useAppLocale();
   if (items.length === 0) return null;
   if (layout === "grid") {
     return (
       <section data-testid={testId}>
-        <h2 className={`${TITLE} mb-3`}>Worth keeping</h2>
+        <h2 className={`${TITLE} mb-3`}>{appText("Worth keeping")}</h2>
         <div className="grid grid-cols-2 gap-3">
           {items.map((item, i) => <Card key={`${item.receiptId}-${i}`} item={item} onOpen={onOpen} inRow={false} />)}
         </div>
@@ -58,14 +61,14 @@ export function WorthKeepingCards({
   return (
     <section data-testid={testId}>
       <div className="flex items-center justify-between mb-3">
-        <h2 className={TITLE}>Worth keeping</h2>
+        <h2 className={TITLE}>{appText("Worth keeping")}</h2>
         {seeAllHref && (
           <Link href={seeAllHref} className="text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-0.5" data-testid={`${testId}-see-all`}>
-            See all <ChevronRight className="w-3.5 h-3.5" />
+            {appText("See all")} <ChevronRight className="w-3.5 h-3.5" />
           </Link>
         )}
       </div>
-      <HighlightsRow label="Worth keeping" idPrefix={testId} prevLabel="Previous items" nextLabel="More items">
+      <HighlightsRow label={appText("Worth keeping")} idPrefix={testId} prevLabel={appText("Previous items")} nextLabel={appText("More items")}>
         {items.map((item, i) => <Card key={`${item.receiptId}-${i}`} item={item} onOpen={onOpen} inRow />)}
         {seeAllHref && hasMore && (
           <Link
@@ -76,7 +79,7 @@ export function WorthKeepingCards({
             <span className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
               <ArrowRight className="w-4 h-4" />
             </span>
-            See all
+            {appText("See all")}
           </Link>
         )}
       </HighlightsRow>

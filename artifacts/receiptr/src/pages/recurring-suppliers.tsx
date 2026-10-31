@@ -1,3 +1,5 @@
+import { appText } from "@/lib/appCopy";
+import { useAppLocale, getAppLocale, formatLocaleDate } from "@/lib/locale";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ArrowLeft, ChevronRight, Repeat } from "lucide-react";
@@ -32,7 +34,7 @@ export function formatSupplierDate(value: string | null): string | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return formatLocaleDate(d, getAppLocale());
 }
 
 /** On first, then the most recent receipt (the server sorts too; kept stable after a switch). */
@@ -46,6 +48,7 @@ export function sortSuppliers(list: RecurringSupplier[]): RecurringSupplier[] {
 
 /** Profile "Email imports" section: shown when a mailbox is connected or a supplier exists. */
 export function EmailImportsSection() {
+  useAppLocale();
   const { data: mailStatus } = useMailStatus();
   const { data: suppliers } = useRecurringSuppliers();
   const connected = (mailStatus?.providers ?? []).some((p) => p.enabled && p.connected);
@@ -54,7 +57,7 @@ export function EmailImportsSection() {
   return (
     <section data-testid="profile-email-imports">
       <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-        Email imports
+        {appText("Email imports")}
       </h2>
       <div className="border rounded-xl">
         <Link href="/profile/recurring">
@@ -62,7 +65,7 @@ export function EmailImportsSection() {
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-secondary/50 transition-colors rounded-xl"
             data-testid="link-recurring-suppliers"
           >
-            <span className="font-medium">Recurring suppliers</span>
+            <span className="font-medium">{appText("Recurring suppliers")}</span>
             <span className="flex items-center gap-1.5 text-muted-foreground">
               {count}
               <ChevronRight className="w-4 h-4" />
@@ -84,7 +87,7 @@ function SupplierRow({ supplier, busy, onToggle }: {
   const on = supplier.status === "on";
   const last = formatSupplierDate(supplier.lastReceiptDate);
   const amount = formatMoney(supplier.lastAmount, supplier.lastCurrency);
-  const receipts = `${supplier.receiptCount} receipt${supplier.receiptCount === 1 ? "" : "s"}`;
+  const receipts = appText("{0} receipt(s)", [supplier.receiptCount]);
   return (
     <div className="px-4 py-3.5 flex items-center gap-3" data-testid={`recurring-row-${supplier.supplierKey}`}>
       <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${categoryStyle(supplier.category)} ${off ? "opacity-50" : ""}`}>
@@ -93,11 +96,11 @@ function SupplierRow({ supplier, busy, onToggle }: {
       <div className={`min-w-0 flex-1 ${off ? "opacity-50" : ""}`}>
         <p className="text-sm font-semibold truncate">{supplier.displayName}</p>
         <p className="text-xs text-muted-foreground">
-          {KIND_LABEL[supplier.kind]} · {off ? "Not importing" : receipts}
+          {appText(KIND_LABEL[supplier.kind])} · {off ? appText("Not importing") : receipts}
         </p>
         {(last || amount) && (
           <p className="text-xs text-muted-foreground">
-            {last && <>Last {last}</>}
+            {last && <>{appText("Last")} {last}</>}
             {last && amount && " · "}
             {amount && <span className="font-mono">{amount}</span>}
           </p>
@@ -107,7 +110,7 @@ function SupplierRow({ supplier, busy, onToggle }: {
         checked={on}
         disabled={busy}
         onCheckedChange={onToggle}
-        aria-label={`Import ${supplier.displayName} automatically`}
+        aria-label={appText("Import {0} automatically", [supplier.displayName])}
         data-testid={`recurring-switch-${supplier.supplierKey}`}
       />
     </div>
@@ -116,6 +119,7 @@ function SupplierRow({ supplier, busy, onToggle }: {
 
 /** /profile/recurring: approve a subscription or bill once; the switch is the only way to stop one. */
 export default function RecurringSuppliersPage() {
+  useAppLocale();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data, isLoading } = useRecurringSuppliers();
@@ -128,10 +132,10 @@ export default function RecurringSuppliersPage() {
       // Pending items from it lose (or keep) the recurring card.
       void queryClient.invalidateQueries({ queryKey: PENDING_QUERY_KEY });
       toast(updated.status === "off"
-        ? { title: `Stopped importing from ${updated.displayName}`, description: "Turn it back on here anytime." }
-        : { title: `${updated.displayName} receipts will now import automatically` });
+        ? { title: appText("Stopped importing from {0}", [updated.displayName]), description: appText("Turn it back on here anytime.") }
+        : { title: appText("{0} receipts will now import automatically", [updated.displayName]) });
     },
-    onError: () => toast({ title: "Could not update this supplier. Please try again.", variant: "destructive" }),
+    onError: () => toast({ title: appText("Could not update this supplier. Please try again."), variant: "destructive" }),
   });
 
   const suppliers = sortSuppliers(data ?? []);
@@ -140,11 +144,11 @@ export default function RecurringSuppliersPage() {
     <div className="max-w-md mx-auto px-6 pt-6 pb-12 w-full">
       <Link href="/profile" className="hidden md:inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="w-4 h-4" />
-        Profile
+        {appText("Profile")}
       </Link>
-      <h1 className="text-2xl font-bold mt-4">Recurring suppliers</h1>
+      <h1 className="text-2xl font-bold mt-4">{appText("Recurring suppliers")}</h1>
       <p className="text-sm text-muted-foreground mt-1">
-        Approve a subscription or bill once and its receipts import automatically.
+        {appText("Approve a subscription or bill once and its receipts import automatically.")}
       </p>
 
       {isLoading ? (
@@ -158,9 +162,9 @@ export default function RecurringSuppliersPage() {
             <Repeat className="w-4 h-4" />
           </span>
           <p>
-            <span className="font-semibold">No recurring suppliers yet.</span>{" "}
+            <span className="font-semibold">{appText("No recurring suppliers yet.")}</span>{" "}
             <span className="text-muted-foreground">
-              When we spot a subscription or bill in your email, you can approve it once here.
+              {appText("When we spot a subscription or bill in your email, you can approve it once here.")}
             </span>
           </p>
         </div>
@@ -177,7 +181,7 @@ export default function RecurringSuppliersPage() {
             ))}
           </div>
           <p className="text-xs text-muted-foreground mt-3">
-            Off stops new receipts from that supplier. Receipts already in your library stay.
+            {appText("Off stops new receipts from that supplier. Receipts already in your library stay.")}
           </p>
         </>
       )}

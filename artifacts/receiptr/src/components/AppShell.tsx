@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { appText } from "@/lib/appCopy";
+import { useAppLocale } from "@/lib/locale";
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, ChartNoAxesColumn, LogOut, Plus, Search, UserCircle2 } from "lucide-react";
 import { useUser, useClerk } from "@clerk/react";
@@ -17,6 +19,7 @@ const tabs = [
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  useAppLocale();
   const [location, setLocation] = useLocation();
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -52,9 +55,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             data-testid="link-subpage-back"
           >
             <ArrowLeft className="w-5 h-5" />
-            Back
+            {appText("Back")}
           </Link>
-          <h1 className="text-[17px] font-bold tracking-[-0.01em] truncate">{subPage.title}</h1>
+          <h1 className="text-[17px] font-bold tracking-[-0.01em] truncate">{appText(subPage.title)}</h1>
           <span />
         </header>
       ) : (
@@ -63,7 +66,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Receebo" className="h-[2rem] w-auto" />
           </Link>
           <Link href="/profile">
-            <button aria-label="Open profile" className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center text-sm font-bold text-foreground shrink-0">
+            <button aria-label={appText("Open profile")} className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center text-sm font-bold text-foreground shrink-0">
               {isGuest
                 ? (guestUser?.name?.[0] ?? "G").toUpperCase()
                 : (user?.fullName?.[0] ?? user?.primaryEmailAddress?.emailAddress?.[0] ?? "?").toUpperCase()}
@@ -77,7 +80,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Link href="/search">
           <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Receebo" className="h-8 w-auto" />
         </Link>
-        <nav className="flex items-center gap-1" aria-label="Main">
+        <nav className="flex items-center gap-1" aria-label={appText("Main")}>
           {tabs.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} aria-current={location.startsWith(href) ? "page" : undefined}>
               <Button
@@ -87,11 +90,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 data-testid={`desktop-tab-${label.toLowerCase()}`}
               >
                 <Icon className="w-4 h-4 mr-2" />
-                {label}
+                {appText(label)}
                 {href === "/search" && pendingDot && !onSearch && (
                   <span
                     data-testid="desktop-search-pending-dot"
-                    aria-label="Purchases waiting in your email"
+                    aria-label={appText("Purchases waiting in your email")}
                     className="ml-1.5 w-1.5 h-1.5 rounded-full bg-foreground"
                   />
                 )}
@@ -112,7 +115,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             </Button>
           </Link>
-          <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" onClick={handleSignOut}>
+          <Button aria-label={appText("Sign out")} variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground" onClick={handleSignOut}>
             <LogOut className="w-4 h-4" />
           </Button>
         </div>
