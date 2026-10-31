@@ -11,7 +11,6 @@ vi.mock("@workspace/api-client-react", () => ({
 import InstallBar from "./InstallBar";
 import { resetInstallStateForTests } from "@/lib/pwa";
 import { INSTALL_DISMISS_KEY, INSTALL_DISMISS_MS, shouldShowInstallBar } from "@/lib/installPrompt";
-import { LOCALE_STORAGE_KEY } from "@/lib/locale";
 
 const IPHONE_SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1";
 const IPHONE_CHROME = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 CriOS/130.0 Mobile/15E148 Safari/604.1";
@@ -19,6 +18,7 @@ const ANDROID = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0
 let standalone = false;
 
 beforeEach(() => {
+  vi.restoreAllMocks();
   mocks.signedIn = true;
   mocks.receipts = [{ id: 1 }];
   standalone = false;
@@ -97,13 +97,13 @@ describe("install bar show rules", () => {
     render(<InstallBar />);
     expect(bar()).not.toBeInTheDocument();
   });
-  it("uses pt-BR and pt-PT copy when that locale is selected", () => {
-    localStorage.setItem(LOCALE_STORAGE_KEY, "pt-BR");
+  it("uses pt-BR and pt-PT copy based on browser language", () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["pt-BR"]);
     const view = render(<InstallBar />);
     expect(screen.getByText("Instale o Receebo no seu celular")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Instalar" })).toBeInTheDocument();
     view.unmount();
-    localStorage.setItem(LOCALE_STORAGE_KEY, "pt-PT");
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["pt-PT"]);
     render(<InstallBar />);
     expect(screen.getByText("Instale o Receebo no seu telemóvel")).toBeInTheDocument();
   });

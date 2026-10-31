@@ -2,15 +2,9 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useAuth } from "@clerk/react";
 import { customFetch, type AccountLanguage } from "@workspace/api-client-react";
 import {
-  isAppLocale, LOCALE_STORAGE_KEY, notifyLocaleChange, setAccountLocale, useAppLocale, type AppLocale,
+  isAppLocale, notifyLocaleChange, setAccountLocale, useAppLocale, type AppLocale,
 } from "@/lib/locale";
 
-function readVisitor(): AppLocale | null {
-  try {
-    const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
-    return isAppLocale(saved) ? saved : null;
-  } catch { return null; }
-}
 type LanguageState = {
   language: AppLocale | null;
   loading: boolean;
@@ -32,7 +26,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 }
 
 function LanguageScope({ children, userId, ready }: { children: ReactNode; userId: string | null; ready: boolean }) {
-  const [language, setLanguage] = useState<AppLocale | null>(() => userId ? null : readVisitor());
+  const [language, setLanguage] = useState<AppLocale | null>(null);
   const [loading, setLoading] = useState(!!userId || !ready);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
@@ -55,16 +49,11 @@ function LanguageScope({ children, userId, ready }: { children: ReactNode; userI
       if (!busy.current && !failed.current) setReload((value) => value + 1);
     };
     const visible = () => { if (document.visibilityState === "visible") refresh(); };
-    const storage = (event: StorageEvent) => {
-      if (!userId && (event.key === LOCALE_STORAGE_KEY || event.key === null)) refresh();
-    };
     window.addEventListener("focus", refresh);
-    window.addEventListener("storage", storage);
     window.addEventListener("languagechange", refresh);
     document.addEventListener("visibilitychange", visible);
     return () => {
       window.removeEventListener("focus", refresh);
-      window.removeEventListener("storage", storage);
       window.removeEventListener("languagechange", refresh);
       document.removeEventListener("visibilitychange", visible);
     };
@@ -73,7 +62,7 @@ function LanguageScope({ children, userId, ready }: { children: ReactNode; userI
   useEffect(() => {
     if (!ready) return;
     if (!userId) {
-      setLanguage(readVisitor());
+      setLanguage(null);
       notifyLocaleChange();
       setLoading(false);
       return;
@@ -93,7 +82,7 @@ function LanguageScope({ children, userId, ready }: { children: ReactNode; userI
   }, [userId, ready, reload]);
 
   async function choose(value: AppLocale | null) {
-    if (!ready || busy.current || (value !== null && !isAppLocale(value))) return;
+    if (!ready || !userId || busy.current || (value !== null && !isAppLocale(value))) return;
     busy.current = true;
     const atRevision = ++revision.current;
     const current = () => alive.current && revision.current === atRevision;
@@ -104,20 +93,13 @@ function LanguageScope({ children, userId, ready }: { children: ReactNode; userI
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
-      let saved = value;
-      if (userId) {
-        const result = await request({
-          method: "PATCH", signal: controller.signal,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ language: value }),
-        });
-        saved = result.language;
-      } else {
-        if (value === null) localStorage.removeItem(LOCALE_STORAGE_KEY);
-        else localStorage.setItem(LOCALE_STORAGE_KEY, value);
-      }
+      const result = await request({
+        method: "PATCH", signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: value }),
+      });
       if (current()) {
-        setLanguage(saved);
+        setLanguage(result.language);
         failed.current = null;
         notifyLocaleChange();
       }

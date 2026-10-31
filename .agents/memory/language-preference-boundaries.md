@@ -13,11 +13,8 @@ existing English-only flows or legal scaffolding as translated or approved.
 **How to apply:** Extend translations explicitly by surface. Never use the selected
 language to rewrite purchase country, currency or legal jurisdiction.
 
-Visitor language is not automatically adopted by accounts, unlike visitor market.
+Visitors always use browser language. Do not display a manual language selector on the homepage, including on mobile. Manual language changes belong only in signed-in user settings.
 
-**Why:** A shared browser's display language should not silently overwrite or
-initialize another person's account preference. Account automatic mode means
-browser language, not a previous visitor's saved language.
+**Why:** The user explicitly requested automatic browser language on the public site and manual changes only in account settings after login.
 
-**How to apply:** Keep account values out of browser-wide preference storage and
-restore the visitor's own preference on logout.
+**How to apply:** Ignore legacy visitor language overrides in browser storage. Keep account values out of browser-wide preference storage and restore browser language on logout. Account automatic mode also means browser language, not a previous visitor's saved language. Language remains independent of market.

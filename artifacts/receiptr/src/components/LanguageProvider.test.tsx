@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LanguageProvider } from "./LanguageProvider";
+import { LanguageProvider, useLanguage } from "./LanguageProvider";
 import { LanguageSelector } from "./LanguageSelector";
 import { getAppLocale, LOCALE_STORAGE_KEY, setAccountLocale, useAppLocale } from "@/lib/locale";
 import { lt } from "@/lib/landingLocale";
@@ -13,7 +13,9 @@ vi.mock("@clerk/react", () => ({ useAuth: () => mocks.auth }));
 vi.mock("@workspace/api-client-react", () => ({ customFetch: (...args: unknown[]) => mocks.request(...args) }));
 function View() {
   const locale = useAppLocale();
+  const { choose } = useLanguage();
   return <><LanguageSelector /><output data-testid="locale">{locale}</output>
+    <button onClick={() => void choose("pt-BR")}>Attempt language change</button>
     <span>{lt("Translated content", "Conteúdo traduzido")}</span></>;
 }
 const view = () => render(<LanguageProvider><View /></LanguageProvider>);
@@ -30,20 +32,15 @@ beforeEach(() => {
 afterEach(() => { cleanup(); setAccountLocale(undefined); vi.restoreAllMocks(); });
 
 describe("language preference", () => {
-  it("saves visitor choice locally and updates translated content and document immediately", async () => {
+  it("ignores legacy visitor choice and hides manual selection before login", async () => {
+    localStorage.setItem(LOCALE_STORAGE_KEY, "pt-BR");
     view();
-    choose("pt-BR");
-    await waitFor(() => expect(language()).toBe("pt-BR"));
-    expect(screen.getByText("Conteúdo traduzido")).toBeTruthy();
-    expect(document.documentElement.lang).toBe("pt-BR");
+    expect(language()).toBe("en");
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.getByText("Translated content")).toBeTruthy();
+    expect(document.documentElement.lang).toBe("en");
     expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("pt-BR");
     expect(mocks.request).not.toHaveBeenCalled();
-    cleanup();
-    view();
-    expect(language()).toBe("pt-BR");
-    choose("auto");
-    await waitFor(() => expect(language()).toBe("en"));
-    expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBeNull();
   });
   it("uses browser language and reacts to browser language changes in automatic mode", async () => {
     view();
@@ -82,7 +79,7 @@ describe("language preference", () => {
     await waitFor(() => expect(select()).not.toBeDisabled());
     expect(language()).toBe("en");
   });
-  it("discards late account reads on account switch and restores visitors on logout", async () => {
+  it("discards late account reads on account switch and restores browser language on logout", async () => {
     localStorage.setItem(LOCALE_STORAGE_KEY, "pt-BR");
     mocks.auth.userId = "A";
     let resolve!: (data: { language: string }) => void;
@@ -96,7 +93,8 @@ describe("language preference", () => {
     expect(language()).toBe("en");
     mocks.auth.userId = null;
     result.rerender(<LanguageProvider><View /></LanguageProvider>);
-    await waitFor(() => expect(language()).toBe("pt-BR"));
+    await waitFor(() => expect(language()).toBe("en"));
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
   it("shows failed reads with explicit retry and never adopts visitor choice", async () => {
     mocks.auth.userId = "A";
@@ -134,17 +132,17 @@ describe("language preference", () => {
     act(() => window.dispatchEvent(new Event("focus")));
     await waitFor(() => expect(language()).toBe("pt-BR"));
   });
-  it("reports unavailable visitor storage instead of pretending the choice was saved", async () => {
+  it("rejects manual language changes before login", async () => {
     view();
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("denied"); });
-    choose("pt-BR");
-    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Attempt language change" }));
     expect(getAppLocale()).toBe("en");
+    expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBeNull();
+    expect(mocks.request).not.toHaveBeenCalled();
   });
-  it("reacts to visitor preferences from another tab", async () => {
+  it("ignores legacy visitor preferences from another tab", async () => {
     view();
     localStorage.setItem(LOCALE_STORAGE_KEY, "pt-PT");
     act(() => window.dispatchEvent(new StorageEvent("storage", { key: LOCALE_STORAGE_KEY })));
-    await waitFor(() => expect(language()).toBe("pt-PT"));
+    expect(language()).toBe("en");
   });
 });

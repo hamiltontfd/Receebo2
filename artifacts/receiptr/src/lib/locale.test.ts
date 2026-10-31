@@ -12,11 +12,11 @@ describe("locale scaffolding", () => {
     expect(resolveLocale("en-US")).toBe("en");
     expect(resolveLocale(undefined)).toBe("en");
   });
-  it("uses browser language independently of market, with explicit locale override", () => {
+  it("uses browser language independently of market and legacy visitor overrides", () => {
     expect(getAppLocale({ getItem: () => null }, "en-US")).toBe("en");
     expect(getAppLocale({ getItem: () => null }, "pt-BR")).toBe("pt-BR");
     expect(getAppLocale(null, "pt-PT")).toBe("pt-PT");
-    expect(getAppLocale({ getItem: () => "pt-BR" })).toBe("pt-BR");
+    expect(getAppLocale({ getItem: () => "pt-BR" }, "en-US")).toBe("en");
     expect(getAppLocale({ getItem: () => "fr" }, "pt-PT")).toBe("pt-PT");
     expect(getAppLocale({ getItem: () => { throw new Error("Denied"); } }, "pt-BR")).toBe("pt-BR");
   });

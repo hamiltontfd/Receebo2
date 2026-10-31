@@ -1,12 +1,15 @@
 import { useId } from "react";
+import { useAuth } from "@clerk/react";
 import { useLanguage } from "./LanguageProvider";
 import { useAppLocale, type AppLocale } from "@/lib/locale";
 import { lt } from "@/lib/landingLocale";
 
 export function LanguageSelector({ compact = false }: { compact?: boolean }) {
+  const { userId, isLoaded } = useAuth();
   const { language, loading, saving, error, choose, retry } = useLanguage();
   useAppLocale();
   const id = useId();
+  if (!isLoaded || !userId) return null;
   return <div className={compact ? "max-w-48 text-xs" : "space-y-2"} data-testid="language-selector">
     <label htmlFor={id} className={compact ? "sr-only" : "block text-sm font-medium"}>
       {lt("Language", "Idioma")}

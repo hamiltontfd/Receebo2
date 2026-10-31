@@ -4,7 +4,7 @@
  * time. Spec: /workspace/receebo-email SPEC §2, docs/locales-and-rights.md.
  *
  * - Account language wins while signed in; null uses browser language.
- * - Signed-out visitors use localStorage "receebo:locale", then browser language.
+ * - Signed-out visitors always use browser language, ignoring legacy local overrides.
  * - Browser/sign-up fallback: pt-BR → pt-BR, any other pt* → pt-PT, else en.
  * - Without a saved override, browser language selects the UI locale.
  * - Money is EUR for everyone (the subscription), formatted per locale.
@@ -20,7 +20,7 @@ const listeners = new Set<() => void>();
 export function notifyLocaleChange() {
   listeners.forEach((listener) => listener());
 }
-/** undefined = visitor; null = account using automatic browser language. */
+/** undefined = visitor; null = account using automatic browser language. Both use the browser. */
 export function setAccountLocale(language: AppLocale | null | undefined) {
   accountOverride = language;
   notifyLocaleChange();
@@ -44,17 +44,13 @@ export function resolveLocale(tag: string | null | undefined): AppLocale {
 
 /** Browser language is independent of account market and purchase country. */
 export function getAppLocale(
-  storage: Pick<Storage, "getItem"> | null = typeof localStorage === "undefined" ? null : localStorage,
+  _legacyStorage: Pick<Storage, "getItem"> | null = null,
   browserLanguage: string | null | undefined = typeof navigator === "undefined" ? undefined : navigator.languages?.[0] ?? navigator.language,
 ): AppLocale {
   // Explicit arguments keep this helper usable for deterministic formatting/tests.
   if (arguments.length === 0 && accountOverride !== undefined) {
     return accountOverride ?? resolveLocale(browserLanguage);
   }
-  try {
-    const saved = storage?.getItem(LOCALE_STORAGE_KEY);
-    if (saved && (APP_LOCALES as readonly string[]).includes(saved)) return saved as AppLocale;
-  } catch { /* Storage denial must not disable browser language detection. */ }
   return resolveLocale(browserLanguage);
 }
 
