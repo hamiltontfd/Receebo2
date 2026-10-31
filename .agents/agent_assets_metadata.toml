@@ -1,8 +1,21 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "3Ab3hp741Bz-sffHcjVTQ"
 uri = "file://assets/receiptr-icon.png"
 type = "image"
 title = "generated_image"
+
+[[outputs]]
+id = "Ra_q0muEtm6VDhYQvWxzy"
+uri = "file://artifacts/receiptr/public/opengraph-receebo-launch.jpg"
+type = "image"
+title = "Nova prévia do Receebo para compartilhamento"
+description = "Imagem atualizada com os mockups atuais do app, em 1280 × 720. Disponível no site após republicar."
+logical_id = "43c5196a-7b55-4f53-a91e-9f543a2f5940"
+content_hash = "sha256:7fd402d44a5e0f31131828f3ab1e3fb78a351a2b316bbf7871c46deacc6f4785"
+size = 86642
+mtime_ms = 1793439678679
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/43c5196a-7b55-4f53-a91e-9f543a2f5940/57d4d64e-4d8a-411b-9fbe-372602b745ee"
+storage_version_token = "1793439742051369"
+content_type = "image/jpeg"
