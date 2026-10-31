@@ -78,7 +78,7 @@ describe("signed renewal payment notifications", () => {
   it("sends once for duplicate events and repeated failed attempts, including concurrent deliveries", async () => {
     await Promise.all([signedFailure(), signedFailure(), signedFailure({ attempt_count: 2 })]);
     expect(mocks.email).toHaveBeenCalledTimes(1);
-    expect(mocks.email).toHaveBeenCalledWith("user_paid", invoice.id, expect.stringContaining("continues until"));
+    expect(mocks.email).toHaveBeenCalledWith("user_paid", invoice.id, { owner: false, continuesUntil: new Date(4102444800 * 1000) });
   });
   it("rejects invalid signatures before any side effects", async () => {
     await expect(signedFailure({}, "invalid")).rejects.toThrow();
@@ -130,11 +130,11 @@ describe("signed renewal payment notifications", () => {
     const subscription = await mocks.subscription();
     mocks.subscription.mockResolvedValue({ ...subscription, status: "unpaid", items: { data: [{ current_period_end: 1 }] } });
     await signedFailure();
-    expect(mocks.email).toHaveBeenLastCalledWith("user_paid", invoice.id, expect.stringContaining("access has ended"));
+    expect(mocks.email).toHaveBeenLastCalledWith("user_paid", invoice.id, { owner: false, continuesUntil: null });
     mocks.ledger.clear();
     mocks.owner.mockResolvedValue(true);
     await signedFailure();
-    expect(mocks.email).toHaveBeenLastCalledWith("user_paid", invoice.id, expect.stringContaining("Owner access is unchanged"));
+    expect(mocks.email).toHaveBeenLastCalledWith("user_paid", invoice.id, { owner: true, continuesUntil: null });
   });
   it("uses the exact existing cutoff, including equality and missing dates", () => {
     const cutoff = new Date("2030-01-01T00:00:00Z");

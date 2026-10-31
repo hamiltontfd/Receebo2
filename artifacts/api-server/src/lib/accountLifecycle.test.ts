@@ -184,6 +184,47 @@ describe("daily retention sweep (real PostgreSQL)", () => {
     await runDataRetentionSweep({ now: new Date(now.getTime() + 6 * DAY_MS), enabled: true, userIds: [userId] });
     expect(fixture.perform).not.toHaveBeenCalled();
   });
+
+  it("rolls back the final warning claim if language lookup rejects and waits for actual delivery", async () => {
+    const now = new Date();
+    const userId = newUser();
+    fixture.status.set(userId, frozen(55, now));
+    await db.insert(accountLifecycleTable).values({
+      userId, accessEndedAt: new Date(now.getTime() - 55 * DAY_MS),
+      deletionDueAt: new Date(now.getTime() + 5 * DAY_MS), warning30SentAt: now,
+    });
+    const localeModule = await import("./emailLocale");
+    const lookup = vi.spyOn(localeModule, "getUserEmailLocale").mockRejectedValue(new Error("preference unavailable"));
+    fixture.warn.mockImplementation(async () => {
+      // The new locale query runs AFTER the sweep has claimed the warning.
+      const [claimed] = await db.select().from(accountLifecycleTable)
+        .where(eq(accountLifecycleTable.userId, userId));
+      expect(claimed.warning7SentAt).not.toBeNull();
+      await localeModule.getUserEmailLocale(userId);
+      return true;
+    });
+    try {
+      expect(await runDataRetentionSweep({ now, enabled: true, userIds: [userId] }))
+        .toMatchObject({ failed: 1, warned: 0, deleted: 0 });
+      const [row] = await db.select().from(accountLifecycleTable).where(eq(accountLifecycleTable.userId, userId));
+      expect(row.warning7SentAt).toBeNull();
+      expect(row.warning30SentAt?.getTime()).toBe(now.getTime());
+      // Already beyond both the old deadline and six days from the failed claim.
+      const retryAt = new Date(now.getTime() + 7 * DAY_MS);
+      expect(await runDataRetentionSweep({ now: retryAt, enabled: true, userIds: [userId] }))
+        .toMatchObject({ failed: 1, warned: 0, deleted: 0 });
+      expect(fixture.perform).not.toHaveBeenCalled();
+      lookup.mockResolvedValue("pt-BR");
+      expect(await runDataRetentionSweep({ now: retryAt, enabled: true, userIds: [userId] }))
+        .toMatchObject({ failed: 0, warned: 1, deleted: 0 });
+      expect(fixture.perform).not.toHaveBeenCalled();
+      expect(await runDataRetentionSweep({ now: new Date(retryAt.getTime() + 7 * DAY_MS + 1000), enabled: true, userIds: [userId] }))
+        .toMatchObject({ deleted: 1 });
+      expect(fixture.perform).toHaveBeenCalledTimes(1);
+    } finally {
+      lookup.mockRestore();
+    }
+  });
 });
 
 describe("export while frozen", () => {

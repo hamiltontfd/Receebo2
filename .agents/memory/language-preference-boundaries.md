@@ -19,3 +19,18 @@ Visitors always use browser language. Do not display a manual language selector 
 **Why:** The user explicitly requested automatic browser language on the public site and manual changes only in account settings after login.
 
 **How to apply:** Ignore legacy visitor language overrides in browser storage. Keep account values out of browser-wide preference storage and restore browser language on logout. Account automatic mode also means browser language, not a previous visitor's saved language. Language remains independent of market.
+
+For account emails, automatic means English, not the last browser language.
+Explicit account choices apply to application-owned mail only; provider-owned
+authentication/billing messages remain separate.
+
+**Why:** Scheduled jobs and webhooks have no browser, and market or receipt
+country must not silently become a language preference. The email language must
+also survive account deletion long enough to send the final confirmation.
+
+**How to apply:** Resolve the current saved language per send, fail on read errors,
+and capture it with the contact before deleting the account. Do not cache or
+persist an inferred browser language for automatic email sends.
+Callers that reserve a notification before sending must undo that reservation
+on thrown lookup errors as well as unsuccessful delivery. A reservation is not
+proof that a required deletion warning reached the provider.

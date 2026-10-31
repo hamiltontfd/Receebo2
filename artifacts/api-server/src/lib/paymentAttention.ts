@@ -38,9 +38,10 @@ export async function notifyPaymentFailure(eventInvoice: Stripe.Invoice): Promis
   if (!billing || (billing.stripeSubscriptionId && billing.stripeSubscriptionId !== subscriptionId)) return;
   const periodEnd = subscription.items.data[0]?.current_period_end;
   const endAt = periodEnd ? new Date(periodEnd * 1000) : null;
-  const message = await hasOwnerAccess(billing.userId)
-    ? "Your Owner access is unchanged, but your subscription has an outstanding payment."
-    : paymentAccessMessage(endAt);
+  const access = {
+    owner: await hasOwnerAccess(billing.userId),
+    continuesUntil: endAt && endAt > new Date() ? endAt : null,
+  };
 
   // Serialize duplicate events across workers. Rollback on failure lets Stripe retry.
   // Resend's stable idempotency key also covers a crash after provider acceptance.
@@ -49,7 +50,7 @@ export async function notifyPaymentFailure(eventInvoice: Stripe.Invoice): Promis
     const [sent] = await tx.select().from(paymentNoticesTable)
       .where(eq(paymentNoticesTable.invoiceId, invoice.id));
     if (sent) return;
-    await sendPaymentAttentionEmail(billing.userId, invoice.id, message);
+    await sendPaymentAttentionEmail(billing.userId, invoice.id, access);
     await tx.insert(paymentNoticesTable).values({ invoiceId: invoice.id, userId: billing.userId });
   });
 }

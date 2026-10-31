@@ -128,9 +128,10 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription): Promise<vo
   }
 
   // Atomically claim the send slot — prevents duplicate sends with the nightly sweep
+  const claimAt = new Date();
   const claimed = await db
     .update(userBillingTable)
-    .set({ trialReminderSentAt: new Date() })
+    .set({ trialReminderSentAt: claimAt })
     .where(
       and(
         eq(userBillingTable.userId, billing.userId),
@@ -177,15 +178,17 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription): Promise<vo
     "webhookHandlers: sending trial-ending reminder email",
   );
 
-  const sent = await sendTrialEndingEmail(billing.userId, trialEnd, { planName, planAmount, planCurrency });
-
-  if (!sent) {
-    // Reset flag so the nightly sweep can retry
-    await db
-      .update(userBillingTable)
-      .set({ trialReminderSentAt: null })
-      .where(eq(userBillingTable.userId, billing.userId));
-    logger.warn({ userId: billing.userId }, "webhookHandlers: trial reminder email failed — flag reset for retry");
+  let sent = false;
+  try {
+    sent = await sendTrialEndingEmail(billing.userId, trialEnd, { planName, planAmount, planCurrency });
+  } finally {
+    if (!sent) {
+      // A rejected locale lookup is not a delivered reminder. Release only our
+      // own claim so neither webhook retries nor the sweep lose the notice.
+      await db.update(userBillingTable).set({ trialReminderSentAt: null })
+        .where(and(eq(userBillingTable.userId, billing.userId), eq(userBillingTable.trialReminderSentAt, claimAt)));
+      logger.warn({ userId: billing.userId }, "webhookHandlers: trial reminder email failed — flag reset for retry");
+    }
   }
 }
 

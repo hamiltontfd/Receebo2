@@ -135,16 +135,25 @@ export async function runDataRetentionSweep(
           .where(sql`${accountLifecycleTable.userId} = ${userId} AND ${column} IS NULL`)
           .returning({ userId: accountLifecycleTable.userId });
         if (claimed.length === 0) continue;
-        const ok = await sendDeletionWarningEmail(userId, {
-          stage, deletionDate: row.deletionDueAt, receiptCount: counts.receipts,
-        });
+        let ok = false;
+        try {
+          ok = await sendDeletionWarningEmail(userId, {
+            stage, deletionDate: row.deletionDueAt, receiptCount: counts.receipts,
+          });
+        } finally {
+          // Locale/contact reads can throw before delivery. A claim is not proof
+          // of delivery: restore it on BOTH rejection and false, or a later sweep
+          // could delete the account without its mandatory final warning.
+          if (!ok) {
+            await db.update(accountLifecycleTable)
+              .set({ warning30SentAt: row.warning30SentAt, warning7SentAt: row.warning7SentAt })
+              .where(sql`${accountLifecycleTable.userId} = ${userId} AND ${column} = ${now}`);
+          }
+        }
         if (ok) {
           result.warned++;
         } else {
           result.failed++;
-          await db.update(accountLifecycleTable)
-            .set({ warning30SentAt: row.warning30SentAt, warning7SentAt: row.warning7SentAt })
-            .where(eq(accountLifecycleTable.userId, userId));
         }
         continue;
       }

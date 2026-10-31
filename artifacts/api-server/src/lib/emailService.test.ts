@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ send: vi.fn(), user: vi.fn() }));
 vi.mock("resend", () => ({ Resend: class { emails = { send: mocks.send }; } }));
 vi.mock("@clerk/express", () => ({ clerkClient: { users: { getUser: mocks.user } } }));
+vi.mock("./emailLocale", async importOriginal => ({
+  ...await importOriginal<typeof import("./emailLocale")>(),
+  getUserEmailLocale: async () => "en",
+}));
 import * as emailService from "./emailService";
 import {
   appUrl, emailSender, escapeHtml, sanitizeSubject, formatMoney, formatEmailDate,

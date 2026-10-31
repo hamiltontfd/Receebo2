@@ -3,6 +3,9 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { clerkClient } from "@clerk/express";
 import { logger } from "./logger";
 import { billingOrigin, PUBLISHED_ORIGIN } from "./billingUrls";
+import { getUserEmailLocale, emailLabels, type EmailLocale } from "./emailLocale";
+import { localizedReturnReminder, localizedWarrantyReminder } from "./reminderEmailCopy";
+import { deletionWarningCopy, accountDeletedCopy, deletionCodeCopy, paymentCopy, type PaymentAccess } from "./transactionEmailCopy";
 import {
   renderReturnReminder, renderWarrantyReminder, type ReminderMessage, type ReminderPurchase,
 } from "./reminderCopy";
@@ -193,6 +196,7 @@ const BUTTON_STYLE = "display:inline-block;background:#111;color:#fff;text-decor
 const FOOTER_STYLE = "color:#bbb;font-size:12px;margin-top:40px;border-top:1px solid #eee;padding-top:16px;";
 
 export interface EmailLayout {
+  locale?: EmailLocale;
   /** Small uppercase header line, plain text (escaped). */
   eyebrow: string;
   /** Pre-escaped HTML for the main content. */
@@ -210,14 +214,15 @@ export function emailButton(label: string, href: string): string {
 }
 
 export function renderEmailLayout(layout: EmailLayout): string {
+  const labels = emailLabels(layout.locale);
   const unsub = layout.unsubscribeUrl
-    ? `\n    <a href="${escapeHtml(layout.unsubscribeUrl)}" style="color:#999;">Unsubscribe</a> from warranty and return reminders, or manage preferences in your <a href="${escapeHtml(`${appUrl()}/settings`)}" style="color:#999;">settings</a>.`
+    ? `\n    <a href="${escapeHtml(layout.unsubscribeUrl)}" style="color:#999;">${labels.unsubscribe}</a> ${labels.unsubscribeRest} <a href="${escapeHtml(`${appUrl()}/settings`)}" style="color:#999;">${labels.settings}</a>.`
     : "";
   const footer = layout.footerHtml || unsub
     ? `\n  <p style="${FOOTER_STYLE}">${layout.footerHtml ?? ""}${unsub}</p>`
     : "";
   return `<!DOCTYPE html>
-<html>
+<html lang="${layout.locale ?? "en"}">
 <body style="${BODY_STYLE}">
   <p style="${EYEBROW_STYLE}">${escapeHtml(layout.eyebrow)}</p>
   ${layout.bodyHtml}${layout.cta ? `\n  ${emailButton(layout.cta.label, layout.cta.href)}` : ""}${footer}
@@ -228,18 +233,27 @@ export function renderEmailLayout(layout: EmailLayout): string {
 // ── Payment attention (paid renewals) ─────────────────────────────────────────
 
 export async function sendPaymentAttentionEmail(
-  userId: string, invoiceId: string, accessMessage: string,
+  userId: string, invoiceId: string, access: PaymentAccess,
 ): Promise<void> {
   const email = await getUserEmail(userId);
   if (!email) throw new Error("Payment notice recipient unavailable");
+  const locale = await getUserEmailLocale(userId);
+  const accessMessage = paymentCopy(access, locale);
   // A durable sign-in-protected link, not an expiring bearer portal session.
   const settingsUrl = `${billingOrigin()}/settings`;
-  const text = `Your Receebo renewal payment failed. ${accessMessage} Open ${settingsUrl} and choose Update payment details to open Stripe's secure billing portal. Stripe may retry your payment.`;
+  const en = locale === "en";
+  const subject = en ? "Action needed: update your Receebo payment details" : "Ação necessária: atualize os dados de pagamento do Receebo";
+  const heading = en ? "Your renewal payment failed" : "O pagamento da renovação falhou";
+  const instructions = en ? "Stripe may retry your payment. Open Settings and choose Update payment details to use Stripe's secure billing portal."
+    : `O Stripe pode tentar cobrar novamente. Abra as ${emailLabels(locale).settings} e escolha Atualizar dados de pagamento para usar o portal seguro do Stripe.`;
+  const cta = en ? "Update payment details in Receebo" : "Atualizar dados de pagamento no Receebo";
+  const text = en ? `Your Receebo renewal payment failed. ${accessMessage} Open ${settingsUrl} and choose Update payment details to open Stripe's secure billing portal. Stripe may retry your payment.`
+    : `${heading}. ${accessMessage} ${instructions} ${cta}: ${settingsUrl}`;
   const result = await resend.emails.send({
     ...emailSender(),
-    to: email, subject: "Action needed: update your Receebo payment details",
+    to: email, subject,
     text,
-    html: `<h1>Your renewal payment failed</h1><p>${escapeHtml(accessMessage)}</p><p>Stripe may retry your payment. Open Settings and choose Update payment details to use Stripe's secure billing portal.</p><p><a href="${escapeHtml(settingsUrl)}">Update payment details in Receebo</a></p>`,
+    html: renderEmailLayout({ locale, eyebrow: "Receebo", bodyHtml: `<h1>${heading}</h1><p>${escapeHtml(accessMessage)}</p><p>${escapeHtml(instructions)}</p>`, cta: { label: cta, href: settingsUrl } }),
   }, { idempotencyKey: `payment-attention/${invoiceId}` });
   if (result.error) {
     logger.error({ kind: "payment_attention", userId, invoiceId, errorName: result.error.name,
@@ -256,10 +270,12 @@ const REMINDER_NOTE_STYLE = "font-size:13px;color:#737373;line-height:1.5;margin
 
 /** HTML and plain text of a reminder; every value is escaped here. */
 export function renderReminderEmail(
-  message: ReminderMessage, opts: { eyebrow: string; receiptUrl: string; unsubscribeUrl?: string },
+  message: Omit<ReminderMessage, "push">, opts: { eyebrow: string; receiptUrl: string; unsubscribeUrl?: string; locale?: EmailLocale },
 ): { html: string; text: string } {
   const settingsUrl = `${appUrl()}/settings`;
+  const labels = emailLabels(opts.locale);
   const html = renderEmailLayout({
+    locale: opts.locale,
     eyebrow: opts.eyebrow,
     bodyHtml: `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(message.preheader)}</div>
   <h1 style="${H1_STYLE}">${escapeHtml(message.title)}</h1>
@@ -267,8 +283,8 @@ export function renderReminderEmail(
     message.secondary ? `\n  <p style="${REMINDER_SECONDARY_STYLE}">${escapeHtml(message.secondary)}</p>` : ""}
   <p style="${P_STYLE}">${escapeHtml(message.body)}</p>${
     message.note ? `\n  <p style="${REMINDER_NOTE_STYLE}">${escapeHtml(message.note)}</p>` : `\n  <div style="margin:0 0 8px;"></div>`}`,
-    cta: { label: "View receipt", href: opts.receiptUrl },
-    footerHtml: `${escapeHtml(message.footer)} <a href="${escapeHtml(settingsUrl)}" style="color:#999;">Manage reminders</a>.`,
+    cta: { label: labels.view, href: opts.receiptUrl },
+    footerHtml: `${escapeHtml(message.footer)} <a href="${escapeHtml(settingsUrl)}" style="color:#999;">${labels.manage}</a>.`,
     unsubscribeUrl: opts.unsubscribeUrl,
   });
   const text = [
@@ -280,10 +296,10 @@ export function renderReminderEmail(
     message.body,
     ...(message.note ? ["", message.note] : []),
     "",
-    `View receipt: ${opts.receiptUrl}`,
+    `${labels.view}: ${opts.receiptUrl}`,
     "",
-    `${message.footer} Manage reminders: ${settingsUrl}`,
-    ...(opts.unsubscribeUrl ? [`Unsubscribe: ${opts.unsubscribeUrl}`] : []),
+    `${message.footer} ${labels.manage}: ${settingsUrl}`,
+    ...(opts.unsubscribeUrl ? [`${labels.unsubscribe}: ${opts.unsubscribeUrl}`] : []),
   ].join("\n");
   return { html, text };
 }
@@ -307,15 +323,16 @@ export async function sendWarrantyReminderEmail(
 ): Promise<boolean> {
   const email = await getUserEmail(userId);
   if (!email) return false;
-
-  const message = renderWarrantyReminder({
+  const locale = await getUserEmailLocale(userId);
+  const input = {
     ...receipt,
     merchant: receipt.merchant || receipt.originalFileName || null,
-  });
+  };
+  const message = locale === "en" ? renderWarrantyReminder(input) : localizedWarrantyReminder(input, locale);
   const receiptUrl = `${appUrl()}/receipts/${receipt.id}`;
   const unsub = unsubscribeLinks(userId);
   const { html, text } = renderReminderEmail(message, {
-    eyebrow: "Receebo — Warranty Reminder", receiptUrl, unsubscribeUrl: unsub.url,
+    locale, eyebrow: locale === "en" ? "Receebo — Warranty Reminder" : "Receebo — Lembrete de garantia", receiptUrl, unsubscribeUrl: unsub.url,
   });
 
   return deliver({
@@ -342,16 +359,17 @@ export async function sendReturnWindowEmail(
 ): Promise<boolean> {
   const email = await getUserEmail(userId);
   if (!email) return false;
-
-  const message = renderReturnReminder({
+  const locale = await getUserEmailLocale(userId);
+  const input = {
     ...receipt,
     notableItems: receipt.notableItems ?? (receipt.notableItemName ? [{ name: receipt.notableItemName }] : []),
     deadline: receipt.deadlineDate,
-  });
+  };
+  const message = locale === "en" ? renderReturnReminder(input) : localizedReturnReminder(input, locale);
   const receiptUrl = `${appUrl()}/receipts/${receipt.id}`;
   const unsub = unsubscribeLinks(userId);
   const { html, text } = renderReminderEmail(message, {
-    eyebrow: "Receebo — Return Reminder", receiptUrl, unsubscribeUrl: unsub.url,
+    locale, eyebrow: locale === "en" ? "Receebo — Return Reminder" : "Receebo — Lembrete de devolução", receiptUrl, unsubscribeUrl: unsub.url,
   });
 
   return deliver({
@@ -378,20 +396,23 @@ export async function sendTrialEndingEmail(
 ): Promise<boolean> {
   const email = await getUserEmail(userId);
   if (!email) return false;
+  const locale = await getUserEmailLocale(userId);
+  const en = locale === "en";
+  const br = locale === "pt-BR";
 
   const nowMs = Date.now();
   const endMs = trialEndAt.getTime();
   const daysRemaining = Math.max(0, Math.ceil((endMs - nowMs) / 86_400_000));
   const daysLabel =
     daysRemaining === 0
-      ? "today"
+      ? (en ? "today" : "hoje")
       : daysRemaining === 1
-        ? "tomorrow"
-        : `in ${daysRemaining} days`;
+        ? (en ? "tomorrow" : "amanhã")
+        : (en ? `in ${daysRemaining} days` : `em ${daysRemaining} dias`);
 
-  const dateStr = formatEmailDate(trialEndAt) ?? "";
+  const dateStr = formatEmailDate(trialEndAt, locale) ?? "";
 
-  const subject =
+  const subject = !en ? `O seu período de teste do Receebo Pro termina ${daysLabel}` :
     daysRemaining === 0
       ? "Your Receebo Pro trial ends today"
       : daysRemaining === 1
@@ -403,28 +424,38 @@ export async function sendTrialEndingEmail(
   // Format plan name and charge amount for the email body
   const planLabel = planInfo?.planName ?? "Receebo Pro";
   const chargeStr = planInfo?.planAmount != null && planInfo?.planCurrency
-    ? formatMoney(planInfo.planAmount / 100, planInfo.planCurrency)
+    ? formatMoney(planInfo.planAmount / 100, planInfo.planCurrency, locale)
     : null;
 
-  const chargeLine = chargeStr
+  const chargeLine = !en
+    ? `Depois, será cobrado automaticamente ${chargeStr ? `<strong>${escapeHtml(chargeStr)}</strong> ` : ""}pelo plano <strong>${escapeHtml(planLabel)}</strong>, a menos que cancele antes.`
+    : chargeStr
     ? `After that, you'll be automatically charged <strong>${escapeHtml(chargeStr)}</strong> for <strong>${escapeHtml(planLabel)}</strong> unless you cancel before then.`
     : `After that, you'll be charged automatically for <strong>${escapeHtml(planLabel)}</strong> unless you cancel before then.`;
 
   const html = renderEmailLayout({
+    locale,
     eyebrow: "Receebo",
-    bodyHtml: `<h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Your free trial ends ${escapeHtml(daysLabel)}</h1>
+    bodyHtml: !en ? `<h1 style="${H1_STYLE}">O seu teste gratuito termina ${escapeHtml(daysLabel)}</h1>
+  <p style="${P_STYLE}">O período de teste do plano <strong>${escapeHtml(planLabel)}</strong> termina em <strong>${escapeHtml(dateStr)}</strong>. ${chargeLine}</p>
+  <p style="${P_STYLE}">Para evitar a cobrança, cancele a ${br ? "assinatura" : "subscrição"} antes do fim do teste — basta um clique.</p>`
+    : `<h1 style="font-size:22px;font-weight:800;margin:0 0 8px;line-height:1.2;">Your free trial ends ${escapeHtml(daysLabel)}</h1>
   <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 8px;">
     Your <strong>${escapeHtml(planLabel)}</strong> trial expires on <strong>${escapeHtml(dateStr)}</strong>. ${chargeLine}
   </p>
   <p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 24px;">
     To avoid being charged, cancel your subscription before the trial ends — it only takes one click.
   </p>`,
-    cta: { label: "Cancel or Manage Subscription", href: settingsUrl },
-    footerHtml: `You received this because you signed up for a Receebo Pro trial. Visit your subscription settings to cancel anytime before <strong>${escapeHtml(dateStr)}</strong>.`,
+    cta: { label: en ? "Cancel or Manage Subscription" : br ? "Cancelar ou gerenciar assinatura" : "Cancelar ou gerir subscrição", href: settingsUrl },
+    footerHtml: en ? `You received this because you signed up for a Receebo Pro trial. Visit your subscription settings to cancel anytime before <strong>${escapeHtml(dateStr)}</strong>.`
+      : `Recebe esta mensagem porque iniciou um teste do Receebo Pro. Pode cancelar nas ${emailLabels(locale).settings} antes de <strong>${escapeHtml(dateStr)}</strong>.`,
   });
+  const text = en
+    ? `Your free trial ends ${daysLabel}. Your ${planLabel} trial expires on ${dateStr}. ${chargeStr ? `After that, you'll be automatically charged ${chargeStr} for ${planLabel}` : `After that, you'll be charged automatically for ${planLabel}`} unless you cancel before then.\nTo avoid being charged, cancel your subscription before the trial ends.\nCancel or Manage Subscription: ${settingsUrl}\nYou received this because you signed up for a Receebo Pro trial.`
+    : `O seu teste gratuito termina ${daysLabel}. O período de teste do plano ${planLabel} termina em ${dateStr}. Depois, será cobrado automaticamente ${chargeStr ? `${chargeStr} ` : ""}pelo plano ${planLabel}, a menos que cancele antes.\nPara evitar a cobrança, cancele antes do fim do teste.\n${br ? "Cancelar ou gerenciar assinatura" : "Cancelar ou gerir subscrição"}: ${settingsUrl}\nRecebe esta mensagem porque iniciou um teste do Receebo Pro.`;
 
   return deliver({
-    kind: "legacy_trial_ending", userId, to: email, subject, html,
+    kind: "legacy_trial_ending", userId, to: email, subject, html, text,
     context: { daysRemaining, planLabel, chargeStr },
   });
 }
@@ -438,12 +469,12 @@ export async function sendTrialEndingEmail(
 export const SUPPORT_EMAIL = "contact@receebo.net";
 export const EMAIL_LEGAL_LINE = "Receebo · operated by Hamilton Freitas · [ADDRESS]";
 
-function lifecycleFooterHtml(reason: string): string {
-  return `${escapeHtml(reason)}<br>Questions? Email <a href="mailto:${SUPPORT_EMAIL}" style="color:#999;">${SUPPORT_EMAIL}</a>.<br>${escapeHtml(EMAIL_LEGAL_LINE)}`;
+function lifecycleFooterHtml(reason: string, locale: EmailLocale = "en"): string {
+  return `${escapeHtml(reason)}<br>${emailLabels(locale).questions} <a href="mailto:${SUPPORT_EMAIL}" style="color:#999;">${SUPPORT_EMAIL}</a>.<br>${escapeHtml(EMAIL_LEGAL_LINE.replace("operated by", emailLabels(locale).operated))}`;
 }
 
-function lifecycleFooterText(reason: string): string {
-  return `--\n${reason}\n\nQuestions? Email ${SUPPORT_EMAIL}\n\n${EMAIL_LEGAL_LINE}`;
+function lifecycleFooterText(reason: string, locale: EmailLocale = "en"): string {
+  return `--\n${reason}\n\n${emailLabels(locale).questions} ${SUPPORT_EMAIL}\n\n${EMAIL_LEGAL_LINE.replace("operated by", emailLabels(locale).operated)}`;
 }
 
 const P_STYLE = "color:#444;font-size:15px;line-height:1.6;margin:0 0 16px;";
@@ -463,7 +494,9 @@ async function getUserContact(userId: string): Promise<{ email: string; firstNam
 
 /** Email address to use for the post-deletion confirmation (read BEFORE deleting). */
 export async function getDeletionConfirmationContact(userId: string) {
-  return getUserContact(userId);
+  const contact = await getUserContact(userId);
+  // Capture before deleting preferences/Clerk. Never query the deleted account.
+  return contact ? { ...contact, locale: await getUserEmailLocale(userId) } : null;
 }
 
 export type DeletionWarningStage = "30d" | "7d";
@@ -474,7 +507,13 @@ export function renderDeletionWarningEmail(input: {
   receiptCount: number;
   firstName?: string | null;
   baseUrl?: string;
+  locale?: EmailLocale;
 }): { subject: string; html: string; text: string } {
+  if (input.locale && input.locale !== "en") {
+    const copy = deletionWarningCopy(input, input.locale);
+    const url = `${input.baseUrl ?? appUrl()}/settings#upgrade-plans`;
+    return renderLocalizedLifecycle(copy, input.locale, { label: copy.cta, href: url });
+  }
   const date = formatEmailDate(input.deletionDate) ?? "";
   const subscribeUrl = `${input.baseUrl ?? appUrl()}/settings#upgrade-plans`;
   const greeting = input.firstName ? `Hi ${input.firstName},` : "Hi,";
@@ -519,7 +558,8 @@ export async function sendDeletionWarningEmail(
 ): Promise<boolean> {
   const contact = await getUserContact(userId);
   if (!contact) return false;
-  const { subject, html, text } = renderDeletionWarningEmail({ ...input, firstName: contact.firstName });
+  const locale = await getUserEmailLocale(userId);
+  const { subject, html, text } = renderDeletionWarningEmail({ ...input, firstName: contact.firstName, locale });
   return deliver({
     kind: `deletion_warning_${input.stage}`, userId, to: contact.email, subject, html, text,
     idempotencyKey: `deletion-warning/${input.stage}/${userId}/${input.deletionDate.toISOString().slice(0, 10)}`,
@@ -530,7 +570,14 @@ export async function sendDeletionWarningEmail(
 export function renderAccountDeletedEmail(input: {
   reason: "inactive" | "requested";
   firstName?: string | null;
+  locale?: EmailLocale;
 }): { subject: string; html: string; text: string } {
+  if (input.locale && input.locale !== "en") {
+    return renderLocalizedLifecycle({
+      ...accountDeletedCopy(input.reason, input.locale),
+      greeting: input.firstName ? `Olá ${input.firstName},` : "Olá,",
+    }, input.locale);
+  }
   const greeting = input.firstName ? `Hi ${input.firstName},` : "Hi,";
   const lines = [
     input.reason === "inactive"
@@ -556,10 +603,10 @@ export function renderAccountDeletedEmail(input: {
 /** Sent after deletion, so the address is passed in (the sign-in account is gone). */
 export async function sendAccountDeletedEmail(
   userId: string,
-  contact: { email: string; firstName: string | null },
+  contact: { email: string; firstName: string | null; locale: EmailLocale },
   reason: "inactive" | "requested",
 ): Promise<boolean> {
-  const { subject, html, text } = renderAccountDeletedEmail({ reason, firstName: contact.firstName });
+  const { subject, html, text } = renderAccountDeletedEmail({ reason, firstName: contact.firstName, locale: contact.locale });
   return deliver({
     kind: `account_deleted_${reason}`, userId, to: contact.email, subject, html, text,
     idempotencyKey: `account-deleted/${userId}`,
@@ -576,7 +623,20 @@ const CODE_PANEL_STYLE = "background:#F5F5F5;border:1px solid #E6E6E6;border-rad
 export const DELETION_CODE_SUBJECT = "Confirm your Receebo account deletion";
 export const DELETION_CODE_PREHEADER = "Use the code inside to confirm. It expires in 15 minutes.";
 
-export function renderDeletionCodeEmail(input: { code: string; expiresInMinutes: number }): { subject: string; html: string; text: string } {
+export function renderDeletionCodeEmail(input: { code: string; expiresInMinutes: number; locale?: EmailLocale }): { subject: string; html: string; text: string } {
+  if (input.locale && input.locale !== "en") {
+    const copy = deletionCodeCopy(input.expiresInMinutes, input.locale);
+    const html = renderEmailLayout({
+      locale: input.locale, eyebrow: copy.eyebrow,
+      bodyHtml: `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(copy.preheader)}</div>
+  <h1 style="${H1_STYLE}">${escapeHtml(copy.heading)}</h1>
+  <p style="${P_STYLE}">${escapeHtml(copy.intro)}</p>
+  <div style="${CODE_PANEL_STYLE}"><p>${escapeHtml(copy.codeLabel)}</p><p class="rb-code" style="${CODE_STYLE}">${escapeHtml(input.code)}</p></div>
+  <p style="${P_STYLE}">${escapeHtml(copy.expiry)}</p><p style="${P_STYLE}">${escapeHtml(copy.notYou)}</p>`,
+      footerHtml: lifecycleFooterHtml(copy.reason, input.locale),
+    });
+    return { subject: copy.subject, html, text: [copy.heading, copy.intro, `${copy.codeLabel}:`, input.code, copy.expiry, copy.notYou, lifecycleFooterText(copy.reason, input.locale)].join("\n\n") };
+  }
   const intro = "You asked to delete your Receebo account. To confirm, enter this code in Receebo. This permanently deletes your account and all your receipts, and it can't be undone.";
   const expiry = `This code expires in ${input.expiresInMinutes} minutes and can only be used once.`;
   const notYou = `Didn't request this? Ignore this email and your account stays as it is. If you think someone else can sign in to your account, email ${SUPPORT_EMAIL}.`;
@@ -619,9 +679,27 @@ export async function sendDeletionCodeEmail(
   contact: { email: string },
   code: { code: string; expiresAt: Date; expiresInMinutes: number },
 ): Promise<boolean> {
-  const { subject, html, text } = renderDeletionCodeEmail(code);
+  const locale = await getUserEmailLocale(userId);
+  const { subject, html, text } = renderDeletionCodeEmail({ ...code, locale });
   return deliver({
     kind: "account_deletion_code", userId, to: contact.email, subject, html, text,
     idempotencyKey: `deletion-code/${userId}/${code.expiresAt.getTime()}`,
   });
+}
+
+function renderLocalizedLifecycle(
+  copy: { subject: string; heading: string; eyebrow: string; greeting: string; lines: string[]; reason: string },
+  locale: EmailLocale,
+  cta?: { label: string; href: string },
+): { subject: string; html: string; text: string } {
+  return {
+    subject: copy.subject,
+    html: renderEmailLayout({
+      locale, eyebrow: copy.eyebrow,
+      bodyHtml: `<h1 style="${H1_STYLE}">${escapeHtml(copy.heading)}</h1>
+  ${[copy.greeting, ...copy.lines].map(line => `<p style="${P_STYLE}">${escapeHtml(line)}</p>`).join("\n")}`,
+      cta, footerHtml: lifecycleFooterHtml(copy.reason, locale),
+    }),
+    text: [copy.heading, copy.greeting, ...copy.lines, ...(cta ? [`${cta.label}: ${cta.href}`] : []), lifecycleFooterText(copy.reason, locale)].join("\n\n"),
+  };
 }

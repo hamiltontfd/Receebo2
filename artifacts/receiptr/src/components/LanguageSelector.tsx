@@ -30,6 +30,11 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
         "O idioma altera a interface web/PWA, não a região, o país da compra ou a moeda. Os dados originais dos recibos, documentos legais, gravações e conteúdos externos de início de sessão não são traduzidos por este seletor.",
         "O idioma altera a interface web/PWA, não a região, o país da compra ou a moeda. Os dados originais dos recibos, documentos legais, gravações e conteúdos externos de login não são traduzidos por este seletor.",
       )}
+      {" "}{lt(
+        "Account emails use the chosen language. In automatic mode, emails are in English.",
+        "Os e-mails da conta usam o idioma escolhido. No modo automático, os e-mails são enviados em inglês.",
+        "Os e-mails da conta usam o idioma escolhido. No modo automático, os e-mails são enviados em inglês.",
+      )}
     </p>}
     {saving && <p role="status">{lt("Saving…", "A guardar…", "Salvando…")}</p>}
     {error && <div role="alert" className="text-xs text-destructive">

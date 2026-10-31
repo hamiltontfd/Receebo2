@@ -105,7 +105,7 @@ describe.skipIf(!enabled)("payment attention with real Stripe test-clock renewal
     ]);
     await deliver("invoice.payment_failed", { ...failedInvoice, attempt_count: failedInvoice.attempt_count + 1 });
     expect(captured.email).toHaveBeenCalledTimes(1);
-    expect(captured.email).toHaveBeenCalledWith(userId, invoiceId, expect.stringContaining("continues until"));
+    expect(captured.email).toHaveBeenCalledWith(userId, invoiceId, { owner: false, continuesUntil: expect.any(Date) });
     expect(await db.select().from(paymentNoticesTable).where(eq(paymentNoticesTable.userId, userId))).toHaveLength(1);
     expect(await getSubscriptionStatus(userId)).toMatchObject({ plan: "pro", paymentAttention: true });
 

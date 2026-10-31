@@ -17,19 +17,22 @@ needs a lawyer before it ships. Sources: `/workspace/receebo/consumer-rules-br-u
   source; translated labels never replace canonical category/API values.
   External authentication, legal documents, recorded media, native mobile and
   original receipt/merchant/item/AI-extracted content are outside this UI coverage.
-  Emails are a separate server localization surface, not changed by this work.
+  Application-owned emails use the account preference as documented below;
+  automatic email language is English, independently of browser language.
   The selector discloses these boundaries rather than claiming those contents
   are translated. Switching language does not remount forms or clear draft edits.
 - Signed-in preferences are stored per account, available without subscription.
-  Null means automatic browser language. Visitors save only to this browser.
-  Visitor choices are never imported into accounts; accounts never write their
-  language into browser-wide storage. Signing out restores the visitor choice.
+  Null means automatic browser language for the interface. Visitors always use
+  browser language; the homepage has no manual language selector. Manual language
+  changes belong only in signed-in settings. Legacy visitor language overrides
+  are ignored; accounts never write their language into browser-wide storage.
+  Signing out restores automatic browser language.
   Language never changes market, purchase country, receipt/subscription currency,
   or the legal rules applied to a purchase.
 - `en`, `pt-PT`, `pt-BR`. Fallback: pt-BR → pt-BR, other pt → pt-PT, else en.
 - `getAppLocale()` reads the active account language (or browser language in
   automatic mode), independently of market and purchase country. Signed-out
-  visitors retain the existing `localStorage["receebo:locale"]` preference.
+  visitors use browser language, ignoring legacy localStorage language overrides.
 - The public landing page, including FAQ, pricing, navigation and media
   explanations, and shared market selectors have English, pt-PT and pt-BR copy.
   Consumer-rights copy also uses that locale. Screenshot/video content remains
@@ -38,8 +41,35 @@ needs a lawyer before it ships. Sources: `/workspace/receebo/consumer-rules-br-u
   available. Suggestions remain unconfirmed, with confirmation inside the menu;
   nothing opens automatically. Unknown location uses a neutral region control,
   not a fabricated Portugal selection.
-- Dates/money follow the email spec table (en "Dec 12, 2026" / "€449.00";
+- Web dates/money follow the email spec table (en "Dec 12, 2026" / "€449.00";
   pt-PT "12 dez 2026" / "449,00 €"; pt-BR "12 de dez. de 2026" / "€ 449,00").
+
+## Account email language
+- All application-owned emails in `artifacts/api-server/src/lib/emailService.ts`
+  use the account's current `user_preferences.language`: warranty/return reminders,
+  legacy Stripe trial endings, renewal payment failures, deletion warnings,
+  deletion codes and post-deletion confirmations. Subjects, preheaders, HTML,
+  text, buttons and footers support en, pt-PT and pt-BR.
+- **Automatic without a browser means English.** Null/missing/unsupported language
+  resolves to en, independent of browser headers, server locale, market, visitor
+  settings and receipt country. No browser language is persisted implicitly.
+  A preference-read failure aborts the send instead of sending the wrong language.
+- Resolve on each send (no stale language cache). Capture the language together
+  with the contact **before deleting the account**; confirmations use that snapshot.
+- Email formatting preserves existing English en-GB formatting; Portuguese uses
+  the corresponding Intl locale. Dates are rendered in UTC without altering the
+  actual date/deadline, and amounts use their original currency (no conversion).
+  Payment access cutoffs also include their exact UTC timestamp. Warranty kind,
+  statutory window length and retailer-policy basis are taken from receipt facts,
+  never inferred from account language or market. User/merchant/product/plan
+  names and receipt text are not translated.
+- From/Reply-To addresses, links, unsubscribe tokens/headers and provider
+  idempotency keys do not change with language. Transactional deletion/payment/
+  trial emails do not acquire an unsubscribe link.
+- Clerk authentication mail, Stripe's own billing mail, push notifications,
+  legal documents and the existing legal-review/address placeholders are outside
+  this application-template scope. Provider-owned mail does not automatically
+  follow this database preference. Tests mock delivery; they send no real mail.
 
 ## Consumer-rights panel (`consumerRights.ts`)
 - **Brazil (CDC, Lei 8.078/1990)** [LEGAL REVIEW NEEDED]

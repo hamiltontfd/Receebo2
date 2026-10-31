@@ -399,9 +399,10 @@ export async function runTrialReminderSweep(options: { dryRun: boolean }): Promi
 
     // Atomically claim the send slot — only one process wins when trial_reminder_sent_at IS NULL.
     // This prevents duplicate sends in concurrent sweep runs (e.g. multi-instance or rapid restarts).
+    const claimAt = new Date();
     const claimed = await db
       .update(userBillingTable)
-      .set({ trialReminderSentAt: new Date() })
+      .set({ trialReminderSentAt: claimAt })
       .where(
         and(
           eq(userBillingTable.userId, row.userId),
@@ -413,17 +414,22 @@ export async function runTrialReminderSweep(options: { dryRun: boolean }): Promi
     if (claimed.length === 0) continue; // already claimed by a previous run or concurrent process
 
     // Send the email now that we've claimed the slot.
-    const sent = await sendTrialEndingEmail(row.userId, trialEndDate);
+    let sent = false;
+    try {
+      sent = await sendTrialEndingEmail(row.userId, trialEndDate);
+    } catch (err) {
+      logger.warn({ err, userId: row.userId }, "Trial reminder preparation or delivery failed");
+    } finally {
+      if (!sent) {
+        await db.update(userBillingTable).set({ trialReminderSentAt: null })
+          .where(and(eq(userBillingTable.userId, row.userId), eq(userBillingTable.trialReminderSentAt, claimAt)));
+      }
+    }
 
     if (sent) {
       trialRemindersSent++;
     } else {
       trialRemindersFailed++;
-      // Reset the flag so the next nightly sweep can retry.
-      await db
-        .update(userBillingTable)
-        .set({ trialReminderSentAt: null })
-        .where(eq(userBillingTable.userId, row.userId));
       logger.warn({ userId: row.userId }, "Trial reminder email failed — flag reset for retry");
     }
   }
