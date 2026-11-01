@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { AlertTriangle, Loader2, RotateCw } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { BrandLoading } from "@/components/BrandLoading";
 import { useClerk } from "@clerk/react";
 import {
   useBillingStatus,
@@ -59,18 +60,6 @@ export function isRouteAllowedWithoutAccess(path: string, billing: BillingStatus
     if (path === "/scan" && activeScanReviewId() === reviewId) return true;
   }
   return false;
-}
-
-function FullScreenSkeleton({ label }: { label?: string }) {
-  return (
-    <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-background text-foreground" data-testid="status-billing-loading">
-      <div className="w-full max-w-md px-6 space-y-3" aria-hidden>
-        <div className="h-6 w-2/3 mx-auto rounded-lg bg-muted animate-pulse" />
-        <div className="h-4 w-1/2 mx-auto rounded-lg bg-muted animate-pulse" />
-      </div>
-      {label && <p className="text-sm text-muted-foreground">{appText(label)}</p>}
-    </div>
-  );
 }
 
 function GateHeader() {
@@ -178,7 +167,8 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer);
   }, [inActivatingState]);
 
-  if (isLoading) return <FullScreenSkeleton />;
+  // A background refresh must not replace an already usable page.
+  if (isLoading && !billing) return <BrandLoading />;
 
   if (!billing) {
     // Fail closed: no billing data means no app access.
@@ -203,7 +193,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
         />
       );
     }
-    return <FullScreenSkeleton label={appText("Setting up your {0}-day free trial", [TRIAL_DAYS])} />;
+    return <BrandLoading />;
   }
 
   if (hasAppAccess(billing)) return <>{children}</>;

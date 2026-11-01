@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   billing: {} as Record<string, unknown> | undefined,
   isError: false,
+  isLoading: false,
+  isFetching: false,
   location: "/search",
   startTrial: vi.fn(),
   startTrialError: false,
@@ -19,9 +21,9 @@ vi.mock("@/hooks/useBilling", async () => {
     ...actual,
     useBillingStatus: () => ({
       data: mocks.billing,
-      isLoading: false,
+      isLoading: mocks.isLoading,
       isError: mocks.isError,
-      isFetching: false,
+      isFetching: mocks.isFetching,
       refetch: mocks.refetch,
     }),
     useStartTrial: () => ({ mutate: mocks.startTrial, isPending: false, isError: mocks.startTrialError }),
@@ -44,6 +46,8 @@ beforeEach(() => {
   sessionStorage.clear();
   mocks.billing = { plan: "pro", accessState: "paid", canUseApp: true, canUpload: true };
   mocks.isError = false;
+  mocks.isLoading = false;
+  mocks.isFetching = false;
   mocks.location = "/search";
   mocks.startTrial.mockReset();
   mocks.checkout.mockReset();
@@ -52,6 +56,32 @@ beforeEach(() => {
 });
 
 describe("PlanSelectionGate", () => {
+  it("uses the brand while checking the plan, then opens immediately", () => {
+    mocks.billing = undefined;
+    mocks.isLoading = true;
+    const { rerender } = renderGate();
+    expect(screen.getByTestId("status-brand-loading")).toBeInTheDocument();
+    expect(screen.queryByText("Protected receipt library")).not.toBeInTheDocument();
+    expect(document.querySelector(".animate-pulse")).toBeNull();
+
+    mocks.billing = { plan: "pro", accessState: "paid", canUseApp: true };
+    mocks.isLoading = false;
+    rerender(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
+    expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("keeps a mounted page and its state during background plan refreshes", () => {
+    const { rerender } = renderGate();
+    const page = screen.getByText("Protected receipt library");
+    mocks.isFetching = true;
+    mocks.isError = true;
+    rerender(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
+    expect(screen.getByText("Protected receipt library")).toBe(page);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("status-billing-error")).not.toBeInTheDocument();
+  });
+
   it("admits owners even when a legacy pending plan exists", () => {
     sessionStorage.setItem("receebo:pendingPlan", "monthly");
     mocks.billing = { plan: "pro", ownerAccess: true, accessState: "owner", canUseApp: true };
@@ -78,6 +108,7 @@ describe("PlanSelectionGate", () => {
     expect(mocks.startTrial).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Protected receipt library")).not.toBeInTheDocument();
     expect(mocks.checkout).not.toHaveBeenCalled();
+    expect(screen.getByTestId("status-brand-loading")).toBeInTheDocument();
   });
 
   it("shows retry when trial initialization fails", () => {

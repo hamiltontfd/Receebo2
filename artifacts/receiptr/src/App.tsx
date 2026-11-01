@@ -32,6 +32,7 @@ import { MarketProvider } from "@/components/MarketProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import InstallBar from "@/components/InstallBar";
 import { PlanSelectionGate } from "@/components/PlanSelectionGate";
+import { AuthStartupGate } from "@/components/AuthStartupGate";
 import { LEGAL_ACCEPTED_EVENT, LegalConsentGate } from "@/components/LegalConsentGate";
 import { useBillingStatus, resolveAccessState } from "@/hooks/useBilling";
 import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
@@ -156,21 +157,21 @@ function SignUpPage() {
 function HomeRedirect() {
   const { isGuest } = useGuestMode();
   return (
-    <>
+    <AuthStartupGate>
       <Show when="signed-in">
         <Redirect to="/search" />
       </Show>
       <Show when="signed-out">
         {isGuest ? <Redirect to="/search" /> : <Landing />}
       </Show>
-    </>
+    </AuthStartupGate>
   );
 }
 
 function ProtectedShell({ children }: { children: React.ReactNode }) {
   const { userId } = useAuth();
   return (
-    <>
+    <AuthStartupGate>
       <Show when="signed-in">
         <LegalConsentGate key={userId}>
           <PlanSelectionGate>
@@ -183,7 +184,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
         {/* Guest bypass disabled. Accounts get a 15-day, five-receipt trial instead. */}
         <Redirect to="/" />
       </Show>
-    </>
+    </AuthStartupGate>
   );
 }
 
