@@ -3,6 +3,7 @@ import { usePwaUpdateBlocker } from "@/lib/pwa";
 import { Link } from "wouter";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandLoading } from "@/components/BrandLoading";
 
 const API_BASE = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
 
@@ -64,6 +65,7 @@ export function LegalConsentGate({ children }: { children: React.ReactNode }) {
   };
 
   if (status?.accepted) return <>{children}</>;
+  if (!status && !error) return <BrandLoading />;
 
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] items-center justify-center bg-secondary/20 px-5 py-12">
@@ -79,13 +81,6 @@ export function LegalConsentGate({ children }: { children: React.ReactNode }) {
           reminders, and push notifications are controlled separately in
           Settings.
         </p>
-
-        {!status && !error && (
-          <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading…
-          </div>
-        )}
 
         {status && (
           <>

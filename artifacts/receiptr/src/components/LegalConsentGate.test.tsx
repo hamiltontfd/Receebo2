@@ -8,6 +8,27 @@ afterEach(() => {
 });
 
 describe("LegalConsentGate", () => {
+  it("shows only the branded loading screen while legal status is pending", async () => {
+    let resolveStatus!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { resolveStatus = resolve; })));
+    render(<LegalConsentGate><div>Private app</div></LegalConsentGate>);
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByText("Receebo")).toBeInTheDocument();
+    expect(screen.getByText("Receipts. Easy to find.")).toBeInTheDocument();
+    expect(screen.queryByText("Before you continue")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByText("Private app")).not.toBeInTheDocument();
+
+    resolveStatus(new Response(JSON.stringify({
+      accepted: false, termsVersion: "2026-08-30", privacyVersion: "2026-08-30",
+    }), { status: 200 }));
+    expect(await screen.findByText("Before you continue")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agree and continue" })).toBeDisabled();
+    expect(screen.queryByText("Private app")).not.toBeInTheDocument();
+  });
+
   it("shows the app immediately when the current versions are accepted", async () => {
     vi.stubGlobal(
       "fetch",
@@ -31,6 +52,7 @@ describe("LegalConsentGate", () => {
 
     expect(await screen.findByText("Private app")).toBeInTheDocument();
     expect(screen.queryByText("Before you continue")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("requires 18+ confirmation and submits the server-provided versions", async () => {
@@ -102,5 +124,26 @@ describe("LegalConsentGate", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Private app")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+  });
+
+  it("returns to branded loading on retry and opens the app only after verification", async () => {
+    let resolveRetry!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveRetry = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<LegalConsentGate><div>Private app</div></LegalConsentGate>);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByText("Before you continue")).not.toBeInTheDocument();
+    expect(screen.queryByText("Private app")).not.toBeInTheDocument();
+    resolveRetry(new Response(JSON.stringify({
+      accepted: true, termsVersion: "2026-08-30", privacyVersion: "2026-08-30",
+    }), { status: 200 }));
+    expect(await screen.findByText("Private app")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

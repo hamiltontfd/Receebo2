@@ -19,3 +19,17 @@ mtime_ms = 1793439678679
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/43c5196a-7b55-4f53-a91e-9f543a2f5940/57d4d64e-4d8a-411b-9fbe-372602b745ee"
 storage_version_token = "1793439742051369"
 content_type = "image/jpeg"
+
+[[outputs]]
+id = "71FQ-NciVRHjJT4-SXMuj"
+uri = "file://generated-artifacts/brand-loading-mobile.png"
+type = "image"
+title = "Novo carregamento do Receebo"
+description = "Prévia isolada do componente em tela mobile, com o logo original, slogan e indicador discreto."
+logical_id = "4860975f-41da-45ee-b137-4bd0a6c994a3"
+content_hash = "sha256:60ba374b3e8c4091d71f2247fa608f2ce849d11f9fbb4832135bbe59603bed38"
+size = 10365
+mtime_ms = 1793538933691
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/4860975f-41da-45ee-b137-4bd0a6c994a3/b146bb34-7adf-4b09-ad8b-c628bbf9b4d2"
+storage_version_token = "1793538958041736"
+content_type = "image/png"

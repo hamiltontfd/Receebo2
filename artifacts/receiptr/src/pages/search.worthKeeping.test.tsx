@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/components/MarketSelector", () => ({ MarketSelector: () => <div>Market selector</div> }));
+vi.mock("@/components/LanguageSelector", () => ({ LanguageSelector: () => <div>Language selector</div> }));
 
 const state = vi.hoisted(() => ({ signedIn: true, pending: true }));
 vi.mock("@clerk/react", () => ({ useAuth: () => ({ isSignedIn: state.signedIn }) }));
@@ -33,9 +34,20 @@ beforeEach(() => {
   class IO { observe() {} disconnect() {} unobserve() {} }
   (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = IO;
 });
-afterEach(() => { vi.useRealTimers(); state.signedIn = true; state.pending = true; });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); state.signedIn = true; state.pending = true; });
 
 const follows = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+describe("Signed-in home account preferences", () => {
+  it.each([390, 1440])("does not mount market or language selectors at %ipx", (width) => {
+    vi.stubGlobal("innerWidth", width);
+    state.signedIn = true;
+    render(<SearchPage />);
+    expect(screen.getByPlaceholderText("Search purchases...")).toBeInTheDocument();
+    expect(screen.queryByText("Market selector")).not.toBeInTheDocument();
+    expect(screen.queryByText("Language selector")).not.toBeInTheDocument();
+  });
+});
 
 describe("Search home: Worth keeping position", () => {
   it("sits right after Found in your email", () => {

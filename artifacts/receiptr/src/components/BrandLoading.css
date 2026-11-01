@@ -1,0 +1,81 @@
+.brand-loading {
+  box-sizing: border-box;
+  display: flex;
+  min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+.brand-loading__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.1rem;
+  animation: brand-loading-reveal 520ms cubic-bezier(.2, .7, .2, 1) both;
+}
+.brand-loading__mark {
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  animation: brand-loading-breathe 2.4s ease-in-out 520ms infinite;
+}
+.brand-loading__name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.brand-loading__slogan {
+  margin: 0.4rem 0 0;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  animation: brand-loading-reveal 520ms cubic-bezier(.2, .7, .2, 1) 140ms both;
+}
+.brand-loading__bar {
+  position: relative;
+  width: 44px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: hsl(var(--border));
+}
+.brand-loading__bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: hsl(var(--foreground));
+  animation: brand-loading-sweep 1.4s ease-in-out infinite;
+}
+@keyframes brand-loading-reveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes brand-loading-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+@keyframes brand-loading-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-loading__stack,
+  .brand-loading__mark,
+  .brand-loading__slogan,
+  .brand-loading__bar::after {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  .brand-loading__bar::after { transform: translateX(75%); }
+}

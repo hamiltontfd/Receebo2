@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/components/MarketSelector", () => ({ MarketSelector: () => <div>Market selector</div> }));
@@ -7,7 +7,7 @@ vi.mock("@/components/LanguageSelector", () => ({ LanguageSelector: () => <div>L
 const mocks = vi.hoisted(() => ({
   billing: {} as Record<string, unknown>, portal: vi.fn(), toast: vi.fn(),
 }));
-vi.mock("@clerk/react", () => ({ useUser: () => ({ user: null }) }));
+vi.mock("@clerk/react", () => ({ useUser: () => ({ user: { fullName: "Test User" } }) }));
 vi.mock("wouter", () => ({ useLocation: () => ["/settings", vi.fn()] }));
 vi.mock("@/hooks/useBilling", async importOriginal => ({
   ...await importOriginal<typeof import("@/hooks/useBilling")>(),
@@ -35,6 +35,17 @@ beforeEach(() => {
   })));
 });
 afterEach(() => vi.unstubAllGlobals());
+
+describe("Settings account preferences", () => {
+  it.each([390, 1440])("keeps both selectors in Account at %ipx", (width) => {
+    vi.stubGlobal("innerWidth", width);
+    showSettings();
+    const account = screen.getByRole("heading", { name: "Account" }).closest("section")!;
+    expect(within(account).getByText("Test User")).toBeInTheDocument();
+    expect(within(account).getByText("Market selector")).toBeInTheDocument();
+    expect(within(account).getByText("Language selector")).toBeInTheDocument();
+  });
+});
 
 describe("Settings payment attention", () => {
   it("explains the existing grace period and opens the authenticated billing portal", () => {
