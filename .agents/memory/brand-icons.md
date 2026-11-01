@@ -4,10 +4,16 @@ description: User requirements for Receebo browser and installed-app icons.
 ---
 Every logo in the product uses the current Receebo mark from `artifacts/receiptr/public/logo.svg` (the header/landing logo), without the wordmark. Regenerate everything with `node artifacts/receiptr/scripts/generate-icons.mjs`.
 
-- Favicon (`favicon.svg`, `favicon.ico`, `icons/favicon-32.png`) and `logo-mark.svg`: cropped to the black rounded outline, no white margin, transparent outside the rounded corners (Hamilton, 29 Oct 2026: "o logo deve ser padronizado em todos os cantos", plus his earlier favicon-crop request).
+- Favicon: cropped to the black rounded outline, no extra margin, on opaque white including outside the rounded corners. The standalone UI mark may remain transparent.
 - Installed-app icons (manifest, Apple touch icon, Expo app icon): the mark on a white background, with padding; the maskable icon keeps the mark inside the central safe circle.
 - Android push badge (`icons/badge-96.png`): white silhouette of the mark on transparent.
 
 **Why:** The user asked for consistent original-symbol icons everywhere after seeing differently drawn icons (old filled push icon, old Receiptr mobile icon).
 
 **How to apply:** Preserve the original vector geometry when regenerating icons; never redraw the symbol by hand.
+
+Installed iOS notification branding may retain the icon captured at installation, independently of the service worker's notification icon. Do not promise that replacing a push icon URL updates an existing iOS installation immediately.
+
+**Why:** The owner reported an old filled symbol in iOS notifications even while production served the current outlined mark successfully.
+
+**How to apply:** Keep Apple touch and manifest icons consistent with push artwork. Verify actual installed-device behavior separately; distinguish that from successful asset/build checks.

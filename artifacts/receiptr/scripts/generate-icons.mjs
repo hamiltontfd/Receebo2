@@ -29,8 +29,9 @@ const mark = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" vie
 
 const standard = svg(48);
 await writeFile(resolve(publicDir, "icons/icon-source.svg"), standard);
-// Favicon: cropped to the rounded outline (no white margin) so it reads bigger in tabs.
-await writeFile(resolve(publicDir, "favicon.svg"), mark);
+// Opaque white behind the original mark, including its rounded corners.
+const favicon = svg(0);
+await writeFile(resolve(publicDir, "favicon.svg"), favicon);
 // Bare symbol for in-app UI such as the install bar.
 await writeFile(resolve(publicDir, "logo-mark.svg"), mark);
 await rm(resolve(publicDir, "icons/receebo-white-32.png"), { force: true });
@@ -67,7 +68,13 @@ try {
   }, { source, size, badge }).then((b64) => Buffer.from(b64, "base64"));
 
   const outputs = [
-    [resolve(publicDir, "icons/favicon-32.png"), mark, 32],
+    [resolve(publicDir, "icons/favicon-32.png"), favicon, 32],
+    // Fresh canonical URLs prevent installed clients reusing the old filled mark.
+    [resolve(publicDir, "favicon.png"), favicon, 96],
+    [resolve(publicDir, "icons/receebo-app-180.png"), standard, 180],
+    [resolve(publicDir, "icons/receebo-app-192.png"), standard, 192],
+    [resolve(publicDir, "icons/receebo-app-512.png"), standard, 512],
+    [resolve(publicDir, "icons/receebo-app-maskable-512.png"), svg(112), 512],
     [resolve(publicDir, "icons/receebo-white-180.png"), standard, 180],
     [resolve(publicDir, "icons/receebo-white-192.png"), standard, 192],
     [resolve(publicDir, "icons/receebo-white-512.png"), standard, 512],
@@ -85,12 +92,13 @@ try {
     console.log(`Generated ${file.replace(resolve(publicDir, "../.."), "")} (${size}×${size})`);
   }
   await writeFile(resolve(publicDir, "icons/badge-96.png"), await render(mark, 96, { badge: true }));
+  await writeFile(resolve(publicDir, "icons/receebo-badge-96.png"), await render(mark, 96, { badge: true }));
   console.log("Generated icons/badge-96.png (96×96, monochrome)");
 
   // favicon.ico (16/32/48) with embedded PNGs, for browsers that ask for /favicon.ico.
   const sizes = [16, 32, 48];
   const pngs = [];
-  for (const size of sizes) pngs.push(await render(mark, size));
+  for (const size of sizes) pngs.push(await render(favicon, size));
   const header = Buffer.alloc(6 + 16 * sizes.length);
   header.writeUInt16LE(0, 0); header.writeUInt16LE(1, 2); header.writeUInt16LE(sizes.length, 4);
   let offset = header.length;
