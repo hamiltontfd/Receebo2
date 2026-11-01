@@ -10,7 +10,7 @@
 - [Marketing verification safety](marketing-verification-safety.md) — a read-only landing-page check does not make ordinary API startup safe; avoid starting integration jobs just to serve public assets.
 - [Marketing media review](marketing-media-review.md) — capture success is not visual approval; preserve runtime cache paths when isolating capture environments.
 - [OAuth workspace validation](oauth-workspace-browser-validation.md) — connected browsers can show the main preview while assigned work runs on a different host; verify the emitted callback.
-- [Brand icons](brand-icons.md) — favicon and installed-app icons use the original SVG symbol without the wordmark, on a white background.
+- [Brand icons](brand-icons.md) — símbolo original sem placa/margem branca externa; transparência no favicon/web e acabamento escuro nas variantes opacas/maskable.
 - [Stripe environment isolation](stripe-environment-isolation.md) — connector test mode does not imply backend test mode; inspect effective credentials and price compatibility separately.
 - [Login navigation](login-navigation.md) — login must be a dismissible modal over the landing page, including in the installed web app.
 - [Founding customer offer](founding-trial-policy.md) — no-card account trials and legacy Stripe trials are distinct; founding eligibility lasts while the account exists.

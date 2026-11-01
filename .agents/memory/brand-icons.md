@@ -4,11 +4,12 @@ description: User requirements for Receebo browser and installed-app icons.
 ---
 Every logo in the product uses the current Receebo mark from `artifacts/receiptr/public/logo.svg` (the header/landing logo), without the wordmark. Regenerate everything with `node artifacts/receiptr/scripts/generate-icons.mjs`.
 
-- Favicon: cropped to the black rounded outline, no extra margin, on opaque white including outside the rounded corners. The standalone UI mark may remain transparent.
-- Installed-app icons (manifest, Apple touch icon, Expo app icon): the mark on a white background, with padding; the maskable icon keeps the mark inside the central safe circle.
+- Favicon e ícones web padrão: recortados até o contorno preto arredondado, com transparência fora dele, sem placa ou margem branca externa. Preservar o branco interno.
+- Apple touch e variantes opacas: acabamento escuro compatível com o contorno, sem margem branca. Maskable mantém o símbolo na área circular segura sobre fundo escuro.
+- O gerador web não deve alterar incidentalmente assets do Expo nem os badges monocromáticos.
 - Android push badge (`icons/badge-96.png`): white silhouette of the mark on transparent.
 
-**Why:** The user asked for consistent original-symbol icons everywhere after seeing differently drawn icons (old filled push icon, old Receiptr mobile icon).
+**Why:** O usuário rejeitou os cantos brancos no navegador e a placa branca com margens no Dock. Esta orientação substitui explicitamente o pedido anterior de fundo/padding branco.
 
 **How to apply:** Preserve the original vector geometry when regenerating icons; never redraw the symbol by hand.
 

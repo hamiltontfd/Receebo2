@@ -9,6 +9,11 @@ const read = (path) => readFile(new URL(path, root));
 test("search and installed-app icons are real PNGs at the declared sizes", async () => {
   for (const [path, size] of [
     ["favicon.png", 96],
+    ["favicon-outline.png", 96],
+    ["icons/receebo-outline-180.png", 180],
+    ["icons/receebo-outline-192.png", 192],
+    ["icons/receebo-outline-512.png", 512],
+    ["icons/receebo-outline-maskable-512.png", 512],
     ["icons/receebo-app-180.png", 180],
     ["icons/receebo-app-192.png", 192],
     ["icons/receebo-app-512.png", 512],
@@ -26,12 +31,12 @@ test("metadata, manifest and notifications use the fresh icon URLs", async () =>
   const html = (await read("index.html")).toString();
   const config = (await read("vite.config.ts")).toString();
   const worker = (await read("src/sw.ts")).toString();
-  assert.match(html, /sizes="96x96" href="%BASE_URL%favicon\.png"/);
-  assert.match(html, /apple-touch-icon[^>]+receebo-app-180\.png/);
-  for (const name of ["receebo-app-192.png", "receebo-app-512.png", "receebo-app-maskable-512.png"]) {
+  assert.match(html, /sizes="96x96" href="%BASE_URL%favicon-outline\.png"/);
+  assert.match(html, /apple-touch-icon[^>]+receebo-outline-180\.png/);
+  for (const name of ["receebo-outline-192.png", "receebo-outline-512.png", "receebo-outline-maskable-512.png"]) {
     assert.ok(config.includes(name), name);
   }
-  assert.ok(worker.includes("receebo-app-192.png"));
+  assert.ok(worker.includes("receebo-outline-192.png"));
   assert.ok(worker.includes("receebo-badge-96.png"));
-  assert.match((await read("public/favicon.svg")).toString(), /fill="#ffffff"/);
+  assert.equal((await read("public/favicon.svg")).toString(), (await read("public/logo-mark.svg")).toString());
 });

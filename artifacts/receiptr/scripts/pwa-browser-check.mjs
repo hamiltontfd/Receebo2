@@ -5,6 +5,7 @@ import { readFile, stat, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { resolve, extname } from "node:path";
 import { tmpdir } from "node:os";
 import { chromium, expect } from "@playwright/test";
+import { iconBrowserOptions } from "./icon-browser.mjs";
 
 const root = resolve(import.meta.dirname, "../dist/public");
 const output = resolve(import.meta.dirname, "../../../generated-artifacts/pwa");
@@ -17,6 +18,7 @@ expect(manifest.scope).toBe("/");
 expect(manifest.id).toBe("/");
 expect(manifest.display).toBe("standalone");
 for (const icon of manifest.icons) {
+  expect(icon.src).toMatch(/\/icons\/receebo-outline-(192|512|maskable-512)\.png$/);
   const png = await readFile(resolve(root, icon.src.replace(/^\//, "")));
   const size = icon.sizes.split("x").map(Number);
   expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual(size);
@@ -47,7 +49,7 @@ try {
   await mkdir(output, { recursive: true });
   context = await chromium.launchPersistentContext(profile, {
     headless: true,
-    ...(process.env.PWA_CHROMIUM_PATH ? { executablePath: process.env.PWA_CHROMIUM_PATH } : {}),
+    ...iconBrowserOptions(process.env.PWA_CHROMIUM_PATH || process.env.CHROMIUM_PATH),
     args: ["--no-sandbox"],
     viewport: { width: 390, height: 844 },
   });
@@ -57,6 +59,20 @@ try {
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+  // Check what Chromium actually receives, not just the config on disk.
+  const manifestResult = await (await context.newCDPSession(page)).send("Page.getAppManifest");
+  expect(manifestResult.errors).toEqual([]);
+  expect(JSON.parse(manifestResult.data).icons).toEqual(manifest.icons);
+  for (const selector of ['link[rel="icon"]', 'link[rel="apple-touch-icon"]']) {
+    const urls = await page.locator(selector).evaluateAll((links) => links.map((link) => link.href));
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(url).toContain("outline");
+      const response = await page.request.get(url);
+      expect(response.ok()).toBe(true);
+      expect((await response.body()).length).toBeGreaterThan(100);
+    }
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: resolve(output, "online-mobile.png"), fullPage: false });
   const cdp = await context.newCDPSession(page);
@@ -68,6 +84,11 @@ try {
     return (await Promise.all(names.map(async (name) => (await (await caches.open(name)).keys()).map((request) => request.url)))).flat();
   });
   expect(cached.length).toBeGreaterThan(0);
+  for (const asset of ["favicon-outline.ico", "favicon-outline.svg", "favicon-outline.png",
+    "icons/receebo-outline-180.png", "icons/receebo-outline-192.png",
+    "icons/receebo-outline-512.png", "icons/receebo-outline-maskable-512.png"]) {
+    expect(cached.some((url) => new URL(url).pathname === `/${asset}`)).toBe(true);
+  }
   expect(cached.some((url) => /\/api\/|\/__clerk\/|checkout\.stripe/.test(url))).toBe(false);
   await context.setOffline(true);
   await page.reload();

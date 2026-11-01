@@ -43,7 +43,7 @@ export default defineConfig({
       filename: "sw.ts",
       registerType: "prompt",
       injectRegister: null,
-      includeAssets: ["logo.svg", "logo-mark.svg", "logo.png", "favicon.svg", "favicon.ico", "favicon.png", "icons/*.png"],
+      includeAssets: ["logo.svg", "logo-mark.svg", "logo.png", "favicon*.svg", "favicon*.ico", "favicon*.png", "apple-touch-icon.png", "icons/*.png"],
       manifest: {
         name: "Receebo — Receipts. Easy to find.",
         short_name: "Receebo",
@@ -57,17 +57,17 @@ export default defineConfig({
         scope: basePath || "/",
         icons: [
           {
-            src: `${basePath}icons/receebo-app-192.png`,
+            src: `${basePath}icons/receebo-outline-192.png`,
             sizes: "192x192",
             type: "image/png",
           },
           {
-            src: `${basePath}icons/receebo-app-512.png`,
+            src: `${basePath}icons/receebo-outline-512.png`,
             sizes: "512x512",
             type: "image/png",
           },
           {
-            src: `${basePath}icons/receebo-app-maskable-512.png`,
+            src: `${basePath}icons/receebo-outline-maskable-512.png`,
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",

@@ -16,24 +16,19 @@ function png(path: string) {
 }
 
 describe("Receebo brand icons", () => {
-  it("keeps the original symbol geometry on the white app-icon source", () => {
+  it("keeps the original symbol geometry without an external plate", () => {
     const source = readFileSync(resolve(publicDir, "icons/icon-source.svg"), "utf8");
     for (const part of symbolParts()) expect(source).toContain(part);
-    expect(source).toContain('<rect width="512" height="512" fill="#ffffff"/>');
+    expect(source).toContain('viewBox="3 3 48 48"');
+    expect(source.match(/<rect\b/g)).toHaveLength(1);
     expect(source.match(/<path\b/g)).toHaveLength(2);
   });
   it.each(["favicon.svg", "logo-mark.svg"])("preserves the original symbol in %s", (file) => {
     const mark = readFileSync(resolve(publicDir, file), "utf8");
     for (const part of symbolParts()) expect(mark).toContain(part);
     expect(mark.match(/<path\b/g)).toHaveLength(2);
-    if (file === "favicon.svg") {
-      expect(mark).toContain('viewBox="0 0 512 512"');
-      expect(mark).toContain('<rect width="512" height="512" fill="#ffffff"/>');
-      expect(mark).toContain("translate(0 0)");
-    } else {
-      expect(mark).toContain('viewBox="3 3 48 48"');
-      expect(mark).not.toContain("#ffffff");
-    }
+    expect(mark).toContain('viewBox="3 3 48 48"');
+    expect(mark.match(/<rect\b/g)).toHaveLength(1);
   });
   it.each([
     ["favicon-32.png", 32],
@@ -60,10 +55,10 @@ describe("Receebo brand icons", () => {
   });
   it("uses the cropped favicon and a dedicated Apple touch icon", () => {
     const html = readFileSync(resolve(publicDir, "../index.html"), "utf8");
-    expect(html).toContain('href="%BASE_URL%favicon.svg"');
-    expect(html).toContain('href="%BASE_URL%favicon.ico"');
-    expect(html).toContain('sizes="96x96" href="%BASE_URL%favicon.png"');
-    expect(html).toContain('sizes="180x180" href="%BASE_URL%icons/receebo-app-180.png"');
+    expect(html).toContain('href="%BASE_URL%favicon-outline.svg"');
+    expect(html).toContain('href="%BASE_URL%favicon-outline.ico"');
+    expect(html).toContain('sizes="96x96" href="%BASE_URL%favicon-outline.png"');
+    expect(html).toContain('sizes="180x180" href="%BASE_URL%icons/receebo-outline-180.png"');
     expect(html).not.toContain("receebo-white-32.png");
     expect(html).not.toContain('href="%BASE_URL%logo.svg"');
   });

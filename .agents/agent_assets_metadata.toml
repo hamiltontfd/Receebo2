@@ -33,3 +33,17 @@ mtime_ms = 1793538933691
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/4860975f-41da-45ee-b137-4bd0a6c994a3/b146bb34-7adf-4b09-ad8b-c628bbf9b4d2"
 storage_version_token = "1793538958041736"
 content_type = "image/png"
+
+[[outputs]]
+id = "DDpJKyd1_bqZMgTzapiuS"
+uri = "file://generated-artifacts/icons/comparison.png"
+type = "image"
+title = "Receebo — comparação dos ícones"
+description = "Antes e depois em fundo claro e escuro, tamanhos pequenos reais e variantes Apple e maskable."
+logical_id = "14991bbf-f5b1-4aec-bb54-36f43179253a"
+content_hash = "sha256:feb82debb34c5d2fa22d57da5027a4221578f51cf2531cae7f89933730ac1a5f"
+size = 103352
+mtime_ms = 1793540351066
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/14991bbf-f5b1-4aec-bb54-36f43179253a/f71c4cc7-cf77-436e-9837-3a7322c56b4a"
+storage_version_token = "1793540488148573"
+content_type = "image/png"
