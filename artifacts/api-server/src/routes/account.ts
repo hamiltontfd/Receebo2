@@ -1,4 +1,6 @@
 import { Router, type IRouter } from "express";
+import { UpdateAccountOnboardingBody } from "@workspace/api-zod";
+import { advanceOnboarding } from "../lib/onboarding";
 import { desc, eq, inArray } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
 import {
@@ -48,6 +50,40 @@ export const EXPORT_FROZEN_MESSAGE =
   "Your account is paused, so in-app export is off. Email contact@receebo.net and we'll send you a copy of your data.";
 
 const router: IRouter = Router();
+
+// GET also records recoverable receipt evidence; use the same deletion lock as PATCH.
+router.get("/account/onboarding", requireAuth, lockUserDataMutation(async (req, res): Promise<void> => {
+  if (req.get("X-Onboarding-Account") && req.get("X-Onboarding-Account") !== req.userId) {
+    res.status(409).json({ error: "Account changed" });
+    return;
+  }
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    res.json(await advanceOnboarding(req.userId!));
+  } catch (err) {
+    logger.error({ err, userId: req.userId }, "Failed to load onboarding");
+    res.status(500).json({ error: "Failed to load onboarding" });
+  }
+}));
+
+router.patch("/account/onboarding", requireAuth, lockUserDataMutation(async (req, res): Promise<void> => {
+  if (req.get("X-Onboarding-Account") && req.get("X-Onboarding-Account") !== req.userId) {
+    res.status(409).json({ error: "Account changed" });
+    return;
+  }
+  const parsed = UpdateAccountOnboardingBody.strict().safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid onboarding progress" });
+    return;
+  }
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    res.json(await advanceOnboarding(req.userId!, parsed.data));
+  } catch (err) {
+    logger.error({ err, userId: req.userId }, "Failed to save onboarding");
+    res.status(500).json({ error: "Failed to save onboarding" });
+  }
+}));
 
 router.get("/legal/acceptance", requireAuth, async (req, res): Promise<void> => {
   try {

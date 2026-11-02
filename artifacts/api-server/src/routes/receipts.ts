@@ -1,4 +1,6 @@
 import { Router, type IRouter } from "express";
+import { getAuth } from "@clerk/express";
+import { rememberOnboardingReceipt } from "../lib/onboarding";
 import { validPurchaseCountry } from "../lib/purchaseCountry";
 import { and, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, trialUploadsTable } from "@workspace/db";
@@ -457,6 +459,9 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
       set: { state: "succeeded", receiptId: existing.id },
     });
   }
+  if (updated && !updated.isDraft && getAuth(req)?.userId) {
+    await rememberOnboardingReceipt(req.userId!, tx);
+  }
   return updated;
   });
 
@@ -522,6 +527,9 @@ router.delete("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (r
   }
 
   await db.transaction(async tx => {
+    if (!existing.isDraft && getAuth(req)?.userId) {
+      await rememberOnboardingReceipt(req.userId!, tx);
+    }
     await tx.delete(receiptsTable).where(eq(receiptsTable.id, existing.id));
     // Discarding an unsaved draft (e.g. Retake) frees its trial slot; deleting
     // a saved receipt never restores a use.

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { OnboardingProvider } from "@/lib/useOnboarding";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
@@ -354,6 +355,7 @@ function ClerkProviderWithRoutes() {
           <PostAuthCheckout />
           <GuestIdSync />
           <PwaStatus />
+          <OnboardingProvider>
           <Switch>
             <Route path="/" component={HomeRedirect} />
             <Route path="/sign-in/*?" component={SignInPage} />
@@ -390,6 +392,7 @@ function ClerkProviderWithRoutes() {
             <Route path="/get-started" component={GetStarted} />
             <Route component={NotFound} />
           </Switch>
+          </OnboardingProvider>
           <Toaster />
         </TooltipProvider>
         </MarketProvider>

@@ -25,6 +25,7 @@ import type {
 import type {
   AccountLanguage,
   AccountMarket,
+  AccountOnboarding,
   AccountTrialStartResult,
   BillingAccessStatus,
   CheckSimilarReceiptParams,
@@ -36,6 +37,7 @@ import type {
   MarketPreferenceInput,
   MarketSuggestion,
   MerchantSpend,
+  OnboardingProgressInput,
   Receipt,
   ReceiptPage,
   ReceiptInput,
@@ -59,6 +61,142 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getGetAccountOnboardingUrl = () => {
+
+
+
+
+  return `/api/account/onboarding`
+}
+
+export const getAccountOnboarding = async ( options?: RequestInit): Promise<AccountOnboarding> => {
+
+  return customFetch<AccountOnboarding>(getGetAccountOnboardingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAccountOnboardingQueryKey = () => {
+    return [
+    `/api/account/onboarding`
+    ] as const;
+    }
+
+
+export const getGetAccountOnboardingQueryOptions = <TData = Awaited<ReturnType<typeof getAccountOnboarding>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccountOnboarding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAccountOnboardingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccountOnboarding>>> = ({ signal }) => getAccountOnboarding({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAccountOnboarding>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAccountOnboardingQueryResult = NonNullable<Awaited<ReturnType<typeof getAccountOnboarding>>>
+export type GetAccountOnboardingQueryError = ErrorType<void>
+
+
+
+export function useGetAccountOnboarding<TData = Awaited<ReturnType<typeof getAccountOnboarding>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccountOnboarding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAccountOnboardingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateAccountOnboardingUrl = () => {
+
+
+
+
+  return `/api/account/onboarding`
+}
+
+export const updateAccountOnboarding = async (onboardingProgressInput: OnboardingProgressInput, options?: RequestInit): Promise<AccountOnboarding> => {
+
+  return customFetch<AccountOnboarding>(getUpdateAccountOnboardingUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      onboardingProgressInput,)
+  }
+);}
+
+
+
+
+export const getUpdateAccountOnboardingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountOnboarding>>, TError,{data: BodyType<OnboardingProgressInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAccountOnboarding>>, TError,{data: BodyType<OnboardingProgressInput>}, TContext> => {
+
+const mutationKey = ['updateAccountOnboarding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAccountOnboarding>>, {data: BodyType<OnboardingProgressInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAccountOnboarding(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAccountOnboardingMutationResult = NonNullable<Awaited<ReturnType<typeof updateAccountOnboarding>>>
+    export type UpdateAccountOnboardingMutationBody = BodyType<OnboardingProgressInput>
+    export type UpdateAccountOnboardingMutationError = ErrorType<void>
+
+    export const useUpdateAccountOnboarding = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountOnboarding>>, TError,{data: BodyType<OnboardingProgressInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAccountOnboarding>>,
+        TError,
+        {data: BodyType<OnboardingProgressInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAccountOnboardingMutationOptions(options));
+    }
 
 export const getGetAccountLanguageUrl = () => {
 

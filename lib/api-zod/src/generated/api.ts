@@ -8,6 +8,27 @@
 import * as zod from 'zod';
 
 
+export const GetAccountOnboardingResponse = zod.object({
+  "receiptDone": zod.boolean(),
+  "searchDone": zod.boolean(),
+  "completed": zod.boolean(),
+  "dismissed": zod.boolean()
+})
+
+
+export const UpdateAccountOnboardingBody = zod.object({
+  "searchDone": zod.boolean().optional(),
+  "dismissed": zod.boolean().optional()
+})
+
+export const UpdateAccountOnboardingResponse = zod.object({
+  "receiptDone": zod.boolean(),
+  "searchDone": zod.boolean(),
+  "completed": zod.boolean(),
+  "dismissed": zod.boolean()
+})
+
+
 export const GetAccountLanguageResponse = zod.object({
   "language": zod.union([zod.literal('en'),zod.literal('pt-PT'),zod.literal('pt-BR'),zod.literal(null)]).nullable()
 })

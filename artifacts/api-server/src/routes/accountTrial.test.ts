@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import {
   db, accountTrialsTable, trialUploadsTable, uploadIntentsTable, receiptsTable,
   pendingImportsTable, userBillingTable, guestSessionsTable,
-  trialFunnelSubjectsTable,
+  trialFunnelSubjectsTable, userPreferencesTable,
 } from "@workspace/db";
 
 const fixture = vi.hoisted(() => ({
@@ -35,6 +35,7 @@ vi.mock("../lib/legalAcceptance", () => ({
 }));
 vi.mock("../lib/ownerAccess", () => ({ hasOwnerAccess: async () => false }));
 vi.mock("@clerk/express", () => ({
+  getAuth: (req: express.Request) => ({ userId: req.headers["x-test-user"] ?? null }),
   clerkClient: { users: { getUser: async () => ({ emailAddresses: [] }) } },
 }));
 vi.mock("../lib/emailService", () => ({
@@ -125,6 +126,7 @@ afterAll(async () => {
     await db.delete(pendingImportsTable).where(eq(pendingImportsTable.userId, id));
     await db.delete(receiptsTable).where(eq(receiptsTable.userId, id));
     await db.delete(userBillingTable).where(eq(userBillingTable.userId, id));
+    await db.delete(userPreferencesTable).where(eq(userPreferencesTable.userId, id));
     await db.delete(accountTrialsTable).where(eq(accountTrialsTable.userId, id));
     await db.delete(trialFunnelSubjectsTable).where(eq(trialFunnelSubjectsTable.userId, id));
     await db.execute(sql`DELETE FROM trial_ai_reads WHERE user_id = ${id}`);

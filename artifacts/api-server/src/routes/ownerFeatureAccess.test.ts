@@ -2,6 +2,7 @@ import express from "express";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+vi.mock("../lib/onboarding", () => ({ rememberOnboardingReceipt: vi.fn() }));
 
 const mocks = vi.hoisted(() => ({
   stripe: vi.fn(),

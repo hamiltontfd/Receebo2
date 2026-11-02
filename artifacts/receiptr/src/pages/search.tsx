@@ -417,11 +417,18 @@ export default function SearchPage() {
   const [, setLocation] = useLocation();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { isGuest } = useGuestMode();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
+  const searchOwnerRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const onboarding = useOnboarding();
+
+  useEffect(() => {
+    searchOwnerRef.current = null;
+    setQuery("");
+    setDebounced("");
+  }, [userId]);
 
   // Show a welcome toast when the user lands after Stripe Checkout, then
   // immediately clear the param so it doesn't reappear on refresh.
@@ -447,10 +454,10 @@ export default function SearchPage() {
   }, [query]);
 
   useEffect(() => {
-    if (debounced.length > 0 && onboarding.step1Done) {
+    if (searchOwnerRef.current === userId && debounced.trim().length > 0 && onboarding.ready && onboarding.step1Done) {
       onboarding.markSearchDone();
     }
-  }, [debounced, onboarding.step1Done]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debounced, userId, onboarding.ready, onboarding.step1Done, onboarding.markSearchDone]);
 
   const isSearching = debounced.length > 0;
 
@@ -523,7 +530,7 @@ export default function SearchPage() {
     <PageTransition className="flex-1 w-full max-w-lg md:max-w-3xl mx-auto px-5 py-6 flex flex-col gap-5">
 
       {/* Onboarding checklist — signed-in users only */}
-      {isSignedIn && !onboarding.dismissed && (
+      {isSignedIn && onboarding.visible && (
         <OnboardingCard
           {...onboarding}
           onFocusSearch={() => searchInputRef.current?.focus()}
@@ -536,7 +543,10 @@ export default function SearchPage() {
         <Input
           ref={searchInputRef}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            searchOwnerRef.current = userId ?? null;
+            setQuery(e.target.value);
+          }}
           placeholder={appText("Search purchases...")}
           className="pl-10 h-12 rounded-full bg-muted/50 border-transparent focus-visible:bg-background"
         />

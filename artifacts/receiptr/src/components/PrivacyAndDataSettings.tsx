@@ -90,7 +90,7 @@ export function PrivacyAndDataSettings() {
       setSendingCode(false);
     }
   };
-  const { signOut } = useClerk();
+  const { signOut, user } = useClerk();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   // Self-serve export only while the account has access; frozen accounts ask by email.
@@ -156,6 +156,7 @@ export function PrivacyAndDataSettings() {
       }
 
       queryClient.clear();
+      if (user?.id) localStorage.removeItem(`receebo:onboarding:pending:${user.id}`);
       localStorage.removeItem("receebo:guestToken");
       try {
         await signOut({

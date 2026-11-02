@@ -5,6 +5,18 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface AccountOnboarding {
+  receiptDone: boolean;
+  searchDone: boolean;
+  completed: boolean;
+  dismissed: boolean;
+}
+
+export interface OnboardingProgressInput {
+  searchDone?: boolean;
+  dismissed?: boolean;
+}
+
 /**
  * @nullable
  */

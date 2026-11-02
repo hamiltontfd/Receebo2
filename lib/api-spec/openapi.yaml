@@ -15,6 +15,41 @@ tags:
   - name: Storage
     description: Object storage upload and serving endpoints.
 paths:
+  /account/onboarding:
+    get:
+      operationId: getAccountOnboarding
+      responses:
+        "200":
+          description: Durable authenticated account progress; never inferred from legal consent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountOnboarding"
+        "401":
+          description: Authentication required
+        "423":
+          description: Account deletion in progress
+    patch:
+      operationId: updateAccountOnboarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingProgressInput"
+      responses:
+        "200":
+          description: Monotonic progress; false and omitted fields never undo confirmed progress.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountOnboarding"
+        "400":
+          description: Invalid progress
+        "401":
+          description: Authentication required
+        "423":
+          description: Account deletion in progress
   /account/language:
     get:
       operationId: getAccountLanguage
@@ -481,6 +516,27 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
+    AccountOnboarding:
+      type: object
+      additionalProperties: false
+      required: [receiptDone, searchDone, completed, dismissed]
+      properties:
+        receiptDone:
+          type: boolean
+        searchDone:
+          type: boolean
+        completed:
+          type: boolean
+        dismissed:
+          type: boolean
+    OnboardingProgressInput:
+      type: object
+      additionalProperties: false
+      properties:
+        searchDone:
+          type: boolean
+        dismissed:
+          type: boolean
     AccountLanguage:
       type: object
       additionalProperties: false

@@ -10,6 +10,10 @@ export const userPreferencesTable = pgTable("user_preferences", {
   market: text("market", { enum: ["PT", "BR", "US"] }),
   language: text("language", { enum: ["en", "pt-PT", "pt-BR"] }),
   notificationsOptOut: boolean("notifications_opt_out").notNull().default(false),
+  onboardingReceiptDone: boolean("onboarding_receipt_done").notNull().default(false),
+  onboardingSearchDone: boolean("onboarding_search_done").notNull().default(false),
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
+  onboardingDismissed: boolean("onboarding_dismissed").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

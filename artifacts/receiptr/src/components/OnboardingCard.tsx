@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { appText } from "@/lib/appCopy";
 import { useAppLocale } from "@/lib/locale";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,31 +12,19 @@ interface OnboardingCardProps extends OnboardingState {
 export function OnboardingCard({
   step1Done,
   step2Done,
-  allDone,
+  visible,
+  celebrating,
   dismissed,
   dismiss,
   onFocusSearch,
 }: OnboardingCardProps) {
   useAppLocale();
   const [, setLocation] = useLocation();
-  const [celebrating, setCelebrating] = useState(false);
-  const [gone, setGone] = useState(false);
-
-  // When all done, show celebration then slide out
-  useEffect(() => {
-    if (!allDone || gone) return;
-    setCelebrating(true);
-    const t = setTimeout(() => {
-      setGone(true);
-      dismiss();
-    }, 2000);
-    return () => clearTimeout(t);
-  }, [allDone, gone, dismiss]);
 
   const completedCount = (step1Done ? 1 : 0) + (step2Done ? 1 : 0);
   const progressPct = (completedCount / 2) * 100;
 
-  if (dismissed || gone) return null;
+  if (!visible || dismissed) return null;
 
   return (
     <AnimatePresence>
