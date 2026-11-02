@@ -53,7 +53,7 @@ export default function FinalCTASection() {
             </Link>
           </motion.div>
 
-          <motion.p variants={fadeInUp} className="text-sm text-background/40">
+          <motion.p variants={fadeInUp} className="text-sm text-background/70">
             {lt("15 days free · Up to 5 receipts · No card needed", "15 dias grátis · Até 5 recibos · Sem cartão")}
           </motion.p>
         </motion.div>

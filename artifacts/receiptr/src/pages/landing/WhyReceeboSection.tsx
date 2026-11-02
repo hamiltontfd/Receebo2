@@ -115,7 +115,7 @@ export default function WhyReceeboSection() {
                 key={i}
                 onClick={() => goTo(i)}
                 aria-pressed={i === active}
-                className="relative flex-1 py-4 text-sm font-semibold transition-colors focus-visible:outline-none"
+                className="relative flex-1 py-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-foreground focus-visible:-outline-offset-4"
                 style={{
                   color: i === active ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
                 }}
@@ -172,7 +172,7 @@ export default function WhyReceeboSection() {
                       <button
                         key={i}
                         onClick={() => goTo(i)}
-                        className="h-1.5 rounded-full transition-all duration-300 focus-visible:outline-none"
+                        className="h-1.5 rounded-full transition-all duration-300 focus-visible:outline-2 focus-visible:outline-foreground focus-visible:outline-offset-4"
                         style={{
                           width: i === active ? "24px" : "6px",
                           backgroundColor:
