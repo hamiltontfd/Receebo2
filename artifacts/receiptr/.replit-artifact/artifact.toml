@@ -19,12 +19,7 @@ run = "pnpm --filter @workspace/receiptr run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/receiptr", "run", "build" ]
-publicDir = "artifacts/receiptr/dist/public"
-serve = "static"
-
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+run = [ "node", "artifacts/receiptr/scripts/serve-public.mjs" ]
 
 [services.env]
 PORT = "5000"

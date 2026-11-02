@@ -29,7 +29,7 @@ export function useAppLocale(): AppLocale {
   return useSyncExternalStore((listener) => {
     listeners.add(listener);
     return () => { listeners.delete(listener); };
-  }, getAppLocale);
+  }, getAppLocale, () => "en");
 }
 export function isAppLocale(value: unknown): value is AppLocale {
   return typeof value === "string" && (APP_LOCALES as readonly string[]).includes(value);

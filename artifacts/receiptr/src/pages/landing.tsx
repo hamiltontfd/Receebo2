@@ -7,6 +7,8 @@ import { useAuth } from "@clerk/react";
 import { MarketSelector } from "@/components/MarketSelector";
 import { lt } from "@/lib/landingLocale";
 import { useAppLocale } from "@/lib/locale";
+import { useCreateCheckout } from "@/hooks/useBilling";
+import type { ReactNode } from "react";
 
 // Sections
 import HeroSection from "./landing/HeroSection";
@@ -35,6 +37,17 @@ function useScrolled(threshold = 40) {
 /* ── Main Component ────────────────────────────────────────────────────── */
 export default function Landing() {
   const { isSignedIn } = useAuth();
+  const checkout = useCreateCheckout();
+  return <LandingContent isSignedIn={!!isSignedIn} checkout={isSignedIn ? checkout : undefined}
+    marketSelector={<MarketSelector variant="compact" className="-mr-1 sm:mr-0" />} />;
+}
+
+// Shared by the build-time renderer and the interactive authenticated app.
+export function LandingContent({ isSignedIn = false, checkout, marketSelector }: {
+  isSignedIn?: boolean;
+  checkout?: { mutate: (plan: "monthly" | "yearly") => void; isPending: boolean };
+  marketSelector?: ReactNode;
+}) {
   const scrolled = useScrolled(40);
   const locale = useAppLocale();
 
@@ -64,7 +77,7 @@ export default function Landing() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
           >
-            <MarketSelector variant="compact" className="-mr-1 sm:mr-0" />
+            {marketSelector}
             <Link href="/sign-in" className="hidden md:inline-block">
               <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                 <Button
@@ -89,16 +102,16 @@ export default function Landing() {
 
         {/* ── Page Sections ───────────────────────────────────────────── */}
         <main>
-          <HeroSection />
+          <HeroSection isSignedIn={isSignedIn} />
           <PromoVideoSection />
           <DemoSection />
           <WhyReceeboSection />
           <EmailReceiptsSection />
           <ConsumerProtectionSection />
           <ComparisonSection />
-          <PricingSection />
+          <PricingSection checkout={checkout} />
           <FAQSection />
-          <FinalCTASection />
+          <FinalCTASection isSignedIn={isSignedIn} />
         </main>
 
         {/* ── Footer ──────────────────────────────────────────────────── */}

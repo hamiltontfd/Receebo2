@@ -22,3 +22,4 @@
 - [Language preference boundaries](language-preference-boundaries.md) — visitors use browser language automatically; manual selection belongs only in signed-in settings, never on the homepage.
 - [Automation trust boundaries](automation-trust-boundaries.md) — Clerk availability is not verified tenant state; unverified proxy IPs cannot safely identify guests.
 - [Onboarding evidence](onboarding-evidence.md) — legacy browser flags have no reliable owner; receipt ownership proves only the receipt step, never completion.
+- [Public hydration](public-hydration.md) — verify narrow Portuguese/reduced-motion browsers too; preference-dependent controls can invalidate an otherwise valid server snapshot.

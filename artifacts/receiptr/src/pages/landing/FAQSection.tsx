@@ -108,7 +108,7 @@ export default function FAQSection() {
           whileInView="visible"
           viewport={VIEWPORT}
         >
-          <Accordion type="single" collapsible className="space-y-3">
+          <Accordion type="single" collapsible className="space-y-3 [&_[role=region][data-state=closed]]:hidden">
             {faqs.map(({ q, a }, i) => (
               <AccordionItem
                 key={i}
@@ -118,7 +118,7 @@ export default function FAQSection() {
                 <AccordionTrigger className="py-5 text-left font-semibold text-base hover:no-underline">
                   {q}
                 </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed pb-5 text-sm">
+                <AccordionContent forceMount className="text-muted-foreground leading-relaxed pb-5 text-sm">
                   {a}
                 </AccordionContent>
               </AccordionItem>

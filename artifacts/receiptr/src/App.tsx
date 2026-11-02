@@ -8,6 +8,7 @@ import { QueryCache, QueryClient, QueryClientProvider, useQueryClient } from "@t
 import { clearActionCooldowns, temporaryActionError } from "@workspace/api-client-react";
 import { actionWaitMessage } from "@/lib/actionLimit";
 import { appText } from "@/lib/appCopy";
+import { applyPageMetadata } from "@/lib/publicSeo";
 import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -402,9 +403,16 @@ function ClerkProviderWithRoutes() {
   );
 }
 
+function RouteMetadata() {
+  const [path] = useLocation();
+  useEffect(() => applyPageMetadata(path), [path]);
+  return null;
+}
+
 function App() {
   return (
     <WouterRouter base={basePath}>
+      <RouteMetadata />
       <ClerkProviderWithRoutes />
     </WouterRouter>
   );

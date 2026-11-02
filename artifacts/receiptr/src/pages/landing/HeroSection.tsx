@@ -1,15 +1,14 @@
 import { Link } from "wouter";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import { useHydrationSafeReducedMotion } from "@/lib/useHydrationSafeReducedMotion";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@clerk/react";
 import { ArrowRight, Play } from "lucide-react";
 import { fadeInUp, slideInRight, stagger } from "./shared";
 import { marketingMedia } from "./MarketingMedia";
 import { lt } from "@/lib/landingLocale";
 
-export default function HeroSection() {
-  const { isSignedIn } = useAuth();
-  const reduce = useReducedMotion();
+export default function HeroSection({ isSignedIn = false }: { isSignedIn?: boolean }) {
+  const reduce = useHydrationSafeReducedMotion();
   const entrance = reduce ? false : "hidden";
 
   return (

@@ -5,6 +5,7 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { VitePWA } from "vite-plugin-pwa";
 import { marketingSchemaPlugin } from "./build/marketingSchema";
+import { publicPagesPlugin } from "./scripts/public-pages-plugin.mjs";
 
 const rawPort = process.env.PORT;
 
@@ -23,6 +24,7 @@ if (Number.isNaN(port) || port <= 0) {
 // Canonical/Open Graph URLs in index.html use %VITE_APP_URL%. Default it so the
 // literal placeholder never ships; override with VITE_APP_URL if needed.
 process.env.VITE_APP_URL ||= "https://receebo.net";
+process.env.VITE_APP_URL = new URL(process.env.VITE_APP_URL).origin;
 
 const basePath = process.env.BASE_PATH;
 
@@ -39,6 +41,7 @@ export default defineConfig({
     react(),
     tailwindcss({ optimize: false }),
     runtimeErrorOverlay(),
+    publicPagesPlugin(import.meta.dirname, basePath, process.env.VITE_APP_URL),
     VitePWA({
       strategies: "injectManifest",
       srcDir: "src",

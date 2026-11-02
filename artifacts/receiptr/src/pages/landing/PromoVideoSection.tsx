@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "framer-motion";
+import { useHydrationSafeReducedMotion } from "@/lib/useHydrationSafeReducedMotion";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { lt } from "@/lib/landingLocale";
 
@@ -15,10 +15,12 @@ function useIsWide() {
     typeof window === "undefined" || typeof window.matchMedia !== "function"
       ? true
       : window.matchMedia(WIDE_QUERY).matches;
-  const [wide, setWide] = useState(get);
+  // Stable server/hydration snapshot; update to the actual viewport after mount.
+  const [wide, setWide] = useState(true);
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
     const mql = window.matchMedia(WIDE_QUERY);
+    setWide(get());
     const onChange = () => setWide(mql.matches);
     mql.addEventListener?.("change", onChange);
     return () => mql.removeEventListener?.("change", onChange);
@@ -28,7 +30,7 @@ function useIsWide() {
 
 export default function PromoVideoSection() {
   const TITLE = lt("Receebo in 30 seconds", "Receebo em 30 segundos");
-  const reduce = useReducedMotion();
+  const reduce = useHydrationSafeReducedMotion();
   const wide = useIsWide();
   const ratio = wide ? "16x9" : "9x16";
   const ref = useRef<HTMLVideoElement>(null);

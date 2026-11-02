@@ -2,12 +2,10 @@ import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@clerk/react";
 import { fadeInUp, stagger } from "./shared";
 import { lt } from "@/lib/landingLocale";
 
-export default function FinalCTASection() {
-  const { isSignedIn } = useAuth();
+export default function FinalCTASection({ isSignedIn = false }: { isSignedIn?: boolean }) {
 
   return (
     <section className="py-28 lg:py-36 bg-foreground text-background overflow-hidden relative">

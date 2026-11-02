@@ -2,8 +2,6 @@ import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@clerk/react";
-import { useCreateCheckout } from "@/hooks/useBilling";
 import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
 import { cn } from "@/lib/utils";
 import { lt } from "@/lib/landingLocale";
@@ -28,9 +26,9 @@ const getPlans = () => PUBLIC_PLANS.map((plan) => ({
     highlight: plan.key === "yearly",
 }));
 
-export default function PricingSection() {
-  const { isSignedIn } = useAuth();
-  const checkout = useCreateCheckout();
+export default function PricingSection({ checkout }: {
+  checkout?: { mutate: (plan: "monthly" | "yearly") => void; isPending: boolean };
+}) {
   const features = getFeatures();
   const plans = getPlans();
 
@@ -149,7 +147,7 @@ export default function PricingSection() {
               </ul>
 
               {/* CTA */}
-              {isSignedIn ? (
+              {checkout ? (
                 <Button
                   onClick={() => checkout.mutate(key)}
                   disabled={checkout.isPending}

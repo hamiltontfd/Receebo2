@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     // Freshness tooling uses node:test; keep the playback range Vitest tests.
-    exclude: [...configDefaults.exclude, "scripts/marketing/freshness.test.mjs"],
+    exclude: [...configDefaults.exclude, "scripts/marketing/freshness.test.mjs", "scripts/public-delivery.test.mjs"],
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],

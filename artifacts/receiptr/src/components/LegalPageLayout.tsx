@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import DisputeResolutionLine from "@/components/DisputeResolutionLine";
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
@@ -11,27 +10,9 @@ interface LegalPageLayoutProps {
 
 export function LegalPageLayout({
   title,
-  description,
+  description: _description,
   children,
 }: LegalPageLayoutProps) {
-  useEffect(() => {
-    const previousTitle = document.title;
-    const descriptionTag = document.querySelector<HTMLMetaElement>(
-      'meta[name="description"]',
-    );
-    const previousDescription = descriptionTag?.content;
-
-    document.title = `${title} — Receebo`;
-    if (descriptionTag) descriptionTag.content = description;
-
-    return () => {
-      document.title = previousTitle;
-      if (descriptionTag && previousDescription !== undefined) {
-        descriptionTag.content = previousDescription;
-      }
-    };
-  }, [title, description]);
-
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <header className="border-b bg-background/95 backdrop-blur">
