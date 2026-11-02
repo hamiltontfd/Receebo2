@@ -72,7 +72,7 @@ for (const route of ["/missing-page", "/removed/article", "/receipts/123/unknown
   });
 }
 
-for (const route of ["/search", "/search/worth-keeping", "/stats", "/scan", "/imports", "/settings", "/profile", "/profile/recurring", "/get-started", "/receipts/123", "/sign-in", "/sign-up/verify-email-address"]) {
+for (const route of ["/us", "/search", "/search/worth-keeping", "/stats", "/scan", "/imports", "/settings", "/profile", "/profile/recurring", "/get-started", "/receipts/123", "/sign-in", "/sign-up/verify-email-address"]) {
   test(`${route}: client-only route is reachable but not indexable`, async () => {
     const response = await fetch(url + route);
     assert.equal(response.status, 200);

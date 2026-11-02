@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const defaultRoot = fileURLToPath(new URL("../dist/public/", import.meta.url));
 const publicRoutes = new Map([["/", "index.html"], ["/privacy", "privacy/index.html"], ["/terms", "terms/index.html"]]);
-const clientRoute = /^(?:\/(?:search(?:\/worth-keeping)?|stats|scan|imports|settings|profile(?:\/recurring)?|get-started)|\/receipts\/[^/]+|\/sign-(?:in|up)(?:\/.*)?)$/;
+const clientRoute = /^(?:\/(?:us|search(?:\/worth-keeping)?|stats|scan|imports|settings|profile(?:\/recurring)?|get-started)|\/receipts\/[^/]+|\/sign-(?:in|up)(?:\/.*)?)$/;
 const types = {
   ".html": "text/html; charset=utf-8", ".xml": "application/xml; charset=utf-8",
   ".txt": "text/plain; charset=utf-8", ".js": "text/javascript; charset=utf-8",
