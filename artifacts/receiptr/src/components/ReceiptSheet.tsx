@@ -16,6 +16,7 @@ import {
 import { deriveConsumerRights, usRightsCopy } from "@/lib/consumerRights";
 import { useAccountRegion } from "@/lib/region";
 import { usStoreReturnWindow } from "@/lib/usStorePolicies";
+import { WarrantyQuickPick } from "@/components/WarrantyQuickPick";
 import { useAppLocale, formatLocaleDate } from "@/lib/locale";
 import { hasNoConsumerDates } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
@@ -546,6 +547,10 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             render={({ field }) => (
                               <FormItem className="p-4 space-y-1">
                                 <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Warranty")}</FormLabel>
+                                {isUs && (
+                                  <WarrantyQuickPick value={field.value ?? ""} onChange={(t) => form.setValue("warranty", t, { shouldDirty: true })}
+                                    purchaseDate={form.watch("purchaseDate")} onOther={() => form.setFocus("warranty")} />
+                                )}
                                 <FormControl>
                                   <AutosizeTextarea {...field} placeholder={appText("e.g. 2-year manufacturer warranty")} minRows={2} className="border-0 px-0 shadow-none focus-visible:ring-0 resize-none" />
                                 </FormControl>

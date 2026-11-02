@@ -39,7 +39,9 @@ export function localizedReturnReminder(input: ReturnReminderInput, locale: Emai
     secondary: p.item ? `${br ? "Ainda está satisfeito" : "Continua satisfeito"} com ${p.item}?` : null,
     body: `${br ? "Se não for ficar com a compra, inicie" : "Se não quiser ficar com a compra, inicie"} a devolução junto de ${p.merchant ?? "a loja"} até ${date}. O recibo está guardado no Receebo, caso seja necessário.`,
     note: input.basis === "store" && p.merchant
-      ? `Com base na política de devolução de ${p.merchant}. As condições variam; consulte o recibo ou o site da loja.`
+      ? `Com base na política de devolução ${input.holiday ? "de fim de ano " : ""}de ${p.merchant}. As condições variam; ${br ? "confira" : "consulte"} o recibo ou o site da loja.`
+      : input.basis === "user"
+        ? `Com base no prazo de devolução de ${input.windowDays ?? ""} dias que ${br ? "você salvou" : "guardou"} para este recibo.`.replace("de  dias", "")
       : input.basis === "law"
         ? `Com base no prazo de ${input.windowDays ?? 14} dias para ${br ? "arrependimento" : "livre resolução"} em compras online.`
         : null,

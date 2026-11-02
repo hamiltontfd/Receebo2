@@ -53,6 +53,10 @@ beforeAll(async () => {
     purchaseDate: old.toISOString().slice(0, 10), warranty: `Manufacturer warranty until ${iso(20)}` };
   await receipt("usEurWarranty", us, warranty);
   await receipt("ptEurWarranty", pt, warranty);
+  // Warranty alert end to end: a US Best Buy TV whose warranty was set with the "2 years" quick button
+  // (stored text "2-year manufacturer warranty"), bought 2 years ago + 10 days: manufacturer warranty ends in 10 days.
+  await receipt("usUsdWarranty", us, { ...tv, isOnlinePurchase: false, purchaseDate: old.toISOString().slice(0, 10),
+    warranty: "2-year manufacturer warranty" });
 });
 afterAll(async () => {
   await db.delete(receiptsTable).where(inArray(receiptsTable.userId, [us, pt]));
@@ -83,5 +87,17 @@ describe("US mode sweeps (real PostgreSQL)", () => {
     expect(usPushes[0][1].title).toMatch(/^Manufacturer warranty ends/);
     const ptKinds = callsFor(fx.warrantyEmail, ids.ptEurWarranty).map(([, r]) => r.kind).sort();
     expect(ptKinds).toEqual(["legal", "manufacturer"]);
+  });
+
+  it("warranty quick-pick text -> manufacturer reminder (email + push) in en-US for a US account; PT reminders carry no region", async () => {
+    const [call] = callsFor(fx.warrantyEmail, ids.usUsdWarranty);
+    expect(call?.[1]).toMatchObject({ kind: "manufacturer", region: "US", currency: "USD", total: 1299.99, other: null });
+    const due = call[1].expiresOn as string;
+    const enUs = new Date(`${due}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+    const push = fx.push.mock.calls.find(([uid, p]) => uid === us && p.receiptId === ids.usUsdWarranty)?.[1];
+    expect(push).toMatchObject({ title: `Manufacturer warranty ends ${enUs}` });
+    expect(push.body).toContain("$1,299.99");
+    expect(push.body).not.toContain("US$");
+    for (const [, r] of callsFor(fx.warrantyEmail, ids.ptEurWarranty)) expect(r).not.toHaveProperty("region");
   });
 });

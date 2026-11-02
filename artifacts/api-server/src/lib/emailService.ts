@@ -71,9 +71,23 @@ function subjectPart(value: string, max = 60): string {
   return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
 }
 
-import { formatMoney, formatEmailDate } from "./emailFormat";
+import { formatMoney, formatEmailDate, type FormatLocale } from "./emailFormat";
+import { getAccountMarket } from "./accountMarket";
 
 export { formatMoney, formatEmailDate };
+
+/**
+ * English emails for US-market accounts use en-US dates and money (US mode G);
+ * every other account keeps its format. A market read error never blocks a send.
+ */
+async function formatLocaleFor(userId: string, locale: EmailLocale): Promise<FormatLocale> {
+  if (locale !== "en") return locale;
+  try {
+    return (await getAccountMarket(userId)) === "US" ? "en-US" : "en";
+  } catch {
+    return "en";
+  }
+}
 
 // ── Delivery ──────────────────────────────────────────────────────────────────
 
@@ -412,7 +426,8 @@ export async function sendTrialEndingEmail(
         ? (en ? "tomorrow" : "amanhã")
         : (en ? `in ${daysRemaining} days` : `em ${daysRemaining} dias`);
 
-  const dateStr = formatEmailDate(trialEndAt, locale) ?? "";
+  const fmt = await formatLocaleFor(userId, locale);
+  const dateStr = formatEmailDate(trialEndAt, fmt) ?? "";
 
   const subject = !en ? `O seu período de teste do Receebo Pro termina ${daysLabel}` :
     daysRemaining === 0
@@ -426,7 +441,7 @@ export async function sendTrialEndingEmail(
   // Format plan name and charge amount for the email body
   const planLabel = planInfo?.planName ?? "Receebo Pro";
   const chargeStr = planInfo?.planAmount != null && planInfo?.planCurrency
-    ? formatMoney(planInfo.planAmount / 100, planInfo.planCurrency, locale)
+    ? formatMoney(planInfo.planAmount / 100, planInfo.planCurrency, fmt)
     : null;
 
   const chargeLine = !en
@@ -510,13 +525,15 @@ export function renderDeletionWarningEmail(input: {
   firstName?: string | null;
   baseUrl?: string;
   locale?: EmailLocale;
+  /** English only: "en-US" for US-market accounts ("Nov 27, 2028"). */
+  formatLocale?: FormatLocale;
 }): { subject: string; html: string; text: string } {
   if (input.locale && input.locale !== "en") {
     const copy = deletionWarningCopy(input, input.locale);
     const url = `${input.baseUrl ?? appUrl()}/settings#upgrade-plans`;
     return renderLocalizedLifecycle(copy, input.locale, { label: copy.cta, href: url });
   }
-  const date = formatEmailDate(input.deletionDate) ?? "";
+  const date = formatEmailDate(input.deletionDate, input.formatLocale === "en-US" ? "en-US" : "en") ?? "";
   const subscribeUrl = `${input.baseUrl ?? appUrl()}/settings#upgrade-plans`;
   const greeting = input.firstName ? `Hi ${input.firstName},` : "Hi,";
   const receipts = input.receiptCount === 1 ? "your 1 receipt" : `your ${input.receiptCount} receipts`;
@@ -561,7 +578,8 @@ export async function sendDeletionWarningEmail(
   const contact = await getUserContact(userId);
   if (!contact) return false;
   const locale = await getUserEmailLocale(userId);
-  const { subject, html, text } = renderDeletionWarningEmail({ ...input, firstName: contact.firstName, locale });
+  const formatLocale = await formatLocaleFor(userId, locale);
+  const { subject, html, text } = renderDeletionWarningEmail({ ...input, firstName: contact.firstName, locale, formatLocale });
   return deliver({
     kind: `deletion_warning_${input.stage}`, userId, to: contact.email, subject, html, text,
     idempotencyKey: `deletion-warning/${input.stage}/${userId}/${input.deletionDate.toISOString().slice(0, 10)}`,

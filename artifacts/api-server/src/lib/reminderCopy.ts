@@ -20,7 +20,11 @@ export interface ReminderPurchase {
   currency?: string | null;
   /** YYYY-MM-DD */
   purchaseDate?: string | null;
+  /** Account rules region: "US" = en-US dates and money ("Nov 27, 2028", "$1,299.99"); anything else = PT copy, unchanged. */
+  region?: string | null;
 }
+
+const fmtLocale = (p: { region?: string | null }) => (p.region === "US" ? "en-US" : "en") as "en" | "en-US";
 
 export const ITEM_MAX_CHARS = 40;
 export const PUSH_BODY_MAX_CHARS = 60;
@@ -55,11 +59,11 @@ export function itemsPhrase(names: string[]): string | null {
 }
 
 function amountOf(p: ReminderPurchase): string | null {
-  return typeof p.total === "number" && Number.isFinite(p.total) ? formatMoney(p.total, p.currency) : null;
+  return typeof p.total === "number" && Number.isFinite(p.total) ? formatMoney(p.total, p.currency, fmtLocale(p)) : null;
 }
 
-function dateOf(iso: string | null | undefined): string | null {
-  return iso ? formatEmailDate(iso) : null;
+function dateOf(iso: string | null | undefined, region?: string | null): string | null {
+  return iso ? formatEmailDate(iso, fmtLocale({ region })) : null;
 }
 
 function capitalize(s: string): string {
@@ -82,7 +86,7 @@ function parts(p: ReminderPurchase): Parts {
   const item = names[0] ? cut(names[0], ITEM_MAX_CHARS) : null;
   const merchant = clean(p.merchant);
   const amount = amountOf(p);
-  const bought = dateOf(p.purchaseDate);
+  const bought = dateOf(p.purchaseDate, p.region);
   const fallback = merchant ? `your ${merchant} purchase` : "your purchase";
   const where = [merchant, bought ? `bought ${bought}` : null].filter(Boolean).join(", ");
   const itemLine = [itemsPhrase(names), amount, where || null].filter(Boolean).join(" · ");
@@ -123,7 +127,7 @@ export interface ReturnReminderInput extends ReminderPurchase {
 
 export function renderReturnReminder(input: ReturnReminderInput): ReminderMessage {
   const p = parts(input);
-  const deadline = formatEmailDate(input.deadline) ?? "";
+  const deadline = formatEmailDate(input.deadline, fmtLocale(input)) ?? "";
   const days = Math.max(0, Math.floor(input.daysRemaining));
   const amountParen = p.amount ? ` (${p.amount})` : "";
   // No product and no amount: say when it was bought instead.
@@ -169,11 +173,11 @@ export interface WarrantyReminderInput extends ReminderPurchase {
 
 export function renderWarrantyReminder(input: WarrantyReminderInput): ReminderMessage {
   const p = parts(input);
-  const date = formatEmailDate(input.expiresOn) ?? input.expiresOn;
+  const date = formatEmailDate(input.expiresOn, fmtLocale(input)) ?? input.expiresOn;
   const label = input.kind === "legal" ? "Legal warranty" : "Manufacturer warranty";
   const amountParen = p.amount ? ` (${p.amount})` : "";
   const fromBought = !p.item && !p.amount && p.bought ? ` from ${p.bought}` : "";
-  const otherDate = input.other ? formatEmailDate(input.other.expiresOn) : null;
+  const otherDate = input.other ? formatEmailDate(input.other.expiresOn, fmtLocale(input)) : null;
   return {
     subject: `${label} for ${p.subjectItem}${amountParen}${fromBought} ends on ${date}`,
     preheader: p.merchant && p.bought ? `Bought at ${p.merchant} on ${p.bought}.` : p.merchant ? `Bought at ${p.merchant}.` : p.bought ? `Bought on ${p.bought}.` : `${label} ends on ${date}.`,

@@ -108,12 +108,23 @@ describe("ReceiptSheet: US accounts", () => {
     await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
     expect(mocks.update.mock.calls[0][0].data.returnDays).toBe(60);
   });
+  it("warranty quick pick: 3 yr saves the warranty text and previews the end date", async () => {
+    mount({ ...tv, warranty: null, purchaseDate: "2026-11-27" }, "US");
+    fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
+    fireEvent.click(await screen.findByTestId("button-warranty-3y"));
+    expect(screen.getByTestId("text-warranty-end-preview")).toHaveTextContent("Ends Nov 27, 2029. We'll remind you before it ends.");
+    expect(screen.getByTestId("text-warranty-end-preview").textContent).not.toMatch(/subscribed/);
+    fireEvent.click(screen.getByRole("button", { name: /Save Changes/ }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+    expect(mocks.update.mock.calls[0][0].data.warranty).toBe("3-year manufacturer warranty");
+  });
   it("PT accounts never see or send the store window field", async () => {
     mount(tv, "PT");
     expect(screen.queryByText("Returns & warranty")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
     await screen.findByTestId("switch-subscription");
     expect(screen.queryByTestId("input-return-days")).toBeNull();
+    expect(screen.queryByTestId("warranty-quick-pick")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Save Changes/ }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
     expect(mocks.update.mock.calls[0][0].data).not.toHaveProperty("returnDays");

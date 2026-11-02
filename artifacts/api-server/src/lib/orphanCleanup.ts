@@ -231,6 +231,8 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
     const optedOut = await isOptedOut(r.userId);
     if (optedOut && pending.some(c => c.emailPrev !== c.due)) skippedOptOut++;
     const todayIso = todayUtc.toISOString().slice(0, 10);
+    // US accounts: en-US dates and money in English emails and push (PT copy unchanged).
+    const isUs = (await regionOf(r.userId)) === "US";
     for (const { kind, due, emailPrev, pushPrev } of pending) {
       // Product + amount copy (lib/reminderCopy.ts); mentions the other warranty if it still runs.
       const otherKind: WarrantyKind = kind === "legal" ? "manufacturer" : "legal";
@@ -243,6 +245,7 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
         total: r.total,
         currency: r.currency,
         purchaseDate: r.purchaseDate,
+        ...(isUs ? { region: "US" } : {}),
         kind,
         expiresOn: due,
         other: otherDue && otherDue >= todayIso && otherDue !== due ? { kind: otherKind, expiresOn: otherDue } : null,
@@ -578,6 +581,7 @@ export async function runReturnWindowSweep(): Promise<void> {
       daysRemaining,
       basis: window.basis,
       holiday: window.holiday,
+      ...(region === "US" ? { region } : {}),
       windowDays: window.days,
       originalFileName: r.originalFileName,
     };

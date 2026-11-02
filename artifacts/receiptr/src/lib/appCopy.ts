@@ -2,6 +2,11 @@ import { getAppLocale, type AppLocale } from "./locale";
 
 /** Display copy only. Keys are never persisted or sent as API enum values. */
 export const APP_COPY: Record<string, readonly [string, string?]> = {
+  // US mode G: warranty quick pick (1/2/3 years) on receipt review and details.
+  "Manufacturer warranty length": ["Duração da garantia do fabricante"],
+  "{0} yr": ["{0} ano(s)"],
+  "Other length": ["Outra duração"],
+  "Ends {0}. We'll remind you before it ends.": ["Termina a {0}. Avisamos antes do fim.", "Termina em {0}. Avisaremos antes do fim."],
   // US mode (account market US): store return window field on receipt details.
   "Store return window (optional)": ["Prazo de devolução da loja (opcional)"],
   "Use {0} days": ["Usar {0} dias"],

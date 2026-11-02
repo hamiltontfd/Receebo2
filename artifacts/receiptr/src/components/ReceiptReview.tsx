@@ -1,6 +1,6 @@
 import { appText, categoryText } from "@/lib/appCopy";
 import { useAppLocale } from "@/lib/locale";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, CheckCircle2, FileText, Loader2, Package } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -18,6 +18,8 @@ import { privateFileUrl } from "@/lib/privateFileUrl";
 import { formatMoney, formatPurchaseDate } from "@/lib/pendingImports";
 import { useToast } from "@/hooks/use-toast";
 import { usePwaUpdateBlocker } from "@/lib/pwa";
+import { useAccountRegion } from "@/lib/region";
+import { WarrantyQuickPick } from "@/components/WarrantyQuickPick";
 import { PurchaseCountryField } from "@/components/PurchaseCountryField";
 
 interface ReviewFields {
@@ -48,6 +50,9 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
   const updateReceipt = useUpdateReceipt();
   const [fields, setFields] = useState<ReviewFields | null>(null);
   const [initial, setInitial] = useState<ReviewFields | null>(null);
+  // US accounts: warranty quick pick (1/2/3 years, Other) under the fields. PT unchanged.
+  const isUs = useAccountRegion().region === "US";
+  const warrantyInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (receipt && !initial) {
@@ -180,9 +185,15 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
             </div>
             <div className="p-4 space-y-1">
               <label className={label} htmlFor="review-warranty">{appText("Warranty")}</label>
-              <Input id="review-warranty" value={fields.warranty} placeholder={appText("None")} onChange={(e) => set("warranty")(e.target.value)} className={field} />
+              <Input id="review-warranty" ref={warrantyInput} value={fields.warranty} placeholder={appText("None")} onChange={(e) => set("warranty")(e.target.value)} className={field} />
             </div>
           </div>
+          {isUs && (
+            <div className="px-4 pb-4">
+              <WarrantyQuickPick value={fields.warranty} onChange={set("warranty")} purchaseDate={fields.purchaseDate}
+                onOther={() => warrantyInput.current?.focus()} />
+            </div>
+          )}
           <PurchaseCountryField
             className="p-4"
             id="review-purchase-country"
