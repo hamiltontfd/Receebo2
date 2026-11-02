@@ -75,7 +75,8 @@ export default function HeroSection({ isSignedIn = false, variant }: { isSignedI
                 </motion.div>
               </Link>
 
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto">
+              {/* /us has no demo section yet (its media shows € and EU rules). */}
+              {!us && <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto">
                 <Button
                   size="lg"
                   variant="outline"
@@ -87,7 +88,7 @@ export default function HeroSection({ isSignedIn = false, variant }: { isSignedI
                     {lt("See it in action", "Ver em ação")}
                   </a>
                 </Button>
-              </motion.div>
+              </motion.div>}
             </motion.div>
 
             {/* Trial line */}

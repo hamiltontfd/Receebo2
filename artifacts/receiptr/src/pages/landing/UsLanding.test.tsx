@@ -36,6 +36,7 @@ describe("/us landing (C + D)", () => {
     expect(screen.getByText(/Best Buy, Target, Walmart, Amazon/)).toBeTruthy();
     expect(screen.getByTestId("us-hero-placeholder").textContent).toContain("Placeholder");
     expect(screen.queryByTestId("hero-phones")).toBeNull();
+    expect(screen.queryByText("See it in action")).toBeNull();
     expect(document.body.textContent).not.toContain("€");
   });
 
