@@ -7,6 +7,7 @@ import { useCreateCheckout } from "@/hooks/useBilling";
 import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
 import { cn } from "@/lib/utils";
 import { lt } from "@/lib/landingLocale";
+import { PUBLIC_PLANS, formatPublicPrice } from "@/lib/publicPricing";
 
 const getFeatures = () => [
   lt("Unlimited scans", "Digitalizações ilimitadas"),
@@ -18,24 +19,14 @@ const getFeatures = () => [
   lt("Priority processing", "Processamento prioritário"),
 ];
 
-const getPlans = () => [
-  {
-    key: "monthly" as const,
-    name: lt("Monthly", "Mensal"),
-    price: "€2.99",
-    period: lt("/month", "/mês"),
+const getPlans = () => PUBLIC_PLANS.map((plan) => ({
+    key: plan.key,
+    name: plan.key === "monthly" ? lt("Monthly", "Mensal") : lt("Yearly", "Anual"),
+    price: formatPublicPrice(plan),
+    period: plan.key === "monthly" ? lt("/month", "/mês") : lt("/year", "/ano"),
     badge: null,
-    highlight: false,
-  },
-  {
-    key: "yearly" as const,
-    name: lt("Yearly", "Anual"),
-    price: "€24.99",
-    period: lt("/year", "/ano"),
-    badge: null,
-    highlight: true,
-  },
-];
+    highlight: plan.key === "yearly",
+}));
 
 export default function PricingSection() {
   const { isSignedIn } = useAuth();

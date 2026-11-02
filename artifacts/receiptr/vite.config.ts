@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { VitePWA } from "vite-plugin-pwa";
+import { marketingSchemaPlugin } from "./build/marketingSchema";
 
 const rawPort = process.env.PORT;
 
@@ -34,6 +35,7 @@ if (!basePath) {
 export default defineConfig({
   base: basePath,
   plugins: [
+    marketingSchemaPlugin(process.env.VITE_APP_URL),
     react(),
     tailwindcss({ optimize: false }),
     runtimeErrorOverlay(),
