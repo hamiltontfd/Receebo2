@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { billingOrigin } from "./lib/billingUrls";
 import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
 import { migrateAccountMarket } from "./lib/marketMigration";
+import { migrateMarketInterestCounts } from "./lib/marketInterest";
 import { migrateAccountOnboarding } from "./lib/onboarding";
 import { migrateActionRateLimits, startActionRateLimitCleanup } from "./lib/actionRateLimit";
 import { extendTrialsToCurrentDuration, uncountUnsavedTrialDrafts } from "./lib/accountTrial";
@@ -441,6 +442,7 @@ async function start(): Promise<void> {
   await runStartupMigrations();
   await migrateTrialFunnel();
   await migrateAccountMarket();
+  await migrateMarketInterestCounts();
   await migrateAccountOnboarding();
   await migrateActionRateLimits();
   try {

@@ -5,7 +5,9 @@ import { eq, sql } from "drizzle-orm";
 import { UpdateAccountMarketBody, UpdateAccountLanguageBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { lockUserDataMutation } from "../lib/userDataLock";
-import { requestCountry } from "../lib/marketGeoip";
+import { createHash, randomBytes } from "node:crypto";
+import { clientPublicIp, requestCountry } from "../lib/marketGeoip";
+import { interestCountry, recordMarketInterest } from "../lib/marketInterest";
 import { setMarketIfUnset } from "../lib/accountMarket";
 import { logger } from "../lib/logger";
 
@@ -85,4 +87,44 @@ router.patch("/account/market", requireAuth, lockUserDataMutation(async (req, re
     }).returning({ market: userPreferencesTable.market });
   res.json({ ...saved, country: requestCountry(req).country });
 }));
+// "I'm interested" (uncovered countries): aggregate counts only. Two in-memory
+// limits: a global budget, and a per-client one keyed by a salted hash of the
+// verified client IP (salt is per process, never stored; nothing is logged).
+const interestSalt = randomBytes(16);
+const interestGlobalLimit = rateLimit({
+  windowMs: 60_000, limit: 120, keyGenerator: () => "market-interest",
+  standardHeaders: "draft-8", legacyHeaders: false, validate: { xForwardedForHeader: false },
+});
+const interestClientLimit = rateLimit({
+  windowMs: 60 * 60_000, limit: 5,
+  keyGenerator: (req) => {
+    const ip = clientPublicIp(req.socket.remoteAddress, req.headers["x-forwarded-for"]);
+    return ip ? createHash("sha256").update(interestSalt).update(ip).digest("base64url").slice(0, 22) : "unknown-client";
+  },
+  skip: (req) => !clientPublicIp(req.socket.remoteAddress, req.headers["x-forwarded-for"]),
+  standardHeaders: "draft-8", legacyHeaders: false, validate: { xForwardedForHeader: false, keyGeneratorIpFallback: false },
+});
+/**
+ * Public (visitors and accounts). Body { country }. The server-detected country
+ * wins when there is one; otherwise the client's (which itself came from the
+ * server's suggestion or account response). Covered countries are refused.
+ */
+router.post("/market/interest", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+}, interestGlobalLimit, interestClientLimit, async (req, res): Promise<void> => {
+  const detected = requestCountry(req).country;
+  const country = interestCountry(detected ?? (req.body as { country?: unknown } | undefined)?.country);
+  if (!country) {
+    res.status(400).json({ error: "Choose a country Receebo doesn't cover yet." });
+    return;
+  }
+  try {
+    await recordMarketInterest(country);
+    res.status(204).end();
+  } catch (err) {
+    logger.error({ err }, "Could not record market interest");
+    res.status(503).json({ error: "Try again later." });
+  }
+});
 export default router;

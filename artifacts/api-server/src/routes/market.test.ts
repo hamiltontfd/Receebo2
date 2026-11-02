@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, receiptsTable, userPreferencesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 // Run real auth middleware, DB writes and locks. Clerk session verification alone
 // is replaced in this local HTTP harness; production never reads these headers.
@@ -124,6 +124,30 @@ describe("market API with real PostgreSQL", () => {
       await db.delete(userPreferencesTable).where(eq(userPreferencesTable.userId, C));
       await db.delete(userPreferencesTable).where(eq(userPreferencesTable.userId, D));
     }
+  });
+  it("I'm interested: aggregate count per uncovered country only, nothing about the person", async () => {
+    const post = (body: unknown) => fetch(`${base}/market/interest`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const count = async (c: string) => {
+      const r = await db.execute(sql`SELECT count FROM market_interest_counts WHERE country = ${c}`);
+      return r.rows.length ? Number((r.rows[0] as { count: number }).count) : 0;
+    };
+    const before = await count("JP");
+    expect((await post({ country: "jp" })).status).toBe(204);
+    expect((await post({ country: "JP" })).status).toBe(204);
+    expect(await count("JP")).toBe(before + 2);
+    for (const body of [{ country: "US" }, { country: "PT" }, { country: "BR" }, { country: "ZZ" }, { country: "EU" }, {}, { country: 1 }]) {
+      expect((await post(body)).status).toBe(400);
+    }
+    // The table has no column that could hold a user, an IP or a device.
+    const cols = await db.execute(sql`SELECT column_name FROM information_schema.columns WHERE table_name = 'market_interest_counts' ORDER BY column_name`);
+    expect(cols.rows.map((r) => (r as { column_name: string }).column_name)).toEqual(["count", "country", "updated_at"]);
+    // A server-detected country wins over the body.
+    process.env.MARKET_DEV_COUNTRY = "KR";
+    const kr = await count("KR");
+    try { expect((await post({ country: "JP" })).status).toBe(204); } finally { delete process.env.MARKET_DEV_COUNTRY; }
+    expect(await count("KR")).toBe(kr + 1);
   });
   it("validates enum, body, ownership fields and transfer flag", async () => {
     for (const body of [{}, { market: null }, { market: "EU" }, { market: "pt" }, { market: "BR", userId: B }, { market: "BR", onlyIfUnset: "yes" }]) {

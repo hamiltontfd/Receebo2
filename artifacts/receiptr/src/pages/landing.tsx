@@ -5,6 +5,7 @@ import { motion, MotionConfig } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/react";
 import { MarketSelector } from "@/components/MarketSelector";
+import { UncoveredMarketNotice } from "@/components/UncoveredMarketNotice";
 import { lt } from "@/lib/landingLocale";
 import { useAppLocale } from "@/lib/locale";
 import { useCreateCheckout } from "@/hooks/useBilling";
@@ -99,6 +100,9 @@ export function LandingContent({ isSignedIn = false, checkout, marketSelector }:
             </Link>
           </motion.div>
         </header>
+
+        {/* Visitors from a country Receebo doesn't cover yet (server GeoIP). */}
+        <UncoveredMarketNotice variant="floating" />
 
         {/* ── Page Sections ───────────────────────────────────────────── */}
         <main>

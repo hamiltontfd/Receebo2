@@ -2,6 +2,12 @@ import express from "express";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+// The per-user action limiter (ed15809) needs the real DB pool, which this test
+// mocks away; it is covered by its own tests. Pass-through here.
+vi.mock("../middlewares/actionRateLimiter", () => {
+  const pass = (_req: unknown, _res: unknown, next: () => void) => next();
+  return { actionRateLimiter: () => pass, uploadRateLimiter: pass, receiptReadRateLimiter: pass, manualSyncRateLimiter: pass };
+});
 vi.mock("../lib/subscriptionStatus", () => ({
   getSubscriptionStatus: async () => ({ canUseApp: true, canUpload: true }),
 }));

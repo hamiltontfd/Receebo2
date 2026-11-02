@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import TrialBanner from "@/components/TrialBanner";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { usePendingImportCount } from "@/components/PendingImports";
+import { UncoveredMarketNotice } from "@/components/UncoveredMarketNotice";
 import { getLastTab, hidesTabBar, rememberTab, subPageFor } from "@/lib/navState";
 
 // Desktop header tabs (nav B): Search · Add · Stats. Add opens today's /scan page.
@@ -121,6 +122,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
+      {!isGuest && <UncoveredMarketNotice />}
       <main className="flex-1 min-w-0 flex flex-col">{children}</main>
 
       {showTabBar && <BottomTabBar pendingDot={pendingDot} />}
