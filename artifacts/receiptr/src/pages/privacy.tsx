@@ -64,6 +64,13 @@ export default function PrivacyPolicy() {
           don&apos;t cover yet, we only add one to a count for that country,
           with nothing that identifies you.
         </li>
+        <li>
+          <strong>Landing page counts:</strong> when our public pages load or
+          you tap a sign-up button there, we add one to a daily total for that
+          page and, if the link came from one of our ads, its ad label
+          (utm_content). No cookie or identifier is set and nothing that
+          identifies you is kept.
+        </li>
       </ul>
 
       <h2>2. Why we use data and our lawful bases</h2>

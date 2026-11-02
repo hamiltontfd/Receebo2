@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "report:trial-funnel": "pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/trialFunnelReport.ts",
+    "report:landing-events": "pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/landingEventReport.ts",
     "report:market-interest": "pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/marketInterestReport.ts",
     "backfill:purchase-types": "pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/purchaseTypeBackfill.ts",
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",

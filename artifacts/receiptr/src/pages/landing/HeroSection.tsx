@@ -6,8 +6,11 @@ import { ArrowRight, Play } from "lucide-react";
 import { fadeInUp, slideInRight, stagger } from "./shared";
 import { marketingMedia } from "./MarketingMedia";
 import { lt } from "@/lib/landingLocale";
+import { useLandingCta } from "./useLandingCta";
 
-export default function HeroSection({ isSignedIn = false }: { isSignedIn?: boolean }) {
+export default function HeroSection({ isSignedIn = false, variant }: { isSignedIn?: boolean; variant?: "us" }) {
+  const us = variant === "us";
+  const onCta = useLandingCta(us ? "/us" : "/", isSignedIn);
   const reduce = useHydrationSafeReducedMotion();
   const entrance = reduce ? false : "hidden";
 
@@ -36,7 +39,9 @@ export default function HeroSection({ isSignedIn = false }: { isSignedIn?: boole
               <h1 className="text-6xl sm:text-7xl lg:text-[80px] font-extrabold tracking-tighter leading-[0.93] text-foreground">
                 {lt("Receipts.", "Recibos.")}
                 <br />
-                <span className="text-foreground/80">{lt("Easy to find.", "Fáceis de encontrar.")}</span>
+                <span className="text-foreground/80">{us
+                  ? lt("Returns, on time.", "Devoluções a tempo.", "Devoluções no prazo.")
+                  : lt("Easy to find.", "Fáceis de encontrar.")}</span>
               </h1>
             </motion.div>
 
@@ -45,7 +50,11 @@ export default function HeroSection({ isSignedIn = false }: { isSignedIn?: boole
               variants={fadeInUp}
               className="text-lg text-muted-foreground leading-relaxed max-w-md"
             >
-              {lt(
+              {us ? lt(
+                "Bought a TV on Black Friday? Receebo knows the return window at Best Buy, Target, Walmart, Amazon and more, in store and online, and reminds you before it closes. Warranties too.",
+                "Compraste uma TV na Black Friday? O Receebo conhece o prazo de devolução da Best Buy, Target, Walmart, Amazon e outras, na loja e online, e avisa-te antes de terminar. As garantias também.",
+                "Comprou uma TV na Black Friday? O Receebo conhece o prazo de devolução da Best Buy, Target, Walmart, Amazon e outras, na loja e online, e avisa você antes de terminar. As garantias também.",
+              ) : lt(
                 "Scan or import from Outlook. Find any purchase in seconds. Never miss a return or warranty date.",
                 "Digitaliza ou importa do Outlook. Encontra qualquer compra em segundos. Nunca percas um prazo de devolução ou de garantia.",
                 "Escaneie ou importe do Outlook. Encontre qualquer compra em segundos. Nunca perca um prazo de devolução ou de garantia.",
@@ -54,7 +63,7 @@ export default function HeroSection({ isSignedIn = false }: { isSignedIn?: boole
 
             {/* CTAs */}
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-3 pt-1">
-              <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-hero-trial">
+              <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-hero-trial" onClick={onCta}>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
                     size="lg"
@@ -94,7 +103,7 @@ export default function HeroSection({ isSignedIn = false }: { isSignedIn?: boole
             animate="visible"
             className="relative"
           >
-            <figure data-testid="hero-phones" className="m-0">
+            {us ? <UsHeroPlaceholder /> : <figure data-testid="hero-phones" className="m-0">
               <div className="relative mx-auto flex justify-center items-start w-full max-w-[560px] pt-2 pb-8">
                 <PhoneFrame
                   file="library-phone.webp"
@@ -117,7 +126,7 @@ export default function HeroSection({ isSignedIn = false }: { isSignedIn?: boole
               <figcaption className="text-[11px] text-muted-foreground text-center">
                 {lt("Real Receebo screens. Fictional sample purchases and simulated extraction.", "Ecrãs reais do Receebo. Compras de exemplo fictícias e extração simulada. Demonstração em inglês.", "Telas reais do Receebo. Compras de exemplo fictícias e extração simulada. Demonstração em inglês.")}
               </figcaption>
-            </figure>
+            </figure>}
           </motion.div>
         </div>
       </div>
@@ -162,5 +171,22 @@ function PhoneFrame({
         </div>
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * PLACEHOLDER (US mode C): no approved US screenshots exist yet (the PT hero shows
+ * a € receipt and EU legal warranty). Replace with Designer's US captures (a $
+ * Best Buy TV receipt with its return deadline) before launch.
+ */
+function UsHeroPlaceholder() {
+  return (
+    <div
+      data-testid="us-hero-placeholder"
+      className="mx-auto w-full max-w-[460px] aspect-[4/3] rounded-3xl border-2 border-dashed border-amber-400 bg-amber-50 flex flex-col items-center justify-center gap-2 p-6 text-center"
+    >
+      <span className="text-xs font-bold uppercase tracking-widest text-amber-700">Placeholder</span>
+      <span className="text-sm text-amber-900">US app screenshots go here (Designer): Best Buy TV receipt in $, return deadline, warranty 1/2/3 years.</span>
+    </div>
   );
 }

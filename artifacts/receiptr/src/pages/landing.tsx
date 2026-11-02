@@ -10,6 +10,9 @@ import { lt } from "@/lib/landingLocale";
 import { useAppLocale } from "@/lib/locale";
 import { useCreateCheckout } from "@/hooks/useBilling";
 import type { ReactNode } from "react";
+import { sendLandingEvent } from "@/lib/landingBeacon";
+import { useLandingCta } from "./landing/useLandingCta";
+import UsReturnsSection from "./landing/UsReturnsSection";
 
 // Sections
 import HeroSection from "./landing/HeroSection";
@@ -36,21 +39,30 @@ function useScrolled(threshold = 40) {
 }
 
 /* ── Main Component ────────────────────────────────────────────────────── */
-export default function Landing() {
+export default function Landing({ variant }: { variant?: "us" } = {}) {
   const { isSignedIn } = useAuth();
   const checkout = useCreateCheckout();
-  return <LandingContent isSignedIn={!!isSignedIn} checkout={isSignedIn ? checkout : undefined}
+  const us = variant === "us";
+  // Aggregate landing_view count (no id, no cookie, nothing stored in the browser).
+  // Counted here, in the interactive app only, so the build-time snapshot and its
+  // first hydration pass don't count a second view.
+  useEffect(() => { sendLandingEvent("landing_view", us ? "/us" : "/"); }, [us]);
+  return <LandingContent variant={variant} isSignedIn={!!isSignedIn} checkout={isSignedIn ? checkout : undefined}
     marketSelector={<MarketSelector variant="compact" className="-mr-1 sm:mr-0" />} />;
 }
 
 // Shared by the build-time renderer and the interactive authenticated app.
-export function LandingContent({ isSignedIn = false, checkout, marketSelector }: {
+// Provider-independent: no Clerk/API hooks here (the snapshot has no providers).
+export function LandingContent({ variant, isSignedIn = false, checkout, marketSelector }: {
+  variant?: "us";
   isSignedIn?: boolean;
   checkout?: { mutate: (plan: "monthly" | "yearly") => void; isPending: boolean };
   marketSelector?: ReactNode;
 }) {
   const scrolled = useScrolled(40);
   const locale = useAppLocale();
+  const us = variant === "us";
+  const onCta = useLandingCta(us ? "/us" : "/", isSignedIn);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -91,7 +103,7 @@ export function LandingContent({ isSignedIn = false, checkout, marketSelector }:
               </motion.div>
             </Link>
 
-            <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-nav-trial">
+            <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-nav-trial" onClick={onCta}>
               <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                 <Button size="sm" className="rounded-full font-semibold text-sm px-4">
                   {isSignedIn ? lt("Open app", "Abrir app") : lt("Start free", "Começar grátis")}
@@ -106,12 +118,13 @@ export function LandingContent({ isSignedIn = false, checkout, marketSelector }:
 
         {/* ── Page Sections ───────────────────────────────────────────── */}
         <main>
-          <HeroSection isSignedIn={isSignedIn} />
-          <PromoVideoSection />
-          <DemoSection />
-          <WhyReceeboSection />
+          <HeroSection isSignedIn={isSignedIn} variant={variant} />
+          {/* /us: the video, demo and screenshots show € receipts and EU rules, so they are left out until US captures exist. */}
+          {!us && <PromoVideoSection />}
+          {!us && <DemoSection />}
+          {!us && <WhyReceeboSection />}
           <EmailReceiptsSection />
-          <ConsumerProtectionSection />
+          {us ? <UsReturnsSection /> : <ConsumerProtectionSection />}
           <ComparisonSection />
           <PricingSection checkout={checkout} />
           <FAQSection />
