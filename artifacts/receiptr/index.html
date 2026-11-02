@@ -35,7 +35,11 @@
     <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%icons/receebo-outline-180.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Load only the theme fonts without blocking the initial screen render. -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Spline+Sans+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet" media="print" onload="this.onload=null;this.media='all'">
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Spline+Sans+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+    </noscript>
   </head>
   <body>
     <div id="root"></div>
