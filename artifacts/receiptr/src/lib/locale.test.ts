@@ -11,6 +11,8 @@ describe("locale scaffolding", () => {
     expect(resolveLocale("pt-AO")).toBe("pt-PT");
     expect(resolveLocale("en-US")).toBe("en");
     expect(resolveLocale(undefined)).toBe("en");
+    // Hamilton, 2 Nov 2026: any language other than English or Portuguese -> English.
+    for (const tag of ["es-ES", "fr-FR", "de", "it-IT", "zh-CN", ""]) expect(resolveLocale(tag)).toBe("en");
   });
   it("uses browser language independently of market and legacy visitor overrides", () => {
     expect(getAppLocale({ getItem: () => null }, "en-US")).toBe("en");
