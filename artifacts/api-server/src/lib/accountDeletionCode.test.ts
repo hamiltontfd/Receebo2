@@ -24,6 +24,12 @@ vi.mock("./emailService", async (importOriginal) => ({
   },
   sendAccountDeletedEmail: fixture.deletedEmail,
 }));
+vi.mock("./lifecycleEmails", () => ({
+  sendAccountDeletedEmail: fixture.deletedEmail,
+  captureDeletionConfirmation: async (userId: string) => userId.includes("no-email") ? null : {
+    email: "ana@example.invalid", firstName: "Ana", locale: "en", formatLocale: "en", receiptCount: 0, deletionDate: new Date(),
+  },
+}));
 vi.mock("./accountDeletionRunner", () => ({ performAccountDeletion: fixture.perform, listAccountObjectPaths: async () => [] }));
 vi.mock("./accountDeletionState", () => ({ isAccountDeletionInProgress: async (userId: string) => userId.includes("in-progress") }));
 vi.mock("../middlewares/requireAuth", () => ({

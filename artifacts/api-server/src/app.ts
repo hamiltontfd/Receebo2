@@ -22,7 +22,8 @@ app.use(
         return {
           id: req.id,
           method: req.method,
-          url: req.url?.split("?")[0],
+          // Rating links carry a signed token in the path: never log it.
+          url: req.url?.split("?")[0]?.replace(/^(\/api\/feedback\/r\/)[^/]+/, "$1[token]"),
         };
       },
       res(res) {

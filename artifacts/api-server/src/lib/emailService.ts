@@ -80,7 +80,7 @@ export { formatMoney, formatEmailDate };
  * English emails for US-market accounts use en-US dates and money (US mode G);
  * every other account keeps its format. A market read error never blocks a send.
  */
-async function formatLocaleFor(userId: string, locale: EmailLocale): Promise<FormatLocale> {
+export async function formatLocaleFor(userId: string, locale: EmailLocale): Promise<FormatLocale> {
   if (locale !== "en") return locale;
   try {
     return (await getAccountMarket(userId)) === "US" ? "en-US" : "en";
@@ -109,6 +109,13 @@ interface DeliverInput {
  * (e.g. the test sender writing to a non-owner), so both paths are handled.
  */
 async function deliver(input: DeliverInput): Promise<boolean> {
+  return (await deliverEmail(input)).ok;
+}
+
+/** Same as deliver, plus the Resend id and optional tags (lifecycle emails log both). */
+export async function deliverEmail(
+  input: DeliverInput & { tags?: Array<{ name: string; value: string }> },
+): Promise<{ ok: boolean; id: string | null }> {
   const { kind, userId, context } = input;
   try {
     const result = await resend.emails.send({
@@ -118,19 +125,20 @@ async function deliver(input: DeliverInput): Promise<boolean> {
       html: input.html,
       ...(input.text ? { text: input.text } : {}),
       ...(input.headers ? { headers: input.headers } : {}),
+      ...(input.tags ? { tags: input.tags } : {}),
     }, input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined);
     if (result?.error) {
       logger.error(
         { kind, userId, ...context, errorName: result.error.name, errorMessage: result.error.message },
         "Email rejected by Resend",
       );
-      return false;
+      return { ok: false, id: null };
     }
     logger.info({ kind, userId, ...context, emailId: result?.data?.id }, "Email accepted by Resend");
-    return true;
+    return { ok: true, id: result?.data?.id ?? null };
   } catch (err) {
     logger.error({ kind, userId, ...context, err }, "Email send failed");
-    return false;
+    return { ok: false, id: null };
   }
 }
 

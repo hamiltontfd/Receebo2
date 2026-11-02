@@ -28,9 +28,9 @@ import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
 import { isFrozen } from "../lib/accountLifecycleSchedule";
 import {
   getDeletionConfirmationContact,
-  sendAccountDeletedEmail,
   sendDeletionCodeEmail,
 } from "../lib/emailService";
+import { captureDeletionConfirmation, sendAccountDeletedEmail } from "../lib/lifecycleEmails";
 import {
   DELETION_CODE_ERRORS,
   DELETION_CODE_TTL_MS,
@@ -355,8 +355,8 @@ router.delete("/account", requireAuth, async (req, res): Promise<void> => {
     }
   }
 
-  // Read the address first: the sign-in account is gone after deletion.
-  const contact = await getDeletionConfirmationContact(userId);
+  // Read the address, language, date format and receipt count first: all gone after deletion.
+  const contact = await captureDeletionConfirmation(userId);
   const outcome = await performAccountDeletion(userId, { cancelSubscription: true });
   if (outcome.body) res.status(outcome.status).json(outcome.body);
   else res.status(outcome.status).send();

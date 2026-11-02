@@ -7,7 +7,10 @@
  * - 60 days after access ended, everything is deleted (account, receipts,
  *   files, extracted data, Outlook connection) except the billing records
  *   Stripe must keep. Subscribing before then cancels the deletion.
- * - Warnings 30 and 7 days before, and a confirmation after deletion.
+ * - Trial ended unpaid: a "thanks for trying" email with a smile rating, once,
+ *   up to 3 days after the trial ended (cron catch-up).
+ * - Warnings 30 and 7 days before, and a confirmation after deletion
+ *   (lifecycle emails, marketing copy 2 Nov 2026: lifecycleEmails.ts).
  * - SAFETY: nothing is sent or deleted unless DATA_DELETION_ENABLED=true.
  *   Otherwise the daily sweep only logs a dry run of what it would do.
  */
@@ -15,18 +18,33 @@ import { db, accountLifecycleTable, accountDeletionRequestsTable } from "@worksp
 import { eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { getSubscriptionStatus } from "./subscriptionStatus";
+import type { DeletionWarningStage } from "./emailService";
 import {
-  getDeletionConfirmationContact,
+  captureDeletionConfirmation,
   sendAccountDeletedEmail,
   sendDeletionWarningEmail,
-  type DeletionWarningStage,
-} from "./emailService";
+  sendTrialEndedEmail,
+} from "./lifecycleEmails";
+import { hasLifecycleSend } from "./lifecycleEmailStore";
 import { listAccountObjectPaths, performAccountDeletion } from "./accountDeletionRunner";
 import {
   DAY_MS, FINAL_WARNING_DAYS, accessEndedAt, dataDeletionEnabled, deletionDueAt, isFrozen, nextLifecycleAction,
 } from "./accountLifecycleSchedule";
 
 export * from "./accountLifecycleSchedule";
+
+/** trial_ended goes out at most this many days after the trial ended (cron catch-up). */
+export const TRIAL_ENDED_MAX_LATE_DAYS = 3;
+
+/** Trial ended without ever having had a paid plan, recently enough to say "ended today". */
+export function trialEndedEmailDue(
+  status: { accessState?: string; stripeSubscriptionId: string | null; trialEndAt: Date | null },
+  now: Date,
+): boolean {
+  if (status.accessState !== "trial_expired" || status.stripeSubscriptionId || !status.trialEndAt) return false;
+  const late = now.getTime() - status.trialEndAt.getTime();
+  return late >= 0 && late <= TRIAL_ENDED_MAX_LATE_DAYS * DAY_MS;
+}
 
 
 async function countUserData(userId: string) {
@@ -45,6 +63,8 @@ export interface RetentionSweepResult {
   frozen: number;
   cancelled: number;
   warned: number;
+  trialEnded: number;
+  dryRunTrialEnded: number;
   deleted: number;
   dryRunWarnings: number;
   dryRunDeletions: number;
@@ -62,7 +82,7 @@ export async function runDataRetentionSweep(
   const now = options.now ?? new Date();
   const enabled = options.enabled ?? dataDeletionEnabled();
   const result: RetentionSweepResult = {
-    enabled, frozen: 0, cancelled: 0, warned: 0, deleted: 0, dryRunWarnings: 0, dryRunDeletions: 0, failed: 0,
+    enabled, frozen: 0, cancelled: 0, warned: 0, trialEnded: 0, dryRunTrialEnded: 0, deleted: 0, dryRunWarnings: 0, dryRunDeletions: 0, failed: 0,
   };
 
   const userIds = options.userIds ?? ((await db.execute(sql`
@@ -93,6 +113,20 @@ export async function runDataRetentionSweep(
         .onConflictDoNothing();
       const [row] = await db.select().from(accountLifecycleTable).where(eq(accountLifecycleTable.userId, userId));
       if (!row) continue;
+
+      // Trial over without a subscription: once per account, never after a paid plan.
+      // Same safety switch as the deletion emails (its copy announces the deletion date).
+      if (trialEndedEmailDue(status, now) && !(await hasLifecycleSend(userId, "trial_ended"))) {
+        if (!enabled) {
+          result.dryRunTrialEnded++;
+          logger.info({ userId, deletionDueAt: row.deletionDueAt },
+            "Data retention DRY RUN: would send trial_ended email (DATA_DELETION_ENABLED is off)");
+        } else if (await sendTrialEndedEmail(userId, { deletionDate: row.deletionDueAt })) {
+          result.trialEnded++;
+        } else {
+          result.failed++;
+        }
+      }
 
       const action = nextLifecycleAction(row, now);
       if (action.kind === "none") continue;
@@ -137,9 +171,7 @@ export async function runDataRetentionSweep(
         if (claimed.length === 0) continue;
         let ok = false;
         try {
-          ok = await sendDeletionWarningEmail(userId, {
-            stage, deletionDate: row.deletionDueAt, receiptCount: counts.receipts,
-          });
+          ok = await sendDeletionWarningEmail(userId, { stage, deletionDate: row.deletionDueAt });
         } finally {
           // Locale/contact reads can throw before delivery. A claim is not proof
           // of delivery: restore it on BOTH rejection and false, or a later sweep
@@ -166,7 +198,8 @@ export async function runDataRetentionSweep(
           "Data retention DRY RUN: would delete account, receipts, files and email connections (DATA_DELETION_ENABLED is off)");
         continue;
       }
-      const contact = await getDeletionConfirmationContact(userId);
+      // Address, name, language, date format and receipt count: all gone after deletion.
+      const contact = await captureDeletionConfirmation(userId, row.deletionDueAt);
       const outcome = await performAccountDeletion(userId, { cancelSubscription: false });
       if (outcome.status !== 204) {
         result.failed++;

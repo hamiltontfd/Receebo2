@@ -34,3 +34,18 @@ Settings → Delete account → in-app warning → a **6-digit code** is emailed
 - Legal review of the terms/privacy clauses marked [LEGAL REVIEW NEEDED], and whether to bump `TERMS_VERSION`/`PRIVACY_VERSION` (forces re-acceptance).
 - When to set `DATA_DELETION_ENABLED=true` in production.
 - Whether payment failure gets a grace period before the freeze (today access follows Stripe: past-due keeps access until the period ends).
+
+## Lifecycle emails v2 (branch lifecycle-emails-v2, 2 Nov 2026, not published)
+Marketing copy (/workspace/receebo/lifecycle-emails.md) on top of the sweep above. Code: `lib/lifecycleEmails.ts` (send), `lib/lifecycleEmailCopy.ts` (copy, en / pt-PT / pt-BR), `lib/lifecycleEmailStore.ts` (tables, report numbers), `lib/feedbackToken.ts`, `lib/feedbackPages.ts`, `routes/feedback.ts`.
+- Emails: `trial_ended` (new; unpaid no-card trial, once, up to 3 days late), `deletion_warning_30d` / `deletion_warning_7d` (replace the placeholder warnings; the sweep's claim/rollback is unchanged), `account_deleted` (inactive and requested).
+- Language: account language (`user_preferences.language`); none -> English. pt-PT accounts get pt-PT copy (2 Nov brief; supersedes the earlier "pt-PT gets pt-BR"). English dates are en-US for US-market accounts. Language, date format, name, address and receipt count are captured BEFORE deletion.
+- Same safety switch: nothing is sent unless `DATA_DELETION_ENABLED=true` (trial_ended included, its copy announces the deletion date).
+- Copies while paused: still by email (`mailto:contact@receebo.net`), no in-app export; the copy says "ask us for a copy".
+- Smile rating: signed link (HMAC, 30 days, `FEEDBACK_TOKEN_SECRET`; without it in production the email goes without smiles). GET page writes nothing (scanners); JS POSTs after ~300 ms, `<noscript>` button. Last click wins, `click_count`, optional comment (1000 chars, rate limited). Token redacted from request logs.
+- Tables (additive, startup): `email_sends(id, user_id, email_type, idempotency_key unique, deletion_date, locale, sent_at, resend_id, created_at)`, `email_feedback(id, user_id null, email_type, email_send_id null, rating good|ok|bad, locale, comment null <=1000, click_count, created_at, updated_at)`, unique (user_id, email_type, email_send_id).
+- Account deletion (same transaction): email_feedback -> user_id, email_send_id and comment set to NULL (rating, type, locale, dates kept); email_sends rows deleted. The post-deletion `account_deleted` send writes no row (Resend idempotency key only).
+- Privacy policy: new line in section 6 (EN). pt-PT / pt-BR versions (the policy page is English only) are on the rating thanks page:
+  - pt-PT: "Se avaliou a sua experiência com o Receebo, guardamos essa avaliação de forma anónima depois de a sua conta ser eliminada, sem qualquer ligação a si ou ao seu email."
+  - pt-BR: "Se você avaliou sua experiência com o Receebo, guardamos essa avaliação de forma anônima depois que sua conta é excluída, sem nenhum vínculo com você ou seu e-mail."
+  - No PRIVACY_VERSION bump (Hamilton to decide).
+- Read ratings: `SELECT email_type, rating, locale, count(*) FROM email_feedback GROUP BY 1,2,3`.

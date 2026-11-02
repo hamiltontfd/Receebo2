@@ -8,7 +8,7 @@ import { db, accountLifecycleTable } from "@workspace/db";
 
 const fixture = vi.hoisted(() => ({
   status: new Map<string, any>(),
-  warn: vi.fn(), deleted: vi.fn(), perform: vi.fn(),
+  warn: vi.fn(), deleted: vi.fn(), perform: vi.fn(), trialEnded: vi.fn(),
 }));
 vi.mock("./subscriptionStatus", () => ({
   getSubscriptionStatus: async (userId: string) => fixture.status.get(userId),
@@ -18,6 +18,15 @@ vi.mock("./emailService", async (importOriginal) => ({
   sendDeletionWarningEmail: fixture.warn,
   sendAccountDeletedEmail: fixture.deleted,
   getDeletionConfirmationContact: async () => ({ email: "user@example.invalid", firstName: "Ana" }),
+}));
+// Lifecycle emails (marketing copy, 2 Nov 2026) replaced the emailService senders in the sweep.
+vi.mock("./lifecycleEmails", () => ({
+  sendDeletionWarningEmail: fixture.warn,
+  sendAccountDeletedEmail: fixture.deleted,
+  sendTrialEndedEmail: fixture.trialEnded,
+  captureDeletionConfirmation: async () => ({
+    email: "user@example.invalid", firstName: "Ana", locale: "en", formatLocale: "en", receiptCount: 0, deletionDate: new Date(),
+  }),
 }));
 vi.mock("./accountDeletionRunner", () => ({
   performAccountDeletion: fixture.perform,
@@ -65,6 +74,7 @@ afterAll(async () => {
 beforeEach(() => {
   fixture.warn.mockReset().mockResolvedValue(true);
   fixture.deleted.mockReset().mockResolvedValue(true);
+  fixture.trialEnded.mockReset().mockResolvedValue(true);
   fixture.perform.mockReset().mockResolvedValue({ status: 204 });
 });
 
@@ -235,5 +245,25 @@ describe("export while frozen", () => {
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ code: "account_frozen", message: EXPORT_FROZEN_MESSAGE });
     expect(EXPORT_FROZEN_MESSAGE).toContain("contact@receebo.net");
+  });
+});
+
+describe("trial_ended lifecycle email in the sweep (real PostgreSQL)", () => {
+  it("once, only after an unpaid trial, only when enabled (dry run otherwise)", async () => {
+    const now = new Date();
+    const fresh = newUser();
+    const paidBefore = newUser();
+    const longAgo = newUser();
+    fixture.status.set(fresh, frozen(1, now));
+    fixture.status.set(paidBefore, { ...frozen(1, now), stripeSubscriptionId: "sub_x" });
+    fixture.status.set(longAgo, frozen(10, now));
+    expect(await runDataRetentionSweep({ now, enabled: false, userIds: [fresh, paidBefore, longAgo] }))
+      .toMatchObject({ dryRunTrialEnded: 1, trialEnded: 0 });
+    expect(fixture.trialEnded).not.toHaveBeenCalled();
+    expect(await runDataRetentionSweep({ now, enabled: true, userIds: [fresh, paidBefore, longAgo] }))
+      .toMatchObject({ trialEnded: 1 });
+    const [row] = await db.select().from(accountLifecycleTable).where(eq(accountLifecycleTable.userId, fresh));
+    expect(fixture.trialEnded).toHaveBeenCalledTimes(1);
+    expect(fixture.trialEnded).toHaveBeenCalledWith(fresh, { deletionDate: row.deletionDueAt });
   });
 });

@@ -228,6 +228,12 @@ export default function PrivacyPolicy() {
           you to confirm the deletion.
         </li>
         <li>
+          If you rated your experience with Receebo, we keep that rating
+          anonymously after your account is deleted, with no link to you or
+          your email. Any comment you added with the rating is deleted with
+          your account.
+        </li>
+        <li>
           A receipt used for the one-receipt onboarding test is temporary unless
           you create an account and start a trial to save it.
         </li>

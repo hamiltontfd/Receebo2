@@ -25,6 +25,7 @@ import { logger, gmailLogger } from "./logger";
 import { revokeGmailAccess } from "./gmailSync";
 import { cancelSubscriptionForDeletion, deleteAccountObjects } from "./accountDeletion";
 import { withUserDataLock } from "./userDataLock";
+import { anonymizeLifecycleEmailDataSql } from "./lifecycleEmailStore";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -220,6 +221,9 @@ export async function performAccountDeletion(
         await tx.delete(trialFunnelSubjectsTable).where(eq(trialFunnelSubjectsTable.userId, userId));
         await tx.delete(userBillingTable).where(eq(userBillingTable.userId, userId));
         await tx.execute(sql`DELETE FROM trial_ai_reads WHERE user_id = ${userId}`);
+        // Smile ratings stay only as anonymous numbers (no user id, no send id,
+        // no free comment); the lifecycle send log goes (Hamilton 2 Nov 2026).
+        for (const statement of anonymizeLifecycleEmailDataSql(userId)) await tx.execute(statement);
       });
       deletionStage = "database_deleted";
       // Best effort, outside the transaction: these tables come from startup
