@@ -40,3 +40,10 @@ persist an inferred browser language for automatic email sends.
 Callers that reserve a notification before sending must undo that reservation
 on thrown lookup errors as well as unsuccessful delivery. A reservation is not
 proof that a required deletion warning reached the provider.
+
+
+## Superseded 2 Nov 2026 (Hamilton)
+The browser's resolved language IS now persisted, in a separate column
+(`user_preferences.detected_language` + `detected_language_at`), only for signed-in
+accounts after legal consent, never over the manual `language`, and only for emails
+(manual > detected > English). The interface still follows the browser live.

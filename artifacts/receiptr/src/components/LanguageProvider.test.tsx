@@ -146,3 +146,49 @@ describe("language preference", () => {
     expect(language()).toBe("en");
   });
 });
+
+describe("browser language stored for emails (Hamilton, 2 Nov 2026)", () => {
+  const puts = () => mocks.request.mock.calls.filter(([url]) => String(url).endsWith("/api/account/detected-language"));
+  it("signed in, automatic mode: reports the resolved browser language once, again only when it changes", async () => {
+    mocks.auth.userId = "A";
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["pt-BR"]);
+    mocks.request.mockImplementation(async (url: string) => String(url).endsWith("/detected-language") ? { stored: true } : { language: null });
+    view();
+    await waitFor(() => expect(puts()).toHaveLength(1));
+    expect(JSON.parse(String(puts()[0][1].body))).toEqual({ language: "pt-BR" });
+    act(() => window.dispatchEvent(new Event("focus")));
+    await waitFor(() => expect(mocks.request.mock.calls.length).toBeGreaterThanOrEqual(3));
+    expect(puts()).toHaveLength(1);
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["fr-FR"]);
+    act(() => window.dispatchEvent(new Event("languagechange")));
+    await waitFor(() => expect(puts()).toHaveLength(2));
+    expect(JSON.parse(String(puts()[1][1].body))).toEqual({ language: "en" });
+  });
+  it("manual language: nothing reported", async () => {
+    mocks.auth.userId = "A";
+    mocks.request.mockResolvedValue({ language: "pt-PT" });
+    view();
+    await waitFor(() => expect(language()).toBe("pt-PT"));
+    expect(puts()).toHaveLength(0);
+  });
+  it("before consent the API refuses (428); retried when consent is accepted", async () => {
+    mocks.auth.userId = "A";
+    let consented = false;
+    mocks.request.mockImplementation(async (url: string) => {
+      if (String(url).endsWith("/detected-language")) {
+        if (!consented) throw Object.assign(new Error("428"), { status: 428 });
+        return { stored: true };
+      }
+      return { language: null };
+    });
+    view();
+    await waitFor(() => expect(puts()).toHaveLength(1));
+    consented = true;
+    act(() => window.dispatchEvent(new Event("receebo:legal-accepted")));
+    await waitFor(() => expect(puts()).toHaveLength(2));
+  });
+  it("visitors: nothing reported", async () => {
+    view();
+    expect(puts()).toHaveLength(0);
+  });
+});

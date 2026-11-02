@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@clerk/react";
 import { customFetch, type AccountLanguage } from "@workspace/api-client-react";
+import { LEGAL_ACCEPTED_EVENT } from "@/components/LegalConsentGate";
 import {
-  isAppLocale, notifyLocaleChange, setAccountLocale, useAppLocale, type AppLocale,
+  isAppLocale, notifyLocaleChange, resolveLocale, setAccountLocale, useAppLocale, type AppLocale,
 } from "@/lib/locale";
 
 type LanguageState = {
@@ -17,6 +18,26 @@ const Context = createContext<LanguageState | null>(null);
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const request = (options?: RequestInit) =>
   customFetch<AccountLanguage>(`${base}/api/account/language`, { credentials: "include", ...options });
+
+/**
+ * Hamilton, 2 Nov 2026: the browser's resolved language is stored on the account
+ * for emails (detected_language), only for signed-in accounts, only after legal
+ * consent (the API refuses before it; we retry when consent is accepted), never
+ * over a manual choice (the server also refuses then). Sent again only when the
+ * browser language changes. Nothing is kept in browser storage.
+ */
+function reportDetectedLanguage(): Promise<unknown> {
+  const tag = typeof navigator === "undefined" ? undefined : navigator.languages?.[0] ?? navigator.language;
+  return customFetch(`${base}/api/account/detected-language`, {
+    method: "PUT", credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language: resolveLocale(tag) }),
+  });
+}
+export function currentDetectedLanguage(): AppLocale {
+  const tag = typeof navigator === "undefined" ? undefined : navigator.languages?.[0] ?? navigator.language;
+  return resolveLocale(tag);
+}
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const { userId, isLoaded } = useAuth();
@@ -35,6 +56,7 @@ function LanguageScope({ children, userId, ready }: { children: ReactNode; userI
   const busy = useRef(false);
   const failed = useRef<{ value: AppLocale | null } | null>(null);
   const revision = useRef(0);
+  const reported = useRef<AppLocale | null>(null);
 
   useLayoutEffect(() => {
     alive.current = true;
@@ -51,10 +73,12 @@ function LanguageScope({ children, userId, ready }: { children: ReactNode; userI
     const visible = () => { if (document.visibilityState === "visible") refresh(); };
     window.addEventListener("focus", refresh);
     window.addEventListener("languagechange", refresh);
+    window.addEventListener(LEGAL_ACCEPTED_EVENT, refresh);
     document.addEventListener("visibilitychange", visible);
     return () => {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("languagechange", refresh);
+      window.removeEventListener(LEGAL_ACCEPTED_EVENT, refresh);
       document.removeEventListener("visibilitychange", visible);
     };
   }, [userId]);
@@ -75,7 +99,17 @@ function LanguageScope({ children, userId, ready }: { children: ReactNode; userI
     setLoading(true);
     setError(false);
     void request({ signal: controller.signal })
-      .then((result) => { if (current()) setLanguage(result.language); })
+      .then((result) => {
+        if (!current()) return;
+        setLanguage(result.language);
+        // Automatic mode: tell the server which language this browser resolves to.
+        const detected = currentDetectedLanguage();
+        if (result.language === null && reported.current !== detected) {
+          void reportDetectedLanguage()
+            .then(() => { reported.current = detected; })
+            .catch(() => { /* before consent (428) or offline: retried on consent/focus */ });
+        }
+      })
       .catch(() => { if (current()) setError(true); })
       .finally(() => { clearTimeout(timeout); if (current()) setLoading(false); });
     return () => { cancelled = true; clearTimeout(timeout); controller.abort(); };

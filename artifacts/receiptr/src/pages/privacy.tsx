@@ -56,13 +56,21 @@ export default function PrivacyPolicy() {
         </li>
         <li>
           <strong>Approximate country:</strong> our server looks up the country
-          of your IP address in a local database (no third-party service) to set
-          your account&apos;s region, which decides the return and warranty
-          rules shown, and to tell you if your country is not covered yet. We
-          keep only the region, not the IP address. You can change the region in
+          of your IP address in a local database (no third-party service) to
+          tell you if your country is not covered yet and, after you accept the
+          Terms and this Privacy Policy, to set your account&apos;s region once,
+          which decides the return and warranty rules shown. Before that,
+          nothing is stored. We keep only the region, not the IP address. You can change the region in
           Settings. If you tap &quot;I&apos;m interested&quot; for a country we
           don&apos;t cover yet, we only add one to a count for that country,
           with nothing that identifies you.
+        </li>
+        <li>
+          <strong>Language:</strong> after you accept the Terms and this Privacy
+          Policy, the app saves your browser&apos;s language (English,
+          Portuguese or Brazilian Portuguese; otherwise English) to your
+          account so account emails can use it. A language you choose in
+          Settings always takes priority.
         </li>
         <li>
           <strong>Landing page counts:</strong> when our public pages load or

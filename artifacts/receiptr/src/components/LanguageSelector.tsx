@@ -31,9 +31,9 @@ export function LanguageSelector({ compact = false }: { compact?: boolean }) {
         "O idioma altera a interface web/PWA, não a região, o país da compra ou a moeda. Os dados originais dos recibos, documentos legais, gravações e conteúdos externos de login não são traduzidos por este seletor.",
       )}
       {" "}{lt(
-        "Account emails use the chosen language. In automatic mode, emails are in English.",
-        "Os e-mails da conta usam o idioma escolhido. No modo automático, os e-mails são enviados em inglês.",
-        "Os e-mails da conta usam o idioma escolhido. No modo automático, os e-mails são enviados em inglês.",
+        "Account emails use the chosen language. In automatic mode, they use your browser's language (English, Portuguese or Brazilian Portuguese; otherwise English), which we save to your account for that.",
+        "Os emails da conta usam o idioma escolhido. No modo automático, usam o idioma do seu navegador (inglês, português ou português do Brasil; caso contrário, inglês), que guardamos na sua conta para esse fim.",
+        "Os e-mails da conta usam o idioma escolhido. No modo automático, usam o idioma do seu navegador (inglês, português de Portugal ou português do Brasil; caso contrário, inglês), que salvamos na sua conta para isso.",
       )}
     </p>}
     {saving && <p role="status">{lt("Saving…", "A guardar…", "Salvando…")}</p>}

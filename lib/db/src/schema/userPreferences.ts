@@ -8,7 +8,16 @@ import { pgTable, text, boolean, timestamp } from "drizzle-orm/pg-core";
 export const userPreferencesTable = pgTable("user_preferences", {
   userId: text("user_id").primaryKey(),
   market: text("market", { enum: ["PT", "BR", "US"] }),
+  /** Manual choice in Settings (null = automatic). Always wins. */
   language: text("language", { enum: ["en", "pt-PT", "pt-BR"] }),
+  /**
+   * Browser language the signed-in app reported after legal consent (resolved:
+   * en / pt-PT / pt-BR, anything else en). Only written while `language` is
+   * null; used for emails when there is no manual choice. Additive migration in
+   * api-server lib/marketMigration.ts.
+   */
+  detectedLanguage: text("detected_language", { enum: ["en", "pt-PT", "pt-BR"] }),
+  detectedLanguageAt: timestamp("detected_language_at", { withTimezone: true }),
   notificationsOptOut: boolean("notifications_opt_out").notNull().default(false),
   onboardingReceiptDone: boolean("onboarding_receipt_done").notNull().default(false),
   onboardingSearchDone: boolean("onboarding_search_done").notNull().default(false),

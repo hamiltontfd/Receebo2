@@ -18,7 +18,7 @@ needs a lawyer before it ships. Sources: `/workspace/receebo/consumer-rules-br-u
   External authentication, legal documents, recorded media, native mobile and
   original receipt/merchant/item/AI-extracted content are outside this UI coverage.
   Application-owned emails use the account preference as documented below;
-  automatic email language is English, independently of browser language.
+  automatic email language is the browser language detected after consent (see below).
   The selector discloses these boundaries rather than claiming those contents
   are translated. Switching language does not remount forms or clear draft edits.
 - Signed-in preferences are stored per account, available without subscription.
@@ -50,9 +50,15 @@ needs a lawyer before it ships. Sources: `/workspace/receebo/consumer-rules-br-u
   legacy Stripe trial endings, renewal payment failures, deletion warnings,
   deletion codes and post-deletion confirmations. Subjects, preheaders, HTML,
   text, buttons and footers support en, pt-PT and pt-BR.
-- **Automatic without a browser means English.** Null/missing/unsupported language
-  resolves to en, independent of browser headers, server locale, market, visitor
-  settings and receipt country. No browser language is persisted implicitly.
+- **Email language = manual, else detected browser language, else English**
+  (Hamilton, 2 Nov 2026; supersedes "automatic emails are English" and "no
+  browser language is persisted"). The signed-in app reports the browser's
+  resolved language (en / pt-PT / pt-BR; anything else en) with
+  `PUT /api/account/detected-language` into `user_preferences.detected_language`
+  (+ `detected_language_at`). Requires legal consent (428 before; the app retries
+  on the consent event). Written only while the manual `language` is null and only
+  when the value changes; the manual choice is never touched. Unsupported values
+  still resolve to en; never inferred from market, purchase country or server.
   A preference-read failure aborts the send instead of sending the wrong language.
 - Resolve on each send (no stale language cache). Capture the language together
   with the contact **before deleting the account**; confirmations use that snapshot.
@@ -196,3 +202,10 @@ switch these documents or claim legal approval.
 - pt-BR / en-US terms and privacy pages in the app.
 - Return-window reminder rules still need review of the unsourced US retailer table.
 - BR durable/non-durable classification beyond category.
+
+## Account market and legal consent (Hamilton, 2 Nov 2026)
+- `/account/market` is no longer exempt from the legal-consent gate: before consent
+  GET/PATCH return 428 and nothing is stored. The first GET after consent fills an
+  empty market from the server-side IP (once). The app keeps a landing choice made
+  before consent in this tab's session and applies it (only if unset) right after
+  the consent event.

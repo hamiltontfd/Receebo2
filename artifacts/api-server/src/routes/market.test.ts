@@ -11,7 +11,8 @@ import { eq, sql } from "drizzle-orm";
 vi.mock("@clerk/express", () => ({
   getAuth: (req: express.Request) => ({ userId: req.headers["x-test-session"] ?? null }),
 }));
-vi.mock("../lib/legalAcceptance", () => ({ hasCurrentLegalAcceptance: async () => true }));
+const consent = vi.hoisted(() => ({ missing: new Set<string>() }));
+vi.mock("../lib/legalAcceptance", () => ({ hasCurrentLegalAcceptance: async (id: string) => !consent.missing.has(id) }));
 vi.mock("../lib/accountDeletionState", () => ({
   isAccountDeletionInProgress: async (id: string) => id === "deleting-fixture",
 }));
@@ -31,6 +32,7 @@ vi.mock("../lib/objectStorage", () => ({
 import market from "./market";
 import notifications from "./notifications";
 import receipts from "./receipts";
+import { getUserEmailLocale } from "../lib/emailLocale";
 
 const A = `market-fixture-${randomUUID()}`;
 const B = `market-fixture-${randomUUID()}`;
@@ -125,6 +127,62 @@ describe("market API with real PostgreSQL", () => {
       await db.delete(userPreferencesTable).where(eq(userPreferencesTable.userId, D));
     }
   });
+  it("before legal consent nothing is stored; the IP fills the market on the first request after consent (Hamilton, 2 Nov)", async () => {
+    const E = `market-fixture-${randomUUID()}`;
+    consent.missing.add(E);
+    try {
+      process.env.MARKET_DEV_COUNTRY = "US";
+      const before = await call("/account/market", E);
+      expect(before.status).toBe(428);
+      expect((await call("/account/market", E, { market: "BR" })).status).toBe(428);
+      const put = await fetch(`${base}/account/detected-language`, {
+        method: "PUT", headers: { "x-test-session": E, "Content-Type": "application/json" }, body: JSON.stringify({ language: "pt-BR" }),
+      });
+      expect(put.status).toBe(428);
+      expect(await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, E))).toHaveLength(0);
+      consent.missing.delete(E);
+      expect(await (await call("/account/market", E)).json()).toEqual({ market: "US", country: "US" });
+      const [row] = await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, E));
+      expect(row.market).toBe("US");
+    } finally {
+      consent.missing.delete(E);
+      delete process.env.MARKET_DEV_COUNTRY;
+      await db.delete(userPreferencesTable).where(eq(userPreferencesTable.userId, E));
+    }
+  });
+
+  it("browser language for emails: stored after consent, manual language wins, updated only without a manual choice", async () => {
+    const F = `market-fixture-${randomUUID()}`;
+    const put = (language: unknown) => fetch(`${base}/account/detected-language`, {
+      method: "PUT", headers: { "x-test-session": F, "Content-Type": "application/json" }, body: JSON.stringify({ language }),
+    });
+    const row = async () => (await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, F)))[0];
+    try {
+      expect(await getUserEmailLocale(F)).toBe("en");
+      for (const bad of ["fr", "PT", null, 1]) expect((await put(bad)).status).toBe(400);
+      expect(await (await put("pt-BR")).json()).toEqual({ stored: true });
+      const first = await row();
+      expect(first).toMatchObject({ detectedLanguage: "pt-BR", language: null });
+      expect(first.detectedLanguageAt).toBeInstanceOf(Date);
+      expect(await getUserEmailLocale(F)).toBe("pt-BR");
+      // Same value again: no write (timestamp keeps the last change).
+      expect(await (await put("pt-BR")).json()).toEqual({ stored: false });
+      expect((await row()).detectedLanguageAt?.getTime()).toBe(first.detectedLanguageAt?.getTime());
+      // Manual choice in Settings wins and freezes the detected value.
+      expect((await call("/account/language", F, { language: "en" })).status).toBe(200);
+      expect(await (await put("pt-PT")).json()).toEqual({ stored: false });
+      expect(await row()).toMatchObject({ language: "en", detectedLanguage: "pt-BR" });
+      expect(await getUserEmailLocale(F)).toBe("en");
+      // Back to automatic: detected applies again and follows browser changes.
+      expect((await call("/account/language", F, { language: null })).status).toBe(200);
+      expect(await getUserEmailLocale(F)).toBe("pt-BR");
+      expect(await (await put("pt-PT")).json()).toEqual({ stored: true });
+      expect(await getUserEmailLocale(F)).toBe("pt-PT");
+    } finally {
+      await db.delete(userPreferencesTable).where(eq(userPreferencesTable.userId, F));
+    }
+  });
+
   it("I'm interested: aggregate count per uncovered country only, nothing about the person", async () => {
     const post = (body: unknown) => fetch(`${base}/market/interest`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),

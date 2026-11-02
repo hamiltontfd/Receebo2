@@ -213,3 +213,40 @@ describe("market resolution and session isolation", () => {
     await waitFor(() => expect(state()).toMatchObject({ market: "US", source: "account" }));
   });
 });
+
+describe("account market and legal consent (Hamilton, 2 Nov 2026)", () => {
+  const consentError = () => Object.assign(new Error("428"), { status: 428 });
+  it("before consent: no error, nothing stored; after consent the server fills the market", async () => {
+    mocks.auth.userId = "A";
+    let consented = false;
+    mocks.request.mockImplementation(async () => {
+      if (!consented) throw consentError();
+      return { market: "US", country: "US" };
+    });
+    view();
+    await waitFor(() => expect(state().loading).toBe(false));
+    expect(state()).toMatchObject({ market: null, confirmed: false });
+    expect(screen.queryByText(/Could not load or save/)).toBeNull();
+    consented = true;
+    act(() => window.dispatchEvent(new Event("receebo:legal-accepted")));
+    await waitFor(() => expect(state()).toMatchObject({ market: "US", source: "account", confirmed: true }));
+  });
+  it("a landing choice made before consent is applied (only if unset) right after consent", async () => {
+    localStorage.setItem(VISITOR_MARKET_KEY, "US");
+    mocks.auth.userId = "A";
+    let consented = false;
+    mocks.request.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (!consented) throw consentError();
+      return { market: JSON.parse(String(init?.body ?? "{}")).market ?? null, country: "PT" };
+    });
+    view();
+    await waitFor(() => expect(state().loading).toBe(false));
+    expect(screen.queryByText(/Could not load or save/)).toBeNull();
+    consented = true;
+    act(() => window.dispatchEvent(new Event("receebo:legal-accepted")));
+    await waitFor(() => expect(state()).toMatchObject({ market: "US", confirmed: true }));
+    const last = mocks.request.mock.calls.at(-1)!;
+    expect(last[1]).toMatchObject({ method: "PATCH" });
+    expect(JSON.parse(String(last[1].body))).toEqual({ market: "US", onlyIfUnset: true });
+  });
+});

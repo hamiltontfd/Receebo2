@@ -1,3 +1,4 @@
+import { LEGAL_ACCEPTED_EVENT } from "@/components/LegalConsentGate";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@clerk/react";
 import { customFetch, type AccountMarket, type MarketSuggestion } from "@workspace/api-client-react";
@@ -36,6 +37,8 @@ export type MarketState = {
 /** Exported for lib/region.ts (rules) and tests; components use useMarket(). */
 export const MarketContext = createContext<MarketState | null>(null);
 const Context = MarketContext;
+/** The API refuses account market reads/writes before legal consent (Hamilton, 2 Nov 2026). */
+const consentPending = (err: unknown) => (err as { status?: number } | null)?.status === 428;
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const request = <T,>(path: string, options?: RequestInit) =>
   customFetch<T>(`${base}/api/${path}`, { credentials: "include", ...options });
@@ -80,10 +83,12 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", visible);
     window.addEventListener("storage", storage);
+    window.addEventListener(LEGAL_ACCEPTED_EVENT, refresh);
     return () => {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", visible);
       window.removeEventListener("storage", storage);
+      window.removeEventListener(LEGAL_ACCEPTED_EVENT, refresh);
     };
   }, [ready, userId]);
 
@@ -143,7 +148,10 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
             setSuggestion(isMarket(result.market) ? result.market : null);
           }
         }
-      } catch {
+      } catch (err) {
+        // Before legal consent nothing is read or stored; a pending landing
+        // choice stays in this tab's session and is applied after consent.
+        if (userId && consentPending(err)) return;
         if (current()) setError(userId
           ? lt("Could not load or save your account market. Try again.", "Não foi possível carregar ou guardar o mercado da conta. Tente novamente.", "Não foi possível carregar ou salvar o mercado da conta. Tente novamente.")
           : lt("Location unavailable. You can choose a market and keep browsing.", "Localização indisponível. Pode escolher uma região e continuar a navegar.", "Localização indisponível. Você pode escolher uma região e continuar navegando."));
@@ -184,7 +192,14 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
         if (current()) setVisitor(market);
       }
       if (current()) failedChoice.current = null;
-    } catch {
+    } catch (err) {
+      if (userId && consentPending(err)) {
+        // Not stored before consent: keep it for this tab and apply it right after.
+        pendingVisitor.current = market;
+        try { sessionStorage.setItem(pendingKey(userId), market); } catch { /* in-memory */ }
+        if (current()) failedChoice.current = null;
+        return;
+      }
       if (current()) setError(lt("Could not save your market. Check your connection or browser storage and try again.", "Não foi possível guardar a região. Verifique a ligação ou o armazenamento do navegador e tente novamente.", "Não foi possível salvar a região. Verifique a conexão ou o armazenamento do navegador e tente novamente."));
     } finally {
       clearTimeout(timeout);

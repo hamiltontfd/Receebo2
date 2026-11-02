@@ -33,6 +33,31 @@ router.patch("/account/language", requireAuth, lockUserDataMutation(async (req, 
     }).returning({ language: userPreferencesTable.language });
   res.json(saved);
 }));
+/**
+ * The signed-in app reports the browser's resolved language (en / pt-PT /
+ * pt-BR; anything else en) for emails. Requires legal consent (not exempt).
+ * Never touches the manual `language`; written only while it is null, and
+ * only when the value changes (the timestamp marks the last change).
+ */
+router.put("/account/detected-language", requireAuth, async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const value = (req.body as { language?: unknown } | undefined)?.language;
+  if (value !== "en" && value !== "pt-PT" && value !== "pt-BR") {
+    res.status(400).json({ error: "Choose en, pt-PT or pt-BR." });
+    return;
+  }
+  const now = new Date();
+  const result = await db.execute(sql`
+    INSERT INTO user_preferences (user_id, detected_language, detected_language_at)
+    VALUES (${req.userId!}, ${value}, ${now})
+    ON CONFLICT (user_id) DO UPDATE SET detected_language = EXCLUDED.detected_language,
+      detected_language_at = EXCLUDED.detected_language_at, updated_at = now()
+    WHERE user_preferences.language IS NULL
+      AND user_preferences.detected_language IS DISTINCT FROM EXCLUDED.detected_language
+    RETURNING detected_language`);
+  res.json({ stored: result.rows.length > 0 });
+});
+
 // Fixed-size global budget: no IP keys retained/logged, no attacker-controlled key cardinality.
 const suggestionLimit = rateLimit({
   windowMs: 60_000, limit: 600, keyGenerator: () => "market-suggestions",
@@ -48,8 +73,10 @@ router.get("/market/suggestion", (_req, res, next) => {
 
 /**
  * The account market, plus the country detected from this request (never
- * stored). An account without a market gets the IP's market once (first write
- * wins; a saved/manual market is never replaced). Unknown or uncovered
+ * stored). Requires legal consent (requireAuth, not exempt), so nothing is
+ * written before it. An account without a market gets the IP's market on the
+ * first request after consent (first write wins; a saved/manual market is
+ * never replaced). Unknown or uncovered
  * countries leave it empty: PT/EU rules apply and the app shows the notice.
  */
 router.get("/account/market", requireAuth, async (req, res): Promise<void> => {

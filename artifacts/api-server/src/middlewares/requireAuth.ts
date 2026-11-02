@@ -12,8 +12,9 @@ declare global {
   }
 }
 
+// /account/market is NOT exempt (Hamilton, 2 Nov 2026): the market is read,
+// chosen or filled from the IP only after legal consent; before it nothing is stored.
 const LEGAL_EXEMPT_PATHS = new Set([
-  "/account/market",
   "/account/language",
   "/legal/acceptance",
   "/account",

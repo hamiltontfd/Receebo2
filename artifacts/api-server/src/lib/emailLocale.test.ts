@@ -10,7 +10,7 @@ vi.mock("@workspace/db", () => ({
   db: { select: () => ({ from: () => ({ where: mocks.preference }) }) },
 }));
 
-import { getUserEmailLocale, resolveEmailLocale, type EmailLocale } from "./emailLocale";
+import { emailLocaleFrom, getUserEmailLocale, resolveEmailLocale, type EmailLocale } from "./emailLocale";
 import { formatEmailDate, formatMoney } from "./emailFormat";
 import {
   getDeletionConfirmationContact, sendAccountDeletedEmail, sendDeletionCodeEmail,
@@ -156,4 +156,15 @@ it.each(["en", "pt-PT", "pt-BR"] as EmailLocale[])("does not mutate dates/curren
   expect(formatEmailDate("not-a-date", locale)).toBeNull();
   expect(formatMoney(449, "BRL", locale)).toBe(new Intl.NumberFormat(locale === "en" ? "en-GB" : locale, { style: "currency", currency: "BRL" }).format(449));
   expect(timestamp.toISOString()).toBe(before);
+});
+
+describe("email language: manual, else detected browser language, else English", () => {
+  it("resolves in that order", () => {
+    expect(emailLocaleFrom({ language: "en", detectedLanguage: "pt-BR" })).toBe("en");
+    expect(emailLocaleFrom({ language: null, detectedLanguage: "pt-BR" })).toBe("pt-BR");
+    expect(emailLocaleFrom({ language: null, detectedLanguage: "pt-PT" })).toBe("pt-PT");
+    expect(emailLocaleFrom({ language: null, detectedLanguage: null })).toBe("en");
+    expect(emailLocaleFrom(undefined)).toBe("en");
+    expect(emailLocaleFrom({ language: "fr", detectedLanguage: "xx" })).toBe("en");
+  });
 });
