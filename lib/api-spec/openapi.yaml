@@ -631,8 +631,8 @@ components:
           description: MIME type of the uploaded original.
         status:
           type: string
-          enum: [processing, completed, failed, not_a_receipt]
-          description: AI extraction status.
+          enum: [processing, completed, failed, not_a_receipt, unreadable]
+          description: AI extraction status. unreadable = a receipt the AI could not read reliably (asks for a better photo; nothing saved).
         isDraft:
           type: boolean
           description: Draft receipts are pending user confirmation and excluded from the library.

@@ -8,6 +8,7 @@ import { withUserDataLock } from "./userDataLock";
 import { finishTrialUpload } from "./accountTrial";
 import { aiReadCapApplies, claimTrialAiRead } from "./trialAiReads";
 import { resolvePurchaseType } from "./purchaseType";
+import { assessReadability } from "./receiptReadability";
 
 function deduplicateProducts(products: ExtractedProduct[]): ExtractedProduct[] {
   const seen = new Map<string, ExtractedProduct>();
@@ -44,7 +45,7 @@ export interface ExtractionJob {
 
 const activeJobs = new Map<number, boolean>();
 
-async function rejectReceipt(receiptId: number, objectPath: string, status: "failed" | "not_a_receipt") {
+async function rejectReceipt(receiptId: number, objectPath: string, status: "failed" | "not_a_receipt" | "unreadable") {
   await db.transaction(async tx => {
     await tx.update(receiptsTable).set({ status }).where(eq(receiptsTable.id, receiptId));
     await finishTrialUpload(objectPath, false, receiptId, tx);
@@ -95,6 +96,15 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
     if (!data.isReceipt) {
       logger.info({ receiptId }, "Full extraction confirmed image is not a receipt");
       await rejectReceipt(receiptId, objectPath, "not_a_receipt");
+      activeJobs.delete(receiptId);
+      return;
+    }
+
+    // Ask for a better photo instead of saving guessed values.
+    const readability = assessReadability({ ...data, products: deduplicateProducts(data.products) });
+    if (!readability.ok) {
+      logger.info({ receiptId, reasons: readability.reasons }, "Extraction unreadable; asking for a better photo");
+      await rejectReceipt(receiptId, objectPath, "unreadable");
       activeJobs.delete(receiptId);
       return;
     }

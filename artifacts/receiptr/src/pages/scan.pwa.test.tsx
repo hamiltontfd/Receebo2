@@ -116,7 +116,7 @@ describe("upload paths with PWA safeguards", () => {
     const result = mount();
     expect(mocks.getUserMedia).not.toHaveBeenCalled();
     await act(async () => screen.getByRole("button", { name: /camera/i }).click());
-    expect(mocks.getUserMedia).toHaveBeenCalledWith({ video: { facingMode: "environment" } });
+    expect(mocks.getUserMedia).toHaveBeenCalledWith({ video: { facingMode: "environment", width: { ideal: 3840 }, height: { ideal: 2160 } } });
     expect(hasPwaWork()).toBe(true);
     const video = result.container.querySelector("video")!;
     Object.defineProperty(video, "videoWidth", { configurable: true, value: 100 });

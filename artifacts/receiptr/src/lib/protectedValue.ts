@@ -57,7 +57,7 @@ function mainItemName(r: Receipt): string | null {
 
 /** `region`: the account region ("US" = store windows online and in store, no legal warranty; else PT rules). */
 export function classifyReceipt(r: Receipt, now: Date = new Date(), region?: string | null): ClassifyResult {
-  if (r.status === "processing" || r.status === "not_a_receipt" || r.isDraft) return { kind: "none" };
+  if (r.status === "processing" || r.status === "not_a_receipt" || r.status === "unreadable" || r.isDraft) return { kind: "none" };
   if (hasNoConsumerDates(r.purchaseType)) return { kind: "excluded" };
   if (r.total == null || !(r.total > 0)) return { kind: "none" };
 
@@ -290,7 +290,7 @@ export interface DurableKeepItem extends WorthKeepingItem {
  * digital, service or ticket) and that is not Groceries.
  */
 export function isDurableReceipt(r: Receipt): boolean {
-  if (r.status === "processing" || r.status === "not_a_receipt" || r.isDraft) return false;
+  if (r.status === "processing" || r.status === "not_a_receipt" || r.status === "unreadable" || r.isDraft) return false;
   if (hasNoConsumerDates(r.purchaseType)) return false;
   return (r.category ?? "") !== "Groceries";
 }

@@ -16,6 +16,7 @@ import {
   FISCAL_DOCUMENTS_NOTE,
   PRE_CHECK_SYSTEM_PROMPT,
   SYSTEM_PROMPT,
+  EXTRACTION_IMAGE_DETAIL,
   checkIsReceipt,
   extractReceiptData,
 } from "./receiptExtraction";
@@ -69,5 +70,43 @@ describe("fiscal invoices (Brazilian DANFE / NF-e, PT faturas)", () => {
     const data = await extractReceiptData("/objects/x", "image/jpeg");
     expect(create.mock.calls[0][0].messages[0].content).toBe(SYSTEM_PROMPT);
     expect(data).toMatchObject({ isReceipt: true, currency: "BRL", purchaseCountry: "BR", total: 1234.5 });
+  });
+});
+
+describe("no guessing on hard-to-read photos", () => {
+  it("tells the model never to invent values and to flag unreadable photos", () => {
+    expect(SYSTEM_PROMPT).toContain('"legible": boolean');
+    expect(SYSTEM_PROMPT).toMatch(/NEVER guess/);
+    expect(SYSTEM_PROMPT).toMatch(/set "legible" to false/);
+  });
+
+  it("sends photos at original detail for extraction, default detail for the pre-check", async () => {
+    create.mockResolvedValueOnce(reply('{"isReceipt":true}'));
+    await checkIsReceipt("/objects/x", "image/jpeg");
+    expect(create.mock.calls[0][0].messages[1].content[1].image_url.detail).toBeUndefined();
+    create.mockResolvedValueOnce(reply('{"isReceipt":true,"legible":false}'));
+    const data = await extractReceiptData("/objects/x", "image/jpeg");
+    expect(EXTRACTION_IMAGE_DETAIL).toBe("original");
+    expect(create.mock.calls[1][0].messages[1].content[1].image_url.detail).toBe("original");
+    expect(data.legible).toBe(false);
+  });
+
+  it("falls back to the default detail when the gateway rejects it with 400", async () => {
+    create.mockRejectedValueOnce(Object.assign(new Error("bad detail"), { status: 400 }));
+    create.mockResolvedValueOnce(reply('{"isReceipt":true,"legible":true}'));
+    const data = await extractReceiptData("/objects/x", "image/jpeg");
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[1][0].messages[1].content[1].image_url.detail).toBeUndefined();
+    expect(data.legible).toBe(true);
+  });
+
+  it("does not retry other errors, and PDFs carry no detail", async () => {
+    create.mockRejectedValueOnce(Object.assign(new Error("down"), { status: 503 }));
+    await expect(extractReceiptData("/objects/x", "image/jpeg")).rejects.toThrow("down");
+    expect(create).toHaveBeenCalledTimes(1);
+    create.mockResolvedValueOnce(reply('{"isReceipt":true}'));
+    const data = await extractReceiptData("/objects/x", "application/pdf");
+    expect(create.mock.calls[1][0].messages[1].content[1].type).toBe("file");
+    expect(data.legible).toBeNull();
   });
 });

@@ -1,4 +1,5 @@
-const MAX_DIMENSION = 2000;
+/** Full A4 invoices need ~3000 px on the long edge to stay readable. */
+const MAX_DIMENSION = 3000;
 const JPEG_QUALITY = 0.85;
 
 export async function compressImage(

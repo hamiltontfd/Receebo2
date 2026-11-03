@@ -17,4 +17,5 @@ export const ReceiptStatus = {
   completed: 'completed',
   failed: 'failed',
   not_a_receipt: 'not_a_receipt',
+  unreadable: 'unreadable',
 } as const;

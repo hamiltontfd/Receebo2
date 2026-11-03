@@ -38,6 +38,12 @@ export type ExtractedReceipt = {
   deliveryDate: string | null;
   /** goods | subscription | digital | service | ticket, or null when unclear. */
   purchaseType: PurchaseType | null;
+  /**
+   * false when the model says it could not read the total, date or item lines
+   * clearly enough to copy them (photo too small, far, blurry, dark or cut off).
+   * null when the model did not answer.
+   */
+  legible: boolean | null;
 };
 
 
@@ -54,6 +60,7 @@ ${FISCAL_DOCUMENTS_NOTE}
 Respond ONLY with a JSON object matching this exact shape:
 {
   "isReceipt": boolean,             // true if the image contains a purchase receipt, invoice, or proof of purchase; false otherwise
+  "legible": boolean,               // false if you cannot read the total, the purchase date or the item lines clearly enough to copy them exactly from the image (too small, far away, blurry, dark, glare, folded or cut off); true otherwise
   "merchant": string | null,        // store / company / vendor name
   "purchaseDate": string | null,    // the purchase date in strict YYYY-MM-DD format, or null if not present. For invoices and bills use the ISSUE date (invoice date, "data de emissão", "data da fatura"), NEVER the due date ("data limite de pagamento", "data de vencimento", "pagar até", "due date")
   "total": number | null,           // the grand total amount actually paid, as a plain number (no currency symbol)
@@ -84,6 +91,7 @@ Rules:
 - Set "isReceipt" to false for any image that is not a purchase receipt, invoice, or proof of purchase. When false, all other fields should be null or empty arrays.
 - Brazilian DANFE / NF-e (and NFC-e, cupom fiscal, NFS-e): "merchant" is the issuer (EMITENTE, the company at the top, usually next to its CNPJ), NEVER the buyer (DESTINATÁRIO/REMETENTE). "purchaseDate" is "DATA DA EMISSÃO" (not "DATA DA SAÍDA/ENTRADA" nor a "vencimento" in FATURA/DUPLICATA). "total" is "VALOR TOTAL DA NOTA" (or "VALOR A PAGAR"). "transactionNumber" is the NF-e number ("Nº ... SÉRIE ..."). "currency" is "BRL" and "purchaseCountry" is "BR". Products come from "DADOS DOS PRODUTOS / SERVIÇOS" (DESCRIÇÃO, QUANT., VALOR TOTAL).
 - Use null for any field you genuinely cannot determine. Do not invent values.
+- NEVER guess. Every merchant, date, amount and item must be copied from text you can actually read in the image. Do not fill gaps from the store name, from what the store usually sells, or from typical prices. If a value is unreadable, return null for it (and an empty "products" array if the item lines are unreadable) and set "legible" to false. A partial but true answer is better than a complete invented one.
 - purchaseDate: when a document shows several dates, prefer the transaction/order/issue date. A payment due date, billing period end or delivery date is never the purchase date.
 - "total" and "price" must be numbers (e.g. 12.99), never strings, and must not include currency symbols.
 - Transcribe ocrText faithfully, including item lines, taxes, and totals.
@@ -141,7 +149,14 @@ export async function checkIsReceipt(
   }
 }
 
-function buildContentPart(base64: string, contentType: string) {
+/**
+ * Image detail for the full extraction. gpt-5.4's default ("auto" = "high")
+ * caps an image at 2,500 patches (~1,850 x 1,385 px for 4:3), too little for a
+ * full A4 fiscal invoice. "original" allows up to 10,000 patches / 6,000 px.
+ */
+export const EXTRACTION_IMAGE_DETAIL = "original";
+
+function buildContentPart(base64: string, contentType: string, detail?: string) {
   if (contentType === "application/pdf") {
     return {
       type: "file" as const,
@@ -153,7 +168,7 @@ function buildContentPart(base64: string, contentType: string) {
   }
   return {
     type: "image_url" as const,
-    image_url: { url: `data:${contentType};base64,${base64}` },
+    image_url: { url: `data:${contentType};base64,${base64}`, ...(detail ? { detail } : {}) },
   };
 }
 
@@ -165,7 +180,7 @@ export async function extractReceiptData(
   const [buffer] = await file.download();
   const base64 = buffer.toString("base64");
 
-  const completion = await openai.chat.completions.create({
+  const request = (detail?: string) => openai.chat.completions.create({
     model: "gpt-5.4",
     max_completion_tokens: 8192,
     response_format: { type: "json_object" },
@@ -179,11 +194,22 @@ export async function extractReceiptData(
             text: "Extract the structured receipt data from this file.",
           },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          buildContentPart(base64, contentType) as any,
+          buildContentPart(base64, contentType, detail) as any,
         ],
       },
     ],
   });
+
+  let completion: Awaited<ReturnType<typeof request>>;
+  try {
+    completion = await request(EXTRACTION_IMAGE_DETAIL);
+  } catch (error) {
+    // If the AI gateway rejects the detail value, fall back to its default
+    // rather than failing every upload.
+    if ((error as { status?: unknown })?.status !== 400 || contentType === "application/pdf") throw error;
+    logger.warn({ error }, "Extraction with original image detail rejected; retrying with default detail");
+    completion = await request();
+  }
 
   return parseExtraction(completion.choices[0]?.message?.content ?? "{}");
 }
@@ -249,6 +275,8 @@ export function parseExtraction(raw: string): ExtractedReceipt {
   if (deliveryDate && purchaseDate && deliveryDate < purchaseDate) deliveryDate = null;
 
   const isReceipt = typeof parsed.isReceipt === "boolean" ? parsed.isReceipt : true;
+  const legibleRaw = (parsed as Record<string, unknown>).legible;
+  const legible = typeof legibleRaw === "boolean" ? legibleRaw : null;
 
   const purchaseCountryRaw = toStringOrNull((parsed as ExtractedReceipt).purchaseCountry);
   const purchaseCountry =
@@ -277,6 +305,7 @@ export function parseExtraction(raw: string): ExtractedReceipt {
     isOnlinePurchase,
     deliveryDate,
     purchaseType: normalizePurchaseType((parsed as Record<string, unknown>).purchaseType),
+    legible,
   };
 }
 

@@ -53,7 +53,20 @@ function setActiveReview(id: number | null) {
   }
 }
 
-type Phase = "capture" | "reading" | "review" | "not_a_receipt";
+type Phase = "capture" | "reading" | "review" | "not_a_receipt" | "unreadable";
+
+/**
+ * Without a size the browser opens the camera at its default (640x480 on
+ * Android Chrome), far too small to read a full-page invoice: the AI then
+ * guessed values. Ask for the sharpest stream the camera offers.
+ */
+const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
+  video: { facingMode: "environment", width: { ideal: 3840 }, height: { ideal: 2160 } },
+};
+/** Long edge of a single photo sent for reading (full A4 pages need ~3000 px). */
+const PHOTO_MAX_DIM = 3000;
+/** Panoramic frames stay small: 12 stitched frames must fit a phone canvas. */
+const PAN_FRAME_MAX_WIDTH = 720;
 
 const READING_STEPS: Array<{
   label: string;
@@ -100,7 +113,7 @@ function useCameraStream(enabled: boolean) {
     let cancelled = false;
     setCameraError(false);
     navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: "environment" } })
+      ?.getUserMedia(CAMERA_CONSTRAINTS)
       .then((stream) => {
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
@@ -285,9 +298,10 @@ export default function Scan() {
       const video = videoRef.current;
       if (!video || video.readyState < 2) return;
       const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d")?.drawImage(video, 0, 0);
+      const scale = Math.min(1, PAN_FRAME_MAX_WIDTH / video.videoWidth);
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
         if (!blob) return;
         panFramesRef.current.push(blob);
@@ -349,8 +363,8 @@ export default function Scan() {
   // Move to review (or not_a_receipt) when extraction finishes
   useEffect(() => {
     if (phase !== "reading" || !receipt) return undefined;
-    if (receipt.status === "not_a_receipt") {
-      setPhase("not_a_receipt");
+    if (receipt.status === "not_a_receipt" || receipt.status === "unreadable") {
+      setPhase(receipt.status);
       return undefined;
     }
     if (receipt.status === "processing") {
@@ -507,7 +521,7 @@ export default function Scan() {
   const capturePhoto = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    const MAX_DIM = 2000;
+    const MAX_DIM = PHOTO_MAX_DIM;
     let w = video.videoWidth;
     let h = video.videoHeight;
     if (w > MAX_DIM || h > MAX_DIM) {
@@ -1011,16 +1025,27 @@ export default function Scan() {
         </div>
       )}
 
-      {phase === "not_a_receipt" && (
+      {(phase === "not_a_receipt" || phase === "unreadable") && (
         <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center px-2">
           <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center">
             <AlertTriangle className="w-8 h-8 text-destructive" />
           </div>
           <div className="space-y-2 max-w-xs">
-            <h1 className="text-xl font-extrabold tracking-tight">{appText("No receipt found")}</h1>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {appText("Receebo only works with purchase receipts and invoices. Make sure your photo clearly shows the receipt, not a random photo or other document.")}
-            </p>
+            {phase === "unreadable" ? (
+              <>
+                <h1 className="text-xl font-extrabold tracking-tight">{appText("Photo hard to read")}</h1>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {appText("We couldn't read the total, date or items with confidence, so nothing was saved. Take a new photo closer, with the paper flat, in good light and the whole page in the frame.")}
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-xl font-extrabold tracking-tight">{appText("No receipt found")}</h1>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {appText("Receebo only works with purchase receipts and invoices. Make sure your photo clearly shows the receipt, not a random photo or other document.")}
+                </p>
+              </>
+            )}
           </div>
           <div className="flex flex-col gap-3 w-full max-w-xs">
             <Button
@@ -1028,7 +1053,7 @@ export default function Scan() {
               onClick={handleRetake}
             >
               <Camera className="w-4 h-4 mr-2" />
-              {appText("Try again")}
+              {phase === "unreadable" ? appText("Take a new photo") : appText("Try again")}
             </Button>
             <Button
               variant="ghost"
@@ -1118,8 +1143,8 @@ export default function Scan() {
               <div className="rounded-xl border p-4 space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Total")}</p>
                 <div className="flex items-center gap-1">
-                  <span className="font-mono font-semibold text-muted-foreground select-none">
-                    {currencySymbol(receipt?.currency)}
+                  <span data-testid="text-total-currency" className="shrink-0 whitespace-nowrap font-mono font-semibold text-muted-foreground select-none">
+                    {currencySymbol(receipt?.currency).trim()}
                   </span>
                   <Input
                     type="number"
@@ -1127,7 +1152,7 @@ export default function Scan() {
                     value={form.total}
                     onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))}
                     placeholder="0.00"
-                    className="border-0 px-0 font-mono font-semibold focus-visible:ring-0 shadow-none"
+                    className="min-w-0 border-0 px-0 font-mono font-semibold focus-visible:ring-0 shadow-none"
                   />
                 </div>
               </div>
@@ -1185,7 +1210,7 @@ export default function Scan() {
                         {p.quantity && p.quantity > 1 ? `×${p.quantity} ` : ""}{p.name}
                       </span>
                       {p.price != null && (
-                        <span className="font-mono">{currencySymbol(receipt.currency)}{p.price.toFixed(2)}</span>
+                        <span className="shrink-0 whitespace-nowrap font-mono">{currencySymbol(receipt.currency)}{p.price.toFixed(2)}</span>
                       )}
                     </li>
                   ))}

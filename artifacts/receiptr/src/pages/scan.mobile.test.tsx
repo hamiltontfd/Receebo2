@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   create: vi.fn(), update: vi.fn(), remove: vi.fn(), customFetch: vi.fn(),
   toast: vi.fn(), stop: vi.fn(), getUserMedia: vi.fn(),
+  receipt: undefined as Record<string, unknown> | undefined,
   billing: { plan: "free", accessState: "account_trial", canUseApp: true, canUpload: true, trialUploadsRemaining: 2 } as Record<string, unknown>,
 }));
 vi.mock("@/hooks/useBilling", async () => {
@@ -24,9 +25,9 @@ vi.mock("@workspace/api-client-react", async (importOriginal) => ({
   useCreateReceipt: () => ({ mutateAsync: mocks.create }),
   useUpdateReceipt: () => ({ mutateAsync: mocks.update }),
   useDeleteReceipt: () => ({ mutateAsync: mocks.remove }),
-  useGetReceipt: () => ({ data: undefined }),
+  useGetReceipt: () => ({ data: mocks.receipt }),
   customFetch: mocks.customFetch,
-  checkSimilarReceipt: vi.fn(),
+  checkSimilarReceipt: vi.fn(async () => []),
   getGetReceiptQueryKey: (id: number) => ["receipt", id],
   getListReceiptsQueryKey: () => ["receipts"],
   getGetReceiptStatsQueryKey: () => ["stats"],
@@ -43,6 +44,7 @@ import { rememberTab, setPendingUpload, takePendingUpload } from "@/lib/navState
 const track = { stop: vi.fn(), getCapabilities: vi.fn(() => ({})), applyConstraints: vi.fn(async () => undefined) };
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.receipt = undefined;
   takePendingUpload();
   mocks.billing = { plan: "free", accessState: "account_trial", canUseApp: true, canUpload: true, trialUploadsRemaining: 2 };
   Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
@@ -66,7 +68,10 @@ describe("full-screen phone camera", () => {
   it("opens the camera straight away, edge to edge, with no upload control", async () => {
     mount();
     expect(screen.getByTestId("fullscreen-camera")).toBeInTheDocument();
-    await waitFor(() => expect(mocks.getUserMedia).toHaveBeenCalledWith({ video: { facingMode: "environment" } }));
+    await waitFor(() => expect(mocks.getUserMedia).toHaveBeenCalledWith({
+      // A sharp stream: the browser default (640x480) cannot read a full A4 invoice.
+      video: { facingMode: "environment", width: { ideal: 3840 }, height: { ideal: 2160 } },
+    }));
     expect(screen.queryByRole("button", { name: /upload/i })).toBeNull();
     expect(screen.getByRole("radio", { name: /photo/i })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("text-scan-trial-left").textContent).toBe("2 of 5 free receipts left");
@@ -134,5 +139,53 @@ describe("Add sheet → Upload file handoff", () => {
     expect(loc.history?.at(-1)).not.toBe("/search");
     expect(screen.getByRole("button", { name: "Retry saved file" })).toBeVisible();
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+});
+
+async function shootPhoto(result: ReturnType<typeof mount>) {
+  await waitFor(() => expect(screen.getByRole("button", { name: "Take photo" })).not.toBeDisabled());
+  const video = result.container.querySelector("video")!;
+  Object.defineProperty(video, "videoWidth", { configurable: true, value: 100 });
+  Object.defineProperty(video, "videoHeight", { configurable: true, value: 200 });
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((done) => done(new Blob(["camera"], { type: "image/jpeg" })));
+  await act(async () => screen.getByRole("button", { name: "Take photo" }).click());
+  await waitFor(() => expect(mocks.create).toHaveBeenCalled());
+}
+
+describe("after reading", () => {
+  it("asks for a better photo when the receipt was unreadable, and retakes", async () => {
+    mocks.receipt = { id: 42, status: "unreadable", products: [], notableItems: [] };
+    mocks.remove.mockResolvedValue(undefined);
+    const result = mount();
+    await shootPhoto(result);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Photo hard to read" })).toBeInTheDocument());
+    expect(screen.queryByText("No receipt found")).toBeNull();
+    expect(screen.getByText(/nothing was saved/)).toBeInTheDocument();
+    mocks.receipt = undefined;
+    await act(async () => screen.getByRole("button", { name: "Take a new photo" }).click());
+    expect(mocks.remove).toHaveBeenCalledWith({ id: 42 });
+    expect(await screen.findByTestId("fullscreen-camera")).toBeInTheDocument();
+  });
+
+  it("keeps the not-a-receipt screen for non-receipts", async () => {
+    mocks.receipt = { id: 42, status: "not_a_receipt", products: [], notableItems: [] };
+    const result = mount();
+    await shootPhoto(result);
+    await waitFor(() => expect(screen.getByText("No receipt found")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("never wraps a currency code next to the total (BRL on a 390px phone)", async () => {
+    mocks.receipt = {
+      id: 42, status: "completed", merchant: "LLT", purchaseDate: "2026-08-12", total: 56.9, currency: "BRL",
+      products: [{ name: "Cimento", quantity: 1, price: 35.5 }], notableItems: [],
+    };
+    const result = mount();
+    await shootPhoto(result);
+    const code = await screen.findByTestId("text-total-currency", {}, { timeout: 3000 });
+    expect(code.textContent).toBe("BRL");
+    expect(code).toHaveClass("shrink-0", "whitespace-nowrap");
+    expect(screen.getByDisplayValue("56.9")).toHaveClass("min-w-0");
   });
 });
