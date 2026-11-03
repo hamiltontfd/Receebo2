@@ -81,7 +81,7 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
   try {
     // Fast pre-check: cheap AI call that only answers "is this a receipt?"
     // Returns in ~1-2s, avoiding the expensive full extraction for non-receipts.
-    const isReceipt = await checkIsReceipt(objectPath, contentType);
+    const { isReceipt, fullPageDocument } = await checkIsReceipt(objectPath, contentType);
     if (!isReceipt) {
       logger.info({ receiptId }, "Pre-check determined image is not a receipt");
       await rejectReceipt(receiptId, objectPath, "not_a_receipt");
@@ -89,7 +89,7 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
       return;
     }
 
-    const data = await extractReceiptData(objectPath, contentType);
+    const data = await extractReceiptData(objectPath, contentType, { fullPageDocument });
 
     // Fallback guard: if the full extraction still returns isReceipt:false
     // (pre-check false positive), reject cleanly rather than writing null fields.

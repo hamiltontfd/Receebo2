@@ -110,14 +110,20 @@ Rules:
     - "Apple AirPods Pro (2nd Generation) Wireless Earbuds, Up to 2X More Active Noise Cancelling, Adaptive Transparency, Personalized Spatial Audio, MagSafe Charging Case, Bluetooth Headphones for iPhone" → "Apple AirPods Pro 2nd Gen"
   * The full original text is preserved verbatim in "ocrText", so shortening the name here loses no information.`;
 
-export const PRE_CHECK_SYSTEM_PROMPT = `You are a document classifier. Respond ONLY with a JSON object {"isReceipt":true} if the image shows a purchase receipt, invoice, or proof of purchase from a store or service provider. Respond with {"isReceipt":false} for anything else (photos, selfies, screenshots of unrelated things, menus, and non-purchase documents). A valid receipt shows a seller and an amount paid or due for what was bought; items may be hard to read.
+export const PRE_CHECK_SYSTEM_PROMPT = `You are a document classifier. Respond ONLY with a JSON object {"isReceipt":boolean,"fullPageDocument":boolean}. "isReceipt" is true if the image shows a purchase receipt, invoice, or proof of purchase from a store or service provider, and false for anything else (photos, selfies, screenshots of unrelated things, menus, and non-purchase documents). A valid receipt shows a seller and an amount paid or due for what was bought; items may be hard to read. "fullPageDocument" is true when the document is a full-page printed form or invoice (A4 or letter size sheet, e.g. a Brazilian DANFE/NF-e or a Portuguese "Fatura" on A4) and false for a narrow till receipt, "cupom"/ticket, card slip, screenshot or anything else.
 
 ${FISCAL_DOCUMENTS_NOTE}`;
+
+export type PreCheckResult = {
+  isReceipt: boolean;
+  /** A4/letter full-page form or invoice (e.g. DANFE): read at original detail. */
+  fullPageDocument: boolean;
+};
 
 export async function checkIsReceipt(
   objectPath: string,
   contentType: string,
-): Promise<boolean> {
+): Promise<PreCheckResult> {
   const file = await objectStorageService.getObjectEntityFile(objectPath);
   const [buffer] = await file.download();
   const base64 = buffer.toString("base64");
@@ -125,7 +131,7 @@ export async function checkIsReceipt(
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-5.4",
-      max_completion_tokens: 30,
+      max_completion_tokens: 40,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: PRE_CHECK_SYSTEM_PROMPT },
@@ -140,21 +146,28 @@ export async function checkIsReceipt(
       ],
     });
     const raw = completion.choices[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(raw) as { isReceipt?: unknown };
-    // Require an explicit true — any other value (false, missing, malformed) rejects
-    return parsed.isReceipt === true;
+    const parsed = JSON.parse(raw) as { isReceipt?: unknown; fullPageDocument?: unknown };
+    // Require an explicit true — any other value (false, missing, malformed) rejects.
+    // Full page only on an explicit true; otherwise the default detail is used.
+    return { isReceipt: parsed.isReceipt === true, fullPageDocument: parsed.fullPageDocument === true };
   } catch (error) {
     logger.warn({ error }, "Pre-check failed, falling through to full extraction");
-    return true;
+    return { isReceipt: true, fullPageDocument: false };
   }
 }
 
 /**
- * Image detail for the full extraction. gpt-5.4's default ("auto" = "high")
- * caps an image at 2,500 patches (~1,850 x 1,385 px for 4:3), too little for a
- * full A4 fiscal invoice. "original" allows up to 10,000 patches / 6,000 px.
+ * Image detail for full-page documents (A4/letter, e.g. DANFE) only. gpt-5.4's
+ * default ("auto" = "high") caps an image at 2,500 patches (~1,850 x 1,385 px
+ * for 4:3), too little for a full A4 fiscal invoice. "original" allows up to
+ * 10,000 patches / 6,000 px. Small receipts keep the cheaper default.
  */
-export const EXTRACTION_IMAGE_DETAIL = "original";
+export const FULL_PAGE_IMAGE_DETAIL = "original";
+
+/** Detail for the extraction image: original for full pages, else the default. */
+export function extractionImageDetail(options: { fullPageDocument?: boolean } = {}): string | undefined {
+  return options.fullPageDocument === true ? FULL_PAGE_IMAGE_DETAIL : undefined;
+}
 
 function buildContentPart(base64: string, contentType: string, detail?: string) {
   if (contentType === "application/pdf") {
@@ -175,6 +188,7 @@ function buildContentPart(base64: string, contentType: string, detail?: string) 
 export async function extractReceiptData(
   objectPath: string,
   contentType: string,
+  options: { fullPageDocument?: boolean } = {},
 ): Promise<ExtractedReceipt> {
   const file = await objectStorageService.getObjectEntityFile(objectPath);
   const [buffer] = await file.download();
@@ -200,13 +214,14 @@ export async function extractReceiptData(
     ],
   });
 
+  const detail = contentType === "application/pdf" ? undefined : extractionImageDetail(options);
   let completion: Awaited<ReturnType<typeof request>>;
   try {
-    completion = await request(EXTRACTION_IMAGE_DETAIL);
+    completion = await request(detail);
   } catch (error) {
     // If the AI gateway rejects the detail value, fall back to its default
     // rather than failing every upload.
-    if ((error as { status?: unknown })?.status !== 400 || contentType === "application/pdf") throw error;
+    if ((error as { status?: unknown })?.status !== 400 || !detail) throw error;
     logger.warn({ error }, "Extraction with original image detail rejected; retrying with default detail");
     completion = await request();
   }

@@ -140,7 +140,7 @@ beforeEach(() => {
   vi.stubEnv("REPLIT_DEV_DOMAIN", "fixture.replit.dev");
   userId = `account-trial-fixture-${randomUUID()}`;
   users.push(userId);
-  fixture.check.mockReset().mockResolvedValue(true);
+  fixture.check.mockReset().mockResolvedValue({ isReceipt: true, fullPageDocument: false });
   fixture.extraction.mockReset().mockResolvedValue(extractionData);
   fixture.checkout.mockReset().mockResolvedValue({ url: "https://checkout.stripe.com/fixture" });
   fixture.liveSubscriptions = [];
@@ -574,7 +574,7 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
   it("caps AI reads at 10 per trial (uploads + email), counting discarded reads, never for paid users", async () => {
     expect(TRIAL_AI_READ_LIMIT).toBe(10);
     await start();
-    fixture.check.mockResolvedValueOnce(false);
+    fixture.check.mockResolvedValueOnce({ isReceipt: false, fullPageDocument: false });
     await upload(); // not a receipt: slot released, but the AI read is used
     expect(await countTrialAiReads(userId)).toBe(1);
     expect((await getSubscriptionStatus(userId)).trialUploadsUsed).toBe(0);
@@ -648,7 +648,7 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
   });
   it("releases non-receipts and final processing failures, without counting retries twice", async () => {
     await start();
-    fixture.check.mockResolvedValueOnce(false);
+    fixture.check.mockResolvedValueOnce({ isReceipt: false, fullPageDocument: false });
     await upload();
     expect((await getSubscriptionStatus(userId)).trialUploadsRemaining).toBe(TRIAL_LIMIT);
     fixture.extraction.mockRejectedValue(new Error("Fixture transfer failed"));

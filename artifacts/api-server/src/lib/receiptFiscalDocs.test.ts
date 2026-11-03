@@ -16,7 +16,7 @@ import {
   FISCAL_DOCUMENTS_NOTE,
   PRE_CHECK_SYSTEM_PROMPT,
   SYSTEM_PROMPT,
-  EXTRACTION_IMAGE_DETAIL,
+  FULL_PAGE_IMAGE_DETAIL,
   checkIsReceipt,
   extractReceiptData,
 } from "./receiptExtraction";
@@ -53,12 +53,12 @@ describe("fiscal invoices (Brazilian DANFE / NF-e, PT faturas)", () => {
 
   it("checkIsReceipt sends the new prompt and keeps its accept/reject contract", async () => {
     create.mockResolvedValueOnce(reply('{"isReceipt":true}'));
-    expect(await checkIsReceipt("/objects/x", "image/jpeg")).toBe(true);
+    expect(await checkIsReceipt("/objects/x", "image/jpeg")).toEqual({ isReceipt: true, fullPageDocument: false });
     expect(create.mock.calls[0][0].messages[0].content).toBe(PRE_CHECK_SYSTEM_PROMPT);
     create.mockResolvedValueOnce(reply('{"isReceipt":false}'));
-    expect(await checkIsReceipt("/objects/x", "image/jpeg")).toBe(false);
+    expect(await checkIsReceipt("/objects/x", "image/jpeg")).toEqual({ isReceipt: false, fullPageDocument: false });
     create.mockRejectedValueOnce(new Error("503"));
-    expect(await checkIsReceipt("/objects/x", "image/jpeg")).toBe(true);
+    expect(await checkIsReceipt("/objects/x", "image/jpeg")).toEqual({ isReceipt: true, fullPageDocument: false });
   });
 
   it("parses a DANFE-style extraction", async () => {
@@ -80,21 +80,40 @@ describe("no guessing on hard-to-read photos", () => {
     expect(SYSTEM_PROMPT).toMatch(/set "legible" to false/);
   });
 
-  it("sends photos at original detail for extraction, default detail for the pre-check", async () => {
-    create.mockResolvedValueOnce(reply('{"isReceipt":true}'));
-    await checkIsReceipt("/objects/x", "image/jpeg");
+  it("the pre-check asks for and parses the full-page flag (only an explicit true counts)", async () => {
+    expect(PRE_CHECK_SYSTEM_PROMPT).toContain('"fullPageDocument"');
+    create.mockResolvedValueOnce(reply('{"isReceipt":true,"fullPageDocument":true}'));
+    expect(await checkIsReceipt("/objects/x", "image/jpeg")).toEqual({ isReceipt: true, fullPageDocument: true });
+    create.mockResolvedValueOnce(reply('{"isReceipt":true,"fullPageDocument":"yes"}'));
+    expect(await checkIsReceipt("/objects/x", "image/jpeg")).toEqual({ isReceipt: true, fullPageDocument: false });
     expect(create.mock.calls[0][0].messages[1].content[1].image_url.detail).toBeUndefined();
+  });
+
+  it("reads full-page documents at original detail and everything else at the default", async () => {
     create.mockResolvedValueOnce(reply('{"isReceipt":true,"legible":false}'));
-    const data = await extractReceiptData("/objects/x", "image/jpeg");
-    expect(EXTRACTION_IMAGE_DETAIL).toBe("original");
-    expect(create.mock.calls[1][0].messages[1].content[1].image_url.detail).toBe("original");
+    const data = await extractReceiptData("/objects/x", "image/jpeg", { fullPageDocument: true });
+    expect(FULL_PAGE_IMAGE_DETAIL).toBe("original");
+    expect(create.mock.calls[0][0].messages[1].content[1].image_url.detail).toBe("original");
     expect(data.legible).toBe(false);
+    create.mockResolvedValueOnce(reply('{"isReceipt":true}'));
+    await extractReceiptData("/objects/x", "image/jpeg", { fullPageDocument: false });
+    expect(create.mock.calls[1][0].messages[1].content[1].image_url.detail).toBeUndefined();
+    create.mockResolvedValueOnce(reply('{"isReceipt":true}'));
+    await extractReceiptData("/objects/x", "image/jpeg");
+    expect(create.mock.calls[2][0].messages[1].content[1].image_url.detail).toBeUndefined();
+  });
+
+  it("a small receipt that fails is not retried (no detail to drop)", async () => {
+    create.mockRejectedValueOnce(Object.assign(new Error("bad request"), { status: 400 }));
+    await expect(extractReceiptData("/objects/x", "image/jpeg")).rejects.toThrow("bad request");
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to the default detail when the gateway rejects it with 400", async () => {
     create.mockRejectedValueOnce(Object.assign(new Error("bad detail"), { status: 400 }));
     create.mockResolvedValueOnce(reply('{"isReceipt":true,"legible":true}'));
-    const data = await extractReceiptData("/objects/x", "image/jpeg");
+    const data = await extractReceiptData("/objects/x", "image/jpeg", { fullPageDocument: true });
+    expect(create.mock.calls[0][0].messages[1].content[1].image_url.detail).toBe("original");
     expect(create).toHaveBeenCalledTimes(2);
     expect(create.mock.calls[1][0].messages[1].content[1].image_url.detail).toBeUndefined();
     expect(data.legible).toBe(true);
@@ -102,10 +121,10 @@ describe("no guessing on hard-to-read photos", () => {
 
   it("does not retry other errors, and PDFs carry no detail", async () => {
     create.mockRejectedValueOnce(Object.assign(new Error("down"), { status: 503 }));
-    await expect(extractReceiptData("/objects/x", "image/jpeg")).rejects.toThrow("down");
+    await expect(extractReceiptData("/objects/x", "image/jpeg", { fullPageDocument: true })).rejects.toThrow("down");
     expect(create).toHaveBeenCalledTimes(1);
     create.mockResolvedValueOnce(reply('{"isReceipt":true}'));
-    const data = await extractReceiptData("/objects/x", "application/pdf");
+    const data = await extractReceiptData("/objects/x", "application/pdf", { fullPageDocument: true });
     expect(create.mock.calls[1][0].messages[1].content[1].type).toBe("file");
     expect(data.legible).toBeNull();
   });
