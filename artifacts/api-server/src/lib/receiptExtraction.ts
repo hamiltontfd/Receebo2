@@ -41,7 +41,15 @@ export type ExtractedReceipt = {
 };
 
 
-const SYSTEM_PROMPT = `You are an expert receipt and invoice analyst. You are given an image or PDF. First determine whether the image actually shows a purchase receipt, invoice, or proof of purchase. If it does not (e.g. it is a selfie, landscape photo, document, screenshot of something unrelated, or any non-purchase document), set "isReceipt" to false and leave all other fields as null or empty.
+/**
+ * Fiscal invoices printed as full A4 forms look like "documents" to the model.
+ * Without this note it rejected a Brazilian DANFE (NF-e) as "not a receipt".
+ */
+export const FISCAL_DOCUMENTS_NOTE = `Official tax invoices count as receipts even when they are full-page (A4) printed forms with many boxes, barcodes or QR codes, and even when the photo is tilted, folded or partly blurry. This includes: Brazilian "DANFE" / "NF-e" / "Nota Fiscal Eletrônica", "NFC-e", "Cupom Fiscal", "Nota Fiscal de Serviço" (NFS-e) — these show "CNPJ", "EMITENTE", "DESTINATÁRIO", "CHAVE DE ACESSO", "DADOS DOS PRODUTOS" and "VALOR TOTAL DA NOTA"; Portuguese "Fatura", "Fatura-Recibo", "Fatura Simplificada", "Recibo" (with NIF/ATCUD); and invoices from any other country. NOT receipts: price quotes or estimates ("Orçamento", "Proposta", "Quote"), unpaid payment slips on their own ("Boleto"), bank statements, contracts, ID documents, letters and forms with no purchase.`;
+
+export const SYSTEM_PROMPT = `You are an expert receipt and invoice analyst. You are given an image or PDF. First determine whether the image actually shows a purchase receipt, invoice, or proof of purchase. If it does not (e.g. it is a selfie, landscape photo, screenshot of something unrelated, or any non-purchase document), set "isReceipt" to false and leave all other fields as null or empty.
+
+${FISCAL_DOCUMENTS_NOTE}
 
 Respond ONLY with a JSON object matching this exact shape:
 {
@@ -74,6 +82,7 @@ Respond ONLY with a JSON object matching this exact shape:
 
 Rules:
 - Set "isReceipt" to false for any image that is not a purchase receipt, invoice, or proof of purchase. When false, all other fields should be null or empty arrays.
+- Brazilian DANFE / NF-e (and NFC-e, cupom fiscal, NFS-e): "merchant" is the issuer (EMITENTE, the company at the top, usually next to its CNPJ), NEVER the buyer (DESTINATÁRIO/REMETENTE). "purchaseDate" is "DATA DA EMISSÃO" (not "DATA DA SAÍDA/ENTRADA" nor a "vencimento" in FATURA/DUPLICATA). "total" is "VALOR TOTAL DA NOTA" (or "VALOR A PAGAR"). "transactionNumber" is the NF-e number ("Nº ... SÉRIE ..."). "currency" is "BRL" and "purchaseCountry" is "BR". Products come from "DADOS DOS PRODUTOS / SERVIÇOS" (DESCRIÇÃO, QUANT., VALOR TOTAL).
 - Use null for any field you genuinely cannot determine. Do not invent values.
 - purchaseDate: when a document shows several dates, prefer the transaction/order/issue date. A payment due date, billing period end or delivery date is never the purchase date.
 - "total" and "price" must be numbers (e.g. 12.99), never strings, and must not include currency symbols.
@@ -93,7 +102,9 @@ Rules:
     - "Apple AirPods Pro (2nd Generation) Wireless Earbuds, Up to 2X More Active Noise Cancelling, Adaptive Transparency, Personalized Spatial Audio, MagSafe Charging Case, Bluetooth Headphones for iPhone" → "Apple AirPods Pro 2nd Gen"
   * The full original text is preserved verbatim in "ocrText", so shortening the name here loses no information.`;
 
-const PRE_CHECK_SYSTEM_PROMPT = `You are a document classifier. Respond ONLY with a JSON object {"isReceipt":true} if the image shows a purchase receipt, invoice, or proof of purchase from a store or service provider. Respond with {"isReceipt":false} for anything else (photos, selfies, random documents, screenshots, menus, etc.). A valid receipt must show at least a merchant name, items purchased, and a total or subtotal amount.`;
+export const PRE_CHECK_SYSTEM_PROMPT = `You are a document classifier. Respond ONLY with a JSON object {"isReceipt":true} if the image shows a purchase receipt, invoice, or proof of purchase from a store or service provider. Respond with {"isReceipt":false} for anything else (photos, selfies, screenshots of unrelated things, menus, and non-purchase documents). A valid receipt shows a seller and an amount paid or due for what was bought; items may be hard to read.
+
+${FISCAL_DOCUMENTS_NOTE}`;
 
 export async function checkIsReceipt(
   objectPath: string,
