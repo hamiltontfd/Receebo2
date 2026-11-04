@@ -21,11 +21,17 @@ export function formatMoney(amount: number, currency?: string | null, locale: Fo
   return code ? `${fixed} ${code}` : fixed;
 }
 
-/** "26 Oct 2026" (en-GB, UTC; en-US: "Oct 26, 2026"). Accepts Date or "YYYY-MM-DD…" strings. */
+/**
+ * "26 Oct 2026" (en-GB, UTC; en-US: "Oct 26, 2026"); Portuguese: the long form
+ * "4 de janeiro de 2027" (pt-PT and pt-BR). The short-month pattern is not used
+ * for Portuguese because ICU renders pt-PT as "4/01/2027".
+ * Accepts Date or "YYYY-MM-DD…" strings.
+ */
 export function formatEmailDate(value: Date | string, locale: FormatLocale = "en"): string | null {
   const date = typeof value === "string"
     ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value)
     : value;
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(intlLocale(locale), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  const month = locale === "pt-PT" || locale === "pt-BR" ? "long" : "short";
+  return date.toLocaleDateString(intlLocale(locale), { day: "numeric", month, year: "numeric", timeZone: "UTC" });
 }

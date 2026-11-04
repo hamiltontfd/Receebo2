@@ -28,10 +28,12 @@ describe("lifecycle email copy (en, pt-PT, pt-BR)", () => {
     expect(noLinks.html).not.toContain("😀");
     const pt = renderTrialEndedEmail({ ...common, locale: "pt-PT", report: full, deletionDate, subscribeUrl: "https://app/s", ratingUrls });
     expect(pt.subject).toBe("Obrigado por experimentar o Receebo");
-    expect(pt.text).toContain("até 4/01/2027"); // Replit formatEmailDate: Node ICU renders pt-PT short month as 4/01/2027
+    expect(pt.text).toContain("até 4 de janeiro de 2027");
+    expect(pt.text).not.toContain("4/01/2027");
     expect(pt.html).toContain('lang="pt-PT"');
     const br = renderTrialEndedEmail({ ...common, locale: "pt-BR", report: full, deletionDate, subscribeUrl: "https://app/s", ratingUrls });
     expect(br.subject).toBe("Obrigado por testar o Receebo");
+    expect(br.text).toContain("4 de janeiro de 2027");
   });
 
   it("pt-PT is European Portuguese, never the Brazilian copy", () => {
