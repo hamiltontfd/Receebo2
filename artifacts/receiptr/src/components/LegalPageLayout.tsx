@@ -5,12 +5,15 @@ import { ArrowLeft } from "lucide-react";
 interface LegalPageLayoutProps {
   title: string;
   description: string;
+  /** Shown as "Effective {date}"; each document keeps its own date. */
+  effectiveDate?: string;
   children: React.ReactNode;
 }
 
 export function LegalPageLayout({
   title,
   description: _description,
+  effectiveDate = "30 August 2026",
   children,
 }: LegalPageLayoutProps) {
   return (
@@ -39,7 +42,7 @@ export function LegalPageLayout({
             {title}
           </h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            Effective 30 August 2026
+            Effective {effectiveDate}
           </p>
         </div>
 

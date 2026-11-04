@@ -5,6 +5,7 @@ export default function PrivacyPolicy() {
     <LegalPageLayout
       title="Privacy Policy"
       description="How Receebo collects, uses, stores, and protects personal data."
+      effectiveDate="4 November 2026"
     >
       <p>
         This Privacy Policy explains how Receebo handles personal data when you
@@ -292,7 +293,11 @@ export default function PrivacyPolicy() {
         transport, private object storage, encrypted email-connection
         credentials, limited
         OAuth scopes, and operational controls designed to protect personal
-        data. No online service can guarantee absolute security. Please use a
+        data. Receipt contents (summary, OCR text and product lines), email
+        imports awaiting your review, connected mailbox addresses and
+        push-notification keys are also encrypted at rest in our database,
+        with a key stored separately from it. No online service can guarantee
+        absolute security. Please use a
         secure account and notify Receebo if you suspect unauthorised access.
       </p>
 
