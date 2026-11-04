@@ -114,7 +114,7 @@ describe("action limits on real route entry points", () => {
     expect((await call("/mail/sync", other, {})).status).toBe(200);
     expect(fixture.outlook).toHaveBeenCalledWith(other);
   });
-  it("blocks upload before lock, URL creation or reservation, and validates guests", async () => {
+  it("blocks upload before lock, URL creation or reservation, and rejects guest tokens", async () => {
     expect((await call("/storage/uploads/request-url", user, uploadBody)).status).toBe(200);
     const blocked = await call("/storage/uploads/request-url", user, uploadBody, { "x-guest-id": guest });
     expect(blocked.status).toBe(429);
@@ -124,9 +124,12 @@ describe("action limits on real route entry points", () => {
     expect(intents.rows[0].n).toBe(1);
     const slots = await pool.query("SELECT count(*)::int n FROM trial_uploads WHERE user_id=$1", [user]);
     expect(slots.rows[0].n).toBe(0);
+    // Guest mode is off: neither an invented nor a registered guest token grants access.
     expect((await call("/storage/uploads/request-url", "", uploadBody, { "x-guest-id": "fake-guest" })).status).toBe(401);
-    expect((await call("/storage/uploads/request-url", "", uploadBody, { "x-guest-id": guest })).status).toBe(200);
-    expect((await call("/storage/uploads/request-url", "", uploadBody, { "x-guest-id": guest })).status).toBe(429);
+    expect((await call("/storage/uploads/request-url", "", uploadBody, { "x-guest-id": guest })).status).toBe(401);
+    expect(fixture.upload).toHaveBeenCalledOnce();
+    const guestIntents = await pool.query("SELECT count(*)::int n FROM upload_intents WHERE user_id=$1", [guest]);
+    expect(guestIntents.rows[0].n).toBe(0);
   });
   it("shares receipt-read budget across searches, detail, stats and private files", async () => {
     expect((await call("/receipts?q=test")).status).toBe(200);
@@ -138,6 +141,7 @@ describe("action limits on real route entry points", () => {
     }
     expect((await call("/receipts", other)).status).toBe(200);
     expect((await call("/receipts", "", undefined, { "x-guest-id": "invented" })).status).toBe(401);
+    expect((await call("/receipts", "", undefined, { "x-guest-id": guest })).status).toBe(401);
   });
   it("returns 503, not quota 429, on counter failure and never starts the action", async () => {
     const original = pool.query.bind(pool);

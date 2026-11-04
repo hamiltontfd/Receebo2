@@ -55,6 +55,7 @@ export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
 }
 
+/** Identity switch marker only (clears action waits); no header is sent. */
 export function setGuestId(id: string | null): void {
   if (_guestId !== id) clearActionCooldowns();
   _guestId = id;
@@ -374,10 +375,7 @@ export async function customFetch<T = unknown>(
     }
   }
 
-  // Attach guest-id header for guest mode sessions
-  if (_guestId && !headers.has("x-guest-id")) {
-    headers.set("x-guest-id", _guestId);
-  }
+  // Guest mode is off on the server: the x-guest-id header is never sent.
 
   const requestInfo = { method, url: resolveUrl(input) };
   const scope = actionScope(requestInfo.url, method);

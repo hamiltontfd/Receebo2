@@ -17,28 +17,9 @@ export interface GuestContextValue {
 
 const GuestContext = createContext<GuestContextValue | null>(null);
 
-async function issueGuestToken(): Promise<string> {
-  const existing = localStorage.getItem(GUEST_TOKEN_KEY);
-  if (existing) {
-    // Re-confirm the token still exists on the server (idempotent endpoint)
-    const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
-    const res = await fetch(`${base}/api/guest-session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: existing }),
-    });
-    if (res.ok) return existing;
-    // Token no longer valid — clear it and issue a fresh one
-    localStorage.removeItem(GUEST_TOKEN_KEY);
-  }
-
-  const base = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
-  const res = await fetch(`${base}/api/guest-session`, { method: "POST" });
-  if (!res.ok) throw new Error("Failed to create guest session");
-  const { guestToken } = (await res.json()) as { guestToken: string };
-  localStorage.setItem(GUEST_TOKEN_KEY, guestToken);
-  return guestToken;
-}
+// Guest mode is off on the server (POST /api/guest-session answers 410), so the
+// client never requests a guest session. An old token left in localStorage is
+// only read by GuestIdSync to claim its receipts after sign-in.
 
 export function clearGuestToken(): void {
   localStorage.removeItem(GUEST_TOKEN_KEY);
@@ -57,10 +38,8 @@ export function GuestProvider({ children }: { children: React.ReactNode }) {
   //   }
   // }, []);
 
-  const enterGuestMode = useCallback(async () => {
-    const token = await issueGuestToken();
-    setGuestUser({ id: token, name: "Guest", email: "guest@receebo.local" });
-  }, []);
+  // No-op: guest sessions can no longer be created.
+  const enterGuestMode = useCallback(async () => {}, []);
 
   const exitGuestMode = useCallback(() => {
     setGuestUser(null);

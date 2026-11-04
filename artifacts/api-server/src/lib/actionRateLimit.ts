@@ -2,11 +2,12 @@ import { createHash } from "node:crypto";
 import { pool } from "@workspace/db";
 import { logger } from "./logger";
 
-export type LimitedAction = "upload" | "receipt-read" | "mail-sync";
+export type LimitedAction = "upload" | "receipt-read" | "mail-sync" | "guest-claim";
 const defaults: Record<LimitedAction, [string, number]> = {
   upload: ["ACTION_UPLOAD_PER_MINUTE", 30],
   "receipt-read": ["ACTION_RECEIPT_READS_PER_MINUTE", 120],
   "mail-sync": ["ACTION_MAIL_SYNC_PER_MINUTE", 1],
+  "guest-claim": ["ACTION_GUEST_CLAIM_PER_MINUTE", 5],
 };
 export function actionLimit(action: LimitedAction): number {
   const [name, fallback] = defaults[action];

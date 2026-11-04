@@ -23,7 +23,6 @@ router.use(["/storage/objects", "/storage/uploads"], (_req, res, next) => {
   res.setHeader("Cache-Control", "private, no-store");
   res.vary("Cookie");
   res.vary("Authorization");
-  res.vary("x-guest-id");
   next();
 });
 

@@ -1,9 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db, guestSessionsTable, receiptsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
 import { logger } from "../lib/logger";
-import { guestSessionRateLimiter } from "../middlewares/guestSessionRateLimiter";
+import { actionRateLimiter } from "../middlewares/actionRateLimiter";
 import { requireAuth } from "../middlewares/requireAuth";
 import { lockUserDataMutation, withUserDataLock } from "../lib/userDataLock";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
@@ -12,37 +11,27 @@ import { accountTrialStatus, TRIAL_CAP_ERROR } from "../lib/accountTrial";
 import { trialUploadsTable } from "@workspace/db";
 
 const router: IRouter = Router();
+const guestClaimRateLimiter = actionRateLimiter("guest-claim");
 
-router.post("/guest-session", guestSessionRateLimiter, async (req, res): Promise<void> => {
-  try {
-    // Idempotent: if the client re-submits an existing token, confirm and return it
-    const submitted = typeof req.body?.token === "string" ? req.body.token : null;
-    if (submitted) {
-      const [existing] = await db
-        .select()
-        .from(guestSessionsTable)
-        .where(eq(guestSessionsTable.token, submitted))
-        .limit(1);
-      if (existing) {
-        res.status(200).json({ guestToken: existing.token });
-        return;
-      }
-    }
-
-    const token = randomUUID();
-    await db.insert(guestSessionsTable).values({ token });
-    res.status(201).json({ guestToken: token });
-  } catch (error) {
-    logger.error({ error }, "Failed to create guest session");
-    res.status(500).json({ error: "Failed to create guest session" });
-  }
+// Guest mode is switched off: no new guest sessions, nothing is created.
+router.post("/guest-session", (_req, res): void => {
+  res.status(410).json({
+    error: "Guest mode is no longer available. Create an account to start your free trial.",
+    code: "GUEST_MODE_DISABLED",
+  });
 });
 
-router.post("/guest-session/claim", requireAuth, requireCurrentLegalAcceptance, lockUserDataMutation(async (req, res): Promise<void> => {
+const MAX_GUEST_TOKEN_LENGTH = 128;
+
+// One-time move of an old guest's receipts into the signed-in account. Only a
+// token already in guest_sessions qualifies (server-issued UUIDs, plus legacy
+// guest-* ids seeded there in July 2026); the session row is deleted in the
+// same transaction, so each token can be claimed once.
+router.post("/guest-session/claim", requireAuth, requireCurrentLegalAcceptance, guestClaimRateLimiter, lockUserDataMutation(async (req, res): Promise<void> => {
   const clerkUserId = req.userId!;
 
   const guestToken = typeof req.body?.guestToken === "string" ? req.body.guestToken : null;
-  if (!guestToken) {
+  if (!guestToken || guestToken.length > MAX_GUEST_TOKEN_LENGTH || guestToken === clerkUserId) {
     // No token supplied — safe no-op
     res.sendStatus(204);
     return;
@@ -96,14 +85,14 @@ router.post("/guest-session/claim", requireAuth, requireCurrentLegalAcceptance, 
     });
 
     logger.info(
-      { clerkUserId, guestToken, count: updated.length },
+      { clerkUserId, count: updated.length },
       "Guest receipts migrated",
     );
 
     res.sendStatus(204);
     });
   } catch (error) {
-    logger.error({ error, clerkUserId, guestToken }, "Failed to claim guest session");
+    logger.error({ error, clerkUserId }, "Failed to claim guest session");
     res.status(500).json({ error: "Failed to claim guest session" });
   }
 }));
