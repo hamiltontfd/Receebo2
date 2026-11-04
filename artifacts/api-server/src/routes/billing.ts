@@ -13,7 +13,8 @@ import { clerkClient } from "@clerk/express";
 import { logger } from "../lib/logger";
 import { hasOwnerAccess } from "../lib/ownerAccess";
 import { billingOrigin } from "../lib/billingUrls";
-import { billingPriceId, billingPortalConfiguration } from "../lib/billingConfig";
+import { billingPriceId, billingPortalConfiguration, effectiveBillingCurrency, priceMatchesPlan, PLAN_AMOUNTS } from "../lib/billingConfig";
+import { getAccountMarket } from "../lib/accountMarket";
 
 const router: IRouter = Router();
 
@@ -24,6 +25,13 @@ async function getUserEmail(userId: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** Plan currency and amounts (minor units) for this account's market. */
+async function accountPricing(userId: string) {
+  const market = await getAccountMarket(userId).catch(() => null);
+  const currency = effectiveBillingCurrency(market);
+  return { currency, monthly: PLAN_AMOUNTS[currency].monthly, yearly: PLAN_AMOUNTS[currency].yearly };
 }
 
 /** GET /billing/subscription — current user's plan status */
@@ -48,6 +56,7 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
       cancelAtPeriodEnd: status.cancelAtPeriodEnd,
       ownerAccess: status.ownerAccess === true,
       hasBillingAccount: status.hasBillingAccount === true,
+      pricing: await accountPricing(req.userId!),
     });
   } catch (err) {
     logger.error({ err }, "billing: failed to get subscription status");
@@ -93,12 +102,13 @@ router.post("/billing/start-trial", requireAuth, requireCurrentLegalAcceptance,
     const status = await getSubscriptionStatus(req.userId!);
     if (status.accessState === "not_started") {
       const startedAt = new Date();
+      const market = await getAccountMarket(req.userId!).catch(() => null);
       await db.insert(accountTrialsTable).values({
         userId: req.userId!,
         startedAt,
         endsAt: new Date(startedAt.getTime() + TRIAL_DURATION_MS),
-        monthlyPriceId: billingPriceId("monthly"),
-        yearlyPriceId: billingPriceId("yearly"),
+        monthlyPriceId: billingPriceId("monthly", market),
+        yearlyPriceId: billingPriceId("yearly", market),
       }).onConflictDoNothing();
     }
     res.json({ started: true });
@@ -128,7 +138,8 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
       return;
     }
     const interval = planType as "monthly" | "yearly";
-    const priceId = billingPriceId(interval);
+    const market = await getAccountMarket(userId).catch(() => null);
+    const priceId = billingPriceId(interval, market);
     if (!priceId) {
       res.status(503).json({ error: "Stripe price IDs are not configured yet" });
       return;
@@ -144,12 +155,21 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
     // Reject mixed-mode or wrong-interval prices before creating a customer.
     const [eligibility] = await db.select().from(accountTrialsTable)
       .where(eq(accountTrialsTable.userId, userId));
-    const protectedPriceId = (planType === "yearly" ? eligibility?.yearlyPriceId : eligibility?.monthlyPriceId) ?? priceId;
-    const price = await stripe.prices.retrieve(protectedPriceId);
+    // A saved founding price is kept when its currency matches the account's market
+    // currency; otherwise (e.g. a BR account frozen on EUR before BRL existed) the
+    // market's founding price is used. Founding eligibility itself is unchanged.
+    const wantCurrency = effectiveBillingCurrency(market).toLowerCase();
+    const savedPriceId = planType === "yearly" ? eligibility?.yearlyPriceId : eligibility?.monthlyPriceId;
+    let protectedPriceId = savedPriceId ?? priceId;
+    let price = await stripe.prices.retrieve(protectedPriceId);
+    if (savedPriceId && price.currency !== wantCurrency && savedPriceId !== priceId) {
+      protectedPriceId = priceId;
+      price = await stripe.prices.retrieve(protectedPriceId);
+    }
     const expectedInterval = planType === "yearly" ? "year" : "month";
     if (!price.active || price.livemode !== (process.env.NODE_ENV === "production") ||
       price.recurring?.interval !== expectedInterval || price.recurring.interval_count !== 1 ||
-      price.currency !== "eur" || price.unit_amount !== (planType === "yearly" ? 2499 : 299)) {
+      !priceMatchesPlan(price, interval)) {
       res.status(503).json({ error: "Stripe price does not match the configured plan and environment" });
       return;
     }
@@ -194,8 +214,8 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
     // Abandoning checkout never removes founding eligibility.
     if (eligibility) {
       await db.update(accountTrialsTable).set({
-        monthlyPriceId: eligibility.monthlyPriceId ?? (planType === "monthly" ? protectedPriceId : billingPriceId("monthly")),
-        yearlyPriceId: eligibility.yearlyPriceId ?? (planType === "yearly" ? protectedPriceId : billingPriceId("yearly")),
+        monthlyPriceId: eligibility.monthlyPriceId ?? (planType === "monthly" ? protectedPriceId : billingPriceId("monthly", market)),
+        yearlyPriceId: eligibility.yearlyPriceId ?? (planType === "yearly" ? protectedPriceId : billingPriceId("yearly", market)),
       }).where(eq(accountTrialsTable.userId, userId));
     }
     const openSessions = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 100 });
