@@ -41,6 +41,7 @@ function normalizeCategoryPatch(value: string | null | undefined): string | unde
 
 import { deliveryDateError } from "../lib/returnWindowCalc";
 import { refreshWarrantyExpiries } from "../lib/warrantyExpiryStore";
+import { receiptSearchCondition, searchReceipts } from "../lib/receiptSearch";
 import { afterReceiptCursor, decodeReceiptCursor, encodeReceiptCursor, receiptListOrder } from "../lib/receiptOrder";
 const router: IRouter = Router();
 
@@ -59,17 +60,11 @@ router.get("/receipts", requireAuthOrGuest, receiptReadRateLimiter, async (req, 
   ];
 
   if (isSearch) {
-    const term = `%${q}%`;
-    const search = or(
-      ilike(receiptsTable.merchant, term),
-      ilike(receiptsTable.category, term),
-      ilike(receiptsTable.summary, term),
-      ilike(receiptsTable.ocrText, term),
-      ilike(receiptsTable.originalFileName, term),
-      ilike(receiptsTable.currency, term),
-      sql`${receiptsTable.products}::text ILIKE ${term}`,
-      sql`${receiptsTable.notableItems}::text ILIKE ${term}`,
-    );
+    // Plaintext columns are matched in SQL as before. Content columns that may
+    // be encrypted (summary, ocr_text, products, notable_items) match in SQL
+    // only while still plaintext; rows holding any encrypted one are loaded
+    // and matched in memory after decryption (lib/receiptSearch.ts).
+    const search = receiptSearchCondition(q);
     if (search) conditions.push(search);
   } else {
     // Cursor pagination: items after the last one of the previous page.
@@ -81,12 +76,14 @@ router.get("/receipts", requireAuthOrGuest, receiptReadRateLimiter, async (req, 
   // For search: fetch all matches. For paginated: fetch limit+1 to detect next page.
   const fetchLimit = isSearch ? 10000 : limit + 1;
 
-  const rows = await db
-    .select()
-    .from(receiptsTable)
-    .where(and(...conditions))
-    .orderBy(...receiptListOrder)
-    .limit(fetchLimit);
+  const rows = isSearch
+    ? await searchReceipts(q, conditions, fetchLimit)
+    : await db
+      .select()
+      .from(receiptsTable)
+      .where(and(...conditions))
+      .orderBy(...receiptListOrder)
+      .limit(fetchLimit);
 
   if (isSearch) {
     res.json({ items: ListReceiptsResponse.parse(rows), nextCursor: null });

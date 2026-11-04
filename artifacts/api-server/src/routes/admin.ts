@@ -4,6 +4,7 @@ import { and, eq, ilike } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { receiptsTable, type ReceiptProductItem, type ReceiptNotableItem } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { secretMatches } from "../lib/secretCompare";
 import { runTrialReminderSweep } from "../lib/orphanCleanup";
 
 const router: IRouter = Router();
@@ -16,8 +17,8 @@ function requireAdminSecret(req: Request, res: Response, next: NextFunction): vo
     return;
   }
 
-  const provided = req.headers["x-admin-secret"];
-  if (!provided || provided !== adminSecret) {
+  // Constant-time (hash + timingSafeEqual): no content or length leak.
+  if (!secretMatches(req.headers["x-admin-secret"], adminSecret)) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }

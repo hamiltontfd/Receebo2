@@ -5,6 +5,7 @@ import {
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
+import { encryptedText } from "../encryptedColumns";
 
 /**
  * Per-user mailbox connections for providers other than Gmail (Gmail keeps
@@ -21,7 +22,7 @@ export const emailConnectionsTable = pgTable(
     userId: text("user_id").notNull(),
     /** outlook (future: other providers) */
     provider: text("provider").notNull(),
-    accountEmail: text("account_email"),
+    accountEmail: encryptedText("account_email", "email_connections.account_email"),
     accessToken: text("access_token"),
     refreshToken: text("refresh_token").notNull(),
     tokenExpiry: timestamp("token_expiry", { withTimezone: true }),

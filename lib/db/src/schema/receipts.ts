@@ -10,6 +10,7 @@ import {
   boolean,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
+import { encryptedJsonb, encryptedText } from "../encryptedColumns";
 import { z } from "zod/v4";
 
 export type ReceiptProductItem = {
@@ -41,11 +42,12 @@ export const receiptsTable = pgTable("receipts", {
   total: doublePrecision("total"),
   currency: text("currency"),
   category: text("category"),
-  summary: text("summary"),
-  ocrText: text("ocr_text"),
+  /** Encrypted at rest when DATA_ENCRYPTION_KEY is set (docs/data-encryption.md). */
+  summary: encryptedText("summary", "receipts.summary"),
+  ocrText: encryptedText("ocr_text", "receipts.ocr_text"),
   transactionNumber: text("transaction_number"),
-  products: jsonb("products").$type<ReceiptProductItem[]>().notNull().default([]),
-  notableItems: jsonb("notable_items").$type<ReceiptNotableItem[]>().notNull().default([]),
+  products: encryptedJsonb<ReceiptProductItem[]>("products", "receipts.products", []).notNull().default([]),
+  notableItems: encryptedJsonb<ReceiptNotableItem[]>("notable_items", "receipts.notable_items", []).notNull().default([]),
   purchaseCountry: text("purchase_country"),
   isOnlinePurchase: boolean("is_online_purchase"),
   /**

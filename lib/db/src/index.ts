@@ -22,4 +22,5 @@ export const advisoryLockPool = guardPoolErrors(
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";
+export * from "./fieldCrypto";
 export { guardPoolErrors, connectGuarded, type GuardedClient, type PoolErrorLog } from "./poolErrors";

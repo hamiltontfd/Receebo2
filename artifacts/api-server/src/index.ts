@@ -7,7 +7,9 @@ import { isOutlookConfigured } from "./lib/outlookSync";
 import { isMailProviderEnabled } from "./lib/mailProviders/config";
 import { encryptToken, decryptToken } from "./lib/tokenCrypto";
 import { sql, eq } from "drizzle-orm";
-import { db, gmailConnectionsTable } from "@workspace/db";
+import { db, gmailConnectionsTable, setFieldCryptoLogger, hasDataEncryptionKey, currentDataKeyId } from "@workspace/db";
+import { runDataEncryptionBackfill } from "./lib/dataEncryptionBackfill";
+import { logDatabaseTls } from "./lib/dbTls";
 import { spawn } from "child_process";
 import { fileURLToPath } from "node:url";
 import { billingOrigin } from "./lib/billingUrls";
@@ -42,6 +44,10 @@ process.on("unhandledRejection", (reason) => {
     "Unhandled promise rejection",
   );
 });
+
+// Content field encryption (docs/data-encryption.md) logs through pino:
+// field name, key id and fingerprint only, never content.
+setFieldCryptoLogger((level, message, details) => logger[level](details ?? {}, message));
 
 const rawPort = process.env["PORT"];
 
@@ -440,6 +446,9 @@ async function initStripe(): Promise<void> {
 }
 
 async function start(): Promise<void> {
+  await logDatabaseTls();
+  if (hasDataEncryptionKey()) logger.info({ keyId: currentDataKeyId() }, "Content field encryption on");
+  else logger.warn("DATA_ENCRYPTION_KEY not set: content fields are stored in plaintext (as before)");
   // Apply schema migrations synchronously before accepting requests
   await runStartupMigrations();
   await migrateTrialFunnel();
@@ -528,6 +537,8 @@ async function start(): Promise<void> {
       );
     }
     void initStripe();
+    // Encrypt content fields still in plaintext (only with DATA_ENCRYPTION_KEY; one instance; counts only).
+    void runDataEncryptionBackfill();
   });
 }
 

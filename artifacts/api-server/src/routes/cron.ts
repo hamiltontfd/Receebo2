@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { secretMatches } from "../lib/secretCompare";
 import { runDailyMaintenanceIfDue } from "../lib/orphanCleanup";
 import { runOutlookSweep } from "../lib/outlookSync";
 import { logger } from "../lib/logger";
@@ -32,10 +32,7 @@ const router: IRouter = Router();
 
 /** Constant-time comparison (hashes first so lengths never leak). */
 export function cronSecretMatches(provided: unknown, expected: string | undefined): boolean {
-  if (!expected || typeof provided !== "string" || provided.length === 0) return false;
-  const a = createHash("sha256").update(provided).digest();
-  const b = createHash("sha256").update(expected).digest();
-  return timingSafeEqual(a, b);
+  return secretMatches(provided, expected);
 }
 
 /** 503 when CRON_SECRET is not set, 401 on a missing or wrong header. */

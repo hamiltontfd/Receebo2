@@ -7,6 +7,7 @@ import {
   jsonb,
   unique,
 } from "drizzle-orm/pg-core";
+import { encryptedJsonb, encryptedText } from "../encryptedColumns";
 
 export type PendingImportExtractionData = {
   merchant: string | null;
@@ -48,7 +49,7 @@ export type PendingImportExtractionData = {
  */
 export const gmailConnectionsTable = pgTable("gmail_connections", {
   userId: text("user_id").primaryKey(),
-  gmailEmail: text("gmail_email"),
+  gmailEmail: encryptedText("gmail_email", "gmail_connections.gmail_email"),
   accessToken: text("access_token"),
   refreshToken: text("refresh_token").notNull(),
   tokenExpiry: timestamp("token_expiry", { withTimezone: true }),
@@ -107,7 +108,7 @@ export const pendingImportsTable = pgTable(
     /** processing | pending | approved | dismissed */
     status: text("status").notNull().default("pending"),
     approvedReceiptId: integer("approved_receipt_id"),
-    extractionData: jsonb("extraction_data").$type<PendingImportExtractionData>(),
+    extractionData: encryptedJsonb<PendingImportExtractionData | null>("extraction_data", "pending_imports.extraction_data", null),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

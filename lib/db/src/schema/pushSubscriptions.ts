@@ -1,4 +1,5 @@
 import { pgTable, serial, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { encryptedText } from "../encryptedColumns";
 
 export const pushSubscriptionsTable = pgTable(
   "push_subscriptions",
@@ -6,8 +7,8 @@ export const pushSubscriptionsTable = pgTable(
     id: serial("id").primaryKey(),
     userId: text("user_id").notNull(),
     endpoint: text("endpoint").notNull(),
-    p256dh: text("p256dh").notNull(),
-    auth: text("auth").notNull(),
+    p256dh: encryptedText("p256dh", "push_subscriptions.p256dh", "").notNull(),
+    auth: encryptedText("auth", "push_subscriptions.auth", "").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
