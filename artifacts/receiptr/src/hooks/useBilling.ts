@@ -22,8 +22,6 @@ export const BILLING_QUERY_KEY = ["billing", "subscription"] as const;
 export const BILLING_POLL_MS = 10_000;
 export const TRIAL_UPLOAD_LIMIT = TRIAL_RECEIPT_LIMIT;
 export const TRIAL_DAYS = TRIAL_LENGTH_DAYS;
-export const MONTHLY_PRICE = "€2.99";
-export const YEARLY_PRICE = "€24.99";
 
 export type AccessState =
   | "not_started"
@@ -49,6 +47,8 @@ export type BillingStatus = SubscriptionStatus & {
   reviewReceiptId?: number | null;
   /** Frozen accounts only: when the data will be deleted (ISO). */
   dataDeletionAt?: string | null;
+  /** Plan currency and amounts (minor units) for this account's market. */
+  pricing?: { currency: string; monthly: number; yearly: number };
 };
 
 const ACCESS_STATES: AccessState[] = [

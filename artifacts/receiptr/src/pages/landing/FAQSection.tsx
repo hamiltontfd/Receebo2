@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { usePlanPrices } from "@/hooks/usePlanPrices";
 import {
   Accordion,
   AccordionContent,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/availableMailProviders";
 import { lt } from "@/lib/landingLocale";
 
-function buildFaqs(providers: AvailableMailProvider[]) {
+function buildFaqs(providers: AvailableMailProvider[], { monthly: m, yearly: y }: Record<"monthly" | "yearly", string>) {
   const inbox = lInboxPhrase(providers);
   const accountsNote = lAccountsNote(providers);
   return [
@@ -61,24 +62,25 @@ function buildFaqs(providers: AvailableMailProvider[]) {
   {
     q: lt("How does the free trial work?", "Como funciona o período experimental gratuito?", "Como funciona o teste grátis?"),
     a: lt(
-      "Create an account and accept the Terms, and your trial starts. No card is needed. It lasts 15 days and you can add up to 5 receipts, by upload or email import. After your 5th receipt you can still view, search and export everything, and get warranty and return alerts, until day 15. Nothing is charged automatically. To keep going, choose €2.99/month or €24.99/year; you're charged when you subscribe. You can also upgrade early from Settings.",
-      "Cria uma conta e aceita os Termos, e o período experimental começa. Não é preciso cartão. Dura 15 dias e podes adicionar até 5 recibos, por carregamento ou importação de email. Depois do 5.º recibo continuas a poder ver, pesquisar e exportar tudo, e a receber alertas de garantia e devolução, até ao dia 15. Nada é cobrado automaticamente. Para continuar, escolhe €2.99/mês ou €24.99/ano; és cobrado quando subscreves. Também podes fazer upgrade mais cedo nas Definições.",
-      "Crie uma conta e aceite os Termos, e o teste começa. Não precisa de cartão. Dura 15 dias e você pode adicionar até 5 recibos, por envio ou importação de e-mail. Depois do 5º recibo você ainda pode ver, pesquisar e exportar tudo, e receber alertas de garantia e devolução, até o dia 15. Nada é cobrado automaticamente. Para continuar, escolha €2.99/mês ou €24.99/ano; a cobrança acontece quando você assina. Também pode fazer upgrade antes nas Configurações.",
+      `Create an account and accept the Terms, and your trial starts. No card is needed. It lasts 15 days and you can add up to 5 receipts, by upload or email import. After your 5th receipt you can still view, search and export everything, and get warranty and return alerts, until day 15. Nothing is charged automatically. To keep going, choose ${m}/month or ${y}/year; you're charged when you subscribe. You can also upgrade early from Settings.`,
+      `Cria uma conta e aceita os Termos, e o período experimental começa. Não é preciso cartão. Dura 15 dias e podes adicionar até 5 recibos, por carregamento ou importação de email. Depois do 5.º recibo continuas a poder ver, pesquisar e exportar tudo, e a receber alertas de garantia e devolução, até ao dia 15. Nada é cobrado automaticamente. Para continuar, escolhe ${m}/mês ou ${y}/ano; és cobrado quando subscreves. Também podes fazer upgrade mais cedo nas Definições.`,
+      `Crie uma conta e aceite os Termos, e o teste começa. Não precisa de cartão. Dura 15 dias e você pode adicionar até 5 recibos, por envio ou importação de e-mail. Depois do 5º recibo você ainda pode ver, pesquisar e exportar tudo, e receber alertas de garantia e devolução, até o dia 15. Nada é cobrado automaticamente. Para continuar, escolha ${m}/mês ou ${y}/ano; a cobrança acontece quando você assina. Também pode fazer upgrade antes nas Configurações.`,
     ),
   },
   {
     q: lt("What are founding prices?", "O que são preços de fundador?"),
     a: lt(
-      "€2.99/month and €24.99/year are founding prices. They stay available to you for as long as your account exists, including if you cancel and subscribe again later.",
-      "€2.99/mês e €24.99/ano são preços de fundador. Mantêm-se disponíveis para ti enquanto a tua conta existir, mesmo que canceles e voltes a subscrever mais tarde.",
-      "€2.99/mês e €24.99/ano são preços de fundador. Continuam disponíveis para você enquanto sua conta existir, mesmo se cancelar e assinar de novo depois.",
+      `${m}/month and ${y}/year are founding prices. They stay available to you for as long as your account exists, including if you cancel and subscribe again later.`,
+      `${m}/mês e ${y}/ano são preços de fundador. Mantêm-se disponíveis para ti enquanto a tua conta existir, mesmo que canceles e voltes a subscrever mais tarde.`,
+      `${m}/mês e ${y}/ano são preços de fundador. Continuam disponíveis para você enquanto sua conta existir, mesmo se cancelar e assinar de novo depois.`,
     ),
   },
 ];
 }
 
 export default function FAQSection() {
-  const faqs = buildFaqs(useAvailableMailProviders());
+  const { prices } = usePlanPrices();
+  const faqs = buildFaqs(useAvailableMailProviders(), prices);
   return (
     <section className="py-24 lg:py-32">
       <div className="max-w-3xl mx-auto px-6">

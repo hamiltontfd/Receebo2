@@ -3,7 +3,8 @@ import { appText } from "@/lib/appCopy";
 import { useAppLocale } from "@/lib/locale";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCreateCheckout, MONTHLY_PRICE, YEARLY_PRICE } from "@/hooks/useBilling";
+import { useCreateCheckout } from "@/hooks/useBilling";
+import { usePlanPrices } from "@/hooks/usePlanPrices";
 
 export const PAID_FEATURES = [
   "Unlimited receipt scans",
@@ -30,9 +31,10 @@ const fadeUp = {
 export function PlanChoice({ founding }: { founding: boolean }) {
   useAppLocale();
   const checkout = useCreateCheckout();
+  const { prices } = usePlanPrices();
   const plans = [
-    { key: "monthly" as const, name: "Monthly", price: MONTHLY_PRICE, period: "/ month", highlight: false },
-    { key: "yearly" as const, name: "Yearly", price: YEARLY_PRICE, period: "/ year", highlight: true },
+    { key: "monthly" as const, name: "Monthly", price: prices.monthly, period: "/ month", highlight: false },
+    { key: "yearly" as const, name: "Yearly", price: prices.yearly, period: "/ year", highlight: true },
   ];
   const pending = checkout.isPending ? checkout.variables : null;
 

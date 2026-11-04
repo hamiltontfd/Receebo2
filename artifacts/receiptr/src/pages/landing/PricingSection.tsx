@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
 import { cn } from "@/lib/utils";
 import { lt } from "@/lib/landingLocale";
-import { PUBLIC_PLANS, formatPublicPrice } from "@/lib/publicPricing";
+import { PUBLIC_PLANS } from "@/lib/publicPricing";
+import { usePlanPrices } from "@/hooks/usePlanPrices";
 
 const getFeatures = () => [
   lt("Unlimited scans", "Digitalizações ilimitadas"),
@@ -17,10 +18,10 @@ const getFeatures = () => [
   lt("Priority processing", "Processamento prioritário"),
 ];
 
-const getPlans = () => PUBLIC_PLANS.map((plan) => ({
+const getPlans = (prices: Record<"monthly" | "yearly", string>) => PUBLIC_PLANS.map((plan) => ({
     key: plan.key,
     name: plan.key === "monthly" ? lt("Monthly", "Mensal") : lt("Yearly", "Anual"),
-    price: formatPublicPrice(plan),
+    price: prices[plan.key],
     period: plan.key === "monthly" ? lt("/month", "/mês") : lt("/year", "/ano"),
     badge: null,
     highlight: plan.key === "yearly",
@@ -30,7 +31,8 @@ export default function PricingSection({ checkout }: {
   checkout?: { mutate: (plan: "monthly" | "yearly") => void; isPending: boolean };
 }) {
   const features = getFeatures();
-  const plans = getPlans();
+  const { prices } = usePlanPrices();
+  const plans = getPlans(prices);
 
   return (
     <section className="py-24 lg:py-32 bg-muted/20">

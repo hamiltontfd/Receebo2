@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { Check, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TRIAL_UPLOAD_LIMIT } from "@/hooks/useBilling";
+import { usePlanPrices } from "@/hooks/usePlanPrices";
 
 const FEATURES = [
   "Unlimited receipt scans",
@@ -27,6 +28,7 @@ const fadeUp = {
 };
 
 export default function GetStarted() {
+  const { prices } = usePlanPrices();
   useAppLocale();
   const { isSignedIn } = useAuth();
   const [, setLocation] = useLocation();
@@ -95,7 +97,7 @@ export default function GetStarted() {
             <div>
               <p className="font-bold text-lg tracking-tight">{appText("Pro Monthly")}</p>
               <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-4xl font-bold font-mono tracking-tight">€2.99</span>
+                <span className="text-4xl font-bold font-mono tracking-tight">{prices.monthly}</span>
                 <span className="text-sm text-muted-foreground">{appText("/ month")}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">{appText("Founding price, charged when you subscribe")}</p>
@@ -141,7 +143,7 @@ export default function GetStarted() {
             <div>
               <p className="font-bold text-lg tracking-tight mb-1">{appText("Pro Yearly")}</p>
               <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-4xl font-bold font-mono tracking-tight">€24.99</span>
+                <span className="text-4xl font-bold font-mono tracking-tight">{prices.yearly}</span>
                 <span className="text-sm opacity-70">{appText("/ year")}</span>
               </div>
               <p className="text-xs opacity-60 mt-1">{appText("Founding price, charged when you subscribe")}</p>

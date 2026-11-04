@@ -93,7 +93,8 @@ export default function TermsOfService() {
         <li>
           A paid subscription starts only when you explicitly choose a plan
           and complete checkout. Founding prices are €2.99 per month or €24.99
-          per year, charged when you subscribe, with no separate paid-plan
+          per year (R$20.00 per month or R$200.00 per year for accounts in
+          the Brazil market), charged when you subscribe, with no separate paid-plan
           trial. Founding prices remain available to you for as long as your
           account exists, including if you cancel and resubscribe later.
         </li>
