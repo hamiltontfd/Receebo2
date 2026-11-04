@@ -1,11 +1,11 @@
 import { formatEmailDate, formatMoney } from "./emailFormat";
 import type { EmailLocale } from "./emailLocale";
 import {
-  reminderItemNames, ITEM_MAX_CHARS, type ReminderMessage,
+  reminderItemNames, reminderPushBody, renderReturnReminder, renderWarrantyReminder, ITEM_MAX_CHARS, type ReminderMessage,
   type ReturnReminderInput, type WarrantyReminderInput,
 } from "./reminderCopy";
 
-/** Email-only translations. The existing push copy and scheduling stay unchanged.
+/** Email and push translations (pt-PT, pt-BR); English copy lives in reminderCopy.ts.
  * No legal inference: kind/basis/windowDays and deadlines come from the receipt. */
 function parts(input: ReturnReminderInput | WarrantyReminderInput, locale: EmailLocale) {
   const names = reminderItemNames(input).map(n => n.length > ITEM_MAX_CHARS ? `${n.slice(0, ITEM_MAX_CHARS - 1).trimEnd()}…` : n);
@@ -67,4 +67,37 @@ export function localizedWarrantyReminder(input: WarrantyReminderInput, locale: 
       : null,
     footer: `Recebe esta mensagem porque os lembretes de garantia estão ${locale === "pt-BR" ? "ativados" : "ativos"}.`,
   };
+}
+
+export interface PushCopy { title: string; body: string }
+
+function ptPushBody(input: ReturnReminderInput | WarrantyReminderInput, locale: EmailLocale): string {
+  const p = parts(input, locale);
+  const merchant = p.merchant || null;
+  const noItem = merchant ? `Compra em ${merchant}` : locale === "pt-BR" ? "Sua compra" : "A sua compra";
+  return reminderPushBody(p.item ?? null, p.amount, merchant, noItem);
+}
+
+/**
+ * Return-window push in the account's language (same resolution as emails:
+ * Settings choice, else detected browser language, else English). English is
+ * the existing copy, unchanged (en-US for US accounts).
+ */
+export function returnReminderPush(input: ReturnReminderInput, locale: EmailLocale): PushCopy {
+  if (locale === "en") return renderReturnReminder(input).push;
+  const days = Math.max(0, Math.floor(input.daysRemaining));
+  const title = days <= 0
+    ? "Último dia para devolver"
+    : days === 1
+      ? "O prazo de devolução termina amanhã"
+      : `O prazo de devolução termina em ${days} dias`;
+  return { title, body: ptPushBody(input, locale) };
+}
+
+/** Warranty push in the account's language; English unchanged. */
+export function warrantyReminderPush(input: WarrantyReminderInput, locale: EmailLocale): PushCopy {
+  if (locale === "en") return renderWarrantyReminder(input).push;
+  const date = formatEmailDate(input.expiresOn, locale) ?? input.expiresOn;
+  const label = input.kind === "legal" ? "Garantia legal" : "Garantia do fabricante";
+  return { title: `${label} termina em ${date}`, body: ptPushBody(input, locale) };
 }

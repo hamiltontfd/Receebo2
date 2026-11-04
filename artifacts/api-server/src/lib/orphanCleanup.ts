@@ -30,10 +30,33 @@ function reminderAccessChecker(): (userId: string) => Promise<boolean> {
 }
 import { sendPushNotification } from "./pushNotifications";
 import { calcReturnWindow } from "./returnWindowCalc";
-import { renderReturnReminder, renderWarrantyReminder } from "./reminderCopy";
+import { returnReminderPush, warrantyReminderPush } from "./reminderEmailCopy";
+import { getUserEmailLocale, type EmailLocale } from "./emailLocale";
 import { runDataRetentionSweep } from "./accountLifecycle";
 import { syncWarrantyExpiries, warrantyInputColumns } from "./warrantyExpiryStore";
 import { accountRegionLookup } from "./accountMarket";
+
+/**
+ * Push language per sweep: the same account language as emails (Settings
+ * choice, else detected browser language, else English). A failed lookup
+ * returns null so the push is not claimed and the next run retries, instead
+ * of sending in the wrong language.
+ */
+function pushLocaleLookup(): (userId: string) => Promise<EmailLocale | null> {
+  const cache = new Map<string, EmailLocale>();
+  return async (userId: string) => {
+    const cached = cache.get(userId);
+    if (cached) return cached;
+    try {
+      const locale = await getUserEmailLocale(userId);
+      cache.set(userId, locale);
+      return locale;
+    } catch (err) {
+      logger.warn({ err, userId }, "Push language lookup failed; push retried next run");
+      return null;
+    }
+  };
+}
 
 const ORPHAN_AGE_THRESHOLD_DAYS = 7;
 const ORPHAN_AGE_THRESHOLD_MS = ORPHAN_AGE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
@@ -204,6 +227,7 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
   }
 
   const hasAccess = reminderAccessChecker();
+  const localeOf = pushLocaleLookup();
   const regionOf = accountRegionLookup();
   let sent = 0;
   let failed = 0;
@@ -277,7 +301,8 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
           }
         }
       }
-      if (pushPrev !== due) {
+      const pushLocale = pushPrev !== due ? await localeOf(r.userId) : null;
+      if (pushPrev !== due && pushLocale) {
         const column = kind === "legal" ? receiptsTable.legalWarrantyPushSentFor : receiptsTable.manufacturerWarrantyPushSentFor;
         const mark = (value: string | null) => kind === "legal"
           ? { legalWarrantyPushSentFor: value }
@@ -288,7 +313,7 @@ export async function runWarrantyReminderSweep(now = new Date()): Promise<{ sent
           .where(and(eq(receiptsTable.id, r.id), pushPrev === null ? isNull(column) : eq(column, pushPrev)))
           .returning({ id: receiptsTable.id });
         if (claimed.length > 0) {
-          const { push } = renderWarrantyReminder(reminder);
+          const push = warrantyReminderPush(reminder, pushLocale);
           const pushed = await sendPushNotification(r.userId, { ...push, receiptId: r.id });
           if (!pushed) {
             await db.update(receiptsTable).set(mark(pushPrev))
@@ -542,6 +567,7 @@ export async function runReturnWindowSweep(): Promise<void> {
   let skippedOptOut = 0;
   let skippedNoAccess = 0;
   const hasAccess = reminderAccessChecker();
+  const localeOf = pushLocaleLookup();
   const regionOf = accountRegionLookup();
 
   for (const r of receipts) {
@@ -670,7 +696,8 @@ export async function runReturnWindowSweep(): Promise<void> {
     // --- 2-day and 1-day push alerts ---
     // Push delivery has its own deduplication markers so email preferences do
     // not accidentally suppress browser notifications.
-    const shouldSendPush = needsPush1d || needsPush2d;
+    const pushLocale = needsPush1d || needsPush2d ? await localeOf(r.userId) : null;
+    const shouldSendPush = (needsPush1d || needsPush2d) && pushLocale !== null;
     const pushField = needsPush1d
       ? receiptsTable.returnPushSent1dAt
       : receiptsTable.returnPushSent2dAt;
@@ -686,7 +713,7 @@ export async function runReturnWindowSweep(): Promise<void> {
         .returning({ id: receiptsTable.id });
 
       if (claimed.length > 0) {
-        const { push } = renderReturnReminder({ ...reminder, deadline: deadlineDate });
+        const push = returnReminderPush({ ...reminder, deadline: deadlineDate }, pushLocale!);
         const sent = await sendPushNotification(r.userId, { ...push, receiptId: r.id });
         if (!sent) {
           await db

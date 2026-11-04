@@ -70,6 +70,19 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * Push body: "{Item} · {Amount} · {Merchant}" cut to ~60 chars, or, without a
+ * product name, "{noItem} · {Amount}" (noItem is already localized).
+ */
+export function reminderPushBody(item: string | null, amount: string | null, merchant: string | null, noItem: string): string {
+  if (item) {
+    const tail = [amount, merchant].filter(Boolean).join(" · ");
+    const room = PUSH_BODY_MAX_CHARS - (tail ? tail.length + 3 : 0);
+    return [cut(item, Math.max(12, room)), tail || null].filter(Boolean).join(" · ");
+  }
+  return [noItem, amount].filter(Boolean).join(" · ");
+}
+
 interface Parts {
   item: string | null;
   /** {Item} or "your {Merchant} purchase". */
@@ -90,14 +103,7 @@ function parts(p: ReminderPurchase): Parts {
   const fallback = merchant ? `your ${merchant} purchase` : "your purchase";
   const where = [merchant, bought ? `bought ${bought}` : null].filter(Boolean).join(", ");
   const itemLine = [itemsPhrase(names), amount, where || null].filter(Boolean).join(" · ");
-  let pushBody: string;
-  if (item) {
-    const tail = [amount, merchant].filter(Boolean).join(" · ");
-    const room = PUSH_BODY_MAX_CHARS - (tail ? tail.length + 3 : 0);
-    pushBody = [cut(item, Math.max(12, room)), tail || null].filter(Boolean).join(" · ");
-  } else {
-    pushBody = [merchant ? `${merchant} purchase` : "Your purchase", amount].filter(Boolean).join(" · ");
-  }
+  const pushBody = reminderPushBody(item, amount, merchant, merchant ? `${merchant} purchase` : "Your purchase");
   return { item, subjectItem: item ?? fallback, amount, merchant, bought, itemLine, pushBody };
 }
 
