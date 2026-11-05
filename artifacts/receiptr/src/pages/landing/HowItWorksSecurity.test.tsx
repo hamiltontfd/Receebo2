@@ -38,7 +38,10 @@ describe("How it works + security (landing)", () => {
     expect(screen.getByTestId("how-it-works-notification").textContent).toContain(
       "Best Buy · Return window closes in 3 days",
     );
+    const icon = screen.getByTestId("how-it-works-push-icon") as HTMLImageElement;
+    expect(icon.getAttribute("src")).toMatch(/icons\/receebo-outline-192\.png$/);
     expect(screen.getByText("Free for 15 days. No credit card.")).toBeTruthy();
+    expect(screen.getByText("Free for 15 days. No credit card.")).toHaveClass("text-foreground/80");
   });
 
   it("/us keeps manufacturer-only wording and Best Buy even in pt-BR", () => {

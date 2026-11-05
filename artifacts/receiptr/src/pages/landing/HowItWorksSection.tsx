@@ -2,26 +2,18 @@ import { motion } from "framer-motion";
 import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
 import { lt } from "@/lib/landingLocale";
 
-/** Official mark used in the notification mock (dark square + white R). */
-function ReceeboMark({ className }: { className?: string }) {
+/** Same filled square icon real push notifications use (sw.ts → receebo-outline-192.png). */
+function PushAppIcon({ className }: { className?: string }) {
   return (
-    <svg
+    <img
+      src={`${import.meta.env.BASE_URL}icons/receebo-outline-192.png`}
+      alt=""
+      width={40}
+      height={40}
+      decoding="async"
       className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="3 3 48 48"
-      fill="none"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="48" height="48" rx="12" fill="#1A1A1A" />
-      <path
-        d="M21.4873 7.11621C28.2943 7.11647 33.8123 12.6345 33.8125 19.4414C33.8123 26.2484 28.2943 31.7673 21.4873 31.7676H16.6592L21.1592 36.2666L31.6436 47H15C10.5817 47 7 43.4183 7 39V15C7 10.5817 10.5817 7 15 7H21.4873V7.11621Z"
-        fill="white"
-      />
-      <path
-        d="M39 7C43.4183 7 47 10.5817 47 15V39C47 43.4183 43.4183 47 39 47H37.2354L25.7188 35.2119C32.6833 33.3476 37.8134 26.9939 37.8135 19.4414C37.8134 14.4568 35.5781 9.99455 32.0566 7H39Z"
-        fill="white"
-      />
-    </svg>
+      data-testid="how-it-works-push-icon"
+    />
   );
 }
 
@@ -146,7 +138,7 @@ export default function HowItWorksSection({ variant }: { variant?: "us" } = {}) 
                         className="mt-2 rounded-xl bg-background border border-border shadow-sm px-3.5 py-3 flex gap-3 items-start max-w-full"
                         data-testid="how-it-works-notification"
                       >
-                        <ReceeboMark className="w-9 h-9 shrink-0 rounded-[10px]" />
+                        <PushAppIcon className="w-10 h-10 shrink-0 rounded-[11px] shadow-sm" />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2">
                             <span className="text-sm font-semibold truncate">Receebo</span>
@@ -172,7 +164,7 @@ export default function HowItWorksSection({ variant }: { variant?: "us" } = {}) 
           initial="hidden"
           whileInView="visible"
           viewport={VIEWPORT}
-          className="text-center text-sm text-muted-foreground mt-10"
+          className="text-center text-sm text-foreground/80 mt-10"
         >
           {lt("Free for 15 days. No credit card.", "15 dias grátis. Sem cartão.")}
         </motion.p>
