@@ -35,7 +35,8 @@ import { LanguageProvider } from "@/components/LanguageProvider";
 import InstallBar from "@/components/InstallBar";
 import { PlanSelectionGate } from "@/components/PlanSelectionGate";
 import { AuthStartupGate } from "@/components/AuthStartupGate";
-import { LEGAL_ACCEPTED_EVENT, LegalConsentGate } from "@/components/LegalConsentGate";
+import { LEGAL_ACCEPTED_EVENT, LegalConsentGate, notifyLegalAcceptanceRequired } from "@/components/LegalConsentGate";
+import { ApiError } from "@workspace/api-client-react";
 import { useBillingStatus, resolveAccessState } from "@/hooks/useBilling";
 import { useGuestMode, clearGuestToken } from "@/components/GuestProvider";
 import { setGuestId } from "@workspace/api-client-react";
@@ -324,6 +325,16 @@ function ClerkQueryClientCacheInvalidator() {
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error) => {
+      if (error instanceof ApiError && error.status === 428) {
+        const data = (error.data ?? {}) as { code?: string; termsVersion?: string; privacyVersion?: string };
+        if (data.code === "LEGAL_ACCEPTANCE_REQUIRED" || !data.code) {
+          notifyLegalAcceptanceRequired({
+            termsVersion: data.termsVersion,
+            privacyVersion: data.privacyVersion,
+          });
+        }
+        return;
+      }
       const description = actionWaitMessage(error);
       if (description) toast({ title: appText("Temporarily unavailable"), description, variant: "destructive" });
     },

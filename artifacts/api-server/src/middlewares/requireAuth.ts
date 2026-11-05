@@ -1,6 +1,6 @@
 import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
-import { hasCurrentLegalAcceptance } from "../lib/legalAcceptance";
+import { hasCurrentLegalAcceptance, TERMS_VERSION, PRIVACY_VERSION } from "../lib/legalAcceptance";
 import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
 
 declare global {
@@ -64,6 +64,8 @@ export async function requireAuth(
     res.status(428).json({
       error: "Current Terms, Privacy Policy, and 18+ confirmation are required",
       code: "LEGAL_ACCEPTANCE_REQUIRED",
+      termsVersion: TERMS_VERSION,
+      privacyVersion: PRIVACY_VERSION,
     });
     return;
   }

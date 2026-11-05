@@ -94,6 +94,8 @@ router.get("/legal/acceptance", requireAuth, async (req, res): Promise<void> => 
         privacyVersion: PRIVACY_VERSION,
         acceptedAt: null,
         deletionRecovery: true,
+        hadPriorAcceptance: true,
+        previouslyConfirmedAge: true,
       });
       return;
     }
@@ -104,14 +106,19 @@ router.get("/legal/acceptance", requireAuth, async (req, res): Promise<void> => 
       .orderBy(desc(legalAcceptancesTable.acceptedAt))
       .limit(1);
 
+    const previouslyConfirmedAge = latest?.confirmedAge === true;
+    const accepted =
+      latest?.termsVersion === TERMS_VERSION &&
+      latest?.privacyVersion === PRIVACY_VERSION &&
+      previouslyConfirmedAge;
     res.json({
-      accepted:
-        latest?.termsVersion === TERMS_VERSION &&
-        latest?.privacyVersion === PRIVACY_VERSION &&
-        latest?.confirmedAge === true,
+      accepted,
       termsVersion: TERMS_VERSION,
       privacyVersion: PRIVACY_VERSION,
       acceptedAt: latest?.acceptedAt?.toISOString() ?? null,
+      // Re-accept overlay: prior row means the app can render behind the gate.
+      hadPriorAcceptance: Boolean(latest),
+      previouslyConfirmedAge,
     });
   } catch (err) {
     logger.error({ err, userId: req.userId }, "Failed to load legal acceptance");

@@ -59,7 +59,7 @@ describe("Privacy Policy version bump", () => {
   it("an account that accepted 2026-08-30 must accept again; old versions are refused; new acceptance unblocks", async () => {
     expect(await hasCurrentLegalAcceptance(user)).toBe(false);
     const status = await (await call("/legal/acceptance")).json();
-    expect(status).toMatchObject({ accepted: false, termsVersion: "2026-08-30", privacyVersion: "2026-11-04" });
+    expect(status).toMatchObject({ accepted: false, termsVersion: "2026-08-30", privacyVersion: "2026-11-04", hadPriorAcceptance: true, previouslyConfirmedAge: true });
     expect((await call("/receipts")).status).toBe(428);
     expect((await call("/legal/acceptance", { termsVersion: "2026-08-30", privacyVersion: "2026-08-30", confirmedAge: true })).status).toBe(400);
     const accepted = await call("/legal/acceptance", { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION, confirmedAge: true });

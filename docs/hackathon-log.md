@@ -316,3 +316,12 @@ Branch `landing-sec` from `launch` (a65b673; Replit tree matches 3ed1f5b per Eng
 - New `SecuritySection` (`id="security"`) immediately after How it works: AES-256-GCM details at rest, HTTPS, never sell, delete anytime. No ISO/SOC/GDPR seals; not “everything encrypted”; no Gmail; no EU hosting claim.
 - Wired into `LandingContent` for `/` and `/us`. Screenshots (box only): `/workspace/receebo/landing-sec/`. Transfer bundle prepared, not applied to Replit; no publish; no git push.
 - Tests: new HowItWorksSecurity.test.tsx (5). Web 500 passed, 3 baseline failures (icons + two US Best Buy date tests) (503). Typecheck clean.
+
+## 2026-11-05 — Session 31: privacy re-accept as overlay (Grok Bot; Hamilton: "the new terms and conditions could show once the page has already loaded and we open in overlay instead of on top of a blank page. The user needs to accept in order to keep using the app.")
+Branch `privacy-gate` from `landing-sec` (4028a5e) on box worktree `/workspace/receebo-launch`. No Replit touch, no publish, no push.
+- `LegalConsentGate`: first-time accounts keep the full-page consent; accounts that already accepted an older privacy/terms version (or a mid-session 428 `LEGAL_ACCEPTANCE_REQUIRED`) render the loaded app behind a Radix AlertDialog overlay (dimmed, focus-trapped, no close X, Esc/outside ignored). Accept hides the overlay; server still requires current versions + `confirmedAge: true` (enforcement unchanged).
+- Existing accounts that already confirmed 18+ skip the age checkbox on re-accept (`previouslyConfirmedAge` / prior acceptance); first-time still requires the checkbox. A short "policy updated" line shows only on re-accept.
+- Copy in en / pt-PT / pt-BR via `appCopy` + account/app locale. No "everything encrypted", no Gmail, no GDPR/ISO seals.
+- API: `GET /legal/acceptance` returns `hadPriorAcceptance` and `previouslyConfirmedAge`; `requireAuth` 428 includes `termsVersion` / `privacyVersion`. QueryCache 428 opens the overlay without toasting.
+- Tests: LegalConsentGate (overlay, translations, policy-updated only on re-accept, accept hides, 428 reopen). Web 508 passed, 3 baseline failures (511). Typecheck clean.
+- Screenshots (box only): `/workspace/receebo/privacy-gate/shots/`. Transfer: `/workspace/receebo/privacy-gate-transfer/` (landing-sec + privacy-gate vs a65b673).
