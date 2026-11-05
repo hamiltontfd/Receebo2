@@ -29,6 +29,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { ReceiptReview } from "@/components/ReceiptReview";
+import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
 import { PurchaseCountryField, PurchaseCountryValue } from "@/components/PurchaseCountryField";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { StoreFullscreen } from "@/components/StoreFullscreen";
@@ -59,11 +60,13 @@ import {
 const editFormSchema = z.object({
   merchant: z.string().optional(),
   purchaseDate: z.string().optional(),
+  deliveryDate: z.string().optional(),
   total: z.coerce.number().optional(),
   currency: z.string().optional(),
   category: z.string().optional(),
   warranty: z.string().optional(),
   purchaseCountry: z.string().nullable().optional(),
+  isOnlinePurchase: z.boolean().nullable().optional(),
 });
 
 type EditFormValues = z.infer<typeof editFormSchema>;
@@ -113,11 +116,13 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
     defaultValues: {
       merchant: "",
       purchaseDate: "",
+      deliveryDate: "",
       total: undefined,
       currency: "USD",
       category: "",
       warranty: "",
       purchaseCountry: null,
+      isOnlinePurchase: null,
     },
   });
 
@@ -126,11 +131,13 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
       form.reset({
         merchant: receipt.merchant || "",
         purchaseDate: receipt.purchaseDate || "",
+        deliveryDate: receipt.deliveryDate || "",
         total: receipt.total || undefined,
         currency: receipt.currency || "USD",
         category: receipt.category || "",
         warranty: receipt.warranty || "",
         purchaseCountry: receipt.purchaseCountry ?? null,
+        isOnlinePurchase: receipt.isOnlinePurchase ?? null,
       });
     }
   }, [receipt, isEditing, form]);
@@ -142,11 +149,13 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
         data: {
           merchant: data.merchant,
           purchaseDate: data.purchaseDate,
+          deliveryDate: data.deliveryDate ? data.deliveryDate : null,
           total: data.total,
           currency: data.currency,
           category: data.category,
           warranty: data.warranty,
           purchaseCountry: data.purchaseCountry ?? null,
+          isOnlinePurchase: data.isOnlinePurchase,
         },
       });
       setIsEditing(false);
@@ -446,6 +455,45 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="deliveryDate"
+                  render={({ field }) => (
+                    <FormItem className="p-4 space-y-1">
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="detail-delivery-date">{appText("Delivered on (optional)")}</FormLabel>
+                      <FormControl>
+                        <Input id="detail-delivery-date" type="date" data-testid="detail-delivery-date" {...field} value={field.value ?? ""} className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">{appText("Leave blank to use the purchase date only as an estimate.")}</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="isOnlinePurchase"
+                  render={({ field }) => (
+                    <FormItem className="p-4 space-y-1">
+                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Purchase type")}</FormLabel>
+                      <div className="flex gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => field.onChange(field.value === true ? null : true)}
+                          className={["flex-1 py-1.5 rounded-full text-sm font-medium border", field.value === true ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground"].join(" ")}
+                        >
+                          {appText("🌐 Online")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => field.onChange(field.value === false ? null : false)}
+                          className={["flex-1 py-1.5 rounded-full text-sm font-medium border", field.value === false ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground"].join(" ")}
+                        >
+                          {appText("🏪 In-store")}
+                        </button>
+                      </div>
+                    </FormItem>
+                  )}
+                />
               </div>
               <div className="flex items-center gap-2 mt-4">
                 <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
@@ -545,6 +593,20 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
             </p>
             <p className="text-sm leading-relaxed">{receipt.summary}</p>
           </div>
+        )}
+
+        {!isEditing && (
+          <ConsumerRightsPanel
+            receipt={receipt}
+            onChooseChannel={(online) => {
+              void updateReceipt.mutateAsync({ id: receiptId, data: { isOnlinePurchase: online } }).then(() => {
+                void queryClient.invalidateQueries({ queryKey: getGetReceiptQueryKey(receiptId) });
+                void queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
+              }).catch(() => {
+                toast({ title: appText("Error"), description: appText("Failed to update receipt."), variant: "destructive" });
+              });
+            }}
+          />
         )}
 
         {/* Original receipt — compact row; "Open" shows the file in a new tab */}

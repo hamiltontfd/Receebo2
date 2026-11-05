@@ -21,15 +21,18 @@ import { usePwaUpdateBlocker } from "@/lib/pwa";
 import { useAccountRegion } from "@/lib/region";
 import { WarrantyQuickPick } from "@/components/WarrantyQuickPick";
 import { PurchaseCountryField } from "@/components/PurchaseCountryField";
+import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
 
 interface ReviewFields {
   merchant: string;
   purchaseDate: string;
+  deliveryDate: string;
   category: string;
   total: string;
   warranty: string;
   /** "" = Unknown (null on save). */
   purchaseCountry: string;
+  isOnlinePurchase: boolean | null;
 }
 
 const label = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
@@ -59,10 +62,12 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
       const f = {
         merchant: receipt.merchant ?? "",
         purchaseDate: receipt.purchaseDate ?? "",
+        deliveryDate: receipt.deliveryDate ?? "",
         category: receipt.category ?? "Other",
         total: receipt.total != null ? String(receipt.total) : "",
         warranty: receipt.warranty ?? "",
         purchaseCountry: receipt.purchaseCountry ?? "",
+        isOnlinePurchase: receipt.isOnlinePurchase ?? null,
       };
       setFields(f);
       setInitial(f);
@@ -87,6 +92,8 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
             category: fields.category,
             warranty: fields.warranty,
             purchaseCountry: fields.purchaseCountry || null,
+            deliveryDate: fields.deliveryDate ? fields.deliveryDate : null,
+            isOnlinePurchase: fields.isOnlinePurchase,
             ...(total !== undefined && Number.isFinite(total) ? { total } : {}),
           },
         });
@@ -200,7 +207,26 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
             value={fields.purchaseCountry || null}
             onChange={(v) => set("purchaseCountry")(v ?? "")}
           />
+          <div className="p-4 space-y-1">
+            <label className={label} htmlFor="review-delivery">{appText("Delivered on (optional)")}</label>
+            <Input id="review-delivery" type="date" data-testid="review-delivery-date" value={fields.deliveryDate} onChange={(e) => set("deliveryDate")(e.target.value)} className={field} />
+            <p className="text-xs text-muted-foreground">{appText("Leave blank to use the purchase date only as an estimate.")}</p>
+          </div>
         </div>
+
+        <ConsumerRightsPanel
+          receipt={{
+            ...receipt,
+            merchant: fields.merchant,
+            purchaseDate: fields.purchaseDate,
+            deliveryDate: fields.deliveryDate || null,
+            category: fields.category,
+            warranty: fields.warranty,
+            purchaseCountry: fields.purchaseCountry || null,
+            isOnlinePurchase: fields.isOnlinePurchase,
+          }}
+          onChooseChannel={(online) => setFields((current) => (current ? { ...current, isOnlinePurchase: online } : current))}
+        />
 
         {products.length > 0 && (
           <div>

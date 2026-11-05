@@ -301,6 +301,7 @@ export async function syncMailboxClaimed(
   provider: MailProvider,
   options: { aiReadCap?: boolean } = {},
 ): Promise<MailSyncResult> {
+  const extractionLocale = await (await import("./emailLocale")).getUserEmailLocale(userId);
   const logger = provider.logger;
   const label = provider.label;
   // No-card trials have a fixed AI read budget shared with uploads.
@@ -485,7 +486,7 @@ export async function syncMailboxClaimed(
           return { checked, queued, autoImported };
         }
         try {
-          extraction = await extractReceiptData(objectPath, "application/pdf");
+          extraction = await extractReceiptData(objectPath, "application/pdf", { locale: extractionLocale });
         } catch (err) {
           logger.warn({ err, objectPath }, `${label} sync: extraction failed`);
           retryableFailure = true;
@@ -505,6 +506,7 @@ export async function syncMailboxClaimed(
             subject: message.subject,
             from: message.from,
             receivedAt: message.receivedAt,
+            locale: extractionLocale,
           });
         } catch (err) {
           logger.warn({ err, messageId }, `${label} sync: body extraction failed`);

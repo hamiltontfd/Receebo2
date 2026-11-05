@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calcReturnWindow, deliveryDateError, returnWindowStart } from "./returnWindowCalc";
+import { calcReturnWindow, deliveryDateError, isConfirmedStatutoryDeadline, returnWindowStart } from "./returnWindowCalc";
 import { parseExtraction, toIsoDateOrNull } from "./receiptExtraction";
 import { deliveredByReceived } from "./mailSync";
 
@@ -18,9 +18,10 @@ describe("return window start", () => {
     expect(w?.daysRemaining).toBe(4); // 14 days from delivery
     expect(w?.deadlineDate.toISOString().slice(0, 10)).toBe(iso(4));
   });
-  it("falls back to the purchase date without a delivery date", () => {
+  it("falls back to the purchase date without a delivery date, as an estimate", () => {
     const w = calcReturnWindow({ ...online, purchaseDate: iso(-20), deliveryDate: null });
-    expect(w).toMatchObject({ startsFrom: "purchase", daysRemaining: -6 });
+    expect(w).toMatchObject({ startsFrom: "purchase", daysRemaining: -6, basis: "law" });
+    expect(w && isConfirmedStatutoryDeadline(w)).toBe(false);
   });
   it("ignores a delivery date before the purchase or not a real date", () => {
     expect(returnWindowStart("2026-10-10", "2026-10-01")).toEqual({ date: "2026-10-10", from: "purchase" });
@@ -29,7 +30,20 @@ describe("return window start", () => {
   });
   it("Brazil: 7 days from delivery (CDC art. 49)", () => {
     const w = calcReturnWindow({ purchaseDate: iso(-10), deliveryDate: iso(-3), purchaseCountry: "BR", isOnlinePurchase: true, currency: "BRL", merchant: "Loja" });
-    expect(w?.daysRemaining).toBe(4);
+    expect(w).toMatchObject({ days: 7, startsFrom: "delivery", basis: "law", daysRemaining: 4 });
+    expect(w && isConfirmedStatutoryDeadline(w)).toBe(true);
+    expect(w?.deadlineDate.toISOString().slice(0, 10)).toBe(iso(4));
+  });
+  it("Brazil online with a blank delivery date is not a confirmed legal deadline", () => {
+    const w = calcReturnWindow({ purchaseDate: iso(-1), deliveryDate: null, purchaseCountry: "BR", isOnlinePurchase: true, currency: "BRL", merchant: "Amazon" });
+    expect(w).toMatchObject({ days: 7, startsFrom: "purchase", basis: "law" });
+    expect(w && isConfirmedStatutoryDeadline(w)).toBe(false);
+  });
+  it("does not invent an online window for Amazon or an unknown channel", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "BR", isOnlinePurchase: null, currency: "BRL", merchant: "Amazon.com.br" })).toBeNull();
+    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "BR", isOnlinePurchase: null, currency: "BRL", merchant: "Loja do bairro" })).toBeNull();
+    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "BR", isOnlinePurchase: false, currency: "BRL", merchant: "Amazon.com.br" })).toBeNull();
   });
 });
 

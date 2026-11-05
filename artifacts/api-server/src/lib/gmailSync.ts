@@ -445,7 +445,9 @@ async function syncUserGmailUnlocked(
       // AI extraction
       let extraction: Awaited<ReturnType<typeof extractReceiptData>>;
       try {
-        extraction = await extractReceiptData(objectPath, "application/pdf");
+        extraction = await extractReceiptData(objectPath, "application/pdf", {
+          locale: await (await import("./emailLocale")).getUserEmailLocale(userId),
+        });
       } catch (err) {
         logger.warn({ err, objectPath }, "Gmail sync: extraction failed");
         await cleanupSyncObject(userId, objectPath, "extraction failed");

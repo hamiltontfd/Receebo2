@@ -25,6 +25,7 @@ import {
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { currencySymbol } from "@/lib/currency";
 import { PurchaseCountryField } from "@/components/PurchaseCountryField";
+import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
 import { compressImage, compressedFileName } from "@/lib/compressImage";
 import { CATEGORIES, categoryStyle } from "@/lib/categories";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -224,7 +225,7 @@ export default function Scan() {
   const [dismissedIncomplete, setDismissedIncomplete] = useState(false);
 
   // Saved draft from a warning-card retake so edits survive re-scan
-  const savedFormDraftRef = useRef<{ merchant: string; purchaseDate: string; total: string; category: string; warranty: string; purchaseCountry: string } | null>(null);
+  const savedFormDraftRef = useRef<{ merchant: string; purchaseDate: string; deliveryDate: string; total: string; category: string; warranty: string; purchaseCountry: string; isOnlinePurchase: boolean | null } | null>(null);
 
   // Panoramic mode
   const PAN_MAX_FRAMES = 12;
@@ -398,13 +399,24 @@ export default function Scan() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, receipt?.id]);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    merchant: string;
+    purchaseDate: string;
+    deliveryDate: string;
+    total: string;
+    category: string;
+    warranty: string;
+    purchaseCountry: string;
+    isOnlinePurchase: boolean | null;
+  }>({
     merchant: "",
     purchaseDate: "",
+    deliveryDate: "",
     total: "",
     category: "",
     warranty: "",
     purchaseCountry: "",
+    isOnlinePurchase: null,
   });
 
   useEffect(() => {
@@ -412,10 +424,12 @@ export default function Scan() {
       const fromScan = {
         merchant: receipt.merchant ?? "",
         purchaseDate: receipt.purchaseDate ?? "",
+        deliveryDate: receipt.deliveryDate ?? "",
         total: receipt.total != null ? String(receipt.total) : "",
         category: receipt.category ?? "",
         warranty: receipt.warranty ?? "",
         purchaseCountry: receipt.purchaseCountry ?? "",
+        isOnlinePurchase: receipt.isOnlinePurchase ?? null,
       };
       // If the user hit "Retake" from the warning card, merge their saved edits
       // back in — the new scan's data takes priority for any field it filled;
@@ -426,10 +440,12 @@ export default function Scan() {
         setForm({
           merchant: fromScan.merchant || draft.merchant,
           purchaseDate: fromScan.purchaseDate || draft.purchaseDate,
+          deliveryDate: fromScan.deliveryDate || draft.deliveryDate,
           total: fromScan.total || draft.total,
           category: fromScan.category || draft.category,
           warranty: fromScan.warranty || draft.warranty,
           purchaseCountry: fromScan.purchaseCountry || draft.purchaseCountry,
+          isOnlinePurchase: fromScan.isOnlinePurchase ?? draft.isOnlinePurchase,
         });
       } else {
         setForm(fromScan);
@@ -590,6 +606,8 @@ export default function Scan() {
           category: form.category || undefined,
           warranty: form.warranty || undefined,
           purchaseCountry: form.purchaseCountry || null,
+          deliveryDate: form.deliveryDate ? form.deliveryDate : null,
+          isOnlinePurchase: form.isOnlinePurchase,
           isDraft: false,
         },
       });
@@ -1195,6 +1213,19 @@ export default function Scan() {
               />
             </div>
 
+            <div className="rounded-xl border p-4 space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="scan-delivery-date">{appText("Delivered on (optional)")}</label>
+              <Input
+                id="scan-delivery-date"
+                type="date"
+                data-testid="scan-delivery-date"
+                value={form.deliveryDate}
+                onChange={(e) => setForm((f) => ({ ...f, deliveryDate: e.target.value }))}
+                className="border-0 px-0 font-medium focus-visible:ring-0 shadow-none"
+              />
+              <p className="text-xs text-muted-foreground">{appText("Leave blank to use the purchase date only as an estimate.")}</p>
+            </div>
+
             {receipt?.products && receipt.products.length > 0 && (
               <div className="rounded-xl border p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -1221,6 +1252,25 @@ export default function Scan() {
 
           {receipt?.notableItems && receipt.notableItems.length > 0 && (
             <NotableItemsBanner items={receipt.notableItems} currency={receipt.currency} />
+          )}
+
+          {receipt && (
+            <ConsumerRightsPanel
+              receipt={{
+                purchaseDate: form.purchaseDate || receipt.purchaseDate,
+                deliveryDate: form.deliveryDate || null,
+                category: form.category || receipt.category,
+                currency: receipt.currency,
+                purchaseCountry: form.purchaseCountry || null,
+                isOnlinePurchase: form.isOnlinePurchase,
+                merchant: form.merchant || receipt.merchant,
+                warranty: form.warranty,
+                purchaseType: receipt.purchaseType,
+                notableItems: receipt.notableItems,
+                products: receipt.products,
+              }}
+              onChooseChannel={(online) => setForm((f) => ({ ...f, isOnlinePurchase: online }))}
+            />
           )}
 
           {(() => {

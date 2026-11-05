@@ -311,7 +311,7 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
     }
     expect(purchaseDate).not.toBe("");
     const target = receipts[0].id;
-    await db.update(receiptsTable).set({ purchaseDate, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", isDraft: false })
+    await db.update(receiptsTable).set({ purchaseDate, deliveryDate: purchaseDate, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", isDraft: false })
       .where(eq(receiptsTable.id, target));
     // Only this fixture receipt "sends"; any other dev row is reported as not sent, which resets its claim.
     fixture.returnEmail.mockReset().mockImplementation(async (uid: string) => uid === userId);
@@ -461,7 +461,7 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
       const w = calcReturnWindow({ purchaseDate: iso, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", merchant: "Fixture store" });
       if (w && w.daysRemaining === 1) purchaseDate = iso;
     }
-    await db.update(receiptsTable).set({ purchaseDate, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR",
+    await db.update(receiptsTable).set({ purchaseDate, deliveryDate: purchaseDate, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR",
       category: "Electronics", isDraft: false }).where(eq(receiptsTable.id, receipt.id));
     expect((await request(`/receipts/${receipt.id}`, { purchaseType: "subscription" }, "PATCH")).status).toBe(200);
     let [row] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receipt.id));
@@ -526,7 +526,7 @@ describe("durable no-card account trial (real PostgreSQL, isolated users)", () =
       const w = calcReturnWindow({ purchaseDate: iso, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", merchant: "Fixture store" });
       if (w && w.daysRemaining === 1) purchaseDate = iso;
     }
-    await db.update(receiptsTable).set({ purchaseDate, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", isDraft: false })
+    await db.update(receiptsTable).set({ purchaseDate, deliveryDate: purchaseDate, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", isDraft: false })
       .where(eq(receiptsTable.id, receipt.id));
     fixture.returnEmail.mockReset().mockImplementation(async (uid: string) => uid === userId);
     fixture.push.mockReset().mockImplementation(async (uid: string) => uid === userId);

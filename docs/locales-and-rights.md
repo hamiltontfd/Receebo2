@@ -16,7 +16,9 @@ needs a lawyer before it ships. Sources: `/workspace/receebo/consumer-rules-br-u
   use this language. Shared app copy is in `appCopy.ts`, using the existing locale
   source; translated labels never replace canonical category/API values.
   External authentication, legal documents, recorded media, native mobile and
-  original receipt/merchant/item/AI-extracted content are outside this UI coverage.
+  original receipt text, merchant names and OCR stay as printed. New AI summaries,
+  shortened item names and notable-item reasons are written in the account language
+  at extraction time (manual, else detected browser language, else English).
   Application-owned emails use the account preference as documented below;
   automatic email language is the browser language detected after consent (see below).
   The selector discloses these boundaries rather than claiming those contents
@@ -68,7 +70,8 @@ needs a lawyer before it ships. Sources: `/workspace/receebo/consumer-rules-br-u
   Payment access cutoffs also include their exact UTC timestamp. Warranty kind,
   statutory window length and retailer-policy basis are taken from receipt facts,
   never inferred from account language or market. User/merchant/product/plan
-  names and receipt text are not translated.
+  names and receipt text are not translated. Extraction of a new receipt uses that
+  same language for the summary, shortened item names and reasons only.
 - From/Reply-To addresses, links, unsubscribe tokens/headers and provider
   idempotency keys do not change with language. Transactional deletion/payment/
   trial emails do not acquire an unsubscribe link.
@@ -93,6 +96,16 @@ needs a lawyer before it ships. Sources: `/workspace/receebo/consumer-rules-br-u
 - **PT/EU** unchanged (3-year / 2-year legal warranty), plus the manufacturer
   warranty card when the receipt states one.
 - Return windows count from delivery when known (session 16, item 5).
+- A statutory online window (BR 7 days, PT/EU 14) is a confirmed deadline only
+  when delivery is known. A blank delivery date keeps the purchase date as a
+  labeled provisional estimate and does not send a return reminder. The PT/EU
+  day counts themselves are unchanged.
+- Unknown channel asks the user. Amazon with a null channel is a suggestion of
+  online, which the user can correct. Neither case stores `true` by itself, and
+  neither hides the question. Manufacturer warranty is shown only when the
+  receipt states a length; otherwise the panel says it is not confirmed and
+  does not add it to the legal period.
+- The same panel is used on scan review, the receipt page and the search sheet.
 
 ## Legal documents (`legalDocuments.ts`)
 The document registry is scaffolding, not a market-dependent consent flow:

@@ -178,6 +178,16 @@ export function calcReturnWindow(params: {
   return { deadlineDate, daysRemaining, startsFrom: start.from, days: returnDays, basis };
 }
 
+/**
+ * A statutory withdrawal counted from the purchase date is only an estimate.
+ * The legal period starts on delivery. Store policies and a number the user
+ * saved are their own deadlines and stay confirmed.
+ */
+export function isConfirmedStatutoryDeadline(window: { basis: string; startsFrom: "delivery" | "purchase" }): boolean {
+  if (window.basis !== "law") return true;
+  return window.startsFrom === "delivery";
+}
+
 function daysUntil(deadlineIso: string): number {
   const todayUtc = new Date();
   todayUtc.setUTCHours(0, 0, 0, 0);

@@ -2,6 +2,7 @@ import { refreshWarrantyExpiries } from "./warrantyExpiryStore";
 import { db, receiptsTable } from "@workspace/db";
 import { eq, and, lt } from "drizzle-orm";
 import { checkIsReceipt, extractReceiptData, type ExtractedProduct } from "./receiptExtraction";
+import { getUserEmailLocale } from "./emailLocale";
 import { logger } from "./logger";
 import { isAccountDeletionInProgress } from "./accountDeletionState";
 import { withUserDataLock } from "./userDataLock";
@@ -89,7 +90,8 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
       return;
     }
 
-    const data = await extractReceiptData(objectPath, contentType, { fullPageDocument });
+    const locale = await getUserEmailLocale(job.userId);
+    const data = await extractReceiptData(objectPath, contentType, { fullPageDocument, locale });
 
     // Fallback guard: if the full extraction still returns isReceipt:false
     // (pre-check false positive), reject cleanly rather than writing null fields.

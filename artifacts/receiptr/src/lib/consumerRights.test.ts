@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveConsumerRights, returnWindowStartDate } from "./consumerRights";
+import { deriveConsumerRights, isProvisionalLegalEstimate, merchantSuggestsOnline, returnWindowStartDate } from "./consumerRights";
 
 const local = (offsetDays: number) => {
   const d = new Date();
@@ -104,6 +104,52 @@ describe("EU/EEA countries other than PT", () => {
     const r = deriveConsumerRights({ purchaseCountry: "GB", currency: "GBP", merchant: "Shop", category: "Electronics", isOnlinePurchase: true, purchaseDate: "2026-03-10" });
     expect(r.warranty).toBeNull();
     expect(r.returnWindow).toBeNull();
+  });
+});
+
+describe("channel suggestion and provisional estimate", () => {
+  it("suggests online only for Amazon, and only while the channel is still unknown", () => {
+    expect(merchantSuggestsOnline("Amazon.com.br")).toBe(true);
+    expect(merchantSuggestsOnline("AMAZON SERVICOS DE VAREJO")).toBe(true);
+    expect(merchantSuggestsOnline("Magazine Luiza")).toBe(false);
+    expect(merchantSuggestsOnline(null)).toBe(false);
+  });
+  it("Brazil online, delivery set: confirmed 7-day window; blank delivery: estimate; manufacturer stays separate", () => {
+    const delivered = deriveConsumerRights({
+      purchaseCountry: "BR", currency: "BRL", merchant: "Amazon", category: "Home",
+      isOnlinePurchase: true, purchaseDate: "2026-03-01", deliveryDate: "2026-03-05", locale: "pt-BR",
+    });
+    expect(delivered.returnWindow).toMatchObject({ startsFrom: "delivery", source: "CDC Art. 49" });
+    expect(delivered.returnWindow && isProvisionalLegalEstimate(delivered.returnWindow)).toBe(false);
+    expect(delivered.warranty?.label).toContain("90 dias");
+    expect(delivered.manufacturerWarranty).toBeNull();
+    const blank = deriveConsumerRights({
+      purchaseCountry: "BR", currency: "BRL", merchant: "Amazon", category: "Home",
+      isOnlinePurchase: true, purchaseDate: "2026-03-01", locale: "pt-BR",
+    });
+    expect(blank.returnWindow?.startsFrom).toBe("purchase");
+    expect(blank.returnWindow && isProvisionalLegalEstimate(blank.returnWindow)).toBe(true);
+    expect(blank.manufacturerWarranty).toBeNull();
+    const stated = deriveConsumerRights({
+      purchaseCountry: "BR", currency: "BRL", merchant: "Amazon", category: "Home",
+      isOnlinePurchase: true, purchaseDate: "2026-03-01", deliveryDate: "2026-03-05",
+      warrantyText: "Garantia do fabricante: 12 meses",
+    });
+    expect(stated.manufacturerWarranty?.months).toBe(12);
+    expect(stated.warranty!.expiry.getTime()).not.toBe(stated.manufacturerWarranty!.expiry.getTime());
+  });
+  it("an unknown channel has no deadline; a store window that starts on the purchase date is not a legal estimate", () => {
+    const unknown = deriveConsumerRights({
+      purchaseCountry: "BR", currency: "BRL", merchant: "Loja do bairro", category: "Home",
+      isOnlinePurchase: null, purchaseDate: "2026-03-01", locale: "pt-BR",
+    });
+    expect(unknown.returnWindow).toBeNull();
+    const store = deriveConsumerRights({
+      region: "US", locale: "en", currency: "USD", purchaseCountry: "US", category: "Electronics",
+      merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: "2026-03-01",
+    });
+    expect(store.returnWindow?.startsFrom).toBe("purchase");
+    expect(store.returnWindow && isProvisionalLegalEstimate(store.returnWindow)).toBe(false);
   });
 });
 

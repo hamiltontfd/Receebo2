@@ -19,6 +19,7 @@ import {
   FULL_PAGE_IMAGE_DETAIL,
   checkIsReceipt,
   extractReceiptData,
+  extractionSystemPrompt,
 } from "./receiptExtraction";
 
 const reply = (content: string) => ({ choices: [{ message: { content } }] });
@@ -42,6 +43,18 @@ describe("fiscal invoices (Brazilian DANFE / NF-e, PT faturas)", () => {
 
   it("still names quotes, boletos and statements as non-receipts", () => {
     for (const term of ["Orçamento", "Boleto", "bank statements"]) expect(FISCAL_DOCUMENTS_NOTE).toContain(term);
+  });
+
+  it("writes generated prose in the account language and does not treat Amazon as proof of online", () => {
+    expect(extractionSystemPrompt("en")).toBe(SYSTEM_PROMPT);
+    expect(extractionSystemPrompt()).toBe(SYSTEM_PROMPT);
+    expect(SYSTEM_PROMPT).toMatch(/Amazon is not proof/);
+    expect(SYSTEM_PROMPT).toMatch(/Do not invent a manufacturer warranty/);
+    const pt = extractionSystemPrompt("pt-BR");
+    expect(pt).toContain("Brazilian Portuguese (pt-BR)");
+    expect(pt).toContain("Aspirador Kärcher WDL 1s");
+    expect(pt).toContain(SYSTEM_PROMPT);
+    expect(extractionSystemPrompt("pt-PT")).toContain("European Portuguese (pt-PT)");
   });
 
   it("DANFE field mapping: issuer as merchant, emission date, VALOR TOTAL DA NOTA, BRL/BR", () => {

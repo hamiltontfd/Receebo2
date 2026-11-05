@@ -11,9 +11,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Loader2, Trash2, Edit2, Share2, AlertTriangle, ScanLine,
   Paperclip, FileText, ArrowLeft, Maximize2, X,
-  Sparkles, Package, Shield, Star, Scale, RotateCcw, Clock,
+  Sparkles, Package, Shield, Star,
 } from "lucide-react";
-import { deriveConsumerRights, usRightsCopy } from "@/lib/consumerRights";
+import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
 import { useAccountRegion } from "@/lib/region";
 import { usStoreReturnWindow } from "@/lib/usStorePolicies";
 import { WarrantyQuickPick } from "@/components/WarrantyQuickPick";
@@ -140,8 +140,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
 
   const updateReceipt = useUpdateReceipt();
   const deleteReceipt = useDeleteReceipt();
-  const { region, ready: regionReady } = useAccountRegion();
-  const isUs = region === "US";
+  const isUs = useAccountRegion().region === "US";
 
   const form = useForm<EditFormValues>({
     resolver: zodResolver(editFormSchema),
@@ -638,7 +637,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                               <FormControl>
                                 <Input type="date" {...field} value={field.value ?? ""} data-testid="input-delivery-date" className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
                               </FormControl>
-                              <p className="text-xs text-muted-foreground">{appText("Online orders: the return window counts from delivery.")}</p>
+                              <p className="text-xs text-muted-foreground">{appText("Online orders: the return window counts from delivery.")} {appText("Leave blank to use the purchase date only as an estimate.")}</p>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -793,131 +792,29 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     </div>
                   )}
 
-                  {/* ── Consumer Rights ── */}
-                  {!isEditing && regionReady && (() => {
-                    const rights = deriveConsumerRights({
-                      purchaseDate: receipt.purchaseDate,
-                      deliveryDate: receipt.deliveryDate,
-                      category: receipt.category,
-                      currency: receipt.currency,
-                      purchaseCountry: receipt.purchaseCountry,
-                      isOnlinePurchase: receipt.isOnlinePurchase,
-                      merchant: receipt.merchant,
-                      warrantyText: receipt.warranty,
-                      purchaseType: receipt.purchaseType,
-                      locale,
-                      region,
-                      returnDays: receipt.returnDays,
-                      itemNames: [...(receipt.notableItems ?? []), ...(receipt.products ?? [])].map((i) => i.name),
-                    });
-                    if (!rights.hasAny) return null;
-
-                    const urgencyClass = {
-                      green: "bg-emerald-50 border-emerald-200 text-emerald-700",
-                      amber: "bg-amber-50 border-amber-200 text-amber-700",
-                      red: "bg-red-50 border-red-200 text-red-700",
-                      expired: "bg-muted border-border text-muted-foreground",
-                    } as const;
-
-                    return (
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-                          <Scale className="w-3.5 h-3.5" />
-                          {isUs ? usRightsCopy(locale).panelTitle : <>{appText("Consumer Rights")}{rights.countryLabel ? ` · ${rights.countryLabel}` : ""}</>}
-                        </p>
-                        {!receipt.purchaseCountry && (
-                          <p className="mb-2 text-xs text-muted-foreground">
-                            {appText("Purchase country is unknown. This guidance may use the receipt currency or merchant as an estimate, not a confirmed country.")}
-                          </p>
-                        )}
-                        <div className="space-y-2">
-
-                          {/* Return window */}
-                          {rights.returnWindow && (
-                            <div className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${urgencyClass[rights.returnWindow.urgency]}`}>
-                              <RotateCcw className="w-4 h-4 mt-0.5 shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold leading-tight">
-                                  {rights.returnWindow.isExpired
-                                    ? appText("Return window expired")
-                                    : appText("Return by {0}", [rights.returnWindow.formattedDeadline])}
-                                </p>
-                                <p className="text-xs mt-0.5 opacity-80">
-                                  {rights.returnWindow.isExpired
-                                    ? appText("Expired {0} day(s) ago", [Math.abs(rights.returnWindow.daysLeft)])
-                                    : rights.returnWindow.daysLeft === 0
-                                      ? appText("Last day to return")
-                                      : appText("{0} day(s) left", [rights.returnWindow.daysLeft])}
-                                  {" · "}{rights.returnWindow.source}
-                                  {rights.returnWindow.startsFrom === "delivery" ? appText(" · from delivery") : ""}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Statutory warranty */}
-                          {rights.warranty && (
-                            <div className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${rights.warranty.isExpired ? "bg-muted border-border text-muted-foreground" : "bg-violet-50 border-violet-200 text-violet-700"}`}>
-                              <Clock className="w-4 h-4 mt-0.5 shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold leading-tight">
-                                  {rights.warranty.isExpired
-                                    ? appText("{0} (expired)", [rights.warranty.label])
-                                    : `${rights.warranty.label}`}
-                                </p>
-                                <p className="text-xs mt-0.5 opacity-80">
-                                  {rights.warranty.kind === "complaint_deadline"
-                                    ? rights.warranty.isExpired
-                                      ? appText("Apparent defects: deadline passed {0} · {1}", [rights.warranty.formattedExpiry, rights.warranty.citation])
-                                      : appText("Apparent defects: report by {0} · {1}", [rights.warranty.formattedExpiry, rights.warranty.citation])
-                                    : rights.warranty.isExpired
-                                      ? appText("Expired {0}", [rights.warranty.formattedExpiry])
-                                      : appText("Valid until {0} · {1}", [rights.warranty.formattedExpiry, rights.warranty.citation])}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Manufacturer warranty: own end date, next to the legal one (never added) */}
-                          {rights.manufacturerWarranty && (
-                            <div
-                              data-testid="card-manufacturer-warranty"
-                              className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${rights.manufacturerWarranty.isExpired ? "bg-muted border-border text-muted-foreground" : "bg-sky-50 border-sky-200 text-sky-700"}`}
-                            >
-                              <Shield className="w-4 h-4 mt-0.5 shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold leading-tight">
-                                  {rights.manufacturerWarranty.label}
-                                </p>
-                                <p className="text-xs mt-0.5 opacity-80">
-                                  {rights.manufacturerWarranty.isExpired
-                                    ? appText("Expired {0}", [rights.manufacturerWarranty.formattedExpiry])
-                                    : appText("Until {0} · from the receipt", [rights.manufacturerWarranty.formattedExpiry])}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {rights.notes.length > 0 && (
-                            <ul className="space-y-1 px-1 text-xs leading-5 text-muted-foreground" data-testid="list-rights-notes">
-                              {rights.notes.map((note) => <li key={note}>{note}</li>)}
-                            </ul>
-                          )}
-                          <p className="px-1 text-[11px] leading-4 text-muted-foreground">
-                            {rights.disclaimer}
-                          </p>
-
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {!isEditing && (
+                    <ConsumerRightsPanel
+                      receipt={receipt}
+                      onChooseChannel={(online) => {
+                        if (!receiptId) return;
+                        void updateReceipt.mutateAsync({ id: receiptId, data: { isOnlinePurchase: online } }).then(() => {
+                          void queryClient.invalidateQueries({ queryKey: getGetReceiptQueryKey(receiptId) });
+                          void queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
+                          void queryClient.invalidateQueries({ queryKey: getGetReceiptStatsQueryKey() });
+                          void queryClient.invalidateQueries({ queryKey: getGetRecentReceiptsQueryKey() });
+                        }).catch(() => {
+                          toast({ title: appText("Error"), description: appText("Failed to update receipt."), variant: "destructive" });
+                        });
+                      }}
+                    />
+                  )}
 
                   {/* ── Original receipt ── */}
                   {!isEditing && (
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5" />
-                        Original Receipt
+                        {appText("Original receipt")}
                       </p>
                       <ReceiptPreview
                         fileUrl={fileUrl}

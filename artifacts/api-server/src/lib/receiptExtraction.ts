@@ -71,7 +71,7 @@ Respond ONLY with a JSON object matching this exact shape:
   "warranty": string | null,        // warranty or return-policy information printed on the receipt (e.g. "2-year manufacturer warranty", "30-day returns"), or null if none is mentioned
   "transactionNumber": string | null, // the transaction/receipt/confirmation number printed on the receipt (e.g. "TXN-4821039", "#00123456", "Order #123"), or null if not present
   "purchaseCountry": string | null,   // ISO-3166-1 alpha-2 country code where the purchase was made (e.g. "PT", "US", "BR", "DE"), inferred from currency, merchant name, address, language, or domain. null if not determinable.
-  "isOnlinePurchase": boolean | null, // true if this is an e-commerce / online / distance purchase (order confirmation, Amazon, web store, delivery receipt, etc.); false if in-store; null if unclear.
+  "isOnlinePurchase": boolean | null, // true only when the document itself shows a distance sale (online order, delivery, "pedido" or "entrega"); false only when it shows an in-store sale; null if unclear. A seller name such as Amazon is not proof by itself. A DANFE/NF-e that does not say is null.
   "purchaseType": string | null,    // exactly one of "goods", "subscription", "digital", "service", "ticket" (see rules), or null if unclear
   "deliveryDate": string | null,    // the date the goods were actually DELIVERED ("delivered on", "entregue em", "data de entrega" of a completed delivery) in strict YYYY-MM-DD format. null if not stated, or if only an estimated/expected delivery date is shown ("arrives by", "previsão de entrega", "entrega prevista").
   "products": [                      // individual line items; empty array if none are legible
@@ -97,6 +97,8 @@ Rules:
 - Transcribe ocrText faithfully, including item lines, taxes, and totals.
 - purchaseType: "subscription" for recurring plans and renewals (iCloud+, Apple One, Apple Music, Spotify, Netflix, Google One, Microsoft 365, any "Renews on…", monthly or annual plan, membership); "digital" for a one-off digital purchase with nothing physical delivered (an app, an in-app purchase, a film, series or e-book bought or rented, game DLC); "ticket" for tickets to a dated event (concert, cinema, theatre, sports, festival, museum); "service" for work done for the buyer (repair, installation, course, consultation, cleaning); "goods" for physical products, including a product sold together with a service. Gift cards and vouchers are "goods". Use null only when it is genuinely unclear.
 - Do not include any commentary outside the JSON.
+- isOnlinePurchase: do not infer the channel from the seller name. Amazon, Mercado Livre and other marketplaces are null unless the document shows a distance sale or an in-store sale. The app suggests online for Amazon and the buyer can correct it.
+- Do not invent a manufacturer warranty in "warranty", "summary" or "notableItems[].reason". Mention one only when the document states it.
 - For notableItems: include any line item priced above ~$50 that falls into a durable-goods category such as electronics, appliances, tools, furniture, sporting equipment, or similar. These are purchases where a receipt may be needed for warranty claims, returns, or insurance. Exclude consumables (food, drinks, toiletries), services, and low-value items regardless of category.
 - Deduplication: if the same line item (identical name and price) appears more than once in the image — for example because two overlapping receipt segments were photographed — include it only ONCE in the products array. Do not repeat identical line items.
 - Product naming — apply to BOTH "products[].name" AND "notableItems[].name":
@@ -109,6 +111,29 @@ Rules:
     - "Logitech MX Master 3S Performance Wireless Mouse Ultra-Fast Scrolling Ergo 8K DPI Track on Glass Quiet Clicks USB-C Bluetooth Windows Linux Chrome – Pale Gray" → "Logitech MX Master 3S Mouse"
     - "Apple AirPods Pro (2nd Generation) Wireless Earbuds, Up to 2X More Active Noise Cancelling, Adaptive Transparency, Personalized Spatial Audio, MagSafe Charging Case, Bluetooth Headphones for iPhone" → "Apple AirPods Pro 2nd Gen"
   * The full original text is preserved verbatim in "ocrText", so shortening the name here loses no information.`;
+
+export type ExtractionLocale = "en" | "pt-PT" | "pt-BR";
+
+/**
+ * Account language for generated prose only. Merchant, amounts and ocrText
+ * stay as printed. English is the default and adds nothing, so existing
+ * prompt assertions keep matching SYSTEM_PROMPT.
+ */
+export function proseLanguageNote(locale: ExtractionLocale = "en"): string {
+  if (locale === "en") return "";
+  const name = locale === "pt-BR" ? "Brazilian Portuguese (pt-BR)" : "European Portuguese (pt-PT)";
+  return `
+
+Generated prose language: ${name}.
+Write "summary", every "products[].name", and every "notableItems[].name" and "notableItems[].reason" in ${name}.
+Keep "merchant", "ocrText", printed warranty quotations, amounts and dates exactly as they appear. Do not translate the store name or the raw transcription.
+Keep product names short (brand + model + product type). When you shorten a product type, use ${name} (for example "Aspirador Kärcher WDL 1s", not "Karcher WDL 1s vacuum").
+The reason is one short sentence in ${name}. Do not invent a manufacturer warranty. If the receipt does not state one, do not claim it in the reason.`;
+}
+
+export function extractionSystemPrompt(locale: ExtractionLocale = "en"): string {
+  return SYSTEM_PROMPT + proseLanguageNote(locale);
+}
 
 export const PRE_CHECK_SYSTEM_PROMPT = `You are a document classifier. Respond ONLY with a JSON object {"isReceipt":boolean,"fullPageDocument":boolean}. "isReceipt" is true if the image shows a purchase receipt, invoice, or proof of purchase from a store or service provider, and false for anything else (photos, selfies, screenshots of unrelated things, menus, and non-purchase documents). A valid receipt shows a seller and an amount paid or due for what was bought; items may be hard to read. "fullPageDocument" is true when the document is a full-page printed form or invoice (A4 or letter size sheet, e.g. a Brazilian DANFE/NF-e or a Portuguese "Fatura" on A4) and false for a narrow till receipt, "cupom"/ticket, card slip, screenshot or anything else.
 
@@ -188,18 +213,19 @@ function buildContentPart(base64: string, contentType: string, detail?: string) 
 export async function extractReceiptData(
   objectPath: string,
   contentType: string,
-  options: { fullPageDocument?: boolean } = {},
+  options: { fullPageDocument?: boolean; locale?: ExtractionLocale } = {},
 ): Promise<ExtractedReceipt> {
   const file = await objectStorageService.getObjectEntityFile(objectPath);
   const [buffer] = await file.download();
   const base64 = buffer.toString("base64");
+  const system = extractionSystemPrompt(options.locale);
 
   const request = (detail?: string) => openai.chat.completions.create({
     model: "gpt-5.4",
     max_completion_tokens: 8192,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: system },
       {
         role: "user",
         content: [
@@ -377,7 +403,7 @@ export async function precheckEmailIsReceipt(
  */
 export async function extractReceiptDataFromText(
   text: string,
-  meta: { subject?: string | null; from?: string | null; receivedAt?: string | null } = {},
+  meta: { subject?: string | null; from?: string | null; receivedAt?: string | null; locale?: ExtractionLocale } = {},
 ): Promise<ExtractedReceipt> {
   const header = [
     meta.from ? `From: ${meta.from}` : null,
@@ -390,7 +416,7 @@ export async function extractReceiptDataFromText(
     max_completion_tokens: 8192,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: `${SYSTEM_PROMPT}\n\n${TEXT_EMAIL_INSTRUCTIONS}` },
+      { role: "system", content: `${extractionSystemPrompt(meta.locale)}\n\n${TEXT_EMAIL_INSTRUCTIONS}` },
       {
         role: "user",
         content: `Extract the structured receipt data from this email.\n\n${header}\n\n${text}`,

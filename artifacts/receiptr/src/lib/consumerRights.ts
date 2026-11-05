@@ -289,6 +289,20 @@ export interface ConsumerRightsResult {
 // ── Main derivation ──────────────────────────────────────────────────────────
 
 /** Delivery date when known and not before the purchase; else the purchase date. */
+/** Amazon is suggested as online. The stored channel stays null until the user confirms. */
+export function merchantSuggestsOnline(merchant?: string | null): boolean {
+  return !!merchant && merchant.toLowerCase().includes("amazon");
+}
+
+/**
+ * A statutory withdrawal that starts on the purchase date is an estimate.
+ * Store-policy and user-saved windows are not statutory delivery periods.
+ */
+export function isProvisionalLegalEstimate(window: { startsFrom: "delivery" | "purchase"; source: string }): boolean {
+  if (window.startsFrom !== "purchase") return false;
+  return !/policy|política|politica|you saved|você salvou|guardado por si/i.test(window.source);
+}
+
 export function returnWindowStartDate(
   purchaseDate: string,
   deliveryDate?: string | null,
