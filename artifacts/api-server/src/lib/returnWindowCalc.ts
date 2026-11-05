@@ -179,9 +179,9 @@ export function calcReturnWindow(params: {
 }
 
 /**
- * A statutory withdrawal counted from the purchase date is only an estimate.
- * The legal period starts on delivery. Store policies and a number the user
- * saved are their own deadlines and stay confirmed.
+ * Label helper only. A statutory window that starts on the purchase date is an
+ * estimate until delivery is known. Reminders are unchanged: the sweep still
+ * uses the same deadline calcReturnWindow already returned.
  */
 export function isConfirmedStatutoryDeadline(window: { basis: string; startsFrom: "delivery" | "purchase" }): boolean {
   if (window.basis !== "law") return true;

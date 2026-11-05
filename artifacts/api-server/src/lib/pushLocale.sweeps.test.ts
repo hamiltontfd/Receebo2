@@ -43,7 +43,7 @@ beforeAll(async () => {
   ]);
   // Online purchase delivered/bought 13 days ago in PT: 14-day withdrawal closes tomorrow.
   const online = { merchant: "Worten", currency: "EUR", total: 499.99, isOnlinePurchase: true, purchaseCountry: "PT",
-    products: [{ name: "Televisor LG OLED", price: 499.99 }], purchaseDate: iso(-13), deliveryDate: iso(-13) };
+    products: [{ name: "Televisor LG OLED", price: 499.99 }], purchaseDate: iso(-13) };
   // EU legal warranty (2 years) ends in 10 days.
   const old = new Date(Date.now() + 10 * DAY); old.setUTCFullYear(old.getUTCFullYear() - 2);
   const warranty = { merchant: "Fnac", currency: "EUR", total: 89.9, isOnlinePurchase: false, category: "Electronics",

@@ -29,7 +29,7 @@ function reminderAccessChecker(): (userId: string) => Promise<boolean> {
   };
 }
 import { sendPushNotification } from "./pushNotifications";
-import { calcReturnWindow, isConfirmedStatutoryDeadline } from "./returnWindowCalc";
+import { calcReturnWindow } from "./returnWindowCalc";
 import { returnReminderPush, warrantyReminderPush } from "./reminderEmailCopy";
 import { getUserEmailLocale, type EmailLocale } from "./emailLocale";
 import { runDataRetentionSweep } from "./accountLifecycle";
@@ -594,9 +594,6 @@ export async function runReturnWindowSweep(): Promise<void> {
     });
 
     if (!window) continue;
-    // Purchase-date fallback for a statutory window (BR 7 days, PT/EU 14) is an
-    // estimate, not the legal deadline, so it must not send a reminder.
-    if (!isConfirmedStatutoryDeadline(window)) continue;
     const { deadlineDate, daysRemaining } = window;
     const reminder = {
       id: r.id,

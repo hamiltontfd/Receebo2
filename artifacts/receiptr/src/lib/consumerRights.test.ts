@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveConsumerRights, isProvisionalLegalEstimate, merchantSuggestsOnline, returnWindowStartDate } from "./consumerRights";
+import { deriveConsumerRights, isProvisionalLegalEstimate, merchantSuggestsOnline, returnWindowStartDate, showDeliveryDateField } from "./consumerRights";
 
 const local = (offsetDays: number) => {
   const d = new Date();
@@ -113,6 +113,10 @@ describe("channel suggestion and provisional estimate", () => {
     expect(merchantSuggestsOnline("AMAZON SERVICOS DE VAREJO")).toBe(true);
     expect(merchantSuggestsOnline("Magazine Luiza")).toBe(false);
     expect(merchantSuggestsOnline(null)).toBe(false);
+    expect(showDeliveryDateField(true, "Loja")).toBe(true);
+    expect(showDeliveryDateField(null, "Amazon.com.br")).toBe(true);
+    expect(showDeliveryDateField(false, "Amazon.com.br")).toBe(false);
+    expect(showDeliveryDateField(null, "Loja do bairro")).toBe(false);
   });
   it("Brazil online, delivery set: confirmed 7-day window; blank delivery: estimate; manufacturer stays separate", () => {
     const delivered = deriveConsumerRights({

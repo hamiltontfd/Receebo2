@@ -289,9 +289,16 @@ export interface ConsumerRightsResult {
 // ── Main derivation ──────────────────────────────────────────────────────────
 
 /** Delivery date when known and not before the purchase; else the purchase date. */
-/** Amazon is suggested as online. The stored channel stays null until the user confirms. */
+/** Amazon is indicated as online. A stored true/false from extraction still wins. */
 export function merchantSuggestsOnline(merchant?: string | null): boolean {
   return !!merchant && merchant.toLowerCase().includes("amazon");
+}
+
+/** Delivery date is editable for online receipts, and for Amazon while the channel is still unknown. */
+export function showDeliveryDateField(isOnlinePurchase: boolean | null | undefined, merchant?: string | null): boolean {
+  if (isOnlinePurchase === true) return true;
+  if (isOnlinePurchase === false) return false;
+  return merchantSuggestsOnline(merchant);
 }
 
 /**

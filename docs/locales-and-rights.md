@@ -96,15 +96,20 @@ needs a lawyer before it ships. Sources: `/workspace/receebo/consumer-rules-br-u
 - **PT/EU** unchanged (3-year / 2-year legal warranty), plus the manufacturer
   warranty card when the receipt states one.
 - Return windows count from delivery when known (session 16, item 5).
-- A statutory online window (BR 7 days, PT/EU 14) is a confirmed deadline only
-  when delivery is known. A blank delivery date keeps the purchase date as a
-  labeled provisional estimate and does not send a return reminder. The PT/EU
-  day counts themselves are unchanged.
-- Unknown channel asks the user. Amazon with a null channel is a suggestion of
-  online, which the user can correct. Neither case stores `true` by itself, and
-  neither hides the question. Manufacturer warranty is shown only when the
-  receipt states a length; otherwise the panel says it is not confirmed and
-  does not add it to the legal period.
+- A statutory online window (BR 7 days, PT/EU 14) is labeled a confirmed
+  deadline only when delivery is known. A blank delivery date still shows the
+  purchase date, clearly marked as a provisional estimate. Return reminders
+  are unchanged and still use that same calculated date.
+- The optional delivery date is edited only for an online receipt, or when
+  Amazon is the merchant and the channel is still unknown (the app indicates
+  online). The model still classifies Amazon, order confirmations and delivery
+  receipts as online. If it leaves the channel empty, the panel asks; Amazon
+  is indicated as online and the user can correct it. Nothing stores `true`
+  from the merchant name alone.
+- Manufacturer warranty is shown only when the receipt states a length.
+  Otherwise the panel says it is not confirmed. The CDC art. 26 period (90 or
+  30 days) stays the legal complaint deadline and is never presented as the
+  manufacturer warranty, and the two are never added.
 - The same panel is used on scan review, the receipt page and the search sheet.
 
 ## Legal documents (`legalDocuments.ts`)

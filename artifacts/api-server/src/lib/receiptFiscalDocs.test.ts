@@ -45,10 +45,11 @@ describe("fiscal invoices (Brazilian DANFE / NF-e, PT faturas)", () => {
     for (const term of ["Orçamento", "Boleto", "bank statements"]) expect(FISCAL_DOCUMENTS_NOTE).toContain(term);
   });
 
-  it("writes generated prose in the account language and does not treat Amazon as proof of online", () => {
+  it("keeps Amazon as an online signal and writes generated prose in the account language", () => {
     expect(extractionSystemPrompt("en")).toBe(SYSTEM_PROMPT);
     expect(extractionSystemPrompt()).toBe(SYSTEM_PROMPT);
-    expect(SYSTEM_PROMPT).toMatch(/Amazon is not proof/);
+    expect(SYSTEM_PROMPT).toMatch(/order confirmation, Amazon, web store, delivery receipt/);
+    expect(SYSTEM_PROMPT).not.toMatch(/Amazon is not proof/);
     expect(SYSTEM_PROMPT).toMatch(/Do not invent a manufacturer warranty/);
     const pt = extractionSystemPrompt("pt-BR");
     expect(pt).toContain("Brazilian Portuguese (pt-BR)");
