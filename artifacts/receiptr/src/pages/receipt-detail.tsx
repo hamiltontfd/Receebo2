@@ -30,6 +30,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { ReceiptReview } from "@/components/ReceiptReview";
 import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
+import { showDeliveryDateField } from "@/lib/consumerRights";
 import { PurchaseCountryField, PurchaseCountryValue } from "@/components/PurchaseCountryField";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { StoreFullscreen } from "@/components/StoreFullscreen";
@@ -149,7 +150,9 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
         data: {
           merchant: data.merchant,
           purchaseDate: data.purchaseDate,
-          deliveryDate: data.deliveryDate ? data.deliveryDate : null,
+          ...(showDeliveryDateField(data.isOnlinePurchase, data.merchant)
+            ? { deliveryDate: data.deliveryDate ? data.deliveryDate : null }
+            : {}),
           total: data.total,
           currency: data.currency,
           category: data.category,
@@ -455,20 +458,22 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="deliveryDate"
-                  render={({ field }) => (
-                    <FormItem className="p-4 space-y-1">
-                      <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="detail-delivery-date">{appText("Delivered on (optional)")}</FormLabel>
-                      <FormControl>
-                        <Input id="detail-delivery-date" type="date" data-testid="detail-delivery-date" {...field} value={field.value ?? ""} className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground">{appText("Leave blank to use the purchase date only as an estimate.")}</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {showDeliveryDateField(form.watch("isOnlinePurchase"), form.watch("merchant")) && (
+                  <FormField
+                    control={form.control}
+                    name="deliveryDate"
+                    render={({ field }) => (
+                      <FormItem className="p-4 space-y-1">
+                        <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="detail-delivery-date">{appText("Delivered on (optional)")}</FormLabel>
+                        <FormControl>
+                          <Input id="detail-delivery-date" type="date" data-testid="detail-delivery-date" {...field} value={field.value ?? ""} className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">{appText("Leave blank to use the purchase date only as an estimate.")}</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
                   name="isOnlinePurchase"

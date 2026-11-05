@@ -301,6 +301,13 @@ export function showDeliveryDateField(isOnlinePurchase: boolean | null | undefin
   return merchantSuggestsOnline(merchant);
 }
 
+/** The old "we cannot tell / store usually allows N days" note, when one exists. */
+export function unknownChannelRetailerNote(locale: AppLocale | undefined, merchant?: string | null): string | null {
+  const retailer = findRetailer(merchant);
+  if (!retailer) return null;
+  return rightsCopy(locale).unknownChannelStorePolicy(merchant ?? "", retailer.days);
+}
+
 /**
  * A statutory withdrawal that starts on the purchase date is an estimate.
  * Store-policy and user-saved windows are not statutory delivery periods.

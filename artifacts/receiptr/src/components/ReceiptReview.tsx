@@ -22,6 +22,7 @@ import { useAccountRegion } from "@/lib/region";
 import { WarrantyQuickPick } from "@/components/WarrantyQuickPick";
 import { PurchaseCountryField } from "@/components/PurchaseCountryField";
 import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
+import { showDeliveryDateField } from "@/lib/consumerRights";
 
 interface ReviewFields {
   merchant: string;
@@ -92,7 +93,9 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
             category: fields.category,
             warranty: fields.warranty,
             purchaseCountry: fields.purchaseCountry || null,
-            deliveryDate: fields.deliveryDate ? fields.deliveryDate : null,
+            ...(showDeliveryDateField(fields.isOnlinePurchase, fields.merchant)
+              ? { deliveryDate: fields.deliveryDate ? fields.deliveryDate : null }
+              : {}),
             isOnlinePurchase: fields.isOnlinePurchase,
             ...(total !== undefined && Number.isFinite(total) ? { total } : {}),
           },
@@ -207,11 +210,13 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
             value={fields.purchaseCountry || null}
             onChange={(v) => set("purchaseCountry")(v ?? "")}
           />
-          <div className="p-4 space-y-1">
-            <label className={label} htmlFor="review-delivery">{appText("Delivered on (optional)")}</label>
-            <Input id="review-delivery" type="date" data-testid="review-delivery-date" value={fields.deliveryDate} onChange={(e) => set("deliveryDate")(e.target.value)} className={field} />
-            <p className="text-xs text-muted-foreground">{appText("Leave blank to use the purchase date only as an estimate.")}</p>
-          </div>
+          {showDeliveryDateField(fields.isOnlinePurchase, fields.merchant) && (
+            <div className="p-4 space-y-1">
+              <label className={label} htmlFor="review-delivery">{appText("Delivered on (optional)")}</label>
+              <Input id="review-delivery" type="date" data-testid="review-delivery-date" value={fields.deliveryDate} onChange={(e) => set("deliveryDate")(e.target.value)} className={field} />
+              <p className="text-xs text-muted-foreground">{appText("Leave blank to use the purchase date only as an estimate.")}</p>
+            </div>
+          )}
         </div>
 
         <ConsumerRightsPanel

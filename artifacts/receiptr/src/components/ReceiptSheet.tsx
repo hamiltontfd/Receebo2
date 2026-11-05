@@ -14,6 +14,7 @@ import {
   Sparkles, Package, Shield, Star,
 } from "lucide-react";
 import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
+import { showDeliveryDateField } from "@/lib/consumerRights";
 import { useAccountRegion } from "@/lib/region";
 import { usStoreReturnWindow } from "@/lib/usStorePolicies";
 import { WarrantyQuickPick } from "@/components/WarrantyQuickPick";
@@ -225,7 +226,9 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
         data: {
           merchant: data.merchant,
           purchaseDate: data.purchaseDate,
-          deliveryDate: data.deliveryDate ? data.deliveryDate : null,
+          ...(showDeliveryDateField(data.isOnlinePurchase, data.merchant)
+            ? { deliveryDate: data.deliveryDate ? data.deliveryDate : null }
+            : {}),
           total: data.total,
           currency: data.currency,
           category: data.category,
@@ -628,20 +631,22 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             );
                           }}
                         />
-                        <FormField
-                          control={form.control}
-                          name="deliveryDate"
-                          render={({ field }) => (
-                            <FormItem className="p-4 space-y-1">
-                              <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Delivered on (optional)")}</FormLabel>
-                              <FormControl>
-                                <Input type="date" {...field} value={field.value ?? ""} data-testid="input-delivery-date" className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
-                              </FormControl>
-                              <p className="text-xs text-muted-foreground">{appText("Online orders: the return window counts from delivery.")} {appText("Leave blank to use the purchase date only as an estimate.")}</p>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        {showDeliveryDateField(form.watch("isOnlinePurchase"), form.watch("merchant")) && (
+                          <FormField
+                            control={form.control}
+                            name="deliveryDate"
+                            render={({ field }) => (
+                              <FormItem className="p-4 space-y-1">
+                                <FormLabel className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Delivered on (optional)")}</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} value={field.value ?? ""} data-testid="input-delivery-date" className="border-0 px-0 h-auto py-0 font-medium focus-visible:ring-0 shadow-none" />
+                                </FormControl>
+                                <p className="text-xs text-muted-foreground">{appText("Online orders: the return window counts from delivery.")} {appText("Leave blank to use the purchase date only as an estimate.")}</p>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                         {isUs && (
                           <FormField
                             control={form.control}

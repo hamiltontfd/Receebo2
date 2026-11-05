@@ -59,6 +59,8 @@ describe("ConsumerRightsPanel — same receipt, capture and later detail", () =>
     const choose = vi.fn();
     render(<ConsumerRightsPanel receipt={vacuum({ isOnlinePurchase: null, deliveryDate: null })} onChooseChannel={choose} />);
     expect(screen.getByTestId("text-amazon-suggest").textContent).toMatch(/Sugerimos que esta compra na Amazon foi online/);
+    expect(screen.queryByText(/Não dá para saber pelo recibo/)).toBeNull();
+    expect(screen.queryByText(/costuma aceitar devoluções/)).toBeNull();
     expect(screen.queryByTestId("card-return-window")).toBeNull();
     expect(screen.queryByTestId("card-return-provisional")).toBeNull();
     screen.getByTestId("button-channel-online").click();
@@ -69,6 +71,25 @@ describe("ConsumerRightsPanel — same receipt, capture and later detail", () =>
     setAccountLocale("en");
     render(<ConsumerRightsPanel receipt={vacuum({ merchant: "Loja do bairro", isOnlinePurchase: null })} />);
     expect(screen.getByTestId("text-channel-ask").textContent).toMatch(/online or in store/);
+    expect(screen.queryByTestId("text-delivery-missing")).toBeNull();
     expect(screen.queryByTestId("card-return-window")).toBeNull();
+  });
+
+  it("keeps the store-policy note for an unknown channel that is not Amazon", () => {
+    setAccountLocale("pt-BR");
+    render(<ConsumerRightsPanel receipt={vacuum({
+      merchant: "Zara", purchaseCountry: "PT", currency: "EUR", category: "Clothing & Apparel",
+      isOnlinePurchase: null, deliveryDate: null,
+    })} />);
+    expect(screen.getByTestId("text-channel-ask")).toBeInTheDocument();
+    expect(screen.getByTestId("list-rights-notes").textContent).toMatch(/Não dá para saber pelo recibo/);
+    expect(screen.getByTestId("list-rights-notes").textContent).toMatch(/30 dias/);
+  });
+
+  it("does not mention a missing delivery date for an in-store purchase", () => {
+    setAccountLocale("pt-BR");
+    render(<ConsumerRightsPanel receipt={vacuum({ isOnlinePurchase: false, deliveryDate: null })} />);
+    expect(screen.queryByTestId("text-delivery-missing")).toBeNull();
+    expect(screen.queryByTestId("text-amazon-suggest")).toBeNull();
   });
 });

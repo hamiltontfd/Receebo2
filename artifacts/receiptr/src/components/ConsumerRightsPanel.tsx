@@ -4,6 +4,8 @@ import {
   deriveConsumerRights,
   isProvisionalLegalEstimate,
   merchantSuggestsOnline,
+  showDeliveryDateField,
+  unknownChannelRetailerNote,
   usRightsCopy,
 } from "@/lib/consumerRights";
 import { formatLocaleDate, useAppLocale } from "@/lib/locale";
@@ -67,7 +69,10 @@ export function ConsumerRightsPanel({
   if (!rights.hasAny && !askChannel) return null;
 
   const amazon = merchantSuggestsOnline(receipt.merchant);
+  const showDelivery = showDeliveryDateField(receipt.isOnlinePurchase, receipt.merchant);
   const isUs = region === "US";
+  const suppressedUnknownNote = amazon && askChannel ? unknownChannelRetailerNote(locale, receipt.merchant) : null;
+  const notes = suppressedUnknownNote ? rights.notes.filter((note) => note !== suppressedUnknownNote) : rights.notes;
   const provisional = !!rights.returnWindow && isProvisionalLegalEstimate(rights.returnWindow);
   const urgencyClass = {
     green: "bg-emerald-50 border-emerald-200 text-emerald-700",
@@ -120,7 +125,7 @@ export function ConsumerRightsPanel({
           </div>
         )}
 
-        {!noDates && receipt.purchaseDate && !receipt.deliveryDate && (
+        {showDelivery && !noDates && receipt.purchaseDate && !receipt.deliveryDate && (
           <p className="px-1 text-xs text-muted-foreground" data-testid="text-delivery-missing">
             {appText("Delivery not informed")}
           </p>
@@ -205,9 +210,9 @@ export function ConsumerRightsPanel({
           </div>
         )}
 
-        {rights.notes.length > 0 && (
+        {notes.length > 0 && (
           <ul className="space-y-1 px-1 text-xs leading-5 text-muted-foreground" data-testid="list-rights-notes">
-            {rights.notes.map((note) => <li key={note}>{note}</li>)}
+            {notes.map((note) => <li key={note}>{note}</li>)}
           </ul>
         )}
         {rights.hasAny && (

@@ -45,6 +45,25 @@ function mount(receipt: Record<string, unknown>, region: "PT" | "US" = "PT") {
 
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
+describe("ReceiptSheet delivery date", () => {
+  const goods = { ...base, merchant: "Loja", purchaseCountry: "BR", currency: "BRL", category: "Home", purchaseType: "goods", total: 339 };
+
+  it("shows the optional delivery date when the purchase is online", () => {
+    mount({ ...goods, isOnlinePurchase: true });
+    fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
+    expect(screen.getByTestId("input-delivery-date")).toBeInTheDocument();
+  });
+
+  it("hides the delivery date for an in-store purchase and does not clear it on save", async () => {
+    mount({ ...goods, isOnlinePurchase: false, deliveryDate: "2026-11-03" });
+    fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
+    expect(screen.queryByTestId("input-delivery-date")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Save Changes/ }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+    expect(mocks.update.mock.calls[0][0].data).not.toHaveProperty("deliveryDate");
+  });
+});
+
 describe("ReceiptSheet: 'This is a subscription'", () => {
   it("shows only a note (no return window or warranty) for a subscription", () => {
     mount({ ...base, purchaseType: "subscription", purchaseTypeSource: "ai" });

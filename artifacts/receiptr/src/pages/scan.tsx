@@ -26,6 +26,7 @@ import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { currencySymbol } from "@/lib/currency";
 import { PurchaseCountryField } from "@/components/PurchaseCountryField";
 import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
+import { showDeliveryDateField } from "@/lib/consumerRights";
 import { compressImage, compressedFileName } from "@/lib/compressImage";
 import { CATEGORIES, categoryStyle } from "@/lib/categories";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -606,7 +607,9 @@ export default function Scan() {
           category: form.category || undefined,
           warranty: form.warranty || undefined,
           purchaseCountry: form.purchaseCountry || null,
-          deliveryDate: form.deliveryDate ? form.deliveryDate : null,
+          ...(showDeliveryDateField(form.isOnlinePurchase, form.merchant || receipt?.merchant)
+            ? { deliveryDate: form.deliveryDate ? form.deliveryDate : null }
+            : {}),
           isOnlinePurchase: form.isOnlinePurchase,
           isDraft: false,
         },
@@ -1213,18 +1216,20 @@ export default function Scan() {
               />
             </div>
 
-            <div className="rounded-xl border p-4 space-y-1">
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="scan-delivery-date">{appText("Delivered on (optional)")}</label>
-              <Input
-                id="scan-delivery-date"
-                type="date"
-                data-testid="scan-delivery-date"
-                value={form.deliveryDate}
-                onChange={(e) => setForm((f) => ({ ...f, deliveryDate: e.target.value }))}
-                className="border-0 px-0 font-medium focus-visible:ring-0 shadow-none"
-              />
-              <p className="text-xs text-muted-foreground">{appText("Leave blank to use the purchase date only as an estimate.")}</p>
-            </div>
+            {showDeliveryDateField(form.isOnlinePurchase, form.merchant || receipt?.merchant) && (
+              <div className="rounded-xl border p-4 space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="scan-delivery-date">{appText("Delivered on (optional)")}</label>
+                <Input
+                  id="scan-delivery-date"
+                  type="date"
+                  data-testid="scan-delivery-date"
+                  value={form.deliveryDate}
+                  onChange={(e) => setForm((f) => ({ ...f, deliveryDate: e.target.value }))}
+                  className="border-0 px-0 font-medium focus-visible:ring-0 shadow-none"
+                />
+                <p className="text-xs text-muted-foreground">{appText("Leave blank to use the purchase date only as an estimate.")}</p>
+              </div>
+            )}
 
             {receipt?.products && receipt.products.length > 0 && (
               <div className="rounded-xl border p-4">
