@@ -309,3 +309,10 @@ Branch `launch` from `sec-enc` (ce63318; Replit d6bdc47).
 - Research (no code, no secrets): `MARKET_TRUSTED_PROXY_CIDRS` for the Replit autoscale path (Google Front End: `X-Forwarded-For: [supplied,]<client>,<load-balancer-ip>`, Cloud Run peer in 169.254.0.0/16) and the first run of `DATA_DELETION_ENABLED=true` (no immediate deletion; overdue accounts get only the 7-day final warning). Details in the session report.
 - Tests: lib/emailFormat.test.ts (5), lib/reminderPush.test.ts (5), lib/pushLocale.sweeps.test.ts (2, local PG), routes/legalReacceptance.test.ts (2, local PG), pages/legalPages.test.tsx (2). Typecheck clean. API 605 passed, 4 env-baseline failures (trialFunnel, outlookDailySweep), 2 skipped (611); web 495 passed, 3 baseline failures (498).
 - Not pushed or published; no DB access outside the local test database; Stripe, cron, secrets and production data untouched.
+
+## 2026-11-05 — Session 30: How it works + security on the landing (Grok Bot; Hamilton via Designer: "Aprovo How it works + segurança; envia ao Engineer para implementar em dev")
+Branch `landing-sec` from `launch` (a65b673; Replit tree matches 3ed1f5b per Engineer check). Designer mockup + COPY.md in `/workspace/receebo/social/security-trust-landing/`; no hero trust badge.
+- New `HowItWorksSection`: 3 steps, step 3 highlighted with notification mock (en/us Best Buy; pt-PT Worten; pt-BR Magalu); trial line under the steps. `/us` keeps manufacturer-only warranty wording in every language.
+- New `SecuritySection` (`id="security"`) immediately after How it works: AES-256-GCM details at rest, HTTPS, never sell, delete anytime. No ISO/SOC/GDPR seals; not “everything encrypted”; no Gmail; no EU hosting claim.
+- Wired into `LandingContent` for `/` and `/us`. Screenshots (box only): `/workspace/receebo/landing-sec/`. Transfer bundle prepared, not applied to Replit; no publish; no git push.
+- Tests: new HowItWorksSecurity.test.tsx (5). Web 500 passed, 3 baseline failures (icons + two US Best Buy date tests) (503). Typecheck clean.

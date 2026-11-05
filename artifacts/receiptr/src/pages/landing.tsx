@@ -25,6 +25,8 @@ import ComparisonSection from "./landing/ComparisonSection";
 import PricingSection from "./landing/PricingSection";
 import FAQSection from "./landing/FAQSection";
 import FinalCTASection from "./landing/FinalCTASection";
+import HowItWorksSection from "./landing/HowItWorksSection";
+import SecuritySection from "./landing/SecuritySection";
 
 /* ── Scroll-aware nav ──────────────────────────────────────────────────── */
 function useScrolled(threshold = 40) {
@@ -125,6 +127,8 @@ export function LandingContent({ variant, isSignedIn = false, checkout, marketSe
           {!us && <WhyReceeboSection />}
           <EmailReceiptsSection />
           {us ? <UsReturnsSection /> : <ConsumerProtectionSection />}
+          <HowItWorksSection variant={variant} />
+          <SecuritySection />
           <ComparisonSection />
           <PricingSection checkout={checkout} />
           <FAQSection />
