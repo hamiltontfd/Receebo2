@@ -1,6 +1,8 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { normalizeCategory } from "./categories";
+import { senderDomain } from "./mailProviders/merchants";
 import { normalizePurchaseType, type PurchaseType } from "./purchaseType";
+import { countryFromStoreDomain, normalizeCountryCode, resolvePurchaseCountry } from "./purchaseCountry";
 import { ObjectStorageService } from "./objectStorage";
 import { logger } from "./logger";
 
@@ -33,6 +35,12 @@ export type ExtractedReceipt = {
   products: ExtractedProduct[];
   notableItems: ExtractedNotableItem[];
   purchaseCountry: string | null;
+  /** Delivery-address country. Online rules use it before the store domain. Not stored on its own. */
+  deliveryCountry: string | null;
+  /** Storefront hostname (amazon.es). Not stored on its own. */
+  storeDomain: string | null;
+  /** Seller's legal seat. Online rules use it only after delivery and the store domain. Not stored on its own. */
+  sellerCountry: string | null;
   isOnlinePurchase: boolean | null;
   /** Date the goods were actually delivered, when the document states it (YYYY-MM-DD). */
   deliveryDate: string | null;
@@ -70,7 +78,10 @@ Respond ONLY with a JSON object matching this exact shape:
   "ocrText": string | null,         // the full raw text content transcribed from the receipt, preserving line breaks
   "warranty": string | null,        // warranty or return-policy information printed on the receipt (e.g. "2-year manufacturer warranty", "30-day returns"), or null if none is mentioned
   "transactionNumber": string | null, // the transaction/receipt/confirmation number printed on the receipt (e.g. "TXN-4821039", "#00123456", "Order #123"), or null if not present
-  "purchaseCountry": string | null,   // ISO-3166-1 alpha-2 country code where the purchase was made (e.g. "PT", "US", "BR", "DE"), inferred from currency, merchant name, address, language, or domain. null if not determinable.
+  "purchaseCountry": string | null,   // In-store: ISO-3166-1 alpha-2 country of the shop (e.g. "PT", "US", "BR", "DE"). Online: leave null; the server decides. null if not determinable.
+  "deliveryCountry": string | null,   // ISO country of the DELIVERY / shipping address (where the goods were sent). null if the document has no delivery address. Never the seller's registered office.
+  "storeDomain": string | null,       // storefront hostname the order was placed on, e.g. "amazon.es", "amazon.com.br", "amazon.com", from the site or the sender address. null if not shown. Not the seller's company name.
+  "sellerCountry": string | null,     // ISO country of the seller's legal seat / registered office (Amazon EU S.à r.l. is "LU"). null if not shown.
   "isOnlinePurchase": boolean | null, // true if this is an e-commerce / online / distance purchase (order confirmation, Amazon, web store, delivery receipt, etc.); false if in-store; null if unclear.
   "purchaseType": string | null,    // exactly one of "goods", "subscription", "digital", "service", "ticket" (see rules), or null if unclear
   "deliveryDate": string | null,    // the date the goods were actually DELIVERED ("delivered on", "entregue em", "data de entrega" of a completed delivery) in strict YYYY-MM-DD format. null if not stated, or if only an estimated/expected delivery date is shown ("arrives by", "previsão de entrega", "entrega prevista").
@@ -93,6 +104,7 @@ Rules:
 - Use null for any field you genuinely cannot determine. Do not invent values.
 - NEVER guess. Every merchant, date, amount and item must be copied from text you can actually read in the image. Do not fill gaps from the store name, from what the store usually sells, or from typical prices. If a value is unreadable, return null for it (and an empty "products" array if the item lines are unreadable) and set "legible" to false. A partial but true answer is better than a complete invented one.
 - purchaseDate: when a document shows several dates, prefer the transaction/order/issue date. A payment due date, billing period end or delivery date is never the purchase date.
+- Online purchase (isOnlinePurchase true): fill "deliveryCountry" from the delivery address only, "storeDomain" from the storefront, and "sellerCountry" from the seller's legal seat. Do not put the registered office in "deliveryCountry" or "purchaseCountry". The server sets the rules country from the delivery country, then the store domain, then the legal seat. In-store: "purchaseCountry" is the shop's country; leave the three online fields null unless they are printed.
 - "total" and "price" must be numbers (e.g. 12.99), never strings, and must not include currency symbols.
 - Transcribe ocrText faithfully, including item lines, taxes, and totals.
 - purchaseType: "subscription" for recurring plans and renewals (iCloud+, Apple One, Apple Music, Spotify, Netflix, Google One, Microsoft 365, any "Renews on…", monthly or annual plan, membership); "digital" for a one-off digital purchase with nothing physical delivered (an app, an in-app purchase, a film, series or e-book bought or rented, game DLC); "ticket" for tickets to a dated event (concert, cinema, theatre, sports, festival, museum); "service" for work done for the buyer (repair, installation, course, consultation, cleaning); "goods" for physical products, including a product sold together with a service. Gift cards and vouchers are "goods". Use null only when it is genuinely unclear.
@@ -265,7 +277,7 @@ export function toIsoDateOrNull(value: unknown): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 }
 
-export function parseExtraction(raw: string): ExtractedReceipt {
+export function parseExtraction(raw: string, hints?: { storeDomain?: string | null }): ExtractedReceipt {
   let parsed: Partial<ExtractedReceipt> = {};
   try {
     parsed = JSON.parse(raw);
@@ -318,15 +330,27 @@ export function parseExtraction(raw: string): ExtractedReceipt {
   const legibleRaw = (parsed as Record<string, unknown>).legible;
   const legible = typeof legibleRaw === "boolean" ? legibleRaw : null;
 
-  const purchaseCountryRaw = toStringOrNull((parsed as ExtractedReceipt).purchaseCountry);
-  const purchaseCountry =
-    purchaseCountryRaw && /^[A-Za-z]{2}$/.test(purchaseCountryRaw)
-      ? purchaseCountryRaw.toUpperCase()
-      : null;
+  const purchaseCountryRaw = normalizeCountryCode((parsed as ExtractedReceipt).purchaseCountry);
+  const deliveryCountry = normalizeCountryCode((parsed as ExtractedReceipt).deliveryCountry);
+  const sellerCountry = normalizeCountryCode((parsed as ExtractedReceipt).sellerCountry);
+  const modelDomain = toStringOrNull((parsed as ExtractedReceipt).storeDomain);
+  const hintedDomain = hints?.storeDomain ?? null;
+  // A printed storefront wins. A sender domain fills in only when the model
+  // value is missing or is not a hostname with a country (a company name).
+  const storeDomain = countryFromStoreDomain(modelDomain) ? modelDomain
+    : countryFromStoreDomain(hintedDomain) ? hintedDomain
+    : modelDomain ?? hintedDomain;
 
   const isOnlinePurchaseRaw = (parsed as ExtractedReceipt).isOnlinePurchase;
   const isOnlinePurchase =
     typeof isOnlinePurchaseRaw === "boolean" ? isOnlinePurchaseRaw : null;
+  const purchaseCountry = resolvePurchaseCountry({
+    isOnlinePurchase,
+    purchaseCountry: purchaseCountryRaw,
+    deliveryCountry,
+    storeDomain,
+    sellerCountry,
+  });
 
   return {
     isReceipt,
@@ -342,6 +366,9 @@ export function parseExtraction(raw: string): ExtractedReceipt {
     products,
     notableItems,
     purchaseCountry,
+    deliveryCountry,
+    storeDomain,
+    sellerCountry,
     isOnlinePurchase,
     deliveryDate,
     purchaseType: normalizePurchaseType((parsed as Record<string, unknown>).purchaseType),
@@ -423,5 +450,7 @@ export async function extractReceiptDataFromText(
     ],
   });
 
-  return parseExtraction(completion.choices[0]?.message?.content ?? "{}");
+  return parseExtraction(completion.choices[0]?.message?.content ?? "{}", {
+    storeDomain: senderDomain(meta.from),
+  });
 }

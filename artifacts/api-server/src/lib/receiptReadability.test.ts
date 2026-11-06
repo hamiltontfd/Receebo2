@@ -11,7 +11,8 @@ const base = (over: Partial<ExtractedReceipt> = {}): ExtractedReceipt => ({
     { name: "Cimento CSN CPIII 50kg", quantity: 1, price: 35.5 },
     { name: "Clarofilito 18kg Argamil", quantity: 2, price: 25 },
   ],
-  notableItems: [], purchaseCountry: "BR", isOnlinePurchase: false, deliveryDate: null,
+  notableItems: [], purchaseCountry: "BR", deliveryCountry: null, storeDomain: null, sellerCountry: null,
+  isOnlinePurchase: false, deliveryDate: null,
   purchaseType: "goods", legible: true, ...over,
 });
 

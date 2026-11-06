@@ -216,6 +216,12 @@ switch these documents or claim legal approval.
 ### Purchase country
 - Scan review, email-import review, receipt details and the receipt sheet expose
   the actual ISO-3166-1 alpha-2 country, including Unknown (`null`).
+- Online purchases take that country from the delivery address printed on the
+  receipt, invoice or email, then from the storefront domain (`amazon.es` is ES,
+  `amazon.com.br` is BR, `amazon.com` is US), and only then from the seller's
+  legal seat. In-store purchases keep the shop country. The three signals are
+  extraction inputs; only the resolved country is stored in `purchase_country`.
+  No new column. The existing country control still corrects it by hand.
 - Manual updates validate real country codes. EU is a market grouping, not a
   purchase country: DE, FR and PT stay distinct. Existing currency/merchant
   rules inference remains an alternative when the country is unknown, not a
