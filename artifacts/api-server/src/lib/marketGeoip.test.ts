@@ -36,6 +36,22 @@ describe("proxy trust boundary", () => {
   it("walks verified proxy networks right to left, stopping before attacker-prepended IP", () => {
     expect(clientPublicIp("127.0.0.1", "1.1.1.1, 8.8.8.8, 10.0.0.3", "127.0.0.1/32,10.0.0.3/32")).toBe("8.8.8.8");
   });
+  it("skips a Google edge hop and keeps the Portuguese client, without trusting a direct Google peer", () => {
+    const prod = "127.0.0.1/32,::1/128,169.254.0.0/16,34.111.179.208/32,34.117.33.233/32";
+    const client = "89.181.171.141";
+    const belgiumEdge = "130.211.85.85";
+    expect(suggestMarket(client)).toEqual({ country: "PT", market: "PT" });
+    expect(suggestMarket(belgiumEdge).country).toBe("BE");
+    expect(clientPublicIp("34.111.179.208", `${client}, ${belgiumEdge}`, prod)).toBe(client);
+    expect(clientPublicIp("34.117.33.233", `${client}, 35.191.1.1`, prod)).toBe(client);
+    expect(clientPublicIp("169.254.8.1", `${client}, 130.211.1.1`, prod)).toBe(client);
+    // The edge address is not a trusted peer: its X-Forwarded-For is ignored.
+    expect(clientPublicIp(belgiumEdge, client, prod)).toBe(belgiumEdge);
+    // A fake address prepended by the client stays to the left of the real client.
+    expect(clientPublicIp("127.0.0.1", `1.1.1.1, ${client}, ${belgiumEdge}`, prod)).toBe(client);
+    // A direct untrusted peer cannot inject Portugal through the same header.
+    expect(clientPublicIp("8.8.8.8", `${client}, ${belgiumEdge}`, prod)).toBe("8.8.8.8");
+  });
   it("fails closed for missing, malformed, all-trusted and oversized chains", () => {
     for (const chain of [undefined, "bad", "8.8.8.8, bad", "127.0.0.1", ["8.8.8.8"], "8.8.8.8,".repeat(300)]) {
       expect(clientPublicIp("127.0.0.1", chain, "127.0.0.1/32")).toBeNull();

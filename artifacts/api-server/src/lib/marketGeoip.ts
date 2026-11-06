@@ -19,26 +19,81 @@ function parseIp(value: string) {
   } catch { return null; }
 }
 
-/** Only explicit operator-verified proxy networks are trusted. Never trust a hop count. */
+/**
+ * Google Front End proxies in front of a global external Application Load Balancer.
+ * Published as "GFE proxy ranges" in
+ * https://cloud.google.com/load-balancing/docs/firewall-rules
+ * (checked 6 Nov 2026). These sit inside goog.json parents (35.184.0.0/13 and
+ * 130.211.0.0/16) but are not customer ranges in cloud.json.
+ * 130.211.48.0/20 + 130.211.64.0/19 + 130.211.96.0/20 are the rest of Google's
+ * own 130.211.0.0/16 (goog.json, absent from cloud.json) that geoip-country
+ * 5.0.20261028 places in BE — europe-west1, where Replit's edge hop showed up.
+ * They do not authorize reading X-Forwarded-For; only MARKET_TRUSTED_PROXY_CIDRS does.
+ */
+export const GOOGLE_EDGE_CIDRS = [
+  "35.191.0.0/16",
+  "130.211.0.0/22",
+  "2600:2d00:1:1::/64",
+  "130.211.48.0/20",
+  "130.211.64.0/19",
+  "130.211.96.0/20",
+] as const;
+
+type Network = [ipaddr.IPv4 | ipaddr.IPv6, number];
+function parseNetworks(cidrs: readonly string[]): Network[] {
+  return cidrs.map((cidr) => {
+    try { return ipaddr.parseCIDR(cidr.trim()); } catch { return null; }
+  }).filter((network): network is Network => network !== null);
+}
+const GOOGLE_EDGE = parseNetworks(GOOGLE_EDGE_CIDRS);
+const matches = (ip: ipaddr.IPv4 | ipaddr.IPv6, networks: Network[]) => networks.some(([net, bits]) =>
+  ip.kind() === net.kind() && ip.match(net, bits));
+
+export type HopKind = "trusted" | "google" | "client" | "other";
+export type ChainShape = { hops: number; kinds: HopKind[]; countries: Array<string | null> };
+
+function hopKind(ip: ipaddr.IPv4 | ipaddr.IPv6, trustedNets: Network[]): HopKind {
+  if (matches(ip, GOOGLE_EDGE)) return "google";
+  if (matches(ip, trustedNets)) return "trusted";
+  return ip.range() === "unicast" ? "client" : "other";
+}
+const skipHop = (ip: ipaddr.IPv4 | ipaddr.IPv6, trustedNets: Network[]) => {
+  const kind = hopKind(ip, trustedNets);
+  return kind === "trusted" || kind === "google";
+};
+
+let loggedChainShape = false;
+function logChainShape(shape: ChainShape) {
+  if (loggedChainShape) return;
+  loggedChainShape = true;
+  // Kinds and country codes only. Never the addresses.
+  logger.info({ hops: shape.hops, kinds: shape.kinds, countries: shape.countries }, "Market GeoIP chain shape");
+}
+
+/** Only explicit operator-verified proxy networks may open X-Forwarded-For. Never trust a hop count. */
 export function clientPublicIp(
   remoteAddress: string | undefined,
   forwarded: string | string[] | undefined,
   trustedCidrs = process.env.MARKET_TRUSTED_PROXY_CIDRS ?? "",
 ): string | null {
-  const networks = trustedCidrs.split(",").filter(Boolean).map((cidr) => {
-    try { return ipaddr.parseCIDR(cidr.trim()); } catch { return null; }
-  }).filter((network): network is [ipaddr.IPv4 | ipaddr.IPv6, number] => network !== null);
-  const trusted = (ip: ipaddr.IPv4 | ipaddr.IPv6) => networks.some(([net, bits]) =>
-    ip.kind() === net.kind() && ip.match(net, bits));
+  const networks = parseNetworks(trustedCidrs.split(",").filter(Boolean));
+  const trusted = (ip: ipaddr.IPv4 | ipaddr.IPv6) => matches(ip, networks);
   let current = parseIp(remoteAddress ?? "");
   if (!current) return null;
   // An untrusted peer cannot supply its own IP, even through any other header.
+  // Google edge ranges are skipped inside an already-trusted walk; they do not start one.
   if (trusted(current)) {
     if (typeof forwarded !== "string" || forwarded.length > 2048) return null;
     const chain = forwarded.split(",").map((part) => parseIp(part.trim()));
     if (!chain.length || chain.length > 16 || chain.some((ip) => !ip)) return null;
-    for (let i = chain.length - 1; i >= 0 && trusted(current); i--) current = chain[i]!;
-    if (trusted(current)) return null;
+    const hops = chain as Array<ipaddr.IPv4 | ipaddr.IPv6>;
+    logChainShape({
+      hops: hops.length,
+      kinds: hops.map((ip) => hopKind(ip, networks)),
+      countries: hops.map((ip) => ip.range() === "unicast" ? suggestMarket(ip.toString()).country : null),
+    });
+    for (let i = hops.length - 1; i >= 0 && skipHop(current, networks); i--) current = hops[i]!;
+    if (skipHop(current, networks)) return null;
   }
   return current.range() === "unicast" ? current.toString() : null;
 }

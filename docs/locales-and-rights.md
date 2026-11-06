@@ -160,6 +160,9 @@ switch these documents or claim legal approval.
 - `GET /api/market/suggestion` accepts **no client-supplied IP parameter**. It
   uses only a public peer address, or walks `X-Forwarded-For` right-to-left
   through explicitly trusted proxy networks. Other IP headers are ignored.
+  Inside an already-trusted walk, Google Front End hops are also skipped
+  (35.191.0.0/16, 130.211.0.0/22, 2600:2d00:1:1::/64, and the BE slice of
+  Google's own 130.211.0.0/16). Those ranges do not make a peer trusted.
 - `geoip-country` includes a maintained, local country-only GeoLite2-derived
   IPv4/IPv6 database. This server endpoint never sends visitor IPs externally. Keep the
   package external to the server bundle: it resolves its data relative to its
@@ -195,9 +198,11 @@ switch these documents or claim legal approval.
   third party. If the server cannot tell the country (no verified public client
   IP), the market stays unknown and the manual selector remains.
 - Production needs `MARKET_TRUSTED_PROXY_CIDRS` set to the verified proxy
-  network(s) in front of the API, or every lookup stays unknown. Once per
-  process the API logs only the *kind* of untrusted peer address
-  ("Market GeoIP: no public client IP", `peerRange`), never the address.
+  network(s) in front of the API, or every lookup stays unknown. The built-in
+  Google Front End ranges do not replace that list. Once per process the API
+  logs only the *kind* of untrusted peer address ("Market GeoIP: no public
+  client IP", `peerRange`) and, when a trusted peer presents a chain, the
+  chain shape (`hops`, `kinds`, `countries`), never an address.
 - Dev/test only: `MARKET_DEV_COUNTRY=US` (or any ISO code) pretends the request
   came from that country. Ignored when `NODE_ENV=production`.
 - The suggestion endpoint keeps `Cache-Control: private, no-store` and its

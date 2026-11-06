@@ -9,12 +9,31 @@
  * The browser only remembers, per country, that it already sent (so the count
  * isn't inflated) or that the notice was closed in this session.
  */
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Globe2, X } from "lucide-react";
 import { MarketContext } from "@/components/MarketProvider";
+import { MarketSelector } from "@/components/MarketSelector";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { countryName } from "@/lib/countries";
 import { useAppLocale, type AppLocale } from "@/lib/locale";
+
+function useNarrowViewport() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const read = () => setNarrow(window.innerWidth < 768);
+    read();
+    if (typeof window.matchMedia !== "function") {
+      window.addEventListener("resize", read);
+      return () => window.removeEventListener("resize", read);
+    }
+    const query = window.matchMedia("(max-width: 767px)");
+    query.addEventListener?.("change", read);
+    return () => query.removeEventListener?.("change", read);
+  }, []);
+  return narrow;
+}
 
 export const COVERED_COUNTRIES = new Set(["PT", "BR", "US"]);
 export const interestSentKey = (country: string) => `receebo:marketInterestSent:${country}`;
@@ -29,6 +48,8 @@ export function uncoveredCopy(locale: AppLocale, country: string) {
     thanks: "Obrigado! Isso nos ajuda a decidir para onde ir em seguida.",
     error: "Não foi possível enviar. Tente novamente.",
     close: "Fechar",
+    wrongCountry: `Não está na ${country}? Escolher país`,
+    chooseCountry: "Escolher país",
   };
   if (locale === "pt-PT") return {
     title: `O Receebo ainda não cobre ${country}`,
@@ -38,6 +59,8 @@ export function uncoveredCopy(locale: AppLocale, country: string) {
     thanks: "Obrigado! Isto ajuda-nos a decidir onde chegar a seguir.",
     error: "Não foi possível enviar. Tente novamente.",
     close: "Fechar",
+    wrongCountry: `Não está na ${country}? Escolher país`,
+    chooseCountry: "Escolher país",
   };
   return {
     title: `Receebo doesn't cover ${country} yet`,
@@ -47,6 +70,8 @@ export function uncoveredCopy(locale: AppLocale, country: string) {
     thanks: "Thanks! This helps us decide where to go next.",
     error: "Couldn't send. Try again.",
     close: "Close",
+    wrongCountry: `Not in ${country}? Choose a country`,
+    chooseCountry: "Choose a country",
   };
 }
 
@@ -55,11 +80,15 @@ const write = (storage: () => Storage, key: string) => { try { storage().setItem
 
 export function UncoveredMarketNotice({ variant = "inline" }: { variant?: "inline" | "floating" }) {
   const locale = useAppLocale();
-  const country = useContext(MarketContext)?.country ?? null;
+  const ctx = useContext(MarketContext);
+  const country = ctx?.country ?? null;
   const code = country?.toUpperCase() ?? null;
+  const mobile = useNarrowViewport();
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [closed, setClosed] = useState(false);
-  if (!code || COVERED_COUNTRIES.has(code) || closed) return null;
+  const [picker, setPicker] = useState(false);
+  const chosen = !!ctx?.confirmed && !!ctx.market && COVERED_COUNTRIES.has(ctx.market);
+  if (!code || COVERED_COUNTRIES.has(code) || closed || chosen) return null;
   if (state !== "sent" && (read(() => localStorage, interestSentKey(code)) || read(() => sessionStorage, noticeDismissedKey(code)))) return null;
 
   const copy = uncoveredCopy(locale, countryName(code, locale));
@@ -102,6 +131,9 @@ export function UncoveredMarketNotice({ variant = "inline" }: { variant?: "inlin
                 {state === "error" && <span className="text-xs text-destructive">{copy.error}</span>}
               </div>
               <p className="text-xs text-muted-foreground">{copy.hint}</p>
+              <button type="button" className="text-sm font-medium underline underline-offset-2" data-testid="button-uncovered-choose-country" onClick={() => setPicker(true)}>
+                {copy.wrongCountry}
+              </button>
             </>
           )}
         </div>
@@ -109,6 +141,25 @@ export function UncoveredMarketNotice({ variant = "inline" }: { variant?: "inlin
           <X className="w-4 h-4" />
         </button>
       </div>
+      {mobile ? (
+        <Sheet open={picker} onOpenChange={setPicker}>
+          <SheetContent side="bottom" className="rounded-t-2xl" data-testid="sheet-market-picker">
+            <SheetHeader>
+              <SheetTitle>{copy.chooseCountry}</SheetTitle>
+            </SheetHeader>
+            <MarketSelector variant="full" />
+          </SheetContent>
+        </Sheet>
+      ) : (
+        <Dialog open={picker} onOpenChange={setPicker}>
+          <DialogContent className="sm:max-w-md" data-testid="dialog-market-picker">
+            <DialogHeader>
+              <DialogTitle>{copy.chooseCountry}</DialogTitle>
+            </DialogHeader>
+            <MarketSelector variant="full" />
+          </DialogContent>
+        </Dialog>
+      )}
     </section>
   );
 }

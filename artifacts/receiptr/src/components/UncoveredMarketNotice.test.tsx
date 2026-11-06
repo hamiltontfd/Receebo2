@@ -16,6 +16,8 @@ beforeEach(() => {
   localStorage.clear(); sessionStorage.clear();
   fetchMock.mockReset().mockResolvedValue(new Response(null, { status: 204 }));
   vi.stubGlobal("fetch", fetchMock);
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+  vi.stubGlobal("matchMedia", () => ({ matches: false, media: "", addEventListener() {}, removeEventListener() {} }));
   setAccountLocale(undefined);
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -63,6 +65,28 @@ describe("UncoveredMarketNotice", () => {
     vi.spyOn(navigator, "languages", "get").mockReturnValue(["pt-BR"]);
     mount("JP");
     expect(screen.getByText(/O Receebo ainda não atende Japão/)).toBeTruthy();
+  });
+  it("links to a country choice and hides once a covered market is chosen", () => {
+    setAccountLocale("pt-BR");
+    const choose = vi.fn(async () => {});
+    const view = (confirmed: boolean) => ({
+      ...market("BE"), market: confirmed ? "PT" as const : null, confirmed, source: confirmed ? "visitor" as const : "suggestion" as const, choose,
+    });
+    const { rerender } = render(<MarketContext.Provider value={view(false)}><UncoveredMarketNotice /></MarketContext.Provider>);
+    expect(screen.getByTestId("button-uncovered-choose-country").textContent).toBe("Não está na Bélgica? Escolher país");
+    fireEvent.click(screen.getByTestId("button-uncovered-choose-country"));
+    expect(screen.getByTestId("dialog-market-picker")).toBeTruthy();
+    expect(screen.getByTestId("select-market")).toBeTruthy();
+    rerender(<MarketContext.Provider value={view(true)}><UncoveredMarketNotice /></MarketContext.Provider>);
+    expect(screen.queryByTestId("notice-uncovered-market")).toBeNull();
+  });
+  it("opens the choice in a bottom sheet on a narrow viewport", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    const { rerender } = render(<MarketContext.Provider value={market("BE")}><UncoveredMarketNotice variant="floating" /></MarketContext.Provider>);
+    rerender(<MarketContext.Provider value={market("BE")}><UncoveredMarketNotice variant="floating" /></MarketContext.Provider>);
+    fireEvent.click(screen.getByTestId("button-uncovered-choose-country"));
+    expect(screen.getByTestId("sheet-market-picker")).toBeTruthy();
+    expect(screen.queryByTestId("dialog-market-picker")).toBeNull();
   });
   it("outside the provider (tests, guest) it renders nothing", () => {
     render(<UncoveredMarketNotice />);
