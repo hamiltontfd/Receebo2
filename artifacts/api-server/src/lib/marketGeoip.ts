@@ -50,24 +50,72 @@ const matches = (ip: ipaddr.IPv4 | ipaddr.IPv6, networks: Network[]) => networks
   ip.kind() === net.kind() && ip.match(net, bits));
 
 export type HopKind = "trusted" | "google" | "client" | "other";
-export type ChainShape = { hops: number; kinds: HopKind[]; countries: Array<string | null> };
+export type ChainShape = {
+  hops: number;
+  kinds: HopKind[];
+  countries: Array<string | null>;
+  /** Rightmost hop, /16 only (`34.149.x.x`) or an IPv6 /16-equivalent. Never a full address. */
+  lastPrefix: string;
+};
 
 function hopKind(ip: ipaddr.IPv4 | ipaddr.IPv6, trustedNets: Network[]): HopKind {
   if (matches(ip, GOOGLE_EDGE)) return "google";
   if (matches(ip, trustedNets)) return "trusted";
   return ip.range() === "unicast" ? "client" : "other";
 }
+const explicitlyTrusted = (ip: ipaddr.IPv4 | ipaddr.IPv6, trustedNets: Network[]) => matches(ip, trustedNets);
 const skipHop = (ip: ipaddr.IPv4 | ipaddr.IPv6, trustedNets: Network[]) => {
   const kind = hopKind(ip, trustedNets);
   return kind === "trusted" || kind === "google";
 };
 
+/** /16 label for an IPv4 hop (`34.149.x.x`). IPv6 keeps only the first group. */
+export function hopPrefixLabel(ip: ipaddr.IPv4 | ipaddr.IPv6): string {
+  if (ip.kind() === "ipv4") {
+    const [a, b] = ip.toString().split(".");
+    return `${a}.${b}.x.x`;
+  }
+  const first = ip.toNormalizedString().split(":")[0] || "0";
+  return `${first}:x:x:x:x:x:x:x`;
+}
+
+export function describeForwardedChain(hops: Array<ipaddr.IPv4 | ipaddr.IPv6>, trustedNets: Array<[ipaddr.IPv4 | ipaddr.IPv6, number]>): ChainShape {
+  return {
+    hops: hops.length,
+    kinds: hops.map((ip) => hopKind(ip, trustedNets)),
+    countries: hops.map((ip) => ip.range() === "unicast" ? suggestMarket(ip.toString()).country : null),
+    lastPrefix: hopPrefixLabel(hops[hops.length - 1]!),
+  };
+}
+
+/**
+ * Client address inside an already-trusted forwarding chain.
+ * The Replit load balancer appends the real client immediately to the left of its
+ * own trusted address, then later hops (Google Front End, region-local infra) are
+ * appended to the right. Anything the client supplied is further left, so the hop
+ * just left of the rightmost trusted CIDR is the client. If the chain has no
+ * trusted address, fall back to walking off the right end and skipping proxy hops.
+ */
+function selectClient(hops: Array<ipaddr.IPv4 | ipaddr.IPv6>, trustedNets: Network[]): ipaddr.IPv4 | ipaddr.IPv6 | null {
+  let anchor = -1;
+  for (let i = hops.length - 1; i >= 0; i--) {
+    if (explicitlyTrusted(hops[i]!, trustedNets)) { anchor = i; break; }
+  }
+  const start = anchor >= 0 ? anchor - 1 : hops.length - 1;
+  for (let i = start; i >= 0; i--) {
+    const hop = hops[i]!;
+    if (skipHop(hop, trustedNets)) continue;
+    return hop.range() === "unicast" ? hop : null;
+  }
+  return null;
+}
+
 let loggedChainShape = false;
 function logChainShape(shape: ChainShape) {
   if (loggedChainShape) return;
   loggedChainShape = true;
-  // Kinds and country codes only. Never the addresses.
-  logger.info({ hops: shape.hops, kinds: shape.kinds, countries: shape.countries }, "Market GeoIP chain shape");
+  // Kinds, country codes and a /16 prefix. Never a full address.
+  logger.info({ hops: shape.hops, kinds: shape.kinds, countries: shape.countries, lastPrefix: shape.lastPrefix }, "Market GeoIP chain shape");
 }
 
 /** Only explicit operator-verified proxy networks may open X-Forwarded-For. Never trust a hop count. */
@@ -87,13 +135,9 @@ export function clientPublicIp(
     const chain = forwarded.split(",").map((part) => parseIp(part.trim()));
     if (!chain.length || chain.length > 16 || chain.some((ip) => !ip)) return null;
     const hops = chain as Array<ipaddr.IPv4 | ipaddr.IPv6>;
-    logChainShape({
-      hops: hops.length,
-      kinds: hops.map((ip) => hopKind(ip, networks)),
-      countries: hops.map((ip) => ip.range() === "unicast" ? suggestMarket(ip.toString()).country : null),
-    });
-    for (let i = hops.length - 1; i >= 0 && skipHop(current, networks); i--) current = hops[i]!;
-    if (skipHop(current, networks)) return null;
+    logChainShape(describeForwardedChain(hops, networks));
+    const selected = selectClient(hops, networks);
+    return selected ? selected.toString() : null;
   }
   return current.range() === "unicast" ? current.toString() : null;
 }

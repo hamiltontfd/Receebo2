@@ -160,9 +160,13 @@ switch these documents or claim legal approval.
 - `GET /api/market/suggestion` accepts **no client-supplied IP parameter**. It
   uses only a public peer address, or walks `X-Forwarded-For` right-to-left
   through explicitly trusted proxy networks. Other IP headers are ignored.
-  Inside an already-trusted walk, Google Front End hops are also skipped
-  (35.191.0.0/16, 130.211.0.0/22, 2600:2d00:1:1::/64, and the BE slice of
-  Google's own 130.211.0.0/16). Those ranges do not make a peer trusted.
+  Inside an already-trusted walk, the client is the hop immediately left of the
+  rightmost address that is in `MARKET_TRUSTED_PROXY_CIDRS` (further trusted or
+  Google Front End hops to its left are skipped). Hops the load balancer appended
+  to the right of itself are ignored. If the chain contains no trusted address,
+  the walk falls back to skipping trusted and Google Front End hops from the
+  right end (35.191.0.0/16, 130.211.0.0/22, 2600:2d00:1:1::/64, and the BE slice
+  of Google's own 130.211.0.0/16). Those ranges do not make a peer trusted.
 - `geoip-country` includes a maintained, local country-only GeoLite2-derived
   IPv4/IPv6 database. This server endpoint never sends visitor IPs externally. Keep the
   package external to the server bundle: it resolves its data relative to its
@@ -202,7 +206,8 @@ switch these documents or claim legal approval.
   Google Front End ranges do not replace that list. Once per process the API
   logs only the *kind* of untrusted peer address ("Market GeoIP: no public
   client IP", `peerRange`) and, when a trusted peer presents a chain, the
-  chain shape (`hops`, `kinds`, `countries`), never an address.
+  chain shape (`hops`, `kinds`, `countries`, and the last hop's /16 as `lastPrefix`,
+  for example `34.149.x.x`), never an address.
 - Dev/test only: `MARKET_DEV_COUNTRY=US` (or any ISO code) pretends the request
   came from that country. Ignored when `NODE_ENV=production`.
 - The suggestion endpoint keeps `Cache-Control: private, no-store` and its

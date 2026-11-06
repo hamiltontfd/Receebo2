@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { clientPublicIp, marketForCountry, suggestMarket } from "./marketGeoip";
+import { clientPublicIp, describeForwardedChain, marketForCountry, suggestMarket } from "./marketGeoip";
+import ipaddr from "ipaddr.js";
 import { validPurchaseCountry } from "./purchaseCountry";
 import { detectCountry, calcReturnWindow } from "./returnWindowCalc";
 import { computeWarrantyExpiries } from "./warrantyExpiry";
@@ -51,6 +52,33 @@ describe("proxy trust boundary", () => {
     expect(clientPublicIp("127.0.0.1", `1.1.1.1, ${client}, ${belgiumEdge}`, prod)).toBe(client);
     // A direct untrusted peer cannot inject Portugal through the same header.
     expect(clientPublicIp("8.8.8.8", `${client}, ${belgiumEdge}`, prod)).toBe("8.8.8.8");
+  });
+  it("anchors on the rightmost trusted hop, so a later infra address is not the client", () => {
+    const prod = "127.0.0.1/32,::1/128,169.254.0.0/16,34.111.179.208/32,34.117.33.233/32";
+    const pt = "89.181.171.141";
+    const us = "8.8.8.8";
+    const lb = "34.111.179.208";
+    const gfe = "35.191.10.10";
+    const beInfra = "34.76.0.1";
+    const usInfra = "34.149.1.1";
+    expect(suggestMarket(beInfra).country).toBe("BE");
+    expect(suggestMarket(usInfra).country).toBe("US");
+    // US box, no client-supplied prefix: [client, trusted LB, Google GFE, region infra].
+    expect(clientPublicIp("127.0.0.1", `${us}, ${lb}, ${gfe}, ${usInfra}`, prod)).toBe(us);
+    // Hamilton in Porto: the last hop is a Belgium infra address, not the client.
+    expect(clientPublicIp("127.0.0.1", `${pt}, ${lb}, ${gfe}, ${beInfra}`, prod)).toBe(pt);
+    expect(suggestMarket(clientPublicIp("127.0.0.1", `${pt}, ${lb}, ${gfe}, ${beInfra}`, prod))).toEqual({ country: "PT", market: "PT" });
+    // A spoofed address stays left of the client the load balancer appended.
+    expect(clientPublicIp("127.0.0.1", `${beInfra}, ${pt}, ${lb}, ${gfe}, ${usInfra}`, prod)).toBe(pt);
+    // No trusted address in the chain: fall back to the right-hand walk (stops on the infra hop).
+    expect(clientPublicIp("127.0.0.1", `${pt}, ${gfe}, ${beInfra}`, prod)).toBe(beInfra);
+    const parsed = `${us}, ${lb}, ${gfe}, ${usInfra}`.split(", ").map((part) => ipaddr.parse(part));
+    const shape = describeForwardedChain(parsed, prod.split(",").map((cidr) => ipaddr.parseCIDR(cidr.trim())));
+    expect(shape).toMatchObject({ hops: 4, kinds: ["client", "trusted", "google", "client"], lastPrefix: "34.149.x.x" });
+    expect(shape.countries[0]).toBe("US");
+    expect(JSON.stringify(shape)).not.toContain(us);
+    expect(JSON.stringify(shape)).not.toContain(usInfra);
+    expect(JSON.stringify(shape)).not.toContain(lb);
   });
   it("fails closed for missing, malformed, all-trusted and oversized chains", () => {
     for (const chain of [undefined, "bad", "8.8.8.8, bad", "127.0.0.1", ["8.8.8.8"], "8.8.8.8,".repeat(300)]) {
