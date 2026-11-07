@@ -6,6 +6,7 @@ import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { sendTrialEndingEmail } from "./lib/emailService";
 import { confirmPaidFunnel, safeFunnel } from "./lib/trialFunnel";
 import { notifyPaymentFailure } from "./lib/paymentAttention";
+import { amountForCurrency, type BillingCurrency } from "./lib/billingConfig";
 
 /**
  * Upsert the Stripe customer → user mapping and store the subscription ID.
@@ -153,23 +154,26 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription): Promise<vo
   let planAmount: number | undefined;
   let planCurrency: string | undefined;
 
-  if (priceItem?.price) {
-    planAmount = priceItem.price.unit_amount ?? undefined;
-    planCurrency = priceItem.price.currency ?? undefined;
-
-    const productId =
-      typeof priceItem.price.product === "string"
-        ? priceItem.price.product
-        : (priceItem.price.product as Stripe.Product | null)?.id;
-
-    if (productId) {
-      try {
-        const stripe = await getUncachableStripeClient();
-        const product = await stripe.products.retrieve(productId);
-        planName = product.name;
-      } catch (err) {
-        logger.warn({ err, productId }, "webhookHandlers: could not fetch product name for trial reminder");
-      }
+  // Subscription.currency is the billed currency. Price.currency stays the
+  // shared Price default (EUR) when the subscription uses the USD option.
+  const billed = subscription.currency?.toUpperCase();
+  const billedCurrency: BillingCurrency | null = billed === "EUR" || billed === "USD" || billed === "BRL" ? billed : null;
+  if (billedCurrency) {
+    planCurrency = billedCurrency.toLowerCase();
+    const optionAmount = priceItem?.price ? amountForCurrency(priceItem.price, billedCurrency) : null;
+    if (optionAmount != null) planAmount = optionAmount;
+  }
+  const productId = !priceItem?.price ? undefined
+    : typeof priceItem.price.product === "string"
+      ? priceItem.price.product
+      : (priceItem.price.product as Stripe.Product | null)?.id;
+  if (productId) {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const product = await stripe.products.retrieve(productId);
+      planName = product.name;
+    } catch (err) {
+      logger.warn({ err, productId }, "webhookHandlers: could not fetch product name for trial reminder");
     }
   }
 

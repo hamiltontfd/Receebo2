@@ -47,8 +47,17 @@ export type BillingStatus = SubscriptionStatus & {
   reviewReceiptId?: number | null;
   /** Frozen accounts only: when the data will be deleted (ISO). */
   dataDeletionAt?: string | null;
-  /** Plan currency and amounts (minor units) for this account's market. */
-  pricing?: { currency: string; monthly: number; yearly: number };
+  /**
+   * Offer prices, or the in-force subscription's currency and option amounts.
+   * `unavailable` means a subscription is in force but its currency was not read;
+   * the amounts are then null and are not the market price.
+   */
+  pricing?: {
+    basis?: "offer" | "subscription" | "unavailable";
+    currency: string | null;
+    monthly: number | null;
+    yearly: number | null;
+  };
 };
 
 const ACCESS_STATES: AccessState[] = [

@@ -13,7 +13,7 @@ import { clerkClient } from "@clerk/express";
 import { logger } from "../lib/logger";
 import { hasOwnerAccess } from "../lib/ownerAccess";
 import { billingOrigin } from "../lib/billingUrls";
-import { billingPriceId, billingPortalConfiguration, effectiveBillingCurrency, priceMatchesSelection, PLAN_AMOUNTS, type BillingCurrency } from "../lib/billingConfig";
+import { billingPriceId, billingPortalConfiguration, describeChargedPlan, effectiveBillingCurrency, priceMatchesSelection, PLAN_AMOUNTS, type BillingCurrency } from "../lib/billingConfig";
 import { getAccountMarket } from "../lib/accountMarket";
 
 const router: IRouter = Router();
@@ -27,47 +27,59 @@ async function getUserEmail(userId: string): Promise<string | null> {
   }
 }
 
-function asBillingCurrency(value: unknown): BillingCurrency | null {
-  const code = typeof value === "string" ? value.toUpperCase() : "";
-  return code === "EUR" || code === "USD" || code === "BRL" ? code : null;
-}
+type PricingQuote = {
+  basis: "offer" | "subscription" | "unavailable";
+  currency: BillingCurrency | null;
+  monthly: number | null;
+  yearly: number | null;
+};
 
 /**
- * Currency of a subscription that is still in force. An existing EUR
- * subscription must keep being described as EUR after the US market moves
- * to USD. A missing row, or a read failure, does not invent a currency.
+ * Quote for GET /billing/subscription. An in-force subscription is described
+ * from Subscription.currency (the currency it bills in). Price.currency is the
+ * shared Price default and is not the charge. If that subscription currency
+ * cannot be read, the market price is not shown as the charge.
  */
-async function currentSubscriptionCurrency(userId: string): Promise<BillingCurrency | null> {
+async function accountPricing(userId: string, inForce: boolean): Promise<PricingQuote> {
+  const market = await getAccountMarket(userId).catch(() => null);
+  const offerCurrency = effectiveBillingCurrency(market);
+  const offer: PricingQuote = {
+    basis: "offer", currency: offerCurrency,
+    monthly: PLAN_AMOUNTS[offerCurrency].monthly, yearly: PLAN_AMOUNTS[offerCurrency].yearly,
+  };
+  const unavailable: PricingQuote = { basis: "unavailable", currency: null, monthly: null, yearly: null };
   try {
     const [billing] = await db.select({ stripeCustomerId: userBillingTable.stripeCustomerId })
       .from(userBillingTable).where(eq(userBillingTable.userId, userId));
-    if (!billing?.stripeCustomerId) return null;
+    if (!billing?.stripeCustomerId) return inForce ? unavailable : offer;
     const result = await db.execute(sql`
       SELECT status,
         COALESCE(current_period_end, (items->'data'->0->>'current_period_end')::bigint) AS current_period_end,
-        items->'data'->0->'price'->>'currency' AS currency
+        currency AS subscription_currency
       FROM stripe.subscriptions
       WHERE customer = ${billing.stripeCustomerId}
         AND livemode = ${process.env.NODE_ENV === "production"}
       ORDER BY created DESC
       LIMIT 1
     `);
-    const row = result.rows[0] as { status?: string; current_period_end?: number | null; currency?: string | null } | undefined;
-    if (!row) return null;
+    const row = result.rows[0] as {
+      status?: string; current_period_end?: number | null; subscription_currency?: string | null; currency?: string | null;
+    } | undefined;
+    if (!row) return inForce ? unavailable : offer;
     const end = row.current_period_end ?? null;
     const current = row.status === "active" || row.status === "trialing" || row.status === "past_due" || row.status === "unpaid"
       || (row.status === "canceled" && !!end && end * 1000 > Date.now());
-    return current ? asBillingCurrency(row.currency) : null;
+    if (!current) return inForce ? unavailable : offer;
+    const charged = describeChargedPlan({
+      subscriptionCurrency: row.subscription_currency ?? row.currency,
+      priceCurrency: (row as { items?: { data?: Array<{ price?: { currency?: string; unit_amount?: number } }> } }).items?.data?.[0]?.price?.currency,
+      priceUnitAmount: (row as { items?: { data?: Array<{ price?: { unit_amount?: number } }> } }).items?.data?.[0]?.price?.unit_amount,
+    });
+    if (charged.basis === "unavailable") return unavailable;
+    return charged;
   } catch {
-    return null;
+    return inForce ? unavailable : offer;
   }
-}
-
-/** Plan currency and amounts (minor units). A live subscription's currency wins over the market. */
-async function accountPricing(userId: string) {
-  const market = await getAccountMarket(userId).catch(() => null);
-  const currency = (await currentSubscriptionCurrency(userId)) ?? effectiveBillingCurrency(market);
-  return { currency, monthly: PLAN_AMOUNTS[currency].monthly, yearly: PLAN_AMOUNTS[currency].yearly };
 }
 
 /** GET /billing/subscription — current user's plan status */
@@ -92,7 +104,7 @@ router.get("/billing/subscription", requireAuth, async (req, res): Promise<void>
       cancelAtPeriodEnd: status.cancelAtPeriodEnd,
       ownerAccess: status.ownerAccess === true,
       hasBillingAccount: status.hasBillingAccount === true,
-      pricing: await accountPricing(req.userId!),
+      pricing: await accountPricing(req.userId!, status.plan === "pro" || status.plan === "trialing"),
     });
   } catch (err) {
     logger.error({ err }, "billing: failed to get subscription status");
@@ -212,6 +224,9 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
       protectedPriceId = priceId;
       price = await loadPrice(priceId);
     }
+    // A missing or wrong USD option blocks this new checkout. Do not charge the
+    // EUR default instead, and do not remove a currency option a subscription
+    // already uses in order to force that fallback.
     if (!priceMatchesSelection(price, wantCurrency, interval, live)) {
       res.status(503).json({ error: "Stripe price does not match the configured plan and environment" });
       return;

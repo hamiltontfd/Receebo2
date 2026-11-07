@@ -28,7 +28,9 @@ const fadeUp = {
 };
 
 export default function GetStarted() {
-  const { prices } = usePlanPrices();
+  const { prices, unavailable } = usePlanPrices();
+  const monthlyPrice = unavailable || !prices ? appText("Price unavailable") : prices.monthly;
+  const yearlyPrice = unavailable || !prices ? appText("Price unavailable") : prices.yearly;
   useAppLocale();
   const { isSignedIn } = useAuth();
   const [, setLocation] = useLocation();
@@ -97,7 +99,7 @@ export default function GetStarted() {
             <div>
               <p className="font-bold text-lg tracking-tight">{appText("Pro Monthly")}</p>
               <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-4xl font-bold font-mono tracking-tight">{prices.monthly}</span>
+                <span className="text-4xl font-bold font-mono tracking-tight" data-testid={unavailable ? "text-price-unavailable" : undefined}>{monthlyPrice}</span>
                 <span className="text-sm text-muted-foreground">{appText("/ month")}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">{appText("Founding price, charged when you subscribe")}</p>
@@ -143,7 +145,7 @@ export default function GetStarted() {
             <div>
               <p className="font-bold text-lg tracking-tight mb-1">{appText("Pro Yearly")}</p>
               <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-4xl font-bold font-mono tracking-tight">{prices.yearly}</span>
+                <span className="text-4xl font-bold font-mono tracking-tight">{yearlyPrice}</span>
                 <span className="text-sm opacity-70">{appText("/ year")}</span>
               </div>
               <p className="text-xs opacity-60 mt-1">{appText("Founding price, charged when you subscribe")}</p>

@@ -14,14 +14,21 @@ const BILLING_KEY = ["billing", "subscription"] as const;
  * market decides (BR = BRL, US = USD, else EUR). On /us, a visitor who has not
  * chosen a market is shown the US offer. Works without providers (landing, tests).
  */
-export function usePlanPrices(options?: { usOffer?: boolean }): { currency: PlanCurrency; prices: Record<PlanKey, string> } {
+export function usePlanPrices(options?: { usOffer?: boolean }): {
+  currency: PlanCurrency | null;
+  prices: Record<PlanKey, string> | null;
+  /** An in-force subscription whose currency could not be read. Not a market quote. */
+  unavailable: boolean;
+} {
   const locale = useAppLocale();
   const marketState = useContext(MarketContext);
   const market = marketState?.market ?? null;
   const client = useContext(QueryClientContext);
-  const server = client?.getQueryData<{ pricing?: { currency?: string } }>(BILLING_KEY)?.pricing?.currency;
+  const pricing = client?.getQueryData<{ pricing?: { currency?: string | null; basis?: string } }>(BILLING_KEY)?.pricing;
+  if (pricing?.basis === "unavailable") return { currency: null, prices: null, unavailable: true };
+  const server = pricing?.currency;
   const currency = isPlanCurrency(server) ? server
     : options?.usOffer && !marketState?.confirmed ? "USD"
     : planCurrencyForMarket(market);
-  return { currency, prices: planPrices(currency, locale) };
+  return { currency, prices: planPrices(currency, locale), unavailable: false };
 }

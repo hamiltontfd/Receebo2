@@ -6,6 +6,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 const state = vi.hoisted(() => ({
   market: null as null | "PT" | "BR" | "US",
+  executeCount: 0,
+  currencyReadError: false,
   billing: null as null | { userId: string; stripeCustomerId: string; stripeSubscriptionId?: string },
   subscription: null as null | {
     id: string; status: string; trial_end: number; current_period_end: number;
@@ -69,7 +71,11 @@ vi.mock("@workspace/db", () => ({
     update: () => ({ set: (values: any) => ({ where: async () => {
       if (state.billing) Object.assign(state.billing, values);
     } }) }),
-    execute: async () => ({ rows: state.subscription ? [state.subscription] : [] }),
+    execute: async () => {
+      state.executeCount += 1;
+      if (state.currencyReadError && state.executeCount > 1) throw new Error("synced subscription currency unavailable");
+      return { rows: state.subscription ? [state.subscription] : [] };
+    },
   },
 }));
 
@@ -108,6 +114,8 @@ beforeEach(() => {
     vi.stubEnv(`STRIPE_${mode}_PORTAL_CONFIGURATION_ID`, "");
   }
   state.market = null;
+  state.executeCount = 0;
+  state.currencyReadError = false;
   state.billing = null;
   state.subscription = null;
   vi.clearAllMocks();
@@ -278,8 +286,47 @@ describe("ordinary user billing, with isolated Stripe and database adapters", ()
     state.subscription = {
       id: "sub_eur", status: "active", trial_end: end, current_period_end: end,
       cancel_at_period_end: false, currency: "eur",
+      items: { data: [{ price: { currency: "eur", unit_amount: 299 } }] },
     } as typeof state.subscription;
-    expect(await status()).toMatchObject({ plan: "pro", pricing: { currency: "EUR", monthly: 299, yearly: 2499 } });
+    expect(await status()).toMatchObject({
+      plan: "pro", pricing: { basis: "subscription", currency: "EUR", monthly: 299, yearly: 2499 },
+    });
+  });
+  it("describes a USD subscription on the EUR-default Price as USD 350 and 2850", async () => {
+    state.market = "US";
+    state.billing = { userId: "ordinary_user", stripeCustomerId: "cus_fixture" };
+    const end = Math.floor(Date.now() / 1000) + 86400;
+    state.subscription = {
+      id: "sub_usd", status: "active", trial_end: end, current_period_end: end,
+      cancel_at_period_end: false, currency: "usd",
+      items: { data: [{ price: { currency: "eur", unit_amount: 299, currency_options: { usd: { unit_amount: 350 } } } }] },
+    } as typeof state.subscription;
+    expect(await status()).toMatchObject({
+      plan: "pro", pricing: { basis: "subscription", currency: "USD", monthly: 350, yearly: 2850 },
+    });
+  });
+  it("does not present the market price when the synced subscription currency is missing or the read fails", async () => {
+    state.market = "US";
+    state.billing = { userId: "ordinary_user", stripeCustomerId: "cus_fixture" };
+    const end = Math.floor(Date.now() / 1000) + 86400;
+    state.subscription = {
+      id: "sub_unknown", status: "active", trial_end: end, current_period_end: end,
+      cancel_at_period_end: false,
+      items: { data: [{ price: { currency: "eur", unit_amount: 299 } }] },
+    } as typeof state.subscription;
+    const missing = await status();
+    expect(missing.pricing).toEqual({ basis: "unavailable", currency: null, monthly: null, yearly: null });
+    expect(JSON.stringify(missing.pricing)).not.toContain("350");
+    expect(JSON.stringify(missing.pricing)).not.toContain("299");
+    state.executeCount = 0;
+    state.currencyReadError = true;
+    state.subscription = {
+      id: "sub_usd", status: "active", trial_end: end, current_period_end: end,
+      cancel_at_period_end: false, currency: "usd",
+    } as typeof state.subscription;
+    const failed = await status();
+    expect(failed.plan).toBe("pro");
+    expect(failed.pricing).toEqual({ basis: "unavailable", currency: null, monthly: null, yearly: null });
   });
   it("requires authentication and consent, and validates plan configuration", async () => {
     expect((await post("/billing/create-checkout-session", { planType: "monthly" },

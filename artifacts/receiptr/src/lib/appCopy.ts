@@ -195,6 +195,7 @@ export const APP_COPY: Record<string, readonly [string, string?]> = {
   "Try again": ["Tentar novamente"],
   "Go back": ["Voltar"],
   "Something went wrong": ["Ocorreu um erro"],
+  "Price unavailable": ["Preço indisponível", "Preço indisponível"],
   "Error": ["Erro"],
   "Check your connection and try again.": ["Verifique a sua ligação e tente novamente.", "Verifique sua conexão e tente novamente."],
   "Home": ["Início"],

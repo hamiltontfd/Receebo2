@@ -83,12 +83,40 @@ export function priceMatchesSelection(
   livemode: boolean,
 ): boolean {
   if (!price.active || price.livemode !== livemode) return false;
+  // The environment stores price ids, not a product id. A non-empty product is
+  // required so a price with no product is rejected. It does not prove this is
+  // the Receebo product: another product with the same amounts would still pass.
   const product = typeof price.product === "string" ? price.product : price.product?.id;
   if (!product) return false;
   const interval = plan === "yearly" ? "year" : "month";
   if (price.recurring?.interval !== interval || price.recurring.interval_count !== 1) return false;
   if (price.recurring.usage_type && price.recurring.usage_type !== "licensed") return false;
   return amountForCurrency(price, currency) === PLAN_AMOUNTS[currency][plan];
+}
+
+export type ChargedPlan =
+  | { basis: "subscription"; currency: BillingCurrency; monthly: number; yearly: number }
+  | { basis: "unavailable" };
+
+/**
+ * Currency and founding amounts of a subscription that is already in force.
+ * Stripe's Subscription.currency is the currency the subscription bills in.
+ * Price.currency stays the Price default (EUR on the shared Price) even when
+ * the subscription was opened on the USD option, so it is not consulted.
+ * The amounts are that currency's options (USD 350/2850, EUR 299/2499), not
+ * the default Price unit_amount. No currency means the charge is unknown.
+ */
+export function describeChargedPlan(input: {
+  subscriptionCurrency: unknown;
+  priceCurrency?: unknown;
+  priceUnitAmount?: unknown;
+}): ChargedPlan {
+  void input.priceCurrency;
+  void input.priceUnitAmount;
+  const code = typeof input.subscriptionCurrency === "string" ? input.subscriptionCurrency.toUpperCase() : "";
+  const currency = code === "EUR" || code === "USD" || code === "BRL" ? code : null;
+  if (!currency) return { basis: "unavailable" };
+  return { basis: "subscription", currency, monthly: PLAN_AMOUNTS[currency].monthly, yearly: PLAN_AMOUNTS[currency].yearly };
 }
 
 /** True when a Price's default currency amount matches the plan. USD options are not visible here. */

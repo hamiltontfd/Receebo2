@@ -32,8 +32,8 @@ export default function PricingSection({ checkout, variant }: {
   variant?: "us";
 }) {
   const features = getFeatures();
-  const { prices } = usePlanPrices(variant === "us" ? { usOffer: true } : undefined);
-  const plans = getPlans(prices);
+  const { prices, unavailable } = usePlanPrices(variant === "us" ? { usOffer: true } : undefined);
+  const plans = getPlans(prices ?? { monthly: lt("Price unavailable", "Preço indisponível"), yearly: lt("Price unavailable", "Preço indisponível") });
 
   return (
     <section className="py-24 lg:py-32 bg-muted/20">
@@ -113,7 +113,7 @@ export default function PricingSection({ checkout, variant }: {
                   )}
                 </div>
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-4xl font-extrabold tracking-tight">{price}</span>
+                  <span className="text-4xl font-extrabold tracking-tight" data-testid={unavailable ? "text-price-unavailable" : undefined}>{price}</span>
                   <span
                     className={cn(
                       "text-sm font-medium",

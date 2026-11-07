@@ -14,7 +14,7 @@ import {
 } from "@/lib/availableMailProviders";
 import { lt } from "@/lib/landingLocale";
 
-function buildFaqs(providers: AvailableMailProvider[], { monthly: m, yearly: y }: Record<"monthly" | "yearly", string>) {
+function buildFaqs(providers: AvailableMailProvider[], { monthly: m, yearly: y }: Record<"monthly" | "yearly", string>, unavailable = false) {
   const inbox = lInboxPhrase(providers);
   const accountsNote = lAccountsNote(providers);
   return [
@@ -61,7 +61,11 @@ function buildFaqs(providers: AvailableMailProvider[], { monthly: m, yearly: y }
   },
   {
     q: lt("How does the free trial work?", "Como funciona o período experimental gratuito?", "Como funciona o teste grátis?"),
-    a: lt(
+    a: unavailable ? lt(
+      "Create an account and accept the Terms, and your trial starts. No card is needed. It lasts 15 days and you can add up to 5 receipts, by upload or email import. After your 5th receipt you can still view, search and export everything, and get warranty and return alerts, until day 15. Nothing is charged automatically. The current subscription price is unavailable, so it is not shown here.",
+      "Cria uma conta e aceita os Termos, e o período experimental começa. Não é preciso cartão. Dura 15 dias e podes adicionar até 5 recibos, por carregamento ou importação de email. Depois do 5.º recibo continuas a poder ver, pesquisar e exportar tudo, e a receber alertas de garantia e devolução, até ao dia 15. Nada é cobrado automaticamente. O preço da subscrição atual não está disponível, por isso não é mostrado aqui.",
+      "Crie uma conta e aceite os Termos, e o teste começa. Não precisa de cartão. Dura 15 dias e você pode adicionar até 5 recibos, por envio ou importação de e-mail. Depois do 5º recibo você ainda pode ver, pesquisar e exportar tudo, e receber alertas de garantia e devolução, até o dia 15. Nada é cobrado automaticamente. O preço da assinatura atual não está disponível, por isso não é mostrado aqui.",
+    ) : lt(
       `Create an account and accept the Terms, and your trial starts. No card is needed. It lasts 15 days and you can add up to 5 receipts, by upload or email import. After your 5th receipt you can still view, search and export everything, and get warranty and return alerts, until day 15. Nothing is charged automatically. To keep going, choose ${m}/month or ${y}/year; you're charged when you subscribe. You can also upgrade early from Settings.`,
       `Cria uma conta e aceita os Termos, e o período experimental começa. Não é preciso cartão. Dura 15 dias e podes adicionar até 5 recibos, por carregamento ou importação de email. Depois do 5.º recibo continuas a poder ver, pesquisar e exportar tudo, e a receber alertas de garantia e devolução, até ao dia 15. Nada é cobrado automaticamente. Para continuar, escolhe ${m}/mês ou ${y}/ano; és cobrado quando subscreves. Também podes fazer upgrade mais cedo nas Definições.`,
       `Crie uma conta e aceite os Termos, e o teste começa. Não precisa de cartão. Dura 15 dias e você pode adicionar até 5 recibos, por envio ou importação de e-mail. Depois do 5º recibo você ainda pode ver, pesquisar e exportar tudo, e receber alertas de garantia e devolução, até o dia 15. Nada é cobrado automaticamente. Para continuar, escolha ${m}/mês ou ${y}/ano; a cobrança acontece quando você assina. Também pode fazer upgrade antes nas Configurações.`,
@@ -69,7 +73,11 @@ function buildFaqs(providers: AvailableMailProvider[], { monthly: m, yearly: y }
   },
   {
     q: lt("What are founding prices?", "O que são preços de fundador?"),
-    a: lt(
+    a: unavailable ? lt(
+      "The current subscription price is unavailable, so the founding amounts are not shown. They stay available to you for as long as your account exists, including if you cancel and subscribe again later.",
+      "O preço da subscrição atual não está disponível, por isso os montantes de fundador não são mostrados. Mantêm-se disponíveis para ti enquanto a tua conta existir, mesmo que canceles e voltes a subscrever mais tarde.",
+      "O preço da assinatura atual não está disponível, por isso os valores de fundador não são mostrados. Continuam disponíveis para você enquanto sua conta existir, mesmo se cancelar e assinar de novo depois.",
+    ) : lt(
       `${m}/month and ${y}/year are founding prices. They stay available to you for as long as your account exists, including if you cancel and subscribe again later.`,
       `${m}/mês e ${y}/ano são preços de fundador. Mantêm-se disponíveis para ti enquanto a tua conta existir, mesmo que canceles e voltes a subscrever mais tarde.`,
       `${m}/mês e ${y}/ano são preços de fundador. Continuam disponíveis para você enquanto sua conta existir, mesmo se cancelar e assinar de novo depois.`,
@@ -79,8 +87,11 @@ function buildFaqs(providers: AvailableMailProvider[], { monthly: m, yearly: y }
 }
 
 export default function FAQSection({ variant }: { variant?: "us" } = {}) {
-  const { prices } = usePlanPrices(variant === "us" ? { usOffer: true } : undefined);
-  const faqs = buildFaqs(useAvailableMailProviders(), prices);
+  const { prices, unavailable } = usePlanPrices(variant === "us" ? { usOffer: true } : undefined);
+  const faqs = buildFaqs(useAvailableMailProviders(), prices ?? {
+    monthly: lt("Price unavailable", "Preço indisponível"),
+    yearly: lt("Price unavailable", "Preço indisponível"),
+  }, unavailable);
   return (
     <section className="py-24 lg:py-32">
       <div className="max-w-3xl mx-auto px-6">

@@ -31,7 +31,10 @@ const fadeUp = {
 export function PlanChoice({ founding }: { founding: boolean }) {
   useAppLocale();
   const checkout = useCreateCheckout();
-  const { prices } = usePlanPrices();
+  const { prices, unavailable } = usePlanPrices();
+  if (unavailable || !prices) {
+    return <p className="text-sm text-muted-foreground" data-testid="text-price-unavailable">{appText("Price unavailable")}</p>;
+  }
   const plans = [
     { key: "monthly" as const, name: "Monthly", price: prices.monthly, period: "/ month", highlight: false },
     { key: "yearly" as const, name: "Yearly", price: prices.yearly, period: "/ year", highlight: true },

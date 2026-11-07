@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { billingCurrencyForMarket, billingPriceId, effectiveBillingCurrency, priceMatchesPlan, priceMatchesSelection } from "./billingConfig";
+import { billingCurrencyForMarket, billingPriceId, describeChargedPlan, effectiveBillingCurrency, priceMatchesPlan, priceMatchesSelection } from "./billingConfig";
 
 const KEYS = ["STRIPE_TEST_MONTHLY_PRICE_ID", "STRIPE_TEST_YEARLY_PRICE_ID", "STRIPE_TEST_MONTHLY_PRICE_ID_BRL", "STRIPE_TEST_YEARLY_PRICE_ID_BRL"];
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
@@ -61,5 +61,17 @@ describe("billing price selection", () => {
       ...shared, unit_amount: 2499, recurring: { interval: "year", interval_count: 1 },
       currency_options: { usd: { unit_amount: 2850 } },
     }, "USD", "yearly", false)).toBe(true);
+  });
+  it("reads the subscription currency, not the shared Price default", () => {
+    expect(describeChargedPlan({
+      subscriptionCurrency: "eur", priceCurrency: "eur", priceUnitAmount: 299,
+    })).toEqual({ basis: "subscription", currency: "EUR", monthly: 299, yearly: 2499 });
+    expect(describeChargedPlan({
+      subscriptionCurrency: "usd", priceCurrency: "eur", priceUnitAmount: 299,
+    })).toEqual({ basis: "subscription", currency: "USD", monthly: 350, yearly: 2850 });
+    expect(describeChargedPlan({
+      subscriptionCurrency: null, priceCurrency: "eur", priceUnitAmount: 299,
+    })).toEqual({ basis: "unavailable" });
+    expect(describeChargedPlan({ subscriptionCurrency: undefined, priceCurrency: "usd", priceUnitAmount: 350 })).toEqual({ basis: "unavailable" });
   });
 });
