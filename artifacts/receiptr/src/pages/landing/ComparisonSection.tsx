@@ -42,9 +42,15 @@ function CheckIcon({ value, highlight }: { value: boolean; highlight?: boolean }
   );
 }
 
-export default function ComparisonSection() {
-  const rows = getRows();
-  const columns = getColumns();
+export default function ComparisonSection({ variant }: { variant?: "us" } = {}) {
+  const allRows = getRows();
+  const allColumns = getColumns();
+  // /us does not advertise the EU consumer-rights line. Other landings keep it.
+  const hideConsumerRights = variant === "us";
+  const rows = hideConsumerRights ? allRows.filter((_, index) => index !== 3) : allRows;
+  const columns = hideConsumerRights
+    ? allColumns.map((column) => ({ ...column, values: column.values.filter((_, index) => index !== 3) }))
+    : allColumns;
   return (
     <section className="py-24 lg:py-32">
       <div className="max-w-4xl mx-auto px-6">

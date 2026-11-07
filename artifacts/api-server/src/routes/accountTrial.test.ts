@@ -59,9 +59,10 @@ vi.mock("../lib/objectStorage", () => ({
 vi.mock("../stripeClient", () => ({
   getUncachableStripeClient: async () => ({
     prices: { retrieve: async (id: string) => ({
-      id, active: true, livemode: false, currency: "eur",
+      id, active: true, livemode: false, currency: "eur", product: "prod_fixture",
       unit_amount: id.includes("yearly") ? 2499 : 299,
-      recurring: { interval: id.includes("yearly") ? "year" : "month", interval_count: 1 },
+      recurring: { interval: id.includes("yearly") ? "year" : "month", interval_count: 1, usage_type: "licensed" },
+      currency_options: { usd: { unit_amount: id.includes("yearly") ? 2850 : 350 } },
     }) },
     customers: { create: async () => ({ id: `cus_fixture_${randomUUID()}` }) },
     subscriptions: { list: async () => ({ data: fixture.liveSubscriptions }) },

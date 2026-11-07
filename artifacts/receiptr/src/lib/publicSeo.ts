@@ -1,3 +1,5 @@
+import { withUsOffers } from "./publicPricing";
+
 export const publicPages = {
   "/": {
     title: "Receebo — Receipts. Easy to find.",
@@ -48,5 +50,14 @@ export function applyPageMetadata(path: string) {
   } else {
     canonical?.remove();
     ogUrl?.remove();
+  }
+  // Amounts only. /us stays noindex and without a canonical URL.
+  if (path !== "/us") return;
+  const script = document.querySelector('script[type="application/ld+json"]');
+  if (!script?.textContent) return;
+  try {
+    script.textContent = JSON.stringify(withUsOffers(JSON.parse(script.textContent)));
+  } catch {
+    /* The shared shell stays EUR if the script is not the marketing graph. */
   }
 }

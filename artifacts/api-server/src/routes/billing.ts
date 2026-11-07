@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { accessEndedAt, deletionDueAt, isFrozen, scheduledDeletionDate } from "../lib/accountLifecycleSchedule";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, userBillingTable, accountTrialsTable, trialFunnelCheckoutsTable } from "@workspace/db";
 import { funnelSubject, recordFunnelEvent, paywallReason, safeFunnel, createFunnelCheckout, confirmPaidFunnel } from "../lib/trialFunnel";
 import { TRIAL_DURATION_MS } from "../lib/accountTrial";
@@ -13,7 +13,7 @@ import { clerkClient } from "@clerk/express";
 import { logger } from "../lib/logger";
 import { hasOwnerAccess } from "../lib/ownerAccess";
 import { billingOrigin } from "../lib/billingUrls";
-import { billingPriceId, billingPortalConfiguration, effectiveBillingCurrency, priceMatchesPlan, PLAN_AMOUNTS } from "../lib/billingConfig";
+import { billingPriceId, billingPortalConfiguration, effectiveBillingCurrency, priceMatchesSelection, PLAN_AMOUNTS, type BillingCurrency } from "../lib/billingConfig";
 import { getAccountMarket } from "../lib/accountMarket";
 
 const router: IRouter = Router();
@@ -27,10 +27,46 @@ async function getUserEmail(userId: string): Promise<string | null> {
   }
 }
 
-/** Plan currency and amounts (minor units) for this account's market. */
+function asBillingCurrency(value: unknown): BillingCurrency | null {
+  const code = typeof value === "string" ? value.toUpperCase() : "";
+  return code === "EUR" || code === "USD" || code === "BRL" ? code : null;
+}
+
+/**
+ * Currency of a subscription that is still in force. An existing EUR
+ * subscription must keep being described as EUR after the US market moves
+ * to USD. A missing row, or a read failure, does not invent a currency.
+ */
+async function currentSubscriptionCurrency(userId: string): Promise<BillingCurrency | null> {
+  try {
+    const [billing] = await db.select({ stripeCustomerId: userBillingTable.stripeCustomerId })
+      .from(userBillingTable).where(eq(userBillingTable.userId, userId));
+    if (!billing?.stripeCustomerId) return null;
+    const result = await db.execute(sql`
+      SELECT status,
+        COALESCE(current_period_end, (items->'data'->0->>'current_period_end')::bigint) AS current_period_end,
+        items->'data'->0->'price'->>'currency' AS currency
+      FROM stripe.subscriptions
+      WHERE customer = ${billing.stripeCustomerId}
+        AND livemode = ${process.env.NODE_ENV === "production"}
+      ORDER BY created DESC
+      LIMIT 1
+    `);
+    const row = result.rows[0] as { status?: string; current_period_end?: number | null; currency?: string | null } | undefined;
+    if (!row) return null;
+    const end = row.current_period_end ?? null;
+    const current = row.status === "active" || row.status === "trialing" || row.status === "past_due" || row.status === "unpaid"
+      || (row.status === "canceled" && !!end && end * 1000 > Date.now());
+    return current ? asBillingCurrency(row.currency) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Plan currency and amounts (minor units). A live subscription's currency wins over the market. */
 async function accountPricing(userId: string) {
   const market = await getAccountMarket(userId).catch(() => null);
-  const currency = effectiveBillingCurrency(market);
+  const currency = (await currentSubscriptionCurrency(userId)) ?? effectiveBillingCurrency(market);
   return { currency, monthly: PLAN_AMOUNTS[currency].monthly, yearly: PLAN_AMOUNTS[currency].yearly };
 }
 
@@ -138,7 +174,14 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
       return;
     }
     const interval = planType as "monthly" | "yearly";
-    const market = await getAccountMarket(userId).catch(() => null);
+    let market: Awaited<ReturnType<typeof getAccountMarket>>;
+    try {
+      market = await getAccountMarket(userId);
+    } catch (err) {
+      logger.warn({ err }, "billing: account market unavailable");
+      res.status(503).json({ error: "Could not read the account market" });
+      return;
+    }
     const priceId = billingPriceId(interval, market);
     if (!priceId) {
       res.status(503).json({ error: "Stripe price IDs are not configured yet" });
@@ -155,21 +198,21 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
     // Reject mixed-mode or wrong-interval prices before creating a customer.
     const [eligibility] = await db.select().from(accountTrialsTable)
       .where(eq(accountTrialsTable.userId, userId));
-    // A saved founding price is kept when its currency matches the account's market
-    // currency; otherwise (e.g. a BR account frozen on EUR before BRL existed) the
-    // market's founding price is used. Founding eligibility itself is unchanged.
-    const wantCurrency = effectiveBillingCurrency(market).toLowerCase();
+    // A saved founding Price id is kept when it still contains the market's
+    // currency at the founding amount. US and EUR share that id; the session
+    // currency selects the option. A saved id with no USD option is not charged
+    // as EUR. Founding eligibility itself is unchanged.
+    const wantCurrency = effectiveBillingCurrency(market);
+    const live = process.env.NODE_ENV === "production";
     const savedPriceId = planType === "yearly" ? eligibility?.yearlyPriceId : eligibility?.monthlyPriceId;
     let protectedPriceId = savedPriceId ?? priceId;
-    let price = await stripe.prices.retrieve(protectedPriceId);
-    if (savedPriceId && price.currency !== wantCurrency && savedPriceId !== priceId) {
+    const loadPrice = (id: string) => stripe.prices.retrieve(id, { expand: ["currency_options"] });
+    let price = await loadPrice(protectedPriceId);
+    if (savedPriceId && savedPriceId !== priceId && !priceMatchesSelection(price, wantCurrency, interval, live)) {
       protectedPriceId = priceId;
-      price = await stripe.prices.retrieve(protectedPriceId);
+      price = await loadPrice(priceId);
     }
-    const expectedInterval = planType === "yearly" ? "year" : "month";
-    if (!price.active || price.livemode !== (process.env.NODE_ENV === "production") ||
-      price.recurring?.interval !== expectedInterval || price.recurring.interval_count !== 1 ||
-      !priceMatchesPlan(price, interval)) {
+    if (!priceMatchesSelection(price, wantCurrency, interval, live)) {
       res.status(503).json({ error: "Stripe price does not match the configured plan and environment" });
       return;
     }
@@ -226,11 +269,17 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
     await safeFunnel(async () => {
       attemptId = await createFunnelCheckout(userId, interval, paywallReason(status.accessState));
     });
+    // EUR and USD are options on one Price. The session currency pins which
+    // option is charged. Adaptive Pricing is disabled for that session only,
+    // so a third currency is not offered. BR keeps its own Price and is not
+    // given a currency override. The Dashboard Adaptive Pricing setting is untouched.
+    const fixedCurrency = wantCurrency === "EUR" || wantCurrency === "USD";
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ["card"],
       line_items: [{ price: protectedPriceId, quantity: 1 }],
       mode: "subscription",
+      ...(fixedCurrency ? { currency: wantCurrency.toLowerCase(), adaptive_pricing: { enabled: false } } : {}),
       subscription_data: { metadata: { userId, offer: "founding_customer" } },
       success_url: `${base}/search?checkout=success`,
       cancel_url: `${base}/search?checkout=cancel${attemptId ? `&attempt=${attemptId}` : ""}`,

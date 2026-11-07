@@ -78,8 +78,8 @@ function buildFaqs(providers: AvailableMailProvider[], { monthly: m, yearly: y }
 ];
 }
 
-export default function FAQSection() {
-  const { prices } = usePlanPrices();
+export default function FAQSection({ variant }: { variant?: "us" } = {}) {
+  const { prices } = usePlanPrices(variant === "us" ? { usOffer: true } : undefined);
   const faqs = buildFaqs(useAvailableMailProviders(), prices);
   return (
     <section className="py-24 lg:py-32">

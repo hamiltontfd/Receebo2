@@ -9,15 +9,19 @@ const BILLING_KEY = ["billing", "subscription"] as const;
 
 /**
  * Founding plan prices for this account/visitor, formatted for the app locale.
- * Signed-in: the server's billing currency (cached /billing/subscription) wins, so the
- * UI shows EUR when BRL prices are not configured; otherwise the market decides
- * (BR = BRL, else EUR). Works without Clerk/QueryClient/Market providers (landing, tests).
+ * Signed-in: the server's billing currency wins, including an existing EUR
+ * subscription that must not be shown as USD. Otherwise the saved or suggested
+ * market decides (BR = BRL, US = USD, else EUR). On /us, a visitor who has not
+ * chosen a market is shown the US offer. Works without providers (landing, tests).
  */
-export function usePlanPrices(): { currency: PlanCurrency; prices: Record<PlanKey, string> } {
+export function usePlanPrices(options?: { usOffer?: boolean }): { currency: PlanCurrency; prices: Record<PlanKey, string> } {
   const locale = useAppLocale();
-  const market = useContext(MarketContext)?.market ?? null;
+  const marketState = useContext(MarketContext);
+  const market = marketState?.market ?? null;
   const client = useContext(QueryClientContext);
   const server = client?.getQueryData<{ pricing?: { currency?: string } }>(BILLING_KEY)?.pricing?.currency;
-  const currency = isPlanCurrency(server) ? server : planCurrencyForMarket(market);
+  const currency = isPlanCurrency(server) ? server
+    : options?.usOffer && !marketState?.confirmed ? "USD"
+    : planCurrencyForMarket(market);
   return { currency, prices: planPrices(currency, locale) };
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { createServer } from "vite";
 import { createMarketingSchema, marketingSchemaPlugin } from "../../build/marketingSchema";
-import { PUBLIC_PLANS, formatPublicPrice } from "./publicPricing";
+import { PUBLIC_PLANS, US_PUBLIC_PLANS, formatPublicPrice, withUsOffers } from "./publicPricing";
 
 describe("public product identity", () => {
   it("connects the canonical website and application without unsupported claims", () => {
@@ -42,6 +42,15 @@ describe("public product identity", () => {
         },
       });
     });
+  });
+
+  it("can describe the same plans in USD without changing the EUR homepage schema", () => {
+    const eur = createMarketingSchema("https://receebo.net/");
+    const usd = withUsOffers(eur);
+    expect(eur["@graph"][1].offers?.[0]).toMatchObject({ price: "2.99", priceCurrency: "EUR" });
+    expect(usd["@graph"][1].offers?.map((offer) => offer.priceCurrency)).toEqual(["USD", "USD"]);
+    expect(usd["@graph"][1].offers?.map((offer) => offer.price)).toEqual(US_PUBLIC_PLANS.map((plan) => plan.price));
+    expect(usd["@graph"][1].offers?.[1].priceSpecification).toMatchObject({ billingDuration: "P1Y", price: "28.50" });
   });
 
   it("emits a standalone JSON-LD script in initial HTML, before React runs", async () => {

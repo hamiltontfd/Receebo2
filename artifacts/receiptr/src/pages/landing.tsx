@@ -129,9 +129,9 @@ export function LandingContent({ variant, isSignedIn = false, checkout, marketSe
           {us ? <UsReturnsSection /> : <ConsumerProtectionSection />}
           <HowItWorksSection variant={variant} />
           <SecuritySection />
-          <ComparisonSection />
-          <PricingSection checkout={checkout} />
-          <FAQSection />
+          <ComparisonSection variant={variant} />
+          <PricingSection checkout={checkout} variant={variant} />
+          <FAQSection variant={variant} />
           <FinalCTASection isSignedIn={isSignedIn} />
         </main>
 

@@ -14,6 +14,8 @@ vi.mock("@clerk/react", () => ({ useAuth: () => ({ isSignedIn: false }) }));
 
 import HeroSection from "./HeroSection";
 import UsReturnsSection from "./UsReturnsSection";
+import ComparisonSection from "./ComparisonSection";
+import PricingSection from "./PricingSection";
 import { MarketContext, type MarketState } from "@/components/MarketProvider";
 import { utmContentFromUrl } from "@/lib/landingBeacon";
 
@@ -78,6 +80,19 @@ describe("/us landing (C + D)", () => {
       unmount();
     }
     langs.mockRestore();
+  });
+
+  it("drops only the consumer-rights comparison row and shows the USD founding prices", () => {
+    const us = render(<ComparisonSection variant="us" />);
+    expect(screen.queryByText("Consumer rights info")).toBeNull();
+    expect(screen.getByText("Warranty tracking")).toBeTruthy();
+    us.unmount();
+    const home = render(<ComparisonSection />);
+    expect(screen.getByText("Consumer rights info")).toBeTruthy();
+    home.unmount();
+    render(<PricingSection variant="us" />);
+    expect(screen.getByText("US$3.50")).toBeTruthy();
+    expect(screen.getByText("US$28.50")).toBeTruthy();
   });
 
   it("utm_content comes from the URL only", () => {

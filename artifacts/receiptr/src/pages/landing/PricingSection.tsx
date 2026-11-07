@@ -27,11 +27,12 @@ const getPlans = (prices: Record<"monthly" | "yearly", string>) => PUBLIC_PLANS.
     highlight: plan.key === "yearly",
 }));
 
-export default function PricingSection({ checkout }: {
+export default function PricingSection({ checkout, variant }: {
   checkout?: { mutate: (plan: "monthly" | "yearly") => void; isPending: boolean };
+  variant?: "us";
 }) {
   const features = getFeatures();
-  const { prices } = usePlanPrices();
+  const { prices } = usePlanPrices(variant === "us" ? { usOffer: true } : undefined);
   const plans = getPlans(prices);
 
   return (

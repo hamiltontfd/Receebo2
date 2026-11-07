@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
+  market: null as null | "PT" | "BR" | "US",
   billing: null as null | { userId: string; stripeCustomerId: string; stripeSubscriptionId?: string },
   subscription: null as null | {
     id: string; status: string; trial_end: number; current_period_end: number;
@@ -41,6 +42,7 @@ vi.mock("../lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock("../lib/emailService", () => ({ sendTrialEndingEmail: vi.fn() }));
+vi.mock("../lib/accountMarket", () => ({ getAccountMarket: async () => state.market }));
 vi.mock("../stripeClient", () => ({
   getUncachableStripeClient: async () => ({
     customers: { create: state.customer },
@@ -105,14 +107,22 @@ beforeEach(() => {
     for (const period of ["MONTHLY", "YEARLY"]) vi.stubEnv(`STRIPE_${mode}_${period}_PRICE_ID`, "");
     vi.stubEnv(`STRIPE_${mode}_PORTAL_CONFIGURATION_ID`, "");
   }
+  state.market = null;
   state.billing = null;
   state.subscription = null;
   vi.clearAllMocks();
   state.customer.mockResolvedValue({ id: "cus_fixture" });
   state.price.mockImplementation(async (id: string) => ({
-    active: true, livemode: process.env.NODE_ENV === "production", currency: "eur",
-    unit_amount: id.includes("yearly") ? 2499 : 299,
-    recurring: { interval: id.includes("yearly") ? "year" : "month", interval_count: 1 },
+    active: true, livemode: process.env.NODE_ENV === "production",
+    currency: id.includes("brl") ? "brl" : "eur",
+    unit_amount: id.includes("brl")
+      ? (id.includes("yearly") ? 20000 : 2000)
+      : (id.includes("yearly") ? 2499 : 299),
+    product: "prod_fixture",
+    recurring: { interval: id.includes("yearly") ? "year" : "month", interval_count: 1, usage_type: "licensed" },
+    currency_options: id.includes("brl") ? undefined : {
+      usd: { unit_amount: id.includes("yearly") ? 2850 : 350 },
+    },
   }));
   state.checkout.mockResolvedValue({ url: "https://checkout.stripe.com/c/test_fixture" });
   state.portal.mockResolvedValue({ url: "https://billing.stripe.com/p/session/test_fixture" });
@@ -167,7 +177,8 @@ describe("ordinary user billing, with isolated Stripe and database adapters", ()
     expect(response.status).toBe(200);
     expect(await response.json()).toHaveProperty("url", "https://checkout.stripe.com/c/test_fixture");
     expect(state.checkout).toHaveBeenCalledWith(expect.objectContaining({
-      customer: "cus_fixture", mode: "subscription",
+      customer: "cus_fixture", mode: "subscription", currency: "eur",
+      adaptive_pricing: { enabled: false },
       line_items: [{ price: `price_${planType}_fixture`, quantity: 1 }],
       subscription_data: { metadata: { userId: "ordinary_user", offer: "founding_customer" } },
       success_url: "https://receebo.net/search?checkout=success",
@@ -217,9 +228,58 @@ describe("ordinary user billing, with isolated Stripe and database adapters", ()
     vi.stubEnv("STRIPE_LIVE_MONTHLY_PRICE_ID", "price_monthly_live_fixture");
     vi.stubEnv("STRIPE_LIVE_PORTAL_CONFIGURATION_ID", "bpc_live_fixture");
     expect((await post("/billing/create-checkout-session", { planType: "monthly" })).status).toBe(200);
-    expect(state.price).toHaveBeenCalledWith("price_monthly_live_fixture");
+    expect(state.price).toHaveBeenCalledWith("price_monthly_live_fixture", { expand: ["currency_options"] });
     expect((await post("/billing/create-portal-session")).status).toBe(200);
     expect(state.portal).toHaveBeenCalledWith(expect.objectContaining({ configuration: "bpc_live_fixture" }));
+  });
+  it("charges a US account the USD option on the same EUR price id", async () => {
+    state.market = "US";
+    expect((await post("/billing/create-checkout-session", { planType: "monthly" })).status).toBe(200);
+    expect(state.checkout).toHaveBeenCalledWith(expect.objectContaining({
+      currency: "usd", adaptive_pricing: { enabled: false },
+      line_items: [{ price: "price_monthly_fixture", quantity: 1 }],
+    }));
+    expect((await post("/billing/create-checkout-session", { planType: "yearly" })).status).toBe(200);
+    expect(state.checkout).toHaveBeenLastCalledWith(expect.objectContaining({
+      currency: "usd",
+      line_items: [{ price: "price_yearly_fixture", quantity: 1 }],
+    }));
+  });
+  it("blocks a US checkout when the USD option is missing or not the yearly price", async () => {
+    state.market = "US";
+    state.price.mockResolvedValueOnce({
+      active: true, livemode: true, currency: "eur", unit_amount: 299, product: "prod_fixture",
+      recurring: { interval: "month", interval_count: 1, usage_type: "licensed" },
+    });
+    expect((await post("/billing/create-checkout-session", { planType: "monthly" })).status).toBe(503);
+    expect(state.checkout).not.toHaveBeenCalled();
+    state.price.mockResolvedValueOnce({
+      active: true, livemode: true, currency: "eur", unit_amount: 299, product: "prod_fixture",
+      recurring: { interval: "month", interval_count: 1, usage_type: "licensed" },
+      currency_options: { usd: { unit_amount: 2850 } },
+    });
+    expect((await post("/billing/create-checkout-session", { planType: "monthly" })).status).toBe(503);
+    expect(state.checkout).not.toHaveBeenCalled();
+  });
+  it("keeps Brazil on its own price id and does not override the session currency", async () => {
+    state.market = "BR";
+    vi.stubEnv("STRIPE_LIVE_MONTHLY_PRICE_ID_BRL", "price_brl_monthly");
+    vi.stubEnv("STRIPE_LIVE_YEARLY_PRICE_ID_BRL", "price_brl_yearly");
+    expect((await post("/billing/create-checkout-session", { planType: "monthly" })).status).toBe(200);
+    const session = state.checkout.mock.calls[0][0] as { currency?: string; adaptive_pricing?: unknown; line_items: unknown };
+    expect(session.currency).toBeUndefined();
+    expect(session.adaptive_pricing).toBeUndefined();
+    expect(session.line_items).toEqual([{ price: "price_brl_monthly", quantity: 1 }]);
+  });
+  it("describes an existing EUR subscription in EUR even when the account market is US", async () => {
+    state.market = "US";
+    state.billing = { userId: "ordinary_user", stripeCustomerId: "cus_fixture" };
+    const end = Math.floor(Date.now() / 1000) + 86400;
+    state.subscription = {
+      id: "sub_eur", status: "active", trial_end: end, current_period_end: end,
+      cancel_at_period_end: false, currency: "eur",
+    } as typeof state.subscription;
+    expect(await status()).toMatchObject({ plan: "pro", pricing: { currency: "EUR", monthly: 299, yearly: 2499 } });
   });
   it("requires authentication and consent, and validates plan configuration", async () => {
     expect((await post("/billing/create-checkout-session", { planType: "monthly" },
