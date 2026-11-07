@@ -104,7 +104,7 @@ export default function HeroSection({ isSignedIn = false, variant }: { isSignedI
             animate="visible"
             className="relative"
           >
-            {us ? <UsHeroPlaceholder /> : <figure data-testid="hero-phones" className="m-0">
+            {us ? <UsHeroPhones reduce={!!reduce} /> : <figure data-testid="hero-phones" className="m-0">
               <div className="relative mx-auto flex justify-center items-start w-full max-w-[560px] pt-2 pb-8">
                 <PhoneFrame
                   file="library-phone.webp"
@@ -136,15 +136,20 @@ export default function HeroSection({ isSignedIn = false, variant }: { isSignedI
 }
 
 function PhoneFrame({
-  file, alt, className, float, duration, priority, testId,
+  file, src, alt, className, float, duration, priority, testId, width = 780, height = 1688, cropDisclosure = true,
 }: {
-  file: string;
+  file?: string;
+  src?: string;
   alt: string;
   className?: string;
   float?: number[];
   duration: number;
   priority?: boolean;
   testId: string;
+  width?: number;
+  height?: number;
+  /** EU captures include a 32px disclosure strip. The US dev captures do not. */
+  cropDisclosure?: boolean;
 }) {
   return (
     <motion.div
@@ -157,16 +162,16 @@ function PhoneFrame({
           <div className="overflow-hidden">
           <img
             data-testid={testId}
-            src={marketingMedia(file)}
+            src={src ?? marketingMedia(file ?? "")}
             alt={alt}
-            width={780}
-            height={1688}
+            width={width}
+            height={height}
             decoding="async"
             {...(priority ? { fetchPriority: "high" as const } : { loading: "eager" as const })}
             className="block w-full h-auto"
-            // Crop the capture-only 32px disclosure strip from the 390px-wide
-            // source viewport. Keep the disclosure in the figure caption instead.
-            style={{ marginTop: `${-(32 / 390) * 100}%` }}
+            // EU captures: crop the capture-only 32px disclosure strip from the
+            // 390px-wide source. The disclosure stays in the figure caption.
+            style={cropDisclosure ? { marginTop: `${-(32 / 390) * 100}%` } : undefined}
           />
           </div>
         </div>
@@ -175,19 +180,51 @@ function PhoneFrame({
   );
 }
 
-/**
- * PLACEHOLDER (US mode C): no approved US screenshots exist yet (the PT hero shows
- * a € receipt and EU legal warranty). Replace with Designer's US captures (a $
- * Best Buy TV receipt with its return deadline) before launch.
- */
-function UsHeroPlaceholder() {
+/** Real dev captures of one fictional US sample. Not redrawn. */
+function UsHeroPhones({ reduce }: { reduce: boolean }) {
+  const base = import.meta.env.BASE_URL;
   return (
-    <div
-      data-testid="us-hero-placeholder"
-      className="mx-auto w-full max-w-[460px] aspect-[4/3] rounded-3xl border-2 border-dashed border-amber-400 bg-amber-50 flex flex-col items-center justify-center gap-2 p-6 text-center"
-    >
-      <span className="text-xs font-bold uppercase tracking-widest text-amber-700">Placeholder</span>
-      <span className="text-sm text-amber-900">US app screenshots go here (Designer): Best Buy TV receipt in $, return deadline, warranty 1/2/3 years.</span>
-    </div>
+    <figure data-testid="us-hero-phones" className="m-0">
+      <div className="relative mx-auto flex justify-center items-start w-full max-w-[560px] pt-2 pb-8">
+        <PhoneFrame
+          src={`${base}marketing/us/us-detail-390-top.png`}
+          width={581}
+          height={1014}
+          cropDisclosure={false}
+          testId="img-us-detail"
+          alt={lt(
+            "Actual Receebo receipt screen for a fictional Demo Electronics sample: a television for $299 on November 7, 2026, purchase country United States.",
+            "Ecrã real de recibo do Receebo de um exemplo fictício da Demo Electronics: uma televisão por 299 dólares em 7 de novembro de 2026, país da compra Estados Unidos.",
+            "Tela real de recibo do Receebo de um exemplo fictício da Demo Electronics: uma televisão por 299 dólares em 7 de novembro de 2026, país da compra Estados Unidos.",
+          )}
+          className="w-[46%] max-w-[260px] z-10 -mr-[8%]"
+          float={reduce ? undefined : [0, -10, 0]}
+          duration={7}
+          priority
+        />
+        <PhoneFrame
+          src={`${base}marketing/us/us-review-390-bottom.png`}
+          width={581}
+          height={1014}
+          cropDisclosure={false}
+          testId="img-us-review"
+          alt={lt(
+            "Actual Receebo review screen for the same fictional sample. A 2-year manufacturer warranty is shown because that text is on the sample. The screen says this store's return window is not known.",
+            "Ecrã real de revisão do Receebo do mesmo exemplo fictício. Mostra uma garantia de fabricante de 2 anos porque esse texto está no exemplo. O ecrã diz que o prazo de devolução desta loja não é conhecido.",
+            "Tela real de revisão do Receebo do mesmo exemplo fictício. Mostra uma garantia de fabricante de 2 anos porque esse texto está no exemplo. A tela diz que o prazo de devolução desta loja não é conhecido.",
+          )}
+          className="w-[46%] max-w-[260px] z-20 mt-[12%]"
+          float={reduce ? undefined : [0, 8, 0]}
+          duration={8}
+        />
+      </div>
+      <figcaption className="text-[11px] text-muted-foreground text-center max-w-md mx-auto leading-relaxed">
+        {lt(
+          "Real Receebo screens of a fictional Demo Electronics sample, not a real store. The 2 years are manufacturer-warranty words on that sample, not a US legal guarantee. The 30 days are free text; Receebo does not count them as the store's return window.",
+          "Ecrãs reais do Receebo de um exemplo fictício da Demo Electronics, não de uma loja real. Os 2 anos são o texto de garantia do fabricante nesse exemplo, não uma garantia legal dos EUA. Os 30 dias são texto livre; o Receebo não os conta como o prazo de devolução da loja.",
+          "Telas reais do Receebo de um exemplo fictício da Demo Electronics, não de uma loja real. Os 2 anos são o texto de garantia do fabricante nesse exemplo, não uma garantia legal dos EUA. Os 30 dias são texto livre; o Receebo não os conta como o prazo de devolução da loja.",
+        )}
+      </figcaption>
+    </figure>
   );
 }

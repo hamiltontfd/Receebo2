@@ -32,14 +32,19 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); localStorage.clear(); sessionStorage.clear(); });
 
 describe("/us landing (C + D)", () => {
-  it("US hero copy and a clearly marked placeholder instead of the € screenshots", () => {
+  it("US hero uses the real fictional sample screens, not the € captures or the placeholder", () => {
     render(<HeroSection variant="us" />);
     expect(screen.getByText("Returns, on time.")).toBeTruthy();
     expect(screen.getByText(/Best Buy, Target, Walmart, Amazon/)).toBeTruthy();
-    expect(screen.getByTestId("us-hero-placeholder").textContent).toContain("Placeholder");
+    expect(screen.queryByTestId("us-hero-placeholder")).toBeNull();
     expect(screen.queryByTestId("hero-phones")).toBeNull();
+    expect(screen.getByTestId("img-us-detail").getAttribute("src")).toContain("marketing/us/us-detail-390-top.png");
+    expect(screen.getByTestId("img-us-review").getAttribute("src")).toContain("marketing/us/us-review-390-bottom.png");
+    expect(screen.getByTestId("us-hero-phones").textContent).toMatch(/not a US legal guarantee/);
+    expect(screen.getByTestId("us-hero-phones").textContent).toMatch(/does not count them as the store's return window/);
     expect(screen.queryByText("See it in action")).toBeNull();
     expect(document.body.textContent).not.toContain("€");
+    expect(document.body.textContent).not.toContain("Placeholder");
   });
 
   it("CTA: aggregate cta_click with utm_content only, and an unchosen visitor becomes US", () => {
