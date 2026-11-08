@@ -207,7 +207,12 @@ describe("ReceiptSheet warranty info Escape", () => {
 
     fireEvent.click(screen.getByTestId("button-rights-info"));
     expect(screen.getByTestId("text-rights-info").textContent).toMatch(/No federal minimum return right or warranty in the US/);
-    expect(screen.getByTestId("text-rights-info").textContent).toMatch(/General information, not legal advice. Check with the store/);
+    expect(screen.getByTestId("text-rights-info").textContent).toMatch(/General information, not legal advice/);
+    expect(screen.getByTestId("text-rights-info").textContent).not.toMatch(/return window/i);
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    fireEvent.click(screen.getByTestId("button-return-info"));
+    expect(screen.getByTestId("text-return-info").textContent).toMatch(/don't know this store's return window/i);
+    expect(screen.getByTestId("text-return-info").textContent).not.toMatch(/manufacturer's warranty/i);
     pressEscape();
     await expectOverlayClosed(onClose);
 
@@ -271,6 +276,9 @@ describe("ReceiptSheet warranty info Escape", () => {
     expect(screen.getAllByTestId("row-return").map((row) => row.textContent).join("\n")).toMatch(/Return window unknown/);
     expect(screen.getAllByTestId("row-warranty").map((row) => row.textContent).join("\n")).toMatch(/Warranty unknown/);
     expect(screen.queryByText("Returns & warranty")).toBeNull();
+    expect(screen.queryByText("Files")).toBeNull();
+    expect(screen.queryByText("Original receipt")).toBeNull();
+    expect(screen.getByTestId("button-view-original")).toBeInTheDocument();
     expect(screen.queryByText("Purchase country")).toBeNull();
     expect(screen.queryByText(/Fictional manufacturer warranty/)).toBeNull();
     expect(screen.getByTestId("section-complete-list").textContent?.indexOf("TV")).toBeLessThan(
@@ -288,6 +296,42 @@ describe("ReceiptSheet warranty info Escape", () => {
     const saved = mocks.update.mock.calls[0][0].data.products;
     expect(saved.map((line: { lineId: string }) => line.lineId)).toEqual(["l_tv000000000001", "l_milk0000000001"]);
     expect(saved[0].coverages).toBeUndefined();
+  });
+
+  it("shows an unknown warranty card without copying the receipt warranty, and keeps another contract when one field changes", async () => {
+    mount({
+      ...sample,
+      contentType: "application/pdf",
+      warranty: "Fictional manufacturer warranty: 2 years from purchase date.",
+      products: [{
+        lineId: "l_tv000000000001", name: "TV sample television", quantity: 1, price: 299, category: "Electronics",
+        coverages: [
+          { id: "c_commercial", kind: "warranty", warrantyType: "commercial", basis: "user", certainty: "confirmed", lengthMonths: 60, source: "user" },
+          { id: "c_maker", kind: "warranty", warrantyType: "manufacturer", basis: "stated", certainty: "estimated", lengthMonths: 24, evidence: "TV: 24 month manufacturer warranty", source: "extraction" },
+        ],
+      }],
+      notableItems: [],
+      itemRights: [{
+        lineId: "l_tv000000000001", index: 0,
+        contracts: [{ id: "us-legal", kind: "warranty", warrantyType: "legal", basis: "rule", certainty: "confirmed", status: "not_applicable", ruleId: "US:no_federal_legal_warranty" }],
+      }],
+    }, "US");
+    const warranty = screen.getByTestId("row-warranty");
+    expect(warranty.textContent).toMatch(/Warranty unknown/);
+    expect(warranty.textContent).not.toMatch(/2 years|24 month|Fictional/);
+    expect(screen.queryByText("Files")).toBeNull();
+    expect(screen.queryByText("Original receipt")).toBeNull();
+    expect(screen.getByTestId("button-view-original").className).toMatch(/121212/);
+
+    fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
+    const maker = screen.getByRole("textbox", { name: /Manufacturer warranty/ });
+    fireEvent.change(maker, { target: { value: "36" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save Changes/ }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled());
+    const coverages = mocks.update.mock.calls.at(-1)?.[0].data.products[0].coverages;
+    expect(coverages.map((c: { warrantyType: string }) => c.warrantyType).sort()).toEqual(["commercial", "manufacturer"]);
+    expect(coverages.find((c: { warrantyType: string }) => c.warrantyType === "commercial").lengthMonths).toBe(60);
+    expect(coverages.find((c: { id?: string }) => c.id === "c_maker").lengthMonths).toBe(36);
   });
 });
 

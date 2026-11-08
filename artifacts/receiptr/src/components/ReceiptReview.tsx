@@ -243,31 +243,7 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
           onChooseChannel={(online) => setFields((current) => (current ? { ...current, isOnlinePurchase: online } : current))}
         />
 
-        {products.length > 0 && (
-          <div>
-            <p className={`${label} mb-2 flex items-center gap-1.5`}>
-              <Package className="w-3.5 h-3.5" /> {appText("Items ·")} {products.length}
-            </p>
-            <div className="rounded-2xl border divide-y">
-              {products.map((p, i) => (
-                <div key={i} className="px-4 py-3 flex items-baseline justify-between gap-3 text-sm">
-                  <span className="min-w-0">
-                    {p.name}
-                    {p.quantity != null && <span className="text-xs text-muted-foreground"> ×{p.quantity}</span>}
-                  </span>
-                  {p.price != null && <span className="font-mono font-semibold shrink-0">{formatMoney(p.price, receipt.currency)}</span>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div>
-          <p className={`${label} mb-2 flex items-center gap-1.5`}>
-            <FileText className="w-3.5 h-3.5" /> {appText("Original receipt")}
-          </p>
-          <ReceiptPreview fileUrl={privateFileUrl(receipt.objectPath)} fileName={receipt.originalFileName} />
-        </div>
+        <ReceiptPreview variant="button" fileUrl={privateFileUrl(receipt.objectPath)} fileName={receipt.originalFileName} />
       </div>
 
       <div className="sticky bottom-0 border-t bg-background px-5 py-3">

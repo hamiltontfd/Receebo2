@@ -56,7 +56,6 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { StoreFullscreen } from "@/components/StoreFullscreen";
 import { generateReceiptPdf } from "@/lib/generateReceiptPdf";
 import { currencySymbol } from "@/lib/currency";
@@ -746,23 +745,26 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                   )}
 
                   {!isEditing && (
-                    isImage ? (
-                      <Button
-                        data-testid="button-view-original"
-                        className="w-full min-h-11 rounded-full bg-[#121212] text-white hover:bg-[#121212]/90"
-                        onClick={() => openStoreView(fileUrl)}
-                        disabled={isOpeningStore}
-                      >
-                        <ScanLine className="w-4 h-4 mr-2" />
-                        {appText(isOpeningStore ? "Loading…" : "View original receipt")}
-                      </Button>
-                    ) : (
-                      <ReceiptPreview fileUrl={fileUrl} fileName={receipt.originalFileName} />
-                    )
+                    <Button
+                      data-testid="button-view-original"
+                      className="w-full min-h-11 rounded-full bg-[#121212] text-white hover:bg-[#121212]/90"
+                      onClick={() => {
+                        if (isImage) { openStoreView(fileUrl); return; }
+                        void customFetch<Blob>(fileUrl, { responseType: "blob" }).then((blob) => {
+                          window.open(URL.createObjectURL(blob), "_blank");
+                        }).catch(() => {
+                          toast({ title: appText("Error"), description: appText("Could not load image."), variant: "destructive" });
+                        });
+                      }}
+                      disabled={isOpeningStore}
+                    >
+                      <ScanLine className="w-4 h-4 mr-2" />
+                      {appText(isOpeningStore ? "Loading…" : "View original receipt")}
+                    </Button>
                   )}
 
-                  {/* ── Files / Attachments ── */}
-                  {!isEditing && (
+                  {/* Extra files. The original stays on the view button and is not listed again. */}
+                  {isEditing && (
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">

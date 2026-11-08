@@ -58,7 +58,8 @@ describe("ReceiptReview (after accepting an email import)", () => {
     expect(await screen.findByText("Added to your receipts")).toBeInTheDocument();
     expect(screen.getByLabelText("Merchant")).toHaveValue("Casa Lumen");
     expect(screen.getByLabelText("Warranty")).toHaveValue("2-year manufacturer");
-    expect(screen.getByText("Items · 1")).toBeInTheDocument();
+    expect(screen.getByTestId("section-complete-list").textContent).toMatch(/Soundbar/);
+    expect(screen.queryByText("Original receipt")).toBeNull();
     expect(screen.getByText("Original email.pdf")).toBeInTheDocument();
   });
 

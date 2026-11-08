@@ -592,12 +592,11 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
               {appText("View original receipt")}
             </Button>
           ) : (
-            <ReceiptPreview fileUrl={fileUrl} fileName={receipt.originalFileName} />
+            <ReceiptPreview variant="button" fileUrl={fileUrl} fileName={receipt.originalFileName} />
           )
         )}
 
-        {/* Files section — primary scan + attachments */}
-        {!isEditing && (
+        {isEditing && (
           <div className="rounded-2xl border divide-y">
             <div className="p-4 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

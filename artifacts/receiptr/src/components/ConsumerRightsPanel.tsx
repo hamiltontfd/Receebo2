@@ -40,7 +40,7 @@ function countryHeading(label: string | null, locale: string): string {
  * a tap toggles it, and Escape or a press outside closes it. The overlay
  * stays inside the viewport and scrolls when the text is long.
  */
-export function WarrantyInfo({ lines }: { lines: string[] }) {
+export function WarrantyInfo({ lines, testId = "button-rights-info", contentTestId = "text-rights-info", label }: { lines: string[]; testId?: string; contentTestId?: string; label?: string }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<number | null>(null);
   const pointerKind = useRef("");
@@ -81,8 +81,8 @@ export function WarrantyInfo({ lines }: { lines: string[] }) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          data-testid="button-rights-info"
-          aria-label={appText("About this warranty")}
+          data-testid={testId}
+          aria-label={label ?? appText("About this warranty")}
           className="shrink-0 rounded-full p-0.5 opacity-80 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           onPointerDown={(event) => {
             pointerKind.current = event.pointerType;
@@ -114,7 +114,7 @@ export function WarrantyInfo({ lines }: { lines: string[] }) {
         </button>
       </PopoverTrigger>
       <PopoverContent
-        data-testid="text-rights-info"
+        data-testid={contentTestId}
         align="end"
         side="top"
         collisionPadding={12}

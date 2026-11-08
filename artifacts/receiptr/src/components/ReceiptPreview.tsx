@@ -7,6 +7,8 @@ import { customFetch } from "@workspace/api-client-react";
 interface ReceiptPreviewProps {
   fileUrl: string;
   fileName: string;
+  /** "button" is the single black action under the item list. */
+  variant?: "row" | "button";
 }
 
 /**
@@ -18,7 +20,7 @@ interface ReceiptPreviewProps {
  * The file is fetched as an authenticated blob up front so the click can call
  * window.open synchronously (keeps mobile popup blockers happy).
  */
-export function ReceiptPreview({ fileUrl, fileName }: ReceiptPreviewProps) {
+export function ReceiptPreview({ fileUrl, fileName, variant = "row" }: ReceiptPreviewProps) {
   useAppLocale();
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
@@ -49,8 +51,22 @@ export function ReceiptPreview({ fileUrl, fileName }: ReceiptPreviewProps) {
     if (blobUrl) window.open(blobUrl, "_blank");
   }, [blobUrl]);
 
+  if (variant === "button") {
+    return (
+      <button
+        type="button"
+        data-testid="button-view-original"
+        className="w-full min-h-11 rounded-full bg-[#121212] text-white text-sm font-medium inline-flex items-center justify-center gap-2 disabled:opacity-40"
+        onClick={handleOpen}
+        disabled={!blobUrl}
+      >
+        {appText("View original receipt")}
+      </button>
+    );
+  }
+
   return (
-    <div className="rounded-2xl border p-4 flex items-center justify-between">
+    <div className="rounded-2xl border p-4 flex items-center justify-between" data-testid="row-original-receipt">
       <div className="flex items-center gap-3 min-w-0">
         <span className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
           <FileText className="w-4 h-4 text-muted-foreground" />

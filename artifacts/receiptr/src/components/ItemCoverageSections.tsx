@@ -141,7 +141,17 @@ export function ItemCoverageSections({
     ? unknownChannelRetailerNote(locale, receipt.merchant)
     : null;
   const noDatesNote = noDates ? derived?.notes[0] ?? null : null;
-  const legalLines = (derived?.notes ?? []).filter((note) => note !== suppressed && note !== noDatesNote);
+  const returnLines: string[] = [];
+  const legalLines: string[] = [];
+  for (const note of derived?.notes ?? []) {
+    if (note === suppressed || note === noDatesNote) continue;
+    // A note that is only about the return window stays on Return by.
+    // The US sentence that names both warranty and return stays with Warranty.
+    const aboutReturn = /return window|prazo de devolu|for returns|aceitar devolu|withdraw|desistir|check your receipt or the store|confira o recibo ou a pol|confirme no recibo ou a pol/i.test(note);
+    const aboutWarranty = /warrant|garantia/i.test(note);
+    if (aboutReturn && !aboutWarranty) returnLines.push(note);
+    else legalLines.push(note);
+  }
   if (derived?.disclaimer) legalLines.push(derived.disclaimer);
   const rights = itemRights ?? [];
   const rows = products.map((line, index) => ({ line, index, contracts: contractsFor(line, index, rights) }));
@@ -192,7 +202,10 @@ export function ItemCoverageSections({
       )}
 
       {!noDates && <div data-testid="section-return-by">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">{appText("Return by")}</p>
+        <div className="flex items-center gap-1.5 mb-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Return by")}</p>
+          {returnLines.length > 0 && <WarrantyInfo lines={returnLines} testId="button-return-info" contentTestId="text-return-info" label={appText("About this return")} />}
+        </div>
         <div className="space-y-2">
           {rows.map(({ line, contracts }) => {
             const returns = contracts.filter((c) => c.kind === "return" && c.status !== "not_applicable");
@@ -222,8 +235,10 @@ export function ItemCoverageSections({
         </div>
         <div className="space-y-2">
           {rows.map(({ line, contracts }) => {
-            const warranties = contracts.filter((c) => c.kind === "warranty" && c.status !== "not_applicable");
-            const shown = warranties.length > 0 ? warranties : contracts.some((c) => c.kind === "warranty" && c.status === "not_applicable") ? [] : [{
+            const warranties = contracts.filter((c) => c.kind === "warranty" && c.status !== "not_applicable" && c.status !== "unknown");
+            // A federal "not applicable" rule is not a warranty for this product.
+            // Missing stays an unknown card. The receipt text is not copied in.
+            const shown = warranties.length > 0 ? warranties : [{
               id: `${line.lineId ?? line.name}-warranty-unknown`, kind: "warranty" as const, basis: "rule" as const,
               certainty: "unknown" as const, status: "unknown" as const,
             }];
