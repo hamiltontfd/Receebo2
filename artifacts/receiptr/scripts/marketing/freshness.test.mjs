@@ -107,6 +107,16 @@ test("fixture requests never reach account services; unknown calls fail closed",
   assert.equal(session.answer("GET", `${origin}/api/receipts`).fulfill.json.items.length, 4);
 });
 
+test("CAPTURE_CLIPS=0 skips video for EU and US, and the defaults stay", async () => {
+  const { clipsEnabled } = await import("./record.mjs");
+  assert.equal(clipsEnabled(false, undefined), true);
+  assert.equal(clipsEnabled(false, "1"), true);
+  assert.equal(clipsEnabled(false, "0"), false);
+  assert.equal(clipsEnabled(true, undefined), false);
+  assert.equal(clipsEnabled(true, "1"), true);
+  assert.equal(clipsEnabled(true, "0"), false);
+});
+
 test("US and EU capture contexts stay separate and the published binaries stay put", async () => {
   const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
   assert.match(record, /View original receipt/);

@@ -1,10 +1,20 @@
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import { capturedAt, receipts, isolate, activeCapture } from "./fixtures.mjs";
 import { illustrativePdf, sampleDocumentHtml, sampleDocumentLines } from "./sample-document.mjs";
 
+/** EU records clips unless this is "0". US records clips only when this is "1". */
+export function clipsEnabled(usContext, flag = process.env.CAPTURE_CLIPS) {
+  if (flag === "0") return false;
+  return usContext ? flag === "1" : true;
+}
+
+const invokedDirectly = process.argv[1]
+  && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+if (invokedDirectly) {
 const capture = activeCapture();
 const us = capture.name === "us";
 
@@ -251,9 +261,7 @@ try {
   }
   await close(phone);
 
-  if (us && process.env.CAPTURE_CLIPS !== "1") {
-    console.log("US stills only. Published video files were not encoded or replaced.", out);
-  } else for (const clip of ["capture", "find", "protect"]) {
+  if (clipsEnabled(us)) for (const clip of ["capture", "find", "protect"]) {
     const c = await context({ width: 960, height: 640, record: true });
     const video = c.page.video();
     await ready(c.page, clip === "capture" ? "/scan" : "/search");
@@ -301,9 +309,12 @@ try {
   await writeFile(`${out}/sources/layout.json`, JSON.stringify({ capturedAt, context: capture.name, dprNote: "centerYAtDpr3 is the viewport center Y in CSS pixels times 3", layout }, null, 2));
   await writeFile(`${out}/manifest.json`, JSON.stringify({ ...manifest, layout, errors }, null, 2));
   if (errors.length || manifest.unexpected.length) throw new Error(JSON.stringify({ errors, unexpected: manifest.unexpected }));
-  console.log(us && process.env.CAPTURE_CLIPS !== "1"
-    ? `Captured US stills only. No video was encoded. ${out}`
-    : `Captured real screens and all three interactions. ${out}`);
+  console.log(clipsEnabled(us)
+    ? `Captured real screens and all three interactions. ${out}`
+    : us
+      ? `Captured US stills only. No video was encoded. ${out}`
+      : `Captured EU phone stills. No video was encoded. WebP copies of those stills were written. ${out}`);
 } finally {
   await browser.close();
+}
 }
