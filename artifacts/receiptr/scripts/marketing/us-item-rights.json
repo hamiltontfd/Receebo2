@@ -1,0 +1,668 @@
+[
+  [
+    {
+      "lineId": "l_usnwdisplay01",
+      "index": 0,
+      "contracts": [
+        {
+          "id": "c_usnwdispw01",
+          "kind": "warranty",
+          "warrantyType": "manufacturer",
+          "basis": "stated",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": null,
+          "lengthMonths": 24,
+          "startDate": "2026-11-02",
+          "endDate": "2028-11-02",
+          "ruleId": null,
+          "evidence": "Illustrative sample: 55-inch display, 24-month manufacturer warranty. Not a store policy.",
+          "conflict": false,
+          "legalReviewPending": false
+        },
+        {
+          "id": "c_usnwdispr01",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "stated",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": 30,
+          "lengthMonths": null,
+          "startDate": "2026-11-02",
+          "endDate": "2026-12-02",
+          "ruleId": null,
+          "evidence": "Illustrative sample: 55-inch display, 30-day return. Not a US legal minimum.",
+          "conflict": false,
+          "legalReviewPending": false
+        },
+        {
+          "id": "rule:l_usnwdisplay01:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_usnwspeaker01",
+      "index": 1,
+      "contracts": [
+        {
+          "id": "c_usnwsprkw01",
+          "kind": "warranty",
+          "warrantyType": "manufacturer",
+          "basis": "stated",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": null,
+          "lengthMonths": 18,
+          "startDate": "2026-11-02",
+          "endDate": "2028-05-02",
+          "ruleId": null,
+          "evidence": "Illustrative sample: shelf speaker, 18-month manufacturer warranty. Not a store policy.",
+          "conflict": false,
+          "legalReviewPending": false
+        },
+        {
+          "id": "c_usnwsprkr01",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "stated",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": 45,
+          "lengthMonths": null,
+          "startDate": "2026-11-02",
+          "endDate": "2026-12-17",
+          "ruleId": null,
+          "evidence": "Illustrative sample: shelf speaker, 45-day return. Not a US legal minimum.",
+          "conflict": false,
+          "legalReviewPending": false
+        },
+        {
+          "id": "rule:l_usnwspeaker01:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_usnwcable0001",
+      "index": 2,
+      "contracts": [
+        {
+          "id": "rule:l_usnwcable0001:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_usnwcable0001:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_usnwanchor001",
+      "index": 3,
+      "contracts": [
+        {
+          "id": "rule:l_usnwanchor001:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_usnwanchor001:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_usnwcloth0001",
+      "index": 4,
+      "contracts": [
+        {
+          "id": "rule:l_usnwcloth0001:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_usnwcloth0001:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "lineId": "l_usharbor0001",
+      "index": 0,
+      "contracts": [
+        {
+          "id": "c_usharborw01",
+          "kind": "warranty",
+          "warrantyType": "manufacturer",
+          "basis": "stated",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": null,
+          "lengthMonths": 12,
+          "startDate": "2026-10-28",
+          "endDate": "2027-10-28",
+          "ruleId": null,
+          "evidence": "Illustrative sample: floor lamp, 12-month manufacturer warranty. Not a store policy.",
+          "conflict": false,
+          "legalReviewPending": false
+        },
+        {
+          "id": "rule:l_usharbor0001:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_usharbor0001:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "lineId": "l_uslinden0001",
+      "index": 0,
+      "contracts": [
+        {
+          "id": "rule:l_uslinden0001:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_uslinden0001:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_uslinden0002",
+      "index": 1,
+      "contracts": [
+        {
+          "id": "rule:l_uslinden0002:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_uslinden0002:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_uslinden0003",
+      "index": 2,
+      "contracts": [
+        {
+          "id": "rule:l_uslinden0003:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_uslinden0003:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_uslinden0004",
+      "index": 3,
+      "contracts": [
+        {
+          "id": "rule:l_uslinden0004:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_uslinden0004:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_uslinden0005",
+      "index": 4,
+      "contracts": [
+        {
+          "id": "rule:l_uslinden0005:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_uslinden0005:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_uslinden0006",
+      "index": 5,
+      "contracts": [
+        {
+          "id": "rule:l_uslinden0006:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_uslinden0006:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "lineId": "l_usfield00001",
+      "index": 0,
+      "contracts": [
+        {
+          "id": "rule:l_usfield00001:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_usfield00001:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_usfield00002",
+      "index": 1,
+      "contracts": [
+        {
+          "id": "rule:l_usfield00002:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_usfield00002:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "lineId": "l_usmaple00001",
+      "index": 0,
+      "contracts": [
+        {
+          "id": "rule:l_usmaple00001:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_usmaple00001:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_usmaple00002",
+      "index": 1,
+      "contracts": [
+        {
+          "id": "rule:l_usmaple00002:US:no_federal_legal_warranty",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "confirmed",
+          "status": "not_applicable",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": "US:no_federal_legal_warranty",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_usmaple00002:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    }
+  ]
+]

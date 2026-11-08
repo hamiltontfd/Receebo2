@@ -1,0 +1,13 @@
+{
+  "note": "Bytes that must stay until a reviewed screenshot replace. This refresh does not overwrite them.",
+  "files": {
+    "artifacts/receiptr/public/media/receebo-promo-16x9.mp4": "ac586fef555ac45968fbb078ddbb56b5a41efe3351392a079bdd6f13e2168815",
+    "artifacts/receiptr/public/media/receebo-promo-16x9.webm": "bfc0390bb883bde80287e9600df02b9d0d4f7a75703d9c151b121623893a8418",
+    "artifacts/receiptr/public/media/receebo-promo-9x16.mp4": "a6fd82fc9a5231b963aed9df3ba7b279d784ae33fc3acb2d08ef864d0dceff1d",
+    "artifacts/receiptr/public/media/receebo-promo-9x16.webm": "4a44235657ad00aa4653595c5b09ff90bd45b829cb05f37e4f3b77da9705be5f",
+    "artifacts/receiptr/public/media/receebo-promo-16x9-poster.webp": "0fe93a271f9784969511279fd3afac801a004d28ba0b39b1655611227ad048b6",
+    "artifacts/receiptr/public/media/receebo-promo-9x16-poster.webp": "6c8c34be8a5f6948d0ee38a48ee044080d1cf434521cd880442674641add00b8",
+    "artifacts/receiptr/public/marketing/us/us-detail-390-top.png": "b4922bbe209d7c4409bd55f7b11c755278eaef5c8daf1bd18d310378c8d50120",
+    "artifacts/receiptr/public/marketing/us/us-review-390-bottom.png": "ec6cbdeb9eac4442f0d54e489f84f7f360772832c88a4b22b2fec34c1539421d"
+  }
+}

@@ -1,0 +1,590 @@
+[
+  [
+    {
+      "lineId": "l_samplecasa0001",
+      "index": 0,
+      "contracts": [
+        {
+          "id": "c_samplecasa0001",
+          "kind": "warranty",
+          "warrantyType": "manufacturer",
+          "basis": "stated",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": null,
+          "lengthMonths": 24,
+          "startDate": "2026-10-23",
+          "endDate": "2028-10-23",
+          "ruleId": null,
+          "evidence": "Illustrative sample text: 55\" 4K Smart TV, 2-year manufacturer warranty.",
+          "conflict": false,
+          "legalReviewPending": false
+        },
+        {
+          "id": "rule:l_samplecasa0001:PT:legal",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": null,
+          "lengthMonths": 36,
+          "startDate": "2026-10-23",
+          "endDate": "2029-10-23",
+          "ruleId": "PT:DL-84/2021",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_samplecasa0001:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_samplecasa0002",
+      "index": 1,
+      "contracts": [
+        {
+          "id": "c_samplecasa0002",
+          "kind": "warranty",
+          "warrantyType": "manufacturer",
+          "basis": "stated",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": null,
+          "lengthMonths": 12,
+          "startDate": "2026-10-23",
+          "endDate": "2027-10-23",
+          "ruleId": null,
+          "evidence": "Illustrative sample text: Sample soundbar, 12-month manufacturer warranty.",
+          "conflict": false,
+          "legalReviewPending": false
+        },
+        {
+          "id": "rule:l_samplecasa0002:PT:legal",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": null,
+          "lengthMonths": 36,
+          "startDate": "2026-10-23",
+          "endDate": "2029-10-23",
+          "ruleId": "PT:DL-84/2021",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_samplecasa0002:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_samplecasa0003",
+      "index": 2,
+      "contracts": [
+        {
+          "id": "rule:l_samplecasa0003:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_samplecasa0003:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_samplecasa0004",
+      "index": 3,
+      "contracts": [
+        {
+          "id": "rule:l_samplecasa0004:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_samplecasa0004:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_samplecasa0005",
+      "index": 4,
+      "contracts": [
+        {
+          "id": "rule:l_samplecasa0005:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_samplecasa0005:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "lineId": "l_samplejardim01",
+      "index": 0,
+      "contracts": [
+        {
+          "id": "c_samplejardim01",
+          "kind": "warranty",
+          "warrantyType": "manufacturer",
+          "basis": "stated",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": null,
+          "lengthMonths": 24,
+          "startDate": "2026-10-12",
+          "endDate": "2028-10-12",
+          "ruleId": null,
+          "evidence": "Illustrative sample text: Cordless vacuum, 2-year manufacturer warranty.",
+          "conflict": false,
+          "legalReviewPending": false
+        },
+        {
+          "id": "rule:l_samplejardim01:PT:legal",
+          "kind": "warranty",
+          "warrantyType": "legal",
+          "basis": "rule",
+          "certainty": "estimated",
+          "status": "open",
+          "lengthDays": null,
+          "lengthMonths": 36,
+          "startDate": "2026-10-12",
+          "endDate": "2029-10-12",
+          "ruleId": "PT:DL-84/2021",
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_samplejardim01:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "lineId": "l_sampleverde001",
+      "index": 0,
+      "contracts": [
+        {
+          "id": "rule:l_sampleverde001:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_sampleverde001:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_sampleverde002",
+      "index": 1,
+      "contracts": [
+        {
+          "id": "rule:l_sampleverde002:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_sampleverde002:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_sampleverde003",
+      "index": 2,
+      "contracts": [
+        {
+          "id": "rule:l_sampleverde003:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_sampleverde003:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_sampleverde004",
+      "index": 3,
+      "contracts": [
+        {
+          "id": "rule:l_sampleverde004:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_sampleverde004:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_sampleverde005",
+      "index": 4,
+      "contracts": [
+        {
+          "id": "rule:l_sampleverde005:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_sampleverde005:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_sampleverde006",
+      "index": 5,
+      "contracts": [
+        {
+          "id": "rule:l_sampleverde006:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_sampleverde006:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    }
+  ],
+  [
+    {
+      "lineId": "l_samplenorte001",
+      "index": 0,
+      "contracts": [
+        {
+          "id": "rule:l_samplenorte001:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_samplenorte001:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "lineId": "l_samplenorte002",
+      "index": 1,
+      "contracts": [
+        {
+          "id": "rule:l_samplenorte002:return:unknown",
+          "kind": "return",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        },
+        {
+          "id": "rule:l_samplenorte002:warranty:unknown",
+          "kind": "warranty",
+          "warrantyType": null,
+          "basis": "rule",
+          "certainty": "unknown",
+          "status": "unknown",
+          "lengthDays": null,
+          "lengthMonths": null,
+          "startDate": null,
+          "endDate": null,
+          "ruleId": null,
+          "legalReviewPending": false,
+          "evidence": null,
+          "conflict": false
+        }
+      ]
+    }
+  ]
+]

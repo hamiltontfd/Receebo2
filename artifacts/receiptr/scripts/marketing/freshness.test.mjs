@@ -4,8 +4,11 @@ import { mkdtemp, mkdir, writeFile, rm, copyFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { changedFiles, fingerprint, validateApproval, exportHashes } from "./freshness.mjs";
-import { isolate, receipts } from "./fixtures.mjs";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { changedFiles, fingerprint, validateApproval, exportHashes, workspace } from "./freshness.mjs";
+import { isolate, receipts, createCaptureSession } from "./fixtures.mjs";
+import { illustrativePdf, sampleDocumentLines } from "./sample-document.mjs";
 
 test("detects added, edited, and deleted media inputs", () => {
   assert.deepEqual(changedFiles({ deleted: "a", edited: "a", stable: "a" }, { added: "b", edited: "b", stable: "a" }),
@@ -97,6 +100,47 @@ test("fixture requests never reach account services; unknown calls fail closed",
   assert.equal((await request("https://fonts.googleapis.com/css2?family=Inter")).action, "continued");
   assert.equal((await request("https://fonts.googleapis.com/css2", "POST")).action, "blocked");
   assert.equal(unexpected.length, 5);
+  const session = createCaptureSession();
+  assert.equal(session.answer("GET", `${origin}/api/account/market`).fulfill.json.market, "PT");
+  assert.equal(session.answer("GET", `${origin}/api/receipts`).fulfill.json.items.length, 4);
+});
+
+test("US and EU capture contexts stay separate and the published binaries stay put", async () => {
+  const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
+  assert.match(record, /View original receipt/);
+  assert.match(record, /section-warranty/);
+  assert.doesNotMatch(record, /name: "Show to store"/);
+  assert.doesNotMatch(record, /Consumer Rights · Portugal/);
+  const vite = await readFile(new URL("./vite.config.ts", import.meta.url), "utf8");
+  assert.match(vite, /127\.0\.0\.1/);
+  assert.match(vite, /5199/);
+  const appVite = await readFile(path.join(workspace, "artifacts/receiptr/vite.config.ts"), "utf8");
+  assert.doesNotMatch(appVite, /scripts\/marketing\/capture/);
+  const replit = await readFile(path.join(workspace, ".replit"), "utf8");
+  assert.doesNotMatch(replit, /5199/);
+  const captureUi = await readFile(new URL("./capture.tsx", import.meta.url), "utf8");
+  assert.match(captureUi, /Sample data · fictional purchases · simulated extraction/);
+  const guard = JSON.parse(await readFile(new URL("./published-media-guard.json", import.meta.url), "utf8"));
+  for (const [file, expected] of Object.entries(guard.files)) {
+    const hash = createHash("sha256").update(await readFile(path.join(workspace, file))).digest("hex");
+    assert.equal(hash, expected, file);
+  }
+  const pdf = illustrativePdf(sampleDocumentLines(receipts[0]));
+  assert.equal(pdf.subarray(0, 8).toString(), "%PDF-1.4");
+  assert.match(pdf.toString("latin1"), /Casa Lumen Electr/);
+});
+
+test("CAPTURE_CONTEXT=us selects the dollar collection without Portugal rules", () => {
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", `
+    process.env.CAPTURE_CONTEXT = "us";
+    const { activeCapture, createCaptureSession } = await import(${JSON.stringify(new URL("./fixtures.mjs", import.meta.url).href)});
+    const capture = activeCapture();
+    if (capture.name !== "us" || capture.receipts.length !== 5 || capture.receipts[0].currency !== "USD") process.exit(1);
+    const market = createCaptureSession().answer("GET", "http://127.0.0.1:5199/api/account/market");
+    if (market.fulfill.json.market !== "US") process.exit(2);
+    if (JSON.stringify(capture.receipts).includes("PT:DL")) process.exit(3);
+  `], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });
 
 test("CLI rejects unreviewed/missing/stale evidence and accepts explicit review only in a disposable workspace", async () => {

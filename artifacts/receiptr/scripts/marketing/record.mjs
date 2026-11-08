@@ -1,12 +1,16 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
-import { capturedAt, receipts, isolate } from "./fixtures.mjs";
+import { capturedAt, receipts, isolate, activeCapture } from "./fixtures.mjs";
+import { illustrativePdf, sampleDocumentHtml, sampleDocumentLines } from "./sample-document.mjs";
+
+const capture = activeCapture();
+const us = capture.name === "us";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
-const out = path.resolve("generated-artifacts/receebo-marketing");
+const out = path.resolve(us ? "generated-artifacts/receebo-marketing-us" : "generated-artifacts/receebo-marketing");
 await mkdir(`${out}/sources`, { recursive: true });
 await mkdir(`${out}/web`, { recursive: true });
 const browser = await chromium.launch({
@@ -18,23 +22,27 @@ const errors = [];
 const manifest = { capturedAt, sampleData: true, clips: {}, screens: [], unexpected: [] };
 const ff = args => execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", ...args]);
 
+function pngSize(bytes) {
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+}
 try {
   // This document is the fictional input receipt, not a recreation of app UI.
-  const input = await browser.newPage({ viewport: { width: 720, height: 900 }, deviceScaleFactor: 1 });
-  await input.setContent(`<html><body style="margin:0;padding:65px;background:#fff;font:22px monospace;color:#171717">
-    <p style="font-size:15px">FICTIONAL SAMPLE · NOT VALID FOR PURCHASE</p>
-    <h1>Casa Lumen Electrónica</h1><p>In-store purchase · Braga, Portugal<br>23 October 2026</p><hr>
-    <p>55" 4K Smart TV<br>1 × €649.00</p><hr>
-    <h2>Total €649.00</h2><p style="font-size:17px;line-height:1.6">Prices include applicable tax.<br>2-year manufacturer warranty.<br>Terms and exclusions apply.<br>Check with the seller.</p>
-    <p style="font-size:16px">Sample data for Receebo demonstration.<br>No payment or account information.</p></body></html>`);
-  const receiptImage = `${out}/sources/sample-receipt.png`;
-  await input.screenshot({ path: receiptImage });
-  await input.close();
+  // Its lines are the same words as the fixture, including the illustrative periods.
+  const lines = sampleDocumentLines(receipts[0]);
+  const receiptImage = `${out}/sources/${us ? "sample-receipt.pdf" : "sample-receipt.png"}`;
+  if (us) {
+    await writeFile(receiptImage, illustrativePdf(lines));
+  } else {
+    const input = await browser.newPage({ viewport: { width: 720, height: 900 }, deviceScaleFactor: 1, colorScheme: "light" });
+    await input.setContent(sampleDocumentHtml(lines));
+    await input.screenshot({ path: receiptImage });
+    await input.close();
+  }
 
-  async function context({ width = 1100, height = 850, record = false } = {}) {
+  async function context({ width = 1100, height = 850, record = false, deviceScaleFactor = record ? 1 : 2 } = {}) {
     const ctx = await browser.newContext({
-      viewport: { width, height }, deviceScaleFactor: record ? 1 : 2,
-      locale: "en-GB", timezoneId: "Europe/Lisbon", reducedMotion: "reduce",
+      viewport: { width, height }, deviceScaleFactor,
+      locale: capture.locale, timezoneId: capture.timezoneId, colorScheme: "light", reducedMotion: "reduce",
       serviceWorkers: "block",
       ...(record ? { recordVideo: { dir: `${out}/sources`, size: { width, height } } } : {}),
     });
@@ -64,49 +72,74 @@ try {
     const png = `${out}/sources/${name}.png`;
     if (locator) await locator.screenshot({ path: png });
     else await page.screenshot({ path: png });
-    ff(["-i", png, "-c:v", "libwebp", "-quality", "88", `${out}/web/${name}.webp`]);
+    // US phone frames stay PNG at the requested pixel size. WebP is the EU export step.
+    // The disclosure banner is part of the page and is not cropped.
+    if (!us) ff(["-i", png, "-c:v", "libwebp", "-quality", "88", `${out}/web/${name}.webp`]);
     manifest.screens.push(name);
   }
+  const heroButton = page => page.getByRole("button", { name: new RegExp(receipts[0].merchant) }).first();
   async function close(c) {
     manifest.unexpected.push(...c.unexpected);
     await c.ctx.close();
   }
-  const desk = await context();
-  await ready(desk.page);
-  await desk.page.getByRole("button", { name: /Casa Lumen Electrónica.*Oct/ }).waitFor();
-  await still(desk.page, "library-desktop");
-  await desk.page.getByRole("button", { name: /Casa Lumen Electrónica.*Oct/ }).click();
-  await desk.page.getByRole("dialog").waitFor();
-  await desk.page.waitForTimeout(500);
-  await still(desk.page, "receipt-desktop", desk.page.getByRole("dialog"));
-  await desk.page.getByText("Consumer Rights · Portugal", { exact: true }).evaluate(el => el.scrollIntoView({ block: "center" }));
-  await desk.page.waitForTimeout(400);
-  await still(desk.page, "protection", desk.page.getByText("Consumer Rights · Portugal", { exact: true }).locator(".."));
-  await close(desk);
+  if (!us || process.env.CAPTURE_DESKTOP === "1") {
+    const desk = await context(us ? { width: 1440, height: 900, deviceScaleFactor: 2 } : {});
+    await ready(desk.page);
+    await heroButton(desk.page).waitFor();
+    await still(desk.page, "library-desktop");
+    await heroButton(desk.page).click();
+    await desk.page.getByRole("dialog").waitFor();
+    await desk.page.waitForTimeout(500);
+    await still(desk.page, "receipt-desktop", desk.page.getByRole("dialog"));
+    if (!us) {
+      await desk.page.getByTestId("section-warranty").evaluate(el => el.scrollIntoView({ block: "center" }));
+      await desk.page.waitForTimeout(400);
+      await still(desk.page, "protection", desk.page.getByTestId("section-warranty"));
+    }
+    await close(desk);
+  }
 
-  const phone = await context({ width: 390, height: 844 });
+  const phone = await context({ ...capture.phone });
   await ready(phone.page);
   await still(phone.page, "library-phone");
-  await phone.page.getByRole("button", { name: /Casa Lumen Electrónica.*Oct/ }).click();
+  await heroButton(phone.page).click();
   await phone.page.waitForTimeout(600);
   await still(phone.page, "receipt-phone");
-  // Prove: the real full-screen "Show to store" view of the sample receipt.
-  // A shorter phone viewport keeps the still close to the landing slot ratio.
-  await phone.page.setViewportSize({ width: 390, height: 640 });
-  const storeButton = phone.page.getByRole("button", { name: "Show to store", exact: true });
-  await storeButton.scrollIntoViewIfNeeded();
-  await storeButton.click();
-  // Rendered outside the modal sheet, so the sheet marks it aria-hidden; use CSS.
-  const storeImage = phone.page.locator('[aria-label="Dismiss full-screen receipt view"] img');
-  await storeImage.waitFor();
-  await storeImage.evaluate(img => img.decode());
-  // Keep the pointer marker on the black margin, off the receipt text.
-  await phone.page.mouse.move(340, 600);
-  await phone.page.waitForTimeout(600);
-  await still(phone.page, "show-to-store");
+  if (us) {
+    await phone.page.getByTestId("button-more-actions").scrollIntoViewIfNeeded();
+    await phone.page.waitForTimeout(300);
+    await still(phone.page, "receipt-actions");
+    await phone.page.goto("http://127.0.0.1:5199/scan");
+    await phone.page.locator('input[type="file"]').setInputFiles(receiptImage);
+    await phone.page.getByRole("button", { name: "Save Purchase", exact: true }).waitFor({ timeout: 20000 });
+    await phone.page.getByTestId("section-warranty").scrollIntoViewIfNeeded();
+    await phone.page.waitForTimeout(400);
+    await still(phone.page, "scan-review");
+    for (const name of ["library-phone", "receipt-phone", "receipt-actions", "scan-review"]) {
+      const size = pngSize(await readFile(`${out}/sources/${name}.png`));
+      if (size.width !== 1170 || size.height !== 2532) {
+        throw new Error(`${name}.png is ${size.width}x${size.height}; expected 1170x2532`);
+      }
+    }
+  } else {
+    // EU landing slot. The disclosure stays in the captured page; the landing
+    // frame crops it later. Do not apply that crop inside this harness.
+    await phone.page.setViewportSize({ width: 390, height: 640 });
+    const storeButton = phone.page.getByRole("button", { name: "View original receipt", exact: true });
+    await storeButton.scrollIntoViewIfNeeded();
+    await storeButton.click();
+    const storeImage = phone.page.locator('[aria-label="Dismiss full-screen receipt view"] img');
+    await storeImage.waitFor();
+    await storeImage.evaluate(img => img.decode());
+    await phone.page.mouse.move(340, 600);
+    await phone.page.waitForTimeout(600);
+    await still(phone.page, "show-to-store");
+  }
   await close(phone);
 
-  for (const clip of ["capture", "find", "protect"]) {
+  if (us && process.env.CAPTURE_CLIPS !== "1") {
+    console.log("US stills only. Published video files were not encoded or replaced.", out);
+  } else for (const clip of ["capture", "find", "protect"]) {
     const c = await context({ width: 960, height: 640, record: true });
     const video = c.page.video();
     await ready(c.page, clip === "capture" ? "/scan" : "/search");
@@ -121,21 +154,21 @@ try {
       await c.page.getByRole("button", { name: "Save Purchase", exact: true }).scrollIntoViewIfNeeded();
       await c.page.waitForTimeout(1200);
       await c.page.getByRole("button", { name: "Save Purchase", exact: true }).click();
-      await c.page.getByRole("heading", { name: "Casa Lumen Electrónica" }).waitFor();
+      await c.page.getByRole("heading", { name: receipts[0].merchant }).waitFor();
       await c.page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
       await c.page.waitForTimeout(1800);
     } else {
       const search = c.page.getByPlaceholder(/Search/).first();
       if (clip === "find") {
         await search.click();
-        await search.pressSequentially("TV", { delay: 140 });
+        await search.pressSequentially(capture.searchQuery, { delay: 140 });
         await c.page.waitForTimeout(1300);
         await still(c.page, "find-poster");
       }
-      await c.page.getByRole("button", { name: /Casa Lumen Electrónica.*Oct/ }).click();
+      await heroButton(c.page).click();
       await c.page.waitForTimeout(1300);
       if (clip === "protect") {
-        await c.page.getByText("Consumer Rights · Portugal", { exact: true }).evaluate(el => el.scrollIntoView({ block: "center" }));
+        await c.page.getByTestId("section-warranty").evaluate(el => el.scrollIntoView({ block: "center" }));
         await c.page.waitForTimeout(1200);
         await still(c.page, "protect-poster");
       }
@@ -153,7 +186,9 @@ try {
   await writeFile(`${out}/sources/fixtures.json`, JSON.stringify(receipts, null, 2));
   await writeFile(`${out}/manifest.json`, JSON.stringify({ ...manifest, errors }, null, 2));
   if (errors.length || manifest.unexpected.length) throw new Error(JSON.stringify({ errors, unexpected: manifest.unexpected }));
-  console.log("Captured real screens and all three interactions.", out);
+  console.log(us && process.env.CAPTURE_CLIPS !== "1"
+    ? `Captured US stills only. No video was encoded. ${out}`
+    : `Captured real screens and all three interactions. ${out}`);
 } finally {
   await browser.close();
 }
