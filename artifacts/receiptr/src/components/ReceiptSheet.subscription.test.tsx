@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -29,7 +29,7 @@ const base = {
   contentType: "application/pdf", attachments: [], createdAt: "2026-10-20T10:00:00Z", updatedAt: "2026-10-20T10:00:00Z",
 };
 
-function mount(receipt: Record<string, unknown>, region: "PT" | "US" = "PT") {
+function mount(receipt: Record<string, unknown>, region: "PT" | "US" = "PT", onClose: () => void = () => {}) {
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   vi.stubGlobal("matchMedia", (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
   mocks.receipt = receipt;
@@ -40,7 +40,7 @@ function mount(receipt: Record<string, unknown>, region: "PT" | "US" = "PT") {
     market: region, country: null, source: "account", confirmed: true, loading: false, saving: false, error: null,
     choose: async () => {}, retry: () => {},
   };
-  render(<QueryClientProvider client={client}><MarketContext.Provider value={market}><ReceiptSheet receiptId={5} open onClose={() => {}} /></MarketContext.Provider></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><MarketContext.Provider value={market}><ReceiptSheet receiptId={5} open onClose={onClose} /></MarketContext.Provider></QueryClientProvider>);
 }
 
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
@@ -163,6 +163,82 @@ describe("ReceiptSheet: US accounts", () => {
     fireEvent.click(screen.getByRole("button", { name: /Save Changes/ }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
     expect(mocks.update.mock.calls[0][0].data).not.toHaveProperty("returnDays");
+  });
+});
+
+describe("ReceiptSheet warranty info Escape", () => {
+  const sample = {
+    ...base,
+    merchant: "Demo Electronics",
+    purchaseCountry: "US",
+    currency: "USD",
+    category: "Electronics",
+    isOnlinePurchase: true,
+    purchaseDate: "2026-11-01",
+    warranty: "Fictional manufacturer warranty: 2 years from purchase date.",
+    summary: "This summary must stay hidden.",
+    products: [{ name: "TV sample television", quantity: 1, price: 299 }],
+    notableItems: [{ name: "TV sample television", price: 299, category: "Electronics", reason: "High-value electronics." }],
+  };
+
+  function pressEscape() {
+    const target = document.activeElement instanceof Element ? document.activeElement : document.body;
+    fireEvent.keyDown(target, { key: "Escape" });
+  }
+
+  async function expectOverlayClosed(onClose: ReturnType<typeof vi.fn>) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText("Demo Electronics")).toBeInTheDocument();
+    expect(screen.getByText("Returns & warranty")).toBeInTheDocument();
+    expect(screen.getByTestId("card-manufacturer-warranty").textContent).toMatch(/Manufacturer warranty \(2 years\)/);
+    expect(screen.queryByTestId("text-rights-info")).toBeNull();
+    expect(screen.queryByText(/No federal minimum/)).toBeNull();
+    expect(screen.queryByText("Summary")).toBeNull();
+    expect(screen.queryByText(/This summary must stay hidden/)).toBeNull();
+  }
+
+  it("Escape closes only the legal text after click, hover, and focus", async () => {
+    const onClose = vi.fn();
+    mount(sample, "US", onClose);
+    expect(screen.queryByTestId("text-rights-info")).toBeNull();
+    expect(screen.getByTestId("card-manufacturer-warranty")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("button-rights-info"));
+    expect(screen.getByTestId("text-rights-info").textContent).toMatch(/No federal minimum return right or warranty in the US/);
+    expect(screen.getByTestId("text-rights-info").textContent).toMatch(/General information, not legal advice. Check with the store/);
+    pressEscape();
+    await expectOverlayClosed(onClose);
+
+    screen.getByRole("button", { name: /Edit/ }).focus();
+    fireEvent.pointerEnter(screen.getByTestId("button-rights-info"), { pointerType: "mouse" });
+    expect(screen.getByTestId("text-rights-info")).toBeInTheDocument();
+    pressEscape();
+    await expectOverlayClosed(onClose);
+
+    screen.getByRole("button", { name: /Edit/ }).focus();
+    fireEvent.focus(screen.getByTestId("button-rights-info"));
+    expect(screen.getByTestId("text-rights-info")).toBeInTheDocument();
+    pressEscape();
+    await expectOverlayClosed(onClose);
+
+    fireEvent.click(screen.getByTestId("button-rights-info"));
+    expect(screen.getByTestId("text-rights-info")).toBeInTheDocument();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await act(async () => {
+      screen.getByText("Demo Electronics").dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "touch" }),
+      );
+      document.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await expectOverlayClosed(onClose);
+
+    pressEscape();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
 

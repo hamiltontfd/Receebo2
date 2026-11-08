@@ -44,6 +44,7 @@ function WarrantyInfo({ lines }: { lines: string[] }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<number | null>(null);
   const pointerKind = useRef("");
+  const suppressFocusOpen = useRef(false);
   const cancelClose = () => {
     if (closeTimer.current != null) window.clearTimeout(closeTimer.current);
     closeTimer.current = null;
@@ -52,7 +53,29 @@ function WarrantyInfo({ lines }: { lines: string[] }) {
     cancelClose();
     closeTimer.current = window.setTimeout(() => setOpen(false), 140);
   };
+  const closeFromEscape = () => {
+    // Closing returns focus to this button. That focus is not a new request to open.
+    suppressFocusOpen.current = true;
+    cancelClose();
+    setOpen(false);
+    window.setTimeout(() => {
+      suppressFocusOpen.current = false;
+    }, 0);
+  };
   useEffect(() => cancelClose, []);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      // Capture on window runs before the sheet's document listener, so Escape
+      // dismisses this overlay and leaves the purchase detail open.
+      event.preventDefault();
+      event.stopPropagation();
+      closeFromEscape();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open]);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -73,6 +96,7 @@ function WarrantyInfo({ lines }: { lines: string[] }) {
             if (event.pointerType === "mouse") scheduleClose();
           }}
           onFocus={() => {
+            if (suppressFocusOpen.current) return;
             // A tap focuses before it clicks. Leave that click to toggle.
             if (pointerKind.current === "touch" || pointerKind.current === "pen") return;
             setOpen(true);
@@ -94,6 +118,11 @@ function WarrantyInfo({ lines }: { lines: string[] }) {
         align="end"
         side="top"
         collisionPadding={12}
+        onEscapeKeyDown={(event) => {
+          event.preventDefault();
+          closeFromEscape();
+        }}
+        onCloseAutoFocus={(event) => event.preventDefault()}
         onPointerEnter={cancelClose}
         onPointerLeave={scheduleClose}
         className="w-[min(20rem,calc(100vw-1.5rem))] max-h-[min(16rem,var(--radix-popover-content-available-height))] overflow-y-auto p-3 text-left text-xs font-normal leading-5 text-popover-foreground"
