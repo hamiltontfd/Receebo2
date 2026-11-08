@@ -591,15 +591,6 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
           </div>
         )}
 
-        {receipt.summary && !isEditing && (
-          <div className="rounded-2xl bg-secondary p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-              {appText("AI Summary")}
-            </p>
-            <p className="text-sm leading-relaxed">{receipt.summary}</p>
-          </div>
-        )}
-
         {!isEditing && (
           <ConsumerRightsPanel
             receipt={receipt}

@@ -196,11 +196,6 @@ function DemoReceiptSheet({
             </ul>
           </div>
 
-          <div className="rounded-2xl bg-secondary p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{appText("AI Summary")}</p>
-            <p className="text-sm leading-relaxed">{receipt.summary}</p>
-          </div>
-
           <div className="rounded-xl border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground flex items-start gap-2">
             <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{appText("This is sample data. Sign in to scan and store your own receipts.")}</span>

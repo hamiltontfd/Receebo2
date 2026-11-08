@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Loader2, Trash2, Edit2, Share2, AlertTriangle, ScanLine,
   Paperclip, FileText, ArrowLeft, Maximize2, X,
-  Sparkles, Package, Shield, Star,
+  Package, Shield, Star,
 } from "lucide-react";
 import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
 import { showDeliveryDateField } from "@/lib/consumerRights";
@@ -740,17 +740,6 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                           );
                         })}
                       </HighlightsRow>
-                    </div>
-                  )}
-
-                  {/* ── Summary ── */}
-                  {!isEditing && receipt.summary && (
-                    <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3.5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-400 mb-1.5 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        {appText("Summary")}
-                      </p>
-                      <p className="text-sm text-blue-900/70 leading-relaxed">{receipt.summary}</p>
                     </div>
                   )}
 

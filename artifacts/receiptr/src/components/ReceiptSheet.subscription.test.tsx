@@ -45,6 +45,22 @@ function mount(receipt: Record<string, unknown>, region: "PT" | "US" = "PT") {
 
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
+describe("ReceiptSheet summary", () => {
+  it("does not show the summary card, and still shows the highlight", () => {
+    mount({
+      ...base,
+      merchant: "Casa Lumen Electrónica",
+      summary: "In-store purchase at Casa Lumen Electrónica of a 55\" 4K Smart TV. Fictional sample purchase in Portugal.",
+      notableItems: [{ name: "55\" 4K Smart TV", price: 649, category: "Electronics", reason: "High-value electronics with legal and manufacturer warranty." }],
+    });
+    expect(screen.queryByText("Summary")).toBeNull();
+    expect(screen.queryByText("Resumo")).toBeNull();
+    expect(screen.queryByText(/In-store purchase at Casa Lumen/)).toBeNull();
+    expect(screen.getByText("55\" 4K Smart TV")).toBeInTheDocument();
+    expect(screen.getByText(/High-value electronics/)).toBeInTheDocument();
+  });
+});
+
 describe("ReceiptSheet delivery date", () => {
   const goods = { ...base, merchant: "Loja", purchaseCountry: "BR", currency: "BRL", category: "Home", purchaseType: "goods", total: 339 };
 
