@@ -217,6 +217,8 @@ try {
     await phone.page.waitForTimeout(300);
     await still(phone.page, "receipt-actions");
     await measure(phone.page, "receipt-actions");
+    manifest.warrantyFrameIncludesActions = layout["receipt-warranty"].boxes["section-warranty"].centerY
+      === layout["receipt-actions"].boxes["section-warranty"].centerY;
     await phone.page.goto("http://127.0.0.1:5199/scan");
     await phone.page.waitForTimeout(800);
     await still(phone.page, "scan-upload");

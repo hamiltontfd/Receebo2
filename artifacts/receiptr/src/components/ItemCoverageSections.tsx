@@ -106,6 +106,26 @@ function hasCoverage(contracts: ShownContract[]): boolean {
   return contracts.some((c) => c.status !== "unknown" && c.status !== "not_applicable");
 }
 
+export interface HighlightMatch<T extends { name: string }> {
+  item: T;
+  line: ShownLine | null;
+  index: number;
+}
+
+/** Same match the highlight cards use: one exact name, never a guess. */
+export function highlightMatches<T extends { name: string }>(
+  products: readonly ShownLine[],
+  notableItems: readonly T[] | null | undefined,
+): HighlightMatch<T>[] {
+  return (notableItems ?? []).map((item) => {
+    const hits = products
+      .map((line, index) => ({ line, index }))
+      .filter(({ line }) => line.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+    const hit = hits.length === 1 ? hits[0] : null;
+    return { item, line: hit?.line ?? null, index: hit?.index ?? -1 };
+  });
+}
+
 export function ItemCoverageSections({
   products,
   notableItems,
@@ -155,7 +175,27 @@ export function ItemCoverageSections({
   if (derived?.disclaimer) legalLines.push(derived.disclaimer);
   const rights = itemRights ?? [];
   const rows = products.map((line, index) => ({ line, index, contracts: contractsFor(line, index, rights) }));
+  const matches = highlightMatches(products, notableItems);
+  // Highlights choose the reading cards. No highlights keeps every line.
+  const coverageRows = notableItems && notableItems.length > 0
+    ? matches.flatMap((match) => match.line
+      ? [{ line: match.line, index: match.index, contracts: contractsFor(match.line, match.index, rights) }]
+      : [])
+    : rows;
   const ordered = [...rows].sort((a, b) => Number(hasCoverage(b.contracts)) - Number(hasCoverage(a.contracts)));
+  const detailFor = (line: ShownLine, contract: ShownContract) => {
+    if (contract.status === "unknown" || contract.status === "not_applicable") return null;
+    const detail = provenance(contract);
+    return detail ? `${line.name}: ${detail}` : null;
+  };
+  for (const { line, contracts } of coverageRows) {
+    for (const contract of contracts) {
+      const detail = detailFor(line, contract);
+      if (!detail) continue;
+      const bucket = contract.kind === "return" ? returnLines : legalLines;
+      if (!bucket.includes(detail)) bucket.push(detail);
+    }
+  }
 
   return (
     <div className="space-y-6" data-testid="item-coverage">
@@ -167,10 +207,8 @@ export function ItemCoverageSections({
         <div data-testid="section-highlights">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">{appText("Highlights")}</p>
           <div className="flex gap-3 overflow-x-auto snap-x">
-            {notableItems.map((item, i) => {
-              const matches = products.filter((line) => line.name.trim().toLowerCase() === item.name.trim().toLowerCase());
-              const line = matches.length === 1 ? matches[0] : null;
-              const index = line ? products.indexOf(line) : -1;
+            {matches.map((match, i) => {
+              const { item, line, index } = match;
               const contracts = line && index >= 0 ? contractsFor(line, index, rights) : [];
               const tags = [
                 ...contracts.filter((c) => c.kind === "return" && c.status !== "unknown" && c.status !== "not_applicable"),
@@ -207,7 +245,7 @@ export function ItemCoverageSections({
           {returnLines.length > 0 && <WarrantyInfo lines={returnLines} testId="button-return-info" contentTestId="text-return-info" label={appText("About this return")} />}
         </div>
         <div className="space-y-2">
-          {rows.map(({ line, contracts }) => {
+          {coverageRows.map(({ line, contracts }) => {
             const returns = contracts.filter((c) => c.kind === "return" && c.status !== "not_applicable");
             const shown = returns.length > 0 ? returns : contracts.some((c) => c.kind === "return" && c.status === "not_applicable") ? [] : [{
               id: `${line.lineId ?? line.name}-return-unknown`, kind: "return" as const, basis: "rule" as const,
@@ -217,11 +255,6 @@ export function ItemCoverageSections({
               <div key={contract.id} className="rounded-xl border border-border bg-neutral-50 px-4 py-3" data-testid="row-return">
                 <p className="text-sm font-semibold">{line.name}</p>
                 <p className="text-sm">{returnTitle(contract, locale)}</p>
-                {contract.status !== "unknown" && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {contract.certainty === "estimated" ? `${appText("Estimated")} · ` : ""}{provenance(contract)}
-                  </p>
-                )}
               </div>
             ));
           })}
@@ -234,7 +267,7 @@ export function ItemCoverageSections({
           {legalLines.length > 0 && <WarrantyInfo lines={legalLines} />}
         </div>
         <div className="space-y-2">
-          {rows.map(({ line, contracts }) => {
+          {coverageRows.map(({ line, contracts }) => {
             const warranties = contracts.filter((c) => c.kind === "warranty" && c.status !== "not_applicable" && c.status !== "unknown");
             // A federal "not applicable" rule is not a warranty for this product.
             // Missing stays an unknown card. The receipt text is not copied in.
@@ -246,9 +279,6 @@ export function ItemCoverageSections({
               <div key={contract.id} className="rounded-xl bg-[#121212] text-white px-4 py-3" data-testid="row-warranty">
                 <p className="text-sm font-semibold">{line.name}</p>
                 <p className="text-sm">{warrantyTitle(contract, locale)}</p>
-                {contract.status !== "unknown" && (
-                  <p className="text-xs text-white/70 mt-0.5">{provenance(contract)}</p>
-                )}
               </div>
             ));
           })}

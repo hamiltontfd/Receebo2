@@ -273,8 +273,13 @@ describe("ReceiptSheet warranty info Escape", () => {
     }
     expect(screen.getByTestId("section-highlights").textContent).toMatch(/Est\. return by/);
     expect(screen.getByTestId("section-highlights").textContent).not.toMatch(/High-value/);
-    expect(screen.getAllByTestId("row-return").map((row) => row.textContent).join("\n")).toMatch(/Return window unknown/);
-    expect(screen.getAllByTestId("row-warranty").map((row) => row.textContent).join("\n")).toMatch(/Warranty unknown/);
+    expect(screen.getAllByTestId("row-return")).toHaveLength(1);
+    expect(screen.getByTestId("row-return").textContent).toMatch(/TV/);
+    expect(screen.getByTestId("row-return").textContent).not.toMatch(/Milk/);
+    const warrantyText = screen.getAllByTestId("row-warranty").map((row) => row.textContent).join("\n");
+    expect(warrantyText).toMatch(/TV/);
+    expect(warrantyText).not.toMatch(/Milk|24 month manufacturer/);
+    expect(screen.getByTestId("section-complete-list").textContent).toMatch(/Milk/);
     expect(screen.queryByText("Returns & warranty")).toBeNull();
     expect(screen.queryByText("Files")).toBeNull();
     expect(screen.queryByText("Original receipt")).toBeNull();
