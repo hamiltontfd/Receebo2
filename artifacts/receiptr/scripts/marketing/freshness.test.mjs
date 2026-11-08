@@ -102,6 +102,8 @@ test("fixture requests never reach account services; unknown calls fail closed",
   assert.equal(unexpected.length, 5);
   const session = createCaptureSession();
   assert.equal(session.answer("GET", `${origin}/api/account/market`).fulfill.json.market, "PT");
+  assert.equal(session.answer("GET", `${origin}/api/account/language`).fulfill.json.language, "en");
+  assert.equal(session.answer("GET", `${origin}/api/account/onboarding`).fulfill.json.dismissed, true);
   assert.equal(session.answer("GET", `${origin}/api/receipts`).fulfill.json.items.length, 4);
 });
 
@@ -109,6 +111,12 @@ test("US and EU capture contexts stay separate and the published binaries stay p
   const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
   assert.match(record, /View original receipt/);
   assert.match(record, /section-warranty/);
+  assert.match(record, /scan-upload/);
+  assert.match(record, /centerYAtDpr3/);
+  assert.match(record, /failure\.png/);
+  const captureUi = await readFile(new URL("./capture.tsx", import.meta.url), "utf8");
+  assert.match(captureUi, /OnboardingProvider/);
+  assert.match(captureUi, /LanguageProvider/);
   assert.doesNotMatch(record, /name: "Show to store"/);
   assert.doesNotMatch(record, /Consumer Rights · Portugal/);
   const vite = await readFile(new URL("./vite.config.ts", import.meta.url), "utf8");
@@ -118,7 +126,6 @@ test("US and EU capture contexts stay separate and the published binaries stay p
   assert.doesNotMatch(appVite, /scripts\/marketing\/capture/);
   const replit = await readFile(path.join(workspace, ".replit"), "utf8");
   assert.doesNotMatch(replit, /5199/);
-  const captureUi = await readFile(new URL("./capture.tsx", import.meta.url), "utf8");
   assert.match(captureUi, /Sample data · fictional purchases · simulated extraction/);
   const guard = JSON.parse(await readFile(new URL("./published-media-guard.json", import.meta.url), "utf8"));
   for (const [file, expected] of Object.entries(guard.files)) {

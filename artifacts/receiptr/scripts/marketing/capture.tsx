@@ -1,6 +1,8 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { LanguageProvider } from "@/components/LanguageProvider";
 import { MarketProvider } from "@/components/MarketProvider";
+import { OnboardingProvider } from "@/lib/useOnboarding";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Route, Switch } from "wouter";
 import { MotionConfig } from "framer-motion";
@@ -36,7 +38,8 @@ try {
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MarketProvider><GuestProvider><TooltipProvider><MotionConfig reducedMotion="always">
+      <LanguageProvider><MarketProvider><GuestProvider><TooltipProvider><MotionConfig reducedMotion="always">
+        <OnboardingProvider>
         <div className="bg-violet-50 text-violet-950 text-center text-xs font-semibold py-2">
           Sample data · fictional purchases · simulated extraction
         </div>
@@ -47,7 +50,8 @@ createRoot(document.getElementById("root")!).render(
           <Route component={SearchPage} />
         </Switch></AppShell>
         <Toaster />
-      </MotionConfig></TooltipProvider></GuestProvider></MarketProvider>
+        </OnboardingProvider>
+      </MotionConfig></TooltipProvider></GuestProvider></MarketProvider></LanguageProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 );

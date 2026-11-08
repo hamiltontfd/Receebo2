@@ -140,6 +140,13 @@ export function createCaptureSession() {
       }
       if (p === `/api/receipts/${hero.id}` && method === "PATCH" && created) return { fulfill: { json: null }, patch: true };
       if (p === "/api/account/market" && method === "GET") return json({ market: capture.market, country: capture.country });
+      if (p === "/api/account/language" && method === "GET") return json({ language: "en" });
+      if (p === "/api/account/detected-language" && (method === "PUT" || method === "POST")) {
+        return { fulfill: { status: 200, json: {} } };
+      }
+      if (p === "/api/account/onboarding" && (method === "GET" || method === "PATCH")) {
+        return json({ receiptDone: true, searchDone: true, completed: true, dismissed: true });
+      }
       if (method !== "GET") return { fulfill: { status: 403, json: { error: "Disabled during marketing capture" } }, unexpected: `${method} ${p}` };
       if (p === "/api/receipts/check-similar") return json([]);
       if (p === "/api/receipts/stats") return json({ totalReceipts: sample.length, totalSpent, categories: [] });
