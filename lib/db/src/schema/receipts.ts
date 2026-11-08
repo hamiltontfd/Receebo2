@@ -13,10 +13,30 @@ import { createInsertSchema } from "drizzle-zod";
 import { encryptedJsonb, encryptedText } from "../encryptedColumns";
 import { z } from "zod/v4";
 
+/** A period stated for one line. Rules are not stored here. */
+export type ReceiptCoverageItem = {
+  id: string;
+  kind: "return" | "warranty";
+  warrantyType: "legal" | "manufacturer" | "commercial" | null;
+  basis: "stated" | "user";
+  certainty: "confirmed" | "estimated";
+  lengthDays: number | null;
+  lengthMonths: number | null;
+  endDate: string | null;
+  evidence: string | null;
+  source: "extraction" | "user";
+};
+
 export type ReceiptProductItem = {
   name: string;
   quantity: number | null;
   price: number | null;
+  /** Stable line identity. Absent on receipts saved before item coverage. */
+  lineId?: string;
+  /** This line's own category. Never copied from the receipt category. */
+  category?: string | null;
+  categorySource?: "user" | "extraction" | null;
+  coverages?: ReceiptCoverageItem[];
 };
 
 export type ReceiptNotableItem = {

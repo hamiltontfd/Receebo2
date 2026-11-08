@@ -19,7 +19,26 @@ export type PendingImportExtractionData = {
   ocrText: string | null;
   warranty: string | null;
   transactionNumber: string | null;
-  products: Array<{ name: string; quantity: number | null; price: number | null }>;
+  products: Array<{
+    name: string;
+    quantity: number | null;
+    price: number | null;
+    lineId?: string;
+    category?: string | null;
+    categorySource?: "user" | "extraction" | null;
+    coverages?: Array<{
+      id: string;
+      kind: "return" | "warranty";
+      warrantyType: "legal" | "manufacturer" | "commercial" | null;
+      basis: "stated" | "user";
+      certainty: "confirmed" | "estimated";
+      lengthDays: number | null;
+      lengthMonths: number | null;
+      endDate: string | null;
+      evidence: string | null;
+      source: "extraction" | "user";
+    }>;
+  }>;
   notableItems: Array<{
     name: string;
     price: number | null;

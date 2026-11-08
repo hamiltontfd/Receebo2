@@ -26,6 +26,7 @@ import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { currencySymbol } from "@/lib/currency";
 import { PurchaseCountryField } from "@/components/PurchaseCountryField";
 import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
+import { ItemCoverageSections } from "@/components/ItemCoverageSections";
 import { showDeliveryDateField } from "@/lib/consumerRights";
 import { compressImage, compressedFileName } from "@/lib/compressImage";
 import { CATEGORIES, categoryStyle } from "@/lib/categories";
@@ -1255,12 +1256,10 @@ export default function Scan() {
             )}
           </div>
 
-          {receipt?.notableItems && receipt.notableItems.length > 0 && (
-            <NotableItemsBanner items={receipt.notableItems} currency={receipt.currency} />
-          )}
-
           {receipt && (
+            <>
             <ConsumerRightsPanel
+              promptsOnly
               receipt={{
                 purchaseDate: form.purchaseDate || receipt.purchaseDate,
                 deliveryDate: form.deliveryDate || null,
@@ -1276,6 +1275,25 @@ export default function Scan() {
               }}
               onChooseChannel={(online) => setForm((f) => ({ ...f, isOnlinePurchase: online }))}
             />
+            <ItemCoverageSections
+              products={receipt.products ?? []}
+              notableItems={receipt.notableItems}
+              itemRights={receipt.itemRights}
+              symbol={currencySymbol(receipt.currency)}
+              receipt={{
+                purchaseDate: form.purchaseDate || receipt.purchaseDate,
+                deliveryDate: form.deliveryDate || null,
+                category: form.category || receipt.category,
+                currency: receipt.currency,
+                purchaseCountry: form.purchaseCountry || null,
+                isOnlinePurchase: form.isOnlinePurchase,
+                merchant: form.merchant || receipt.merchant,
+                warranty: form.warranty,
+                purchaseType: receipt.purchaseType,
+                products: receipt.products,
+              }}
+            />
+            </>
           )}
 
           {(() => {

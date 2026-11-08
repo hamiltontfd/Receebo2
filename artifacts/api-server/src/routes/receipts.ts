@@ -41,6 +41,8 @@ function normalizeCategoryPatch(value: string | null | undefined): string | unde
 
 import { deliveryDateError } from "../lib/returnWindowCalc";
 import { refreshWarrantyExpiries } from "../lib/warrantyExpiryStore";
+import { evaluateItemRights, mergeProductLines } from "../lib/itemCoverage";
+import { getAccountMarket, rulesRegionForMarket } from "../lib/accountMarket";
 import { receiptSearchCondition, searchReceipts } from "../lib/receiptSearch";
 import { afterReceiptCursor, decodeReceiptCursor, encodeReceiptCursor, receiptListOrder } from "../lib/receiptOrder";
 const router: IRouter = Router();
@@ -357,7 +359,7 @@ router.get("/receipts/:id", requireAuthOrGuest, receiptReadRateLimiter, async (r
     .from(receiptAttachmentsTable)
     .where(eq(receiptAttachmentsTable.receiptId, receipt.id));
 
-  res.json(GetReceiptResponse.parse({ ...receipt, attachments }));
+  res.json(GetReceiptResponse.parse({ ...receipt, attachments, itemRights: await itemRightsFor(req.userId!, receipt) }));
 });
 
 router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (req, res): Promise<void> => {
@@ -372,6 +374,7 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const { products: incomingProducts, ...fields } = parsed.data;
   if (!validPurchaseCountry(parsed.data.purchaseCountry)) {
     res.status(400).json({ error: "Choose a real ISO country or Unknown." });
     return;
@@ -381,6 +384,13 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
     eq(receiptsTable.id, params.data.id), eq(receiptsTable.userId, req.userId!),
   ));
   if (!existing) { res.status(404).json({ error: "Receipt not found" }); return; }
+  const mergedProducts = incomingProducts
+    ? mergeProductLines(existing.products ?? [], incomingProducts)
+    : null;
+  if (mergedProducts && !mergedProducts.ok) {
+    res.status(400).json({ error: mergedProducts.error });
+    return;
+  }
   const deliveryError = deliveryDateError(
     parsed.data.deliveryDate, parsed.data.purchaseDate ?? existing.purchaseDate,
   );
@@ -388,7 +398,7 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   // Anything that moves or creates the return deadline (dates, channel, country,
   // store, currency) re-arms its reminders.
   // Only fields the body actually carries can change; the others stay undefined.
-  const body = parsed.data as Record<string, unknown>;
+  const body = fields as Record<string, unknown>;
   const current = existing as Record<string, unknown>;
   const changed = (key: "purchaseDate" | "deliveryDate" | "isOnlinePurchase" | "purchaseCountry" | "merchant" | "currency" | "purchaseType" | "returnDays") =>
     body[key] !== undefined && body[key] !== current[key];
@@ -425,7 +435,8 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   const [updated] = await tx
     .update(receiptsTable)
     .set({
-      ...parsed.data,
+      ...fields,
+      ...(mergedProducts && mergedProducts.ok ? { products: mergedProducts.products } : {}),
       ...(manualAcceptance ? { status: "completed" } : {}),
       // A purchase type sent by the app is the user's choice: never overwritten by hints or the backfill.
       ...(parsed.data.purchaseType !== undefined
@@ -473,8 +484,32 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   }
   await refreshWarrantyExpiries(receipt.id);
 
-  res.json(UpdateReceiptResponse.parse(receipt));
+  res.json(UpdateReceiptResponse.parse({ ...receipt, itemRights: await itemRightsFor(req.userId!, receipt) }));
 }));
+
+async function itemRightsFor(userId: string, receipt: {
+  products?: Parameters<typeof evaluateItemRights>[0];
+  purchaseDate?: string | null;
+  deliveryDate?: string | null;
+  purchaseCountry?: string | null;
+  currency?: string | null;
+  merchant?: string | null;
+  isOnlinePurchase?: boolean | null;
+  purchaseType?: string | null;
+}) {
+  let region: "US" | "PT" = "PT";
+  try { region = rulesRegionForMarket(await getAccountMarket(userId)); } catch { region = "PT"; }
+  return evaluateItemRights(receipt.products, {
+    region,
+    purchaseDate: receipt.purchaseDate,
+    deliveryDate: receipt.deliveryDate,
+    purchaseCountry: receipt.purchaseCountry,
+    currency: receipt.currency,
+    merchant: receipt.merchant,
+    isOnlinePurchase: receipt.isOnlinePurchase,
+    purchaseType: receipt.purchaseType,
+  });
+}
 
 router.delete("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (req, res): Promise<void> => {
   const params = DeleteReceiptParams.safeParse(req.params);

@@ -6,10 +6,36 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export interface ReceiptCoverage {
+  id: string;
+  kind: "return" | "warranty";
+  /** @nullable */
+  warrantyType?: "legal" | "manufacturer" | "commercial" | null;
+  basis: "stated" | "user";
+  certainty: "confirmed" | "estimated";
+  /** @nullable */
+  lengthDays?: number | null;
+  /** @nullable */
+  lengthMonths?: number | null;
+  /** Only a date the document or the user gave. @nullable */
+  endDate?: string | null;
+  /** @nullable */
+  evidence?: string | null;
+  source: "extraction" | "user";
+}
+
 export interface ReceiptProduct {
+  /** Stable line identity. Absent on receipts saved before item coverage. @nullable */
+  lineId?: string | null;
   name: string;
   /** @nullable */
   quantity?: number | null;
   /** @nullable */
   price?: number | null;
+  /** This line's own category. Never copied from the receipt category. @nullable */
+  category?: string | null;
+  /** @nullable */
+  categorySource?: "user" | "extraction" | null;
+  /** Periods stated for this line. Rules are not stored here. */
+  coverages?: ReceiptCoverage[];
 }

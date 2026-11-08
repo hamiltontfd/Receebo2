@@ -2,6 +2,7 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import { normalizeCategory } from "./categories";
 import { senderDomain } from "./mailProviders/merchants";
 import { normalizePurchaseType, type PurchaseType } from "./purchaseType";
+import { acceptExtractedLines } from "./itemCoverage";
 import { countryFromStoreDomain, normalizeCountryCode, resolvePurchaseCountry } from "./purchaseCountry";
 import { ObjectStorageService } from "./objectStorage";
 import { logger } from "./logger";
@@ -12,6 +13,10 @@ export type ExtractedProduct = {
   name: string;
   quantity: number | null;
   price: number | null;
+  lineId?: string;
+  category?: string | null;
+  categorySource?: "extraction" | "user" | null;
+  coverages?: import("@workspace/db").ReceiptProductItem["coverages"];
 };
 
 export type ExtractedNotableItem = {
@@ -86,7 +91,15 @@ Respond ONLY with a JSON object matching this exact shape:
   "purchaseType": string | null,    // exactly one of "goods", "subscription", "digital", "service", "ticket" (see rules), or null if unclear
   "deliveryDate": string | null,    // the date the goods were actually DELIVERED ("delivered on", "entregue em", "data de entrega" of a completed delivery) in strict YYYY-MM-DD format. null if not stated, or if only an estimated/expected delivery date is shown ("arrives by", "previsão de entrega", "entrega prevista").
   "products": [                      // individual line items; empty array if none are legible
-    { "name": string, "quantity": number | null, "price": number | null }
+    {
+      "name": string, "quantity": number | null, "price": number | null,
+      "category": string | null,      // canonical category of THIS line, or null if unclear. Never copy the receipt's category.
+      "statedCoverages": [             // optional. Only a period the document states for THIS line. Empty when unsure.
+        { "kind": "return" | "warranty", "warrantyType": "manufacturer" | "commercial" | null,
+          "lengthDays": number | null, "lengthMonths": number | null, "endDate": string | null,
+          "evidence": string }         // the printed words for this line, copied from the document
+      ]
+    }
   ],
   "notableItems": [                  // items worth keeping the receipt for; empty array if none qualify
     {
@@ -110,6 +123,7 @@ Rules:
 - purchaseType: "subscription" for recurring plans and renewals (iCloud+, Apple One, Apple Music, Spotify, Netflix, Google One, Microsoft 365, any "Renews on…", monthly or annual plan, membership); "digital" for a one-off digital purchase with nothing physical delivered (an app, an in-app purchase, a film, series or e-book bought or rented, game DLC); "ticket" for tickets to a dated event (concert, cinema, theatre, sports, festival, museum); "service" for work done for the buyer (repair, installation, course, consultation, cleaning); "goods" for physical products, including a product sold together with a service. Gift cards and vouchers are "goods". Use null only when it is genuinely unclear.
 - Do not include any commentary outside the JSON.
 - Do not invent a manufacturer warranty in "warranty", "summary" or "notableItems[].reason". Mention one only when the document states it.
+- statedCoverages: include an entry only when the document states a return window or a manufacturer or commercial warranty for that specific line, and copy those printed words into "evidence". Never copy the receipt-level "warranty" field onto lines. Never use general knowledge, a store's reputation, or an OCR dump that does not name the line. Leave statedCoverages empty when unsure. Do not assign a legal warranty; the server applies the law.
 - For notableItems: include any line item priced above ~$50 that falls into a durable-goods category such as electronics, appliances, tools, furniture, sporting equipment, or similar. These are purchases where a receipt may be needed for warranty claims, returns, or insurance. Exclude consumables (food, drinks, toiletries), services, and low-value items regardless of category.
 - Deduplication: if the same line item (identical name and price) appears more than once in the image — for example because two overlapping receipt segments were photographed — include it only ONCE in the products array. Do not repeat identical line items.
 - Product naming — apply to BOTH "products[].name" AND "notableItems[].name":
@@ -298,15 +312,23 @@ export function parseExtraction(raw: string, hints?: { storeDomain?: string | nu
   const toStringOrNull = (value: unknown): string | null =>
     typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
-  const products: ExtractedProduct[] = Array.isArray(parsed.products)
-    ? parsed.products
-        .filter((p) => p && typeof p === "object")
-        .map((p) => ({
-          name: toStringOrNull((p as ExtractedProduct).name) ?? "Item",
-          quantity: toNumberOrNull((p as ExtractedProduct).quantity),
-          price: toNumberOrNull((p as ExtractedProduct).price),
-        }))
-    : [];
+  const warranty = toStringOrNull(parsed.warranty);
+  const ocrText = toStringOrNull(parsed.ocrText);
+  const products: ExtractedProduct[] = acceptExtractedLines(
+    Array.isArray(parsed.products)
+      ? parsed.products.filter((p) => p && typeof p === "object").map((p) => {
+          const raw = p as ExtractedProduct & { statedCoverages?: unknown; category?: unknown };
+          return {
+            name: toStringOrNull(raw.name) ?? "Item",
+            quantity: toNumberOrNull(raw.quantity),
+            price: toNumberOrNull(raw.price),
+            category: raw.category,
+            statedCoverages: raw.statedCoverages,
+          };
+        })
+      : [],
+    { ocrText, receiptWarranty: warranty },
+  );
 
   const notableItems: ExtractedNotableItem[] = Array.isArray(
     (parsed as Partial<ExtractedReceipt>).notableItems,
@@ -360,8 +382,8 @@ export function parseExtraction(raw: string, hints?: { storeDomain?: string | nu
     currency: toStringOrNull(parsed.currency),
     category: normalizeCategory(toStringOrNull(parsed.category)),
     summary: toStringOrNull(parsed.summary),
-    ocrText: toStringOrNull(parsed.ocrText),
-    warranty: toStringOrNull(parsed.warranty),
+    ocrText,
+    warranty,
     transactionNumber: toStringOrNull((parsed as ExtractedReceipt).transactionNumber),
     products,
     notableItems,

@@ -20,13 +20,24 @@ function deduplicateProducts(products: ExtractedProduct[]): ExtractedProduct[] {
       seen.set(key, product);
     } else {
       const existing = seen.get(key)!;
+      const existingCoverages = existing.coverages ?? [];
+      const nextCoverages = product.coverages ?? [];
+      const distinct = existingCoverages.length > 0 && nextCoverages.length > 0
+        && JSON.stringify(existingCoverages) !== JSON.stringify(nextCoverages);
+      if (distinct && product.lineId) {
+        seen.set(`${key}::${product.lineId}`, product);
+        continue;
+      }
+      const kept = nextCoverages.length > existingCoverages.length ? { ...product, quantity: existing.quantity } : existing;
       if (
         product.quantity != null &&
         product.quantity > 1 &&
         existing.quantity != null &&
         existing.quantity > 1
       ) {
-        seen.set(key, { ...existing, quantity: existing.quantity + product.quantity });
+        seen.set(key, { ...kept, quantity: existing.quantity + product.quantity });
+      } else if (kept !== existing) {
+        seen.set(key, kept);
       }
     }
   }

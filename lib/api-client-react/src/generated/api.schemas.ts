@@ -167,12 +167,38 @@ export const ReceiptPurchaseTypeSource = {
   manual: 'manual',
 } as const;
 
+export interface ReceiptCoverage {
+  id: string;
+  kind: "return" | "warranty";
+  /** @nullable */
+  warrantyType?: "legal" | "manufacturer" | "commercial" | null;
+  basis: "stated" | "user";
+  certainty: "confirmed" | "estimated";
+  /** @nullable */
+  lengthDays?: number | null;
+  /** @nullable */
+  lengthMonths?: number | null;
+  /** Only a date the document or the user gave. @nullable */
+  endDate?: string | null;
+  /** @nullable */
+  evidence?: string | null;
+  source: "extraction" | "user";
+}
+
 export interface ReceiptProduct {
+  /** Stable line identity. Absent on receipts saved before item coverage. @nullable */
+  lineId?: string | null;
   name: string;
   /** @nullable */
   quantity?: number | null;
   /** @nullable */
   price?: number | null;
+  /** This line's own category. Never copied from the receipt category. @nullable */
+  category?: string | null;
+  /** @nullable */
+  categorySource?: "user" | "extraction" | null;
+  /** Periods stated for this line. Rules are not stored here. */
+  coverages?: ReceiptCoverage[];
 }
 
 export interface NotableItem {
@@ -270,6 +296,23 @@ export interface Receipt {
    */
   returnDays?: number | null;
   products?: ReceiptProduct[];
+  /** Per-line evaluation computed on read. Not saved and not an input to reminders. */
+  itemRights?: Array<{
+    lineId?: string | null;
+    index: number;
+    contracts: Array<{
+      id: string;
+      kind: "return" | "warranty";
+      warrantyType?: "legal" | "manufacturer" | "commercial" | null;
+      basis: "stated" | "user" | "rule";
+      certainty: "confirmed" | "estimated" | "unknown";
+      status: "open" | "expired" | "unknown" | "not_applicable";
+      endDate?: string | null;
+      ruleId?: string | null;
+      conflict: boolean;
+      legalReviewPending: boolean;
+    }>;
+  }>;
   /** Items flagged as notable (expensive or warranty-relevant). */
   notableItems?: NotableItem[];
   createdAt: string;
@@ -335,6 +378,26 @@ export interface ReceiptUpdate {
   /** Set to false to confirm a draft receipt into the library. */
   isDraft?: boolean;
   notableItems?: NotableItem[];
+  /**
+   * Full ordered line list. Omit to leave stored lines unchanged.
+   * Coverages may omit basis, certainty and source; the server records a user edit.
+   */
+  products?: Array<{
+    lineId?: string | null;
+    name: string;
+    quantity?: number | null;
+    price?: number | null;
+    category?: string | null;
+    coverages?: Array<{
+      id?: string;
+      kind: "return" | "warranty";
+      warrantyType?: "legal" | "manufacturer" | "commercial" | null;
+      lengthMonths?: number | null;
+      lengthDays?: number | null;
+      endDate?: string | null;
+      evidence?: string | null;
+    }>;
+  }>;
 }
 
 export interface ReceiptStats {

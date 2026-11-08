@@ -57,7 +57,8 @@ describe("ReceiptSheet summary", () => {
     expect(screen.queryByText("Resumo")).toBeNull();
     expect(screen.queryByText(/In-store purchase at Casa Lumen/)).toBeNull();
     expect(screen.getByText("55\" 4K Smart TV")).toBeInTheDocument();
-    expect(screen.getByText(/High-value electronics/)).toBeInTheDocument();
+    expect(screen.queryByText(/High-value electronics/)).toBeNull();
+    expect(screen.getByTestId("section-highlights")).toBeInTheDocument();
   });
 });
 
@@ -126,10 +127,9 @@ describe("ReceiptSheet: US accounts", () => {
   };
   it("shows 'Returns & warranty' with the store window for an in-store purchase, no legal warranty or review marker", () => {
     mount(tv, "US");
-    expect(screen.getByText("Returns & warranty")).toBeInTheDocument();
-    expect(screen.getByText(/Return by/)).toBeInTheDocument();
-    expect(screen.getByText(/Best Buy: 15 days \(store policy, checked Oct 27, 2026\)/)).toBeInTheDocument();
-    expect(screen.getByTestId("card-manufacturer-warranty")).toBeInTheDocument();
+    expect(screen.queryByText("Returns & warranty")).toBeNull();
+    expect(screen.getByTestId("section-return-by")).toBeInTheDocument();
+    expect(screen.getByTestId("section-warranty")).toBeInTheDocument();
     expect(screen.queryByText(/legal warranty/i)).toBeNull();
     expect(screen.queryByText(/LEGAL REVIEW/)).toBeNull();
     expect(screen.queryByText(/Consumer Rights/)).toBeNull();
@@ -192,8 +192,7 @@ describe("ReceiptSheet warranty info Escape", () => {
     });
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByText("Demo Electronics")).toBeInTheDocument();
-    expect(screen.getByText("Returns & warranty")).toBeInTheDocument();
-    expect(screen.getByTestId("card-manufacturer-warranty").textContent).toMatch(/Manufacturer warranty \(2 years\)/);
+    expect(screen.getByTestId("section-warranty")).toBeInTheDocument();
     expect(screen.queryByTestId("text-rights-info")).toBeNull();
     expect(screen.queryByText(/No federal minimum/)).toBeNull();
     expect(screen.queryByText("Summary")).toBeNull();
@@ -204,7 +203,7 @@ describe("ReceiptSheet warranty info Escape", () => {
     const onClose = vi.fn();
     mount(sample, "US", onClose);
     expect(screen.queryByTestId("text-rights-info")).toBeNull();
-    expect(screen.getByTestId("card-manufacturer-warranty")).toBeInTheDocument();
+    expect(screen.getByTestId("section-warranty")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("button-rights-info"));
     expect(screen.getByTestId("text-rights-info").textContent).toMatch(/No federal minimum return right or warranty in the US/);
@@ -239,6 +238,56 @@ describe("ReceiptSheet warranty info Escape", () => {
 
     pressEscape();
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads per-item coverage, keeps country in edit, and saves the same line ids", async () => {
+    const onClose = vi.fn();
+    mount({
+      ...sample,
+      contentType: "image/jpeg",
+      products: [
+        { lineId: "l_tv000000000001", name: "TV", quantity: 1, price: 299, category: "Electronics", categorySource: "user" },
+        { lineId: "l_milk0000000001", name: "Milk", quantity: 1, price: 3, category: "Groceries", categorySource: "user" },
+      ],
+      notableItems: [{ name: "TV", price: 299, category: "Electronics", reason: "High-value electronics" }],
+      itemRights: [
+        { lineId: "l_tv000000000001", index: 0, contracts: [
+          { id: "ret-tv", kind: "return", basis: "rule", certainty: "estimated", status: "expired", endDate: "2026-10-15", lengthDays: 14, ruleId: "PT:DL-24/2014" },
+          { id: "war-tv", kind: "warranty", warrantyType: "legal", basis: "rule", certainty: "confirmed", status: "open", endDate: "2029-11-02", lengthMonths: 36, ruleId: "PT:DL-84/2021" },
+          { id: "war-maker", kind: "warranty", warrantyType: "manufacturer", basis: "stated", certainty: "estimated", status: "open", lengthMonths: 24, endDate: "2028-11-01", evidence: "TV: 24 month manufacturer warranty" },
+        ] },
+        { lineId: "l_milk0000000001", index: 1, contracts: [
+          { id: "ret-milk", kind: "return", basis: "rule", certainty: "unknown", status: "unknown" },
+          { id: "war-milk", kind: "warranty", basis: "rule", certainty: "unknown", status: "unknown" },
+        ] },
+      ],
+    }, "PT", onClose);
+    const order = ["section-highlights", "section-return-by", "section-warranty", "section-complete-list", "button-view-original"].map((id) => screen.getByTestId(id));
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(screen.getByTestId("section-highlights").textContent).toMatch(/Est\. return by/);
+    expect(screen.getByTestId("section-highlights").textContent).not.toMatch(/High-value/);
+    expect(screen.getAllByTestId("row-return").map((row) => row.textContent).join("\n")).toMatch(/Return window unknown/);
+    expect(screen.getAllByTestId("row-warranty").map((row) => row.textContent).join("\n")).toMatch(/Warranty unknown/);
+    expect(screen.queryByText("Returns & warranty")).toBeNull();
+    expect(screen.queryByText("Purchase country")).toBeNull();
+    expect(screen.queryByText(/Fictional manufacturer warranty/)).toBeNull();
+    expect(screen.getByTestId("section-complete-list").textContent?.indexOf("TV")).toBeLessThan(
+      screen.getByTestId("section-complete-list").textContent?.indexOf("Milk") ?? 0,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
+    expect(screen.getByText("Purchase country")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Cancel/ }));
+    expect(mocks.update).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Edit/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Save Changes/ }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled());
+    const saved = mocks.update.mock.calls[0][0].data.products;
+    expect(saved.map((line: { lineId: string }) => line.lineId)).toEqual(["l_tv000000000001", "l_milk0000000001"]);
+    expect(saved[0].coverages).toBeUndefined();
   });
 });
 

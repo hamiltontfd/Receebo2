@@ -685,6 +685,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReceiptProduct"
+        itemRights:
+          type: array
+          description: Per-line return and warranty evaluation. Computed on read from stored line facts and the existing rules. Not saved, and not an input to reminders.
+          items:
+            $ref: "#/components/schemas/ItemRights"
         notableItems:
           type: array
           description: Items flagged as notable (expensive or warranty-relevant).
@@ -698,12 +703,84 @@ components:
       required:
         - name
       properties:
+        lineId:
+          type: ["string", "null"]
+          description: Stable line identity. Absent on receipts saved before item coverage.
         name:
           type: string
         quantity:
           type: ["number", "null"]
         price:
           type: ["number", "null"]
+        category:
+          type: ["string", "null"]
+          description: This line's own category. Never copied from the receipt category.
+        categorySource:
+          type: ["string", "null"]
+          enum: [user, extraction, null]
+        coverages:
+          type: array
+          description: Periods stated for this line. Rules are not stored here.
+          items:
+            $ref: "#/components/schemas/ItemCoverage"
+    ItemCoverage:
+      type: object
+      required: [id, kind, basis, certainty, source]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [return, warranty]
+        warrantyType:
+          type: ["string", "null"]
+          enum: [legal, manufacturer, commercial, null]
+        basis:
+          type: string
+          enum: [stated, user]
+        certainty:
+          type: string
+          enum: [confirmed, estimated]
+        lengthDays:
+          type: ["integer", "null"]
+        lengthMonths:
+          type: ["integer", "null"]
+        endDate:
+          type: ["string", "null"]
+          description: Only a date the document or the user gave. A length is not stored as a date.
+        evidence:
+          type: ["string", "null"]
+        source:
+          type: string
+          enum: [extraction, user]
+    ItemRights:
+      type: object
+      required: [index, contracts]
+      properties:
+        lineId:
+          type: ["string", "null"]
+        index:
+          type: integer
+        contracts:
+          type: array
+          items:
+            type: object
+            required: [id, kind, basis, certainty, status, conflict, legalReviewPending]
+            properties:
+              id: { type: string }
+              kind: { type: string, enum: [return, warranty] }
+              warrantyType: { type: ["string", "null"], enum: [legal, manufacturer, commercial, null] }
+              basis: { type: string, enum: [stated, user, rule] }
+              certainty: { type: string, enum: [confirmed, estimated, unknown] }
+              status: { type: string, enum: [open, expired, unknown, not_applicable] }
+              lengthDays: { type: ["integer", "null"] }
+              lengthMonths: { type: ["integer", "null"] }
+              startDate: { type: ["string", "null"] }
+              endDate: { type: ["string", "null"] }
+              ruleId: { type: ["string", "null"] }
+              evidence: { type: ["string", "null"] }
+              conflict: { type: boolean }
+              legalReviewPending: { type: boolean }
     ReceiptInput:
       type: object
       required:
@@ -776,6 +853,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/NotableItem"
+        products:
+          type: array
+          description: Full ordered line list. Omit to leave stored lines unchanged. Coverages omitted on a line are kept.
+          items:
+            $ref: "#/components/schemas/ReceiptProduct"
     ReceiptStats:
       type: object
       required:

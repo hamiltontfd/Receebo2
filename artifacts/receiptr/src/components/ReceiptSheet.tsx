@@ -10,10 +10,15 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Loader2, Trash2, Edit2, Share2, AlertTriangle, ScanLine,
-  Paperclip, FileText, ArrowLeft, Maximize2, X,
-  Package, Shield, Star,
+  Paperclip, FileText, ArrowLeft, Maximize2, X, MoreHorizontal,
+  Package, Shield,
 } from "lucide-react";
 import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
+import { ItemCoverageSections } from "@/components/ItemCoverageSections";
+import { LineCoverageEditor, lineDraftPayload, lineDraftsFrom, type LineDraft } from "@/components/LineCoverageEditor";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { showDeliveryDateField } from "@/lib/consumerRights";
 import { useAccountRegion } from "@/lib/region";
 import { usStoreReturnWindow } from "@/lib/usStorePolicies";
@@ -21,8 +26,7 @@ import { WarrantyQuickPick } from "@/components/WarrantyQuickPick";
 import { useAppLocale, formatLocaleDate } from "@/lib/locale";
 import { hasNoConsumerDates } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
-import { HighlightsRow } from "@/components/HighlightsRow";
-import { PurchaseCountryField, PurchaseCountryValue } from "@/components/PurchaseCountryField";
+import { PurchaseCountryField } from "@/components/PurchaseCountryField";
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
@@ -117,6 +121,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   const isDesktop = useIsDesktop();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [lineDrafts, setLineDrafts] = useState<LineDraft[]>([]);
   const [storeUrl, setStoreUrl] = useState<string | null>(null);
   const [isOpeningStore, setIsOpeningStore] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -175,6 +180,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
         purchaseCountry: receipt.purchaseCountry ?? null,
         purchaseType: receipt.purchaseType ?? null,
       });
+      setLineDrafts(lineDraftsFrom(receipt.products));
     }
   }, [receipt, isEditing, form]);
 
@@ -241,6 +247,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
           ...((data.purchaseType ?? null) !== (receipt?.purchaseType ?? null)
             ? { purchaseType: data.purchaseType ?? null }
             : {}),
+          ...(lineDrafts.length > 0 ? { products: lineDraftPayload(lineDrafts) } : {}),
         },
       });
       setIsEditing(false);
@@ -360,8 +367,6 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   const isProcessing = receipt?.status === "processing";
   const symbol = currencySymbol(receipt?.currency);
   const isImage = receipt?.contentType.startsWith("image/") ?? false;
-
-  const hasHighlights = (receipt?.notableItems?.length ?? 0) > 0;
 
   return (
     <>
@@ -698,6 +703,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                             }}
                           />
                         )}
+                        {isEditing && <LineCoverageEditor lines={lineDrafts} onChange={setLineDrafts} />}
                         <div className="flex items-center gap-2 mt-4">
                           <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
                             {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -711,83 +717,9 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     </Form>
                   )}
 
-                  {/* ── Highlights carousel ── */}
-                  {!isEditing && hasHighlights && (
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
-                        <Star className="w-3.5 h-3.5" />
-                        {appText("Highlights")}
-                      </p>
-                      <HighlightsRow>
-                        {receipt.notableItems!.map((item, i) => {
-                          const CardIcon = categoryIcon(item.category);
-                          return (
-                            <div
-                              key={i}
-                              className="shrink-0 w-40 rounded-2xl border border-border p-4 flex flex-col gap-2 snap-start bg-background"
-                            >
-                              <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${categoryStyle(item.category)}`}>
-                                <CardIcon className="w-[1.1rem] h-[1.1rem]" />
-                              </span>
-                              <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
-                              {item.price != null && (
-                                <p className="font-mono font-bold text-base">{symbol}{item.price.toFixed(2)}</p>
-                              )}
-                              {item.reason && (
-                                <p className="text-xs text-muted-foreground leading-snug line-clamp-2 mt-auto">{item.reason}</p>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </HighlightsRow>
-                    </div>
-                  )}
-
-                  {/* ── Items ── */}
-                  {!isEditing && receipt.products && receipt.products.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
-                        <Package className="w-3.5 h-3.5" />
-                        {appText("Items")}
-                      </p>
-                      <ul className="divide-y divide-border border border-border rounded-xl overflow-hidden">
-                        {receipt.products.map((product, i) => (
-                          <li key={i} className="flex items-center justify-between gap-3 px-4 py-3 bg-background">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{product.name}</p>
-                              {product.quantity && product.quantity > 1 && (
-                                <p className="text-xs text-muted-foreground">{appText("Qty")} {product.quantity}</p>
-                              )}
-                            </div>
-                            {product.price != null && (
-                              <span className="font-mono text-sm font-semibold shrink-0">{symbol}{product.price.toFixed(2)}</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {!isEditing && (
-                    <div className="flex items-center justify-between gap-4 text-sm">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Purchase country")}</span>
-                      <PurchaseCountryValue value={receipt.purchaseCountry} className="font-semibold text-right" />
-                    </div>
-                  )}
-
-                  {/* ── Warranty ── */}
-                  {!isEditing && receipt.warranty && (
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
-                        <Shield className="w-3.5 h-3.5" />
-                        {appText("Warranty")}
-                      </p>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{receipt.warranty}</p>
-                    </div>
-                  )}
-
                   {!isEditing && (
                     <ConsumerRightsPanel
+                      promptsOnly
                       receipt={receipt}
                       onChooseChannel={(online) => {
                         if (!receiptId) return;
@@ -803,29 +735,30 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     />
                   )}
 
-                  {/* ── Original receipt ── */}
                   {!isEditing && (
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5" />
-                        {appText("Original receipt")}
-                      </p>
-                      <ReceiptPreview
-                        fileUrl={fileUrl}
-                        fileName={receipt.originalFileName}
-                      />
-                      {isImage && (
-                        <Button
-                          variant="outline"
-                          className="w-full rounded-full mt-2"
-                          onClick={() => openStoreView(fileUrl)}
-                          disabled={isOpeningStore}
-                        >
-                          <ScanLine className="w-4 h-4 mr-2" />
-                          {appText(isOpeningStore ? "Loading…" : "Show to store")}
-                        </Button>
-                      )}
-                    </div>
+                    <ItemCoverageSections
+                      products={receipt.products ?? []}
+                      notableItems={receipt.notableItems}
+                      itemRights={receipt.itemRights}
+                      symbol={symbol}
+                      receipt={receipt}
+                    />
+                  )}
+
+                  {!isEditing && (
+                    isImage ? (
+                      <Button
+                        data-testid="button-view-original"
+                        className="w-full min-h-11 rounded-full bg-[#121212] text-white hover:bg-[#121212]/90"
+                        onClick={() => openStoreView(fileUrl)}
+                        disabled={isOpeningStore}
+                      >
+                        <ScanLine className="w-4 h-4 mr-2" />
+                        {appText(isOpeningStore ? "Loading…" : "View original receipt")}
+                      </Button>
+                    ) : (
+                      <ReceiptPreview fileUrl={fileUrl} fileName={receipt.originalFileName} />
+                    )
                   )}
 
                   {/* ── Files / Attachments ── */}
@@ -861,29 +794,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                         />
                       </div>
                       <ul className="divide-y divide-border border border-border rounded-xl overflow-hidden">
-                        {/* Original file row */}
-                        <li className="flex items-center gap-3 px-4 py-3 bg-background">
-                          <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
-                          <span className="flex-1 text-sm truncate">{receipt.originalFileName}</span>
-                          {isImage && (
-                            <button
-                              onClick={() => openStoreView(fileUrl)}
-                              disabled={isOpeningStore}
-                              className="text-muted-foreground hover:text-foreground transition-colors shrink-0 disabled:opacity-40"
-                              aria-label="Show fullscreen"
-                            >
-                              <Maximize2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => downloadFile(fileUrl, receipt.originalFileName)}
-                            className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                          >
-                            {appText("Download")}
-                          </button>
-                        </li>
-
-                        {/* Attachment rows */}
+                        {/* Attachment rows. The original file is the view button above. */}
                         {receipt.attachments && receipt.attachments.map((att) => {
                           const attUrl = privateFileUrl(att.objectPath);
                           const attIsImage = att.contentType.startsWith("image/");
@@ -951,27 +862,33 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
-                        className="flex-1 rounded-full"
+                        className="flex-1 min-h-11 rounded-full"
                         disabled={isProcessing}
                         onClick={() => setIsEditing(true)}
                       >
                         <Edit2 className="w-4 h-4 mr-2" />
                         {appText("Edit")}
                       </Button>
-                      <Button variant="outline" className="flex-1 rounded-full" onClick={handleShare}>
+                      <Button variant="outline" className="flex-1 min-h-11 rounded-full" onClick={handleShare}>
                         <Share2 className="w-4 h-4 mr-2" />
                         {appText("Share")}
                       </Button>
                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="flex-1 rounded-full text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/10"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            {appText("Delete")}
-                          </Button>
-                        </AlertDialogTrigger>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="min-h-11 min-w-11 rounded-full px-0" data-testid="button-more-actions" aria-label={appText("More actions")}>
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem className="min-h-11 text-destructive focus:text-destructive" onSelect={(event) => event.preventDefault()}>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                {appText("Delete")}
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>{appText("Delete this receipt?")}</AlertDialogTitle>

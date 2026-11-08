@@ -40,7 +40,7 @@ function countryHeading(label: string | null, locale: string): string {
  * a tap toggles it, and Escape or a press outside closes it. The overlay
  * stays inside the viewport and scrolls when the text is long.
  */
-function WarrantyInfo({ lines }: { lines: string[] }) {
+export function WarrantyInfo({ lines }: { lines: string[] }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<number | null>(null);
   const pointerKind = useRef("");
@@ -142,10 +142,13 @@ function WarrantyInfo({ lines }: { lines: string[] }) {
 export function ConsumerRightsPanel({
   receipt,
   onChooseChannel,
+  promptsOnly = false,
 }: {
   receipt: RightsReceipt;
   /** Confirm or correct online / in store. Null clears the choice. */
   onChooseChannel?: (online: boolean | null) => void;
+  /** Channel, delivery and subscription prompts only. Dates live in the item sections. */
+  promptsOnly?: boolean;
 }) {
   const locale = useAppLocale();
   const { region, ready } = useAccountRegion();
@@ -191,16 +194,19 @@ export function ConsumerRightsPanel({
     expired: "bg-muted border-border text-muted-foreground",
   } as const;
 
+  const deliveryMissing = showDelivery && !noDates && !!receipt.purchaseDate && !receipt.deliveryDate;
+  if (promptsOnly && !askChannel && !deliveryMissing) return null;
+
   return (
     <div data-testid="panel-consumer-rights">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+      {!promptsOnly && <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
         <Scale className="w-3.5 h-3.5" />
         {isUs
           ? usRightsCopy(locale).panelTitle
           : <>{appText("Consumer Rights")}{rights.countryLabel ? ` · ${countryHeading(rights.countryLabel, locale)}` : ""}</>}
         {infoAnchor === "heading" && <WarrantyInfo lines={tucked} />}
-      </div>
-      {!receipt.purchaseCountry && rights.hasAny && (
+      </div>}
+      {!promptsOnly && !receipt.purchaseCountry && rights.hasAny && (
         <p className="mb-2 text-xs text-muted-foreground">
           {appText("Purchase country is unknown. This guidance may use the receipt currency or merchant as an estimate, not a confirmed country.")}
         </p>
@@ -236,13 +242,13 @@ export function ConsumerRightsPanel({
           </div>
         )}
 
-        {showDelivery && !noDates && receipt.purchaseDate && !receipt.deliveryDate && (
+        {deliveryMissing && (
           <p className="px-1 text-xs text-muted-foreground" data-testid="text-delivery-missing">
             {appText("Delivery not informed")}
           </p>
         )}
 
-        {rights.returnWindow && (
+        {!promptsOnly && rights.returnWindow && (
           <div
             data-testid={provisional ? "card-return-provisional" : "card-return-window"}
             className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${urgencyClass[rights.returnWindow.urgency]}`}
@@ -276,7 +282,7 @@ export function ConsumerRightsPanel({
           </div>
         )}
 
-        {rights.warranty && (
+        {!promptsOnly && rights.warranty && (
           <div className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${rights.warranty.isExpired ? "bg-muted border-border text-muted-foreground" : "bg-violet-50 border-violet-200 text-violet-700"}`}>
             <Clock className="w-4 h-4 mt-0.5 shrink-0" />
             <div className="min-w-0">
@@ -301,7 +307,7 @@ export function ConsumerRightsPanel({
           </div>
         )}
 
-        {rights.manufacturerWarranty && (
+        {!promptsOnly && rights.manufacturerWarranty && (
           <div
             data-testid="card-manufacturer-warranty"
             className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${rights.manufacturerWarranty.isExpired ? "bg-muted border-border text-muted-foreground" : "bg-sky-50 border-sky-200 text-sky-700"}`}
@@ -321,7 +327,7 @@ export function ConsumerRightsPanel({
           </div>
         )}
 
-        {rights.warranty && !rights.manufacturerWarranty && (
+        {!promptsOnly && rights.warranty && !rights.manufacturerWarranty && (
           <div data-testid="card-manufacturer-unconfirmed" className="rounded-xl border border-border px-4 py-3">
             <p className="text-sm font-semibold leading-tight">{appText("Manufacturer warranty not confirmed on the receipt")}</p>
             <p className="text-xs mt-0.5 text-muted-foreground">
@@ -330,7 +336,7 @@ export function ConsumerRightsPanel({
           </div>
         )}
 
-        {noDates && notes.length > 0 && (
+        {!promptsOnly && noDates && notes.length > 0 && (
           <ul className="space-y-1 px-1 text-xs leading-5 text-muted-foreground" data-testid="list-rights-notes">
             {notes.map((note) => <li key={note}>{note}</li>)}
           </ul>

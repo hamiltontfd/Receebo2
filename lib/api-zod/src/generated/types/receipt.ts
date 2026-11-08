@@ -86,6 +86,20 @@ export interface Receipt {
    */
   returnDays?: number | null;
   products?: ReceiptProduct[];
+  /** Per-line evaluation computed on read. Not saved and not an input to reminders. */
+  itemRights?: Array<{
+    lineId?: string | null;
+    index: number;
+    contracts: Array<{
+      id: string;
+      kind: "return" | "warranty";
+      basis: "stated" | "user" | "rule";
+      certainty: "confirmed" | "estimated" | "unknown";
+      status: "open" | "expired" | "unknown" | "not_applicable";
+      conflict: boolean;
+      legalReviewPending: boolean;
+    }>;
+  }>;
   /** Items flagged as notable (expensive or warranty-relevant). */
   notableItems?: NotableItem[];
   createdAt: Date;

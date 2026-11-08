@@ -128,6 +128,72 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary List receipts (most recent first)
  */
+export const ItemCoverageInput = zod.object({
+  "id": zod.string().optional(),
+  "kind": zod.enum(["return", "warranty"]),
+  "warrantyType": zod.enum(["legal", "manufacturer", "commercial"]).nullish(),
+  "lengthDays": zod.number().int().min(0).max(365).nullish(),
+  "lengthMonths": zod.number().int().min(1).max(120).nullish(),
+  "endDate": zod.string().nullish(),
+  "evidence": zod.string().max(240).nullish(),
+})
+
+export const ItemCoverageSchema = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(["return", "warranty"]),
+  "warrantyType": zod.enum(["legal", "manufacturer", "commercial"]).nullish(),
+  "basis": zod.enum(["stated", "user"]),
+  "certainty": zod.enum(["confirmed", "estimated"]),
+  "lengthDays": zod.number().nullish(),
+  "lengthMonths": zod.number().nullish(),
+  "endDate": zod.string().nullish(),
+  "evidence": zod.string().nullish(),
+  "source": zod.enum(["extraction", "user"]),
+})
+
+export const ReceiptProductInput = zod.object({
+  "lineId": zod.string().nullish(),
+  "name": zod.string(),
+  "quantity": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "coverages": zod.array(ItemCoverageInput).optional(),
+})
+
+export const ReceiptProductSchema = zod.object({
+  "lineId": zod.string().nullish(),
+  "name": zod.string(),
+  "quantity": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "category": zod.string().nullish(),
+  "categorySource": zod.enum(["user", "extraction"]).nullish(),
+  "coverages": zod.array(ItemCoverageSchema).optional(),
+})
+
+export const ItemRightContractSchema = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(["return", "warranty"]),
+  "warrantyType": zod.enum(["legal", "manufacturer", "commercial"]).nullish(),
+  "basis": zod.enum(["stated", "user", "rule"]),
+  "certainty": zod.enum(["confirmed", "estimated", "unknown"]),
+  "status": zod.enum(["open", "expired", "unknown", "not_applicable"]),
+  "lengthDays": zod.number().nullish(),
+  "lengthMonths": zod.number().nullish(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "ruleId": zod.string().nullish(),
+  "evidence": zod.string().nullish(),
+  "conflict": zod.boolean(),
+  "legalReviewPending": zod.boolean(),
+})
+
+export const ItemRightsSchema = zod.object({
+  "lineId": zod.string().nullish(),
+  "index": zod.number().int(),
+  "contracts": zod.array(ItemRightContractSchema),
+})
+
+
 export const ListReceiptsQueryParams = zod.object({
   "limit": zod.coerce.number().min(1).max(50).optional(),
   "cursor": zod.coerce.string().optional(),
@@ -156,11 +222,8 @@ export const ListReceiptsResponseItem = zod.object({
   "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
   "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
   "returnDays": zod.number().int().min(0).max(365).nullish().describe('Store return window in days written by the user (US accounts). Wins over the store table. Null = not set.'),
-  "products": zod.array(zod.object({
-  "name": zod.string(),
-  "quantity": zod.number().nullish(),
-  "price": zod.number().nullish()
-})).optional(),
+  "products": zod.array(ReceiptProductSchema).optional(),
+  "itemRights": zod.array(ItemRightsSchema).optional().describe('Per-line return and warranty evaluation. Computed on read. Not saved.'),
   "notableItems": zod.array(zod.object({
   "name": zod.string(),
   "price": zod.number().nullish(),
@@ -232,11 +295,8 @@ export const GetRecentReceiptsResponseItem = zod.object({
   "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
   "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
   "returnDays": zod.number().int().min(0).max(365).nullish().describe('Store return window in days written by the user (US accounts). Wins over the store table. Null = not set.'),
-  "products": zod.array(zod.object({
-  "name": zod.string(),
-  "quantity": zod.number().nullish(),
-  "price": zod.number().nullish()
-})).optional(),
+  "products": zod.array(ReceiptProductSchema).optional(),
+  "itemRights": zod.array(ItemRightsSchema).optional().describe('Per-line return and warranty evaluation. Computed on read. Not saved.'),
   "notableItems": zod.array(zod.object({
   "name": zod.string(),
   "price": zod.number().nullish(),
@@ -331,11 +391,8 @@ export const GetReceiptResponse = zod.object({
   "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
   "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
   "returnDays": zod.number().int().min(0).max(365).nullish().describe('Store return window in days written by the user (US accounts). Wins over the store table. Null = not set.'),
-  "products": zod.array(zod.object({
-  "name": zod.string(),
-  "quantity": zod.number().nullish(),
-  "price": zod.number().nullish()
-})).optional(),
+  "products": zod.array(ReceiptProductSchema).optional(),
+  "itemRights": zod.array(ItemRightsSchema).optional().describe('Per-line return and warranty evaluation. Computed on read. Not saved.'),
   "notableItems": zod.array(zod.object({
   "name": zod.string(),
   "price": zod.number().nullish(),
@@ -374,7 +431,8 @@ export const UpdateReceiptBody = zod.object({
   "price": zod.number().nullish(),
   "category": zod.string().nullish(),
   "reason": zod.string().describe('One-line explanation of why this item is worth keeping the receipt for.')
-})).optional()
+})).optional(),
+  "products": zod.array(ReceiptProductInput).optional().describe('Full ordered line list. Omit to leave stored lines unchanged. Send lineId to keep identity and, unless coverages is included, the line\'s stated coverages.')
 })
 
 export const UpdateReceiptResponse = zod.object({
@@ -399,11 +457,8 @@ export const UpdateReceiptResponse = zod.object({
   "purchaseType": zod.union([zod.literal('goods'),zod.literal('subscription'),zod.literal('digital'),zod.literal('service'),zod.literal('ticket'),zod.literal(null)]).nullish().describe('What was bought. Anything but goods (subscriptions, one-off digital purchases, event tickets, services) has no return window, no warranty dates and no reminders. Null = unknown (treated as goods).'),
   "purchaseTypeSource": zod.union([zod.literal('ai'),zod.literal('hint'),zod.literal('manual'),zod.literal(null)]).nullish().describe('Where purchaseType came from. A manual choice is never overwritten.'),
   "returnDays": zod.number().int().min(0).max(365).nullish().describe('Store return window in days written by the user (US accounts). Wins over the store table. Null = not set.'),
-  "products": zod.array(zod.object({
-  "name": zod.string(),
-  "quantity": zod.number().nullish(),
-  "price": zod.number().nullish()
-})).optional(),
+  "products": zod.array(ReceiptProductSchema).optional(),
+  "itemRights": zod.array(ItemRightsSchema).optional().describe('Per-line return and warranty evaluation. Computed on read. Not saved.'),
   "notableItems": zod.array(zod.object({
   "name": zod.string(),
   "price": zod.number().nullish(),

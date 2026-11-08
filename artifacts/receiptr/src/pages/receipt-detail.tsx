@@ -10,7 +10,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft, Loader2, Trash2, Edit2, Share2, AlertTriangle, ScanLine,
-  Paperclip, FileText,
+  Paperclip, FileText, MoreHorizontal,
 } from "lucide-react";
 
 import {
@@ -30,6 +30,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ReceiptPreview } from "@/components/ReceiptPreview";
 import { ReceiptReview } from "@/components/ReceiptReview";
 import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
+import { ItemCoverageSections } from "@/components/ItemCoverageSections";
+import { LineCoverageEditor, lineDraftPayload, lineDraftsFrom, type LineDraft } from "@/components/LineCoverageEditor";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { showDeliveryDateField } from "@/lib/consumerRights";
 import { PurchaseCountryField, PurchaseCountryValue } from "@/components/PurchaseCountryField";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
@@ -91,6 +94,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
   const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [lineDrafts, setLineDrafts] = useState<LineDraft[]>([]);
   const [showStore, setShowStore] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [retryAttachment, setRetryAttachment] = useState<File | null>(null);
@@ -140,6 +144,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
         purchaseCountry: receipt.purchaseCountry ?? null,
         isOnlinePurchase: receipt.isOnlinePurchase ?? null,
       });
+      setLineDrafts(lineDraftsFrom(receipt.products));
     }
   }, [receipt, isEditing, form]);
 
@@ -159,6 +164,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
           warranty: data.warranty,
           purchaseCountry: data.purchaseCountry ?? null,
           isOnlinePurchase: data.isOnlinePurchase,
+          ...(lineDrafts.length > 0 ? { products: lineDraftPayload(lineDrafts) } : {}),
         },
       });
       setIsEditing(false);
@@ -500,6 +506,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                   )}
                 />
               </div>
+              {isEditing && <LineCoverageEditor lines={lineDrafts} onChange={setLineDrafts} />}
               <div className="flex items-center gap-2 mt-4">
                 <Button type="submit" className="flex-1 rounded-full" disabled={updateReceipt.isPending}>
                   {updateReceipt.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -537,14 +544,6 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
                 <span className="font-mono font-semibold">{receipt.transactionNumber}</span>
               </div>
             )}
-            <div className="p-4 flex items-center justify-between gap-4 text-sm">
-              <span className="text-muted-foreground font-medium">{appText("Purchase country")}</span>
-              <PurchaseCountryValue value={receipt.purchaseCountry} className="font-semibold text-right" />
-            </div>
-            <div className="p-4 flex items-center justify-between gap-4 text-sm">
-              <span className="text-muted-foreground font-medium">{appText("Warranty")}</span>
-              <span className="font-semibold text-right">{receipt.warranty || appText("None")}</span>
-            </div>
             <div className="p-4 flex items-center justify-between text-sm">
               <span className="text-muted-foreground font-medium">{appText("Items")}</span>
               <span className="font-semibold">
@@ -557,42 +556,9 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
           </div>
         )}
 
-        {receipt.notableItems && receipt.notableItems.length > 0 && !isEditing && (
-          <NotableItemsBanner items={receipt.notableItems} currency={receipt.currency} />
-        )}
-
-        {receipt.products && receipt.products.length > 0 && !isEditing && (
-          <div className="rounded-2xl border p-4">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {appText("Purchased")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {receipt.products.reduce((sum, p) => sum + (p.quantity && p.quantity > 1 ? p.quantity : 1), 0)} {appText("items total")}
-              </p>
-            </div>
-            <motion.ul
-              className="space-y-2"
-              variants={listVariants}
-              initial="hidden"
-              animate="visible"
-            >
-              {receipt.products.map((product, i) => (
-                <motion.li key={i} variants={itemVariants} className="flex justify-between text-sm">
-                  <span>
-                    {product.quantity && product.quantity > 1 ? `×${product.quantity} ` : ""}{product.name}
-                  </span>
-                  {product.price != null && (
-                    <span className="font-mono font-medium">{symbol}{product.price.toFixed(2)}</span>
-                  )}
-                </motion.li>
-              ))}
-            </motion.ul>
-          </div>
-        )}
-
         {!isEditing && (
           <ConsumerRightsPanel
+            promptsOnly
             receipt={receipt}
             onChooseChannel={(online) => {
               void updateReceipt.mutateAsync({ id: receiptId, data: { isOnlinePurchase: online } }).then(() => {
@@ -605,11 +571,30 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
           />
         )}
 
-        {/* Original receipt — compact row; "Open" shows the file in a new tab */}
-        <ReceiptPreview
-          fileUrl={fileUrl}
-          fileName={receipt.originalFileName}
-        />
+        {!isEditing && (
+          <ItemCoverageSections
+            products={receipt.products ?? []}
+            notableItems={receipt.notableItems}
+            itemRights={receipt.itemRights}
+            symbol={symbol}
+            receipt={receipt}
+          />
+        )}
+
+        {!isEditing && (
+          isImage ? (
+            <Button
+              data-testid="button-view-original"
+              className="w-full min-h-11 rounded-full bg-[#121212] text-white hover:bg-[#121212]/90"
+              onClick={handleShowStore}
+            >
+              <ScanLine className="w-4 h-4 mr-2" />
+              {appText("View original receipt")}
+            </Button>
+          ) : (
+            <ReceiptPreview fileUrl={fileUrl} fileName={receipt.originalFileName} />
+          )
+        )}
 
         {/* Files section — primary scan + attachments */}
         {!isEditing && (
@@ -643,22 +628,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
               />
             </div>
 
-            {/* Primary scan */}
-            <div className="px-4 py-3 flex items-center gap-3">
-              <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
-              <span className="flex-1 text-sm truncate">{receipt.originalFileName}</span>
-              <a
-                href={fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                download={receipt.originalFileName}
-              >
-                {appText("View")}
-              </a>
-            </div>
-
-            {/* Attachments */}
+            {/* Extra files only. The original is the view button above. */}
             {receipt.attachments && receipt.attachments.map((att) => {
               const attUrl = privateFileUrl(att.objectPath);
               const isDeleting = deletingAttachmentId === att.id;
@@ -715,36 +685,36 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
         {/* Actions */}
         {!isEditing && (
           <div className="flex flex-col gap-2">
-            {isImage && (
-              <Button
-                className="w-full rounded-full"
-                onClick={handleShowStore}
-              >
-                <ScanLine className="w-4 h-4 mr-2" />
-                {appText("Show to store")}
-              </Button>
-            )}
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                className="flex-1 rounded-full"
+                className="flex-1 min-h-11 rounded-full"
                 disabled={isProcessing}
                 onClick={() => setIsEditing(true)}
               >
                 <Edit2 className="w-4 h-4 mr-2" />
                 {appText("Edit")}
               </Button>
-              <Button variant="outline" className="flex-1 rounded-full" onClick={handleShare}>
+              <Button variant="outline" className="flex-1 min-h-11 rounded-full" onClick={handleShare}>
                 <Share2 className="w-4 h-4 mr-2" />
                 {appText("Share")}
               </Button>
               <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" className="flex-1 rounded-full text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/10">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    {appText("Delete")}
-                  </Button>
-                </AlertDialogTrigger>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="min-h-11 min-w-11 rounded-full px-0" aria-label={appText("More actions")}>
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <AlertDialogTrigger asChild>
+                      <DropdownMenuItem className="min-h-11 text-destructive focus:text-destructive" onSelect={(event) => event.preventDefault()}>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        {appText("Delete")}
+                      </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>{appText("Delete this receipt?")}</AlertDialogTitle>

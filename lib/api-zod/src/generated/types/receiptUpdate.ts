@@ -41,4 +41,21 @@ export interface ReceiptUpdate {
   /** Set to false to confirm a draft receipt into the library. */
   isDraft?: boolean;
   notableItems?: NotableItem[];
+  /** Full ordered line list. Omit to leave stored lines unchanged. */
+  products?: Array<{
+    lineId?: string | null;
+    name: string;
+    quantity?: number | null;
+    price?: number | null;
+    category?: string | null;
+    coverages?: Array<{
+      id?: string;
+      kind: "return" | "warranty";
+      warrantyType?: "legal" | "manufacturer" | "commercial" | null;
+      lengthMonths?: number | null;
+      lengthDays?: number | null;
+      endDate?: string | null;
+      evidence?: string | null;
+    }>;
+  }>;
 }
