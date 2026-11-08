@@ -112,6 +112,9 @@ test("US and EU capture contexts stay separate and the published binaries stay p
   assert.match(record, /View original receipt/);
   assert.match(record, /section-warranty/);
   assert.match(record, /scan-upload/);
+  assert.match(record, /receipt-warranty/);
+  assert.match(record, /data-capture-pointer/);
+  assert.match(record, /if \(!showPointer\) return/);
   assert.match(record, /centerYAtDpr3/);
   assert.match(record, /failure\.png/);
   const captureUi = await readFile(new URL("./capture.tsx", import.meta.url), "utf8");

@@ -49,18 +49,20 @@ try {
     const unexpected = await isolate(ctx, receiptImage);
     const page = await ctx.newPage();
     page.on("pageerror", e => errors.push(e.message));
-    await page.addInitScript(() => {
+    await page.addInitScript(showPointer => {
       // The install bar is not part of the marketing story (and the capture
       // harness does not mount it); keep it dismissed in case that changes.
       try { localStorage.setItem("receebo:installBarDismissedAt", String(Date.now())); } catch {}
-      // Capture-only emphasis follows actual pointer input; never changes UI.
+      // The ring is only for clip recordings. Still frames never draw it.
+      if (!showPointer) return;
       addEventListener("DOMContentLoaded", () => {
         const dot = document.createElement("div");
+        dot.setAttribute("data-capture-pointer", "");
         dot.style.cssText = "pointer-events:none;position:fixed;width:22px;height:22px;border:2px solid #7c3aed;border-radius:50%;background:#8b5cf622;z-index:99999;left:-40px;top:-40px";
         document.body.append(dot);
         addEventListener("pointermove", e => { dot.style.left = `${e.clientX - 11}px`; dot.style.top = `${e.clientY - 11}px`; });
       });
-    });
+    }, record);
     return { ctx, page, unexpected };
   }
   async function ready(page, route = "/search") {
@@ -70,8 +72,20 @@ try {
   }
   async function still(page, name, locator) {
     const png = `${out}/sources/${name}.png`;
-    if (locator) await locator.screenshot({ path: png });
-    else await page.screenshot({ path: png });
+    // Hide the clip pointer for the still itself, then restore it for the recording.
+    await page.evaluate(() => {
+      const dot = document.querySelector("[data-capture-pointer]");
+      if (dot) dot.style.visibility = "hidden";
+    }).catch(() => {});
+    try {
+      if (locator) await locator.screenshot({ path: png });
+      else await page.screenshot({ path: png });
+    } finally {
+      await page.evaluate(() => {
+        const dot = document.querySelector("[data-capture-pointer]");
+        if (dot) dot.style.visibility = "";
+      }).catch(() => {});
+    }
     // US phone frames stay PNG at the requested pixel size. WebP is the EU export step.
     // The disclosure banner is part of the page and is not cropped.
     if (!us) ff(["-i", png, "-c:v", "libwebp", "-quality", "88", `${out}/web/${name}.webp`]);
@@ -93,7 +107,54 @@ try {
         centerYAtDpr3: centerY * 3,
       };
     }
-    layout[name] = { dpr, boxes };
+    const frame = await page.evaluate(() => {
+      const fully = (el, limit) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        const box = limit ?? { top: 0, bottom: window.innerHeight };
+        return {
+          x: r.x, y: r.y, width: r.width, height: r.height,
+          top: r.top, bottom: r.bottom,
+          fullyVisible: r.height > 0 && r.top >= box.top - 0.5 && r.bottom <= box.bottom + 0.5 && r.bottom <= window.innerHeight + 0.5,
+        };
+      };
+      const section = document.querySelector('[data-testid="section-warranty"]');
+      let scroller = section?.parentElement ?? null;
+      while (scroller && scroller !== document.body) {
+        const style = getComputedStyle(scroller);
+        if (/(auto|scroll)/.test(style.overflowY)) break;
+        scroller = scroller.parentElement;
+      }
+      const limit = scroller && scroller !== document.body ? scroller.getBoundingClientRect() : null;
+      const disclosure = document.querySelector("[data-capture-disclosure]");
+      const cards = [...document.querySelectorAll('[data-testid="row-warranty"]')]
+        .filter(el => /year|month/i.test(el.textContent) && !/unknown/i.test(el.textContent))
+        .map(el => ({ text: el.innerText.replace(/\s+/g, " ").trim(), ...fully(el, limit) }));
+      return { disclosure: fully(disclosure), manufacturerCards: cards };
+    });
+    const mark = (box) => {
+      if (!box) return box;
+      const centerY = box.top + box.height / 2;
+      return { ...box, centerY, centerYAtDpr3: centerY * 3 };
+    };
+    layout[name] = {
+      dpr, boxes,
+      disclosure: mark(frame.disclosure),
+      manufacturerCards: frame.manufacturerCards.map(mark),
+    };
+  }
+  async function showWarrantyTerms(page) {
+    await page.getByTestId("section-warranty").evaluate(section => {
+      let scroller = section.parentElement;
+      while (scroller && scroller !== document.body) {
+        const style = getComputedStyle(scroller);
+        if (/(auto|scroll)/.test(style.overflowY) && scroller.scrollHeight > scroller.clientHeight + 1) break;
+        scroller = scroller.parentElement;
+      }
+      if (!scroller || scroller === document.body) return;
+      scroller.scrollTop += section.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+    });
+    await page.waitForTimeout(300);
   }
   async function requireVisible(page, locator, label, seen = []) {
     try {
@@ -137,10 +198,22 @@ try {
   await heroButton(phone.page).click();
   await requireVisible(phone.page, phone.page.getByRole("dialog"), "phone receipt", phone.unexpected);
   await phone.page.waitForTimeout(600);
-  await still(phone.page, "receipt-phone");
-  await measure(phone.page, "receipt-phone");
-  if (us) {
-    await phone.page.getByTestId("button-more-actions").scrollIntoViewIfNeeded();
+    await still(phone.page, "receipt-phone");
+    await measure(phone.page, "receipt-phone");
+    if (us) {
+      await showWarrantyTerms(phone.page);
+      await still(phone.page, "receipt-warranty");
+      await measure(phone.page, "receipt-warranty");
+      const terms = layout["receipt-warranty"].manufacturerCards;
+      const shown = terms.filter(card => card.fullyVisible).map(card => card.text);
+      if (terms.length < 2 || shown.length < 2) {
+        await phone.page.screenshot({ path: `${out}/sources/failure.png` }).catch(() => {});
+        await writeFile(`${out}/sources/failure.json`, JSON.stringify({
+          label: "receipt warranty", terms, disclosure: layout["receipt-warranty"].disclosure,
+        }, null, 2));
+        throw new Error(`Warranty frame does not fully show both manufacturer cards: ${JSON.stringify(shown)}`);
+      }
+      await phone.page.getByTestId("button-more-actions").scrollIntoViewIfNeeded();
     await phone.page.waitForTimeout(300);
     await still(phone.page, "receipt-actions");
     await measure(phone.page, "receipt-actions");
@@ -154,7 +227,7 @@ try {
     await phone.page.waitForTimeout(400);
     await still(phone.page, "scan-review");
     await measure(phone.page, "scan-review");
-    for (const name of ["library-phone", "receipt-phone", "receipt-actions", "scan-upload", "scan-review"]) {
+    for (const name of ["library-phone", "receipt-phone", "receipt-warranty", "receipt-actions", "scan-upload", "scan-review"]) {
       const size = pngSize(await readFile(`${out}/sources/${name}.png`));
       if (size.width !== 1170 || size.height !== 2532) {
         throw new Error(`${name}.png is ${size.width}x${size.height}; expected 1170x2532`);

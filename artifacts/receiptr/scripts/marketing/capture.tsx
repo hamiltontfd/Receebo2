@@ -40,7 +40,7 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <LanguageProvider><MarketProvider><GuestProvider><TooltipProvider><MotionConfig reducedMotion="always">
         <OnboardingProvider>
-        <div className="bg-violet-50 text-violet-950 text-center text-xs font-semibold py-2">
+        <div data-capture-disclosure className="bg-violet-50 text-violet-950 text-center text-xs font-semibold py-2">
           Sample data · fictional purchases · simulated extraction
         </div>
         <AppShell><Switch>
