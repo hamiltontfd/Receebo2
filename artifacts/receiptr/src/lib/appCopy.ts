@@ -398,6 +398,7 @@ export const APP_COPY: Record<string, readonly [string, string?]> = {
   "Protected value": ["Valor protegido"],
   "Nothing protected right now.": ["Nada protegido neste momento."],
   "Manufacturer warranty": ["Garantia do fabricante"],
+  "About this warranty": ["Sobre esta garantia", "Sobre esta garantia"],
   " · not counted": [" · não contabilizado"],
   "Expiring in": ["A terminar em", "Vencendo em"],
   "days": ["dias"],

@@ -1,4 +1,6 @@
-import { Clock, RotateCcw, Scale, Shield } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Clock, Info, RotateCcw, Scale, Shield } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { appText } from "@/lib/appCopy";
 import {
   deriveConsumerRights,
@@ -31,6 +33,77 @@ export type RightsReceipt = {
 function countryHeading(label: string | null, locale: string): string {
   if (locale !== "en" && label === "Brazil") return "Brasil";
   return label ?? "";
+}
+
+/**
+ * Legal paragraphs sit in one control: hover and keyboard focus open it,
+ * a tap toggles it, and Escape or a press outside closes it. The overlay
+ * stays inside the viewport and scrolls when the text is long.
+ */
+function WarrantyInfo({ lines }: { lines: string[] }) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<number | null>(null);
+  const pointerKind = useRef("");
+  const cancelClose = () => {
+    if (closeTimer.current != null) window.clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = window.setTimeout(() => setOpen(false), 140);
+  };
+  useEffect(() => cancelClose, []);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          data-testid="button-rights-info"
+          aria-label={appText("About this warranty")}
+          className="shrink-0 rounded-full p-0.5 opacity-80 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          onPointerDown={(event) => {
+            pointerKind.current = event.pointerType;
+          }}
+          onPointerEnter={(event) => {
+            if (event.pointerType !== "mouse") return;
+            cancelClose();
+            setOpen(true);
+          }}
+          onPointerLeave={(event) => {
+            if (event.pointerType === "mouse") scheduleClose();
+          }}
+          onFocus={() => {
+            // A tap focuses before it clicks. Leave that click to toggle.
+            if (pointerKind.current === "touch" || pointerKind.current === "pen") return;
+            setOpen(true);
+          }}
+          onClick={(event) => {
+            const pointer = event.nativeEvent instanceof PointerEvent
+              ? event.nativeEvent.pointerType
+              : pointerKind.current;
+            // Touch toggles. A mouse or keyboard click only stays open if hover
+            // or focus already opened it; otherwise the click itself opens it.
+            if (pointer !== "touch" && pointer !== "pen" && open) event.preventDefault();
+          }}
+        >
+          <Info className="w-3.5 h-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        data-testid="text-rights-info"
+        align="end"
+        side="top"
+        collisionPadding={12}
+        onPointerEnter={cancelClose}
+        onPointerLeave={scheduleClose}
+        className="w-[min(20rem,calc(100vw-1.5rem))] max-h-[min(16rem,var(--radix-popover-content-available-height))] overflow-y-auto p-3 text-left text-xs font-normal leading-5 text-popover-foreground"
+      >
+        <ul className="space-y-2">
+          {lines.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 /**
@@ -74,6 +147,14 @@ export function ConsumerRightsPanel({
   const suppressedUnknownNote = amazon && askChannel ? unknownChannelRetailerNote(locale, receipt.merchant) : null;
   const notes = suppressedUnknownNote ? rights.notes.filter((note) => note !== suppressedUnknownNote) : rights.notes;
   const provisional = !!rights.returnWindow && isProvisionalLegalEstimate(rights.returnWindow);
+  const tucked = [...(noDates ? [] : notes), rights.disclaimer].filter(
+    (line, index, all): line is string => !!line && all.indexOf(line) === index,
+  );
+  const infoAnchor = tucked.length === 0 ? null
+    : rights.manufacturerWarranty ? "manufacturer"
+    : rights.warranty ? "legal"
+    : rights.returnWindow ? "return"
+    : "heading";
   const urgencyClass = {
     green: "bg-emerald-50 border-emerald-200 text-emerald-700",
     amber: "bg-amber-50 border-amber-200 text-amber-700",
@@ -83,12 +164,13 @@ export function ConsumerRightsPanel({
 
   return (
     <div data-testid="panel-consumer-rights">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
         <Scale className="w-3.5 h-3.5" />
         {isUs
           ? usRightsCopy(locale).panelTitle
           : <>{appText("Consumer Rights")}{rights.countryLabel ? ` · ${countryHeading(rights.countryLabel, locale)}` : ""}</>}
-      </p>
+        {infoAnchor === "heading" && <WarrantyInfo lines={tucked} />}
+      </div>
       {!receipt.purchaseCountry && rights.hasAny && (
         <p className="mb-2 text-xs text-muted-foreground">
           {appText("Purchase country is unknown. This guidance may use the receipt currency or merchant as an estimate, not a confirmed country.")}
@@ -138,13 +220,16 @@ export function ConsumerRightsPanel({
           >
             <RotateCcw className="w-4 h-4 mt-0.5 shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight">
-                {provisional
-                  ? appText("Estimated return date: {0}", [rights.returnWindow.formattedDeadline])
-                  : rights.returnWindow.isExpired
-                    ? appText("Return window expired")
-                    : appText("Return by {0}", [rights.returnWindow.formattedDeadline])}
-              </p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold leading-tight">
+                  {provisional
+                    ? appText("Estimated return date: {0}", [rights.returnWindow.formattedDeadline])
+                    : rights.returnWindow.isExpired
+                      ? appText("Return window expired")
+                      : appText("Return by {0}", [rights.returnWindow.formattedDeadline])}
+                </p>
+                {infoAnchor === "return" && <WarrantyInfo lines={tucked} />}
+              </div>
               <p className="text-xs mt-0.5 opacity-80">
                 {provisional
                   ? appText("Provisional estimate from the purchase date. Not a confirmed legal deadline. Add the delivery date to start the legal period.")
@@ -166,11 +251,14 @@ export function ConsumerRightsPanel({
           <div className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${rights.warranty.isExpired ? "bg-muted border-border text-muted-foreground" : "bg-violet-50 border-violet-200 text-violet-700"}`}>
             <Clock className="w-4 h-4 mt-0.5 shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight" data-testid="text-legal-warranty">
-                {rights.warranty.isExpired
-                  ? appText("{0} (expired)", [rights.warranty.label])
-                  : rights.warranty.label}
-              </p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold leading-tight" data-testid="text-legal-warranty">
+                  {rights.warranty.isExpired
+                    ? appText("{0} (expired)", [rights.warranty.label])
+                    : rights.warranty.label}
+                </p>
+                {infoAnchor === "legal" && <WarrantyInfo lines={tucked} />}
+              </div>
               <p className="text-xs mt-0.5 opacity-80">
                 {rights.warranty.kind === "complaint_deadline"
                   ? rights.warranty.isExpired
@@ -191,7 +279,10 @@ export function ConsumerRightsPanel({
           >
             <Shield className="w-4 h-4 mt-0.5 shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight">{rights.manufacturerWarranty.label}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold leading-tight">{rights.manufacturerWarranty.label}</p>
+                {infoAnchor === "manufacturer" && <WarrantyInfo lines={tucked} />}
+              </div>
               <p className="text-xs mt-0.5 opacity-80">
                 {rights.manufacturerWarranty.isExpired
                   ? appText("Expired {0}", [rights.manufacturerWarranty.formattedExpiry])
@@ -210,13 +301,10 @@ export function ConsumerRightsPanel({
           </div>
         )}
 
-        {notes.length > 0 && (
+        {noDates && notes.length > 0 && (
           <ul className="space-y-1 px-1 text-xs leading-5 text-muted-foreground" data-testid="list-rights-notes">
             {notes.map((note) => <li key={note}>{note}</li>)}
           </ul>
-        )}
-        {rights.hasAny && (
-          <p className="px-1 text-[11px] leading-4 text-muted-foreground">{rights.disclaimer}</p>
         )}
       </div>
     </div>
