@@ -63,8 +63,11 @@ function formatIso(iso: string | null | undefined, locale: AppLocale): string {
 }
 
 function duration(contract: ShownContract): string | null {
-  if (contract.lengthMonths && contract.lengthMonths % 12 === 0) return appText("{0} years", [contract.lengthMonths / 12]);
-  if (contract.lengthMonths) return appText("{0} months", [contract.lengthMonths]);
+  if (contract.lengthMonths && contract.lengthMonths % 12 === 0) {
+    const years = contract.lengthMonths / 12;
+    return appText(years === 1 ? "{0} year" : "{0} years", [years]);
+  }
+  if (contract.lengthMonths) return appText(contract.lengthMonths === 1 ? "{0} month" : "{0} months", [contract.lengthMonths]);
   if (contract.lengthDays != null) return appText("{0} days", [contract.lengthDays]);
   return null;
 }
@@ -88,6 +91,20 @@ function returnTitle(contract: ShownContract, locale: AppLocale): string {
   if (contract.certainty === "estimated") return appText("Est. return by {0}", [date]);
   if (contract.status === "expired") return appText("Return window expired");
   return appText("Return by {0}", [date]);
+}
+
+function warrantyKindLabel(contract: ShownContract): string | null {
+  if (contract.status === "unknown" || contract.status === "not_applicable") return null;
+  if (contract.warrantyType === "legal") return appText("Legal");
+  if (contract.warrantyType === "manufacturer") return appText("Manufacturer");
+  if (contract.warrantyType === "commercial") return appText("Commercial warranty");
+  return null;
+}
+
+function warrantyLine(contract: ShownContract, locale: AppLocale): string {
+  const title = warrantyTitle(contract, locale);
+  const kind = warrantyKindLabel(contract);
+  return kind ? `${kind} · ${title}` : title;
 }
 
 function warrantyTitle(contract: ShownContract, locale: AppLocale): string {
@@ -229,7 +246,7 @@ export function ItemCoverageSections({
                         ? "text-[11px] leading-4 rounded-md bg-neutral-100 text-neutral-800 px-2 py-1"
                         : "text-[11px] leading-4 rounded-md bg-[#121212] text-white px-2 py-1"}
                     >
-                      {tag.kind === "return" ? returnTitle(tag, locale) : warrantyTitle(tag, locale)}
+                      {tag.kind === "return" ? returnTitle(tag, locale) : warrantyLine(tag, locale)}
                     </span>
                   ))}
                 </div>
@@ -275,12 +292,14 @@ export function ItemCoverageSections({
               id: `${line.lineId ?? line.name}-warranty-unknown`, kind: "warranty" as const, basis: "rule" as const,
               certainty: "unknown" as const, status: "unknown" as const,
             }];
-            return shown.map((contract) => (
-              <div key={contract.id} className="rounded-xl bg-[#121212] text-white px-4 py-3" data-testid="row-warranty">
+            return (
+              <div key={line.lineId ?? `${line.name}-${shown[0].id}`} className="rounded-xl bg-[#121212] text-white px-4 py-3" data-testid="row-warranty">
                 <p className="text-sm font-semibold">{line.name}</p>
-                <p className="text-sm">{warrantyTitle(contract, locale)}</p>
+                {shown.map((contract) => (
+                  <p key={contract.id} className="text-sm" data-testid="warranty-term">{warrantyLine(contract, locale)}</p>
+                ))}
               </div>
-            ));
+            );
           })}
         </div>
       </div>}
