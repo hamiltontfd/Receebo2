@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { deriveConsumerRights, isProvisionalLegalEstimate, merchantSuggestsOnline, returnWindowStartDate, showDeliveryDateField } from "./consumerRights";
 
 const local = (offsetDays: number) => {
@@ -205,15 +205,23 @@ describe("US accounts (region US)", () => {
   const today = local(0);
   const base = { region: "US", locale: "en" as const, currency: "USD", purchaseCountry: "US", category: "Electronics" };
   it("Best Buy in store: store window with countdown, no legal warranty, no [LEGAL REVIEW NEEDED]", () => {
-    const r = deriveConsumerRights({ ...base, merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: local(-5), warrantyText: "2-year manufacturer warranty" });
-    expect(r.returnWindow).toMatchObject({ daysLeft: 10, startsFrom: "purchase" });
-    expect(r.returnWindow?.source).toMatch(/^Best Buy: 15 days \(store policy, checked Oct 27, 2026\)$/);
-    expect(r.warranty).toBeNull();
-    expect(r.manufacturerWarranty).toMatchObject({ months: 24 });
-    expect(r.legalReviewPending).toBe(false);
-    expect(r.notes).toContain("Check your receipt or the store's policy.");
-    expect(JSON.stringify(r)).not.toMatch(/LEGAL REVIEW|legal warranty|Decree|Directive|Consumer Rights|14 days/i);
+    // Freeze clock before Best Buy holiday purchaseFrom 2026-10-30 so local(-5) stays outside the holiday window.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 20, 12, 0, 0)); // 2026-10-20
+    try {
+      const r = deriveConsumerRights({ ...base, merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: local(-5), warrantyText: "2-year manufacturer warranty" });
+      expect(r.returnWindow).toMatchObject({ daysLeft: 10, startsFrom: "purchase" });
+      expect(r.returnWindow?.source).toMatch(/^Best Buy: 15 days \(store policy, checked Oct 27, 2026\)$/);
+      expect(r.warranty).toBeNull();
+      expect(r.manufacturerWarranty).toMatchObject({ months: 24 });
+      expect(r.legalReviewPending).toBe(false);
+      expect(r.notes).toContain("Check your receipt or the store's policy.");
+      expect(JSON.stringify(r)).not.toMatch(/LEGAL REVIEW|legal warranty|Decree|Directive|Consumer Rights|14 days/i);
+    } finally {
+      vi.useRealTimers();
+    }
   });
+
   it("a EUR receipt in a US account still gets no legal warranty and no 14 days", () => {
     const r = deriveConsumerRights({ ...base, currency: "EUR", purchaseCountry: "PT", merchant: "Worten", isOnlinePurchase: true, purchaseDate: today });
     expect(r.warranty).toBeNull();
