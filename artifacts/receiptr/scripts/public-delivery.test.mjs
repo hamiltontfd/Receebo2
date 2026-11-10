@@ -102,9 +102,8 @@ test("HEAD and public media byte ranges remain supported", async () => {
   assert.equal((await fetch(url + "/logo.svg", { headers: { Range: "bytes=999999999-" } })).status, 416);
 });
 
-test("PWA precache includes each generated public page", async () => {
+test("PWA precache keeps offline.html and skips index.html", async () => {
   const worker = await readFile(new URL("../dist/public/sw.js", import.meta.url), "utf8");
-  for (const file of ["index.html", "privacy/index.html", "terms/index.html", "offline.html"]) {
-    assert.ok(worker.includes(`"url":"${file}"`), `${file} missing from worker`);
-  }
+  assert.equal(/"url":"[^"]*index\.html"/.test(worker), false);
+  assert.ok(worker.includes('"url":"offline.html"'), "offline.html missing from worker");
 });

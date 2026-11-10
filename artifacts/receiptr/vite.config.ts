@@ -81,6 +81,10 @@ export default defineConfig({
       },
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // These HTML shells 404 at their file URL (the site serves /, /privacy,
+        // /terms and app routes instead). Precaching them makes Workbox abort
+        // install. offline.html stays in the pattern and is served as a file.
+        globIgnores: ["**/index.html", "app.html", "404.html"],
       },
       devOptions: {
         enabled: true,

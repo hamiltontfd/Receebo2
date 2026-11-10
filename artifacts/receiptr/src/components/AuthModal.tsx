@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import { ClerkLoaded, ClerkLoading } from "@clerk/react";
 import { useLocation } from "wouter";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   Dialog, DialogClose, DialogContent, DialogTitle,
 } from "@/components/ui/dialog";
@@ -31,7 +32,13 @@ export default function AuthModal({ title, children }: { title: string; children
               Back to homepage
             </button>
           </DialogClose>
-          {children}
+          <ClerkLoading>
+            <div role="status" className="flex min-h-40 items-center justify-center" data-testid="auth-loading">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+              <span className="sr-only">Loading</span>
+            </div>
+          </ClerkLoading>
+          <ClerkLoaded>{children}</ClerkLoaded>
         </DialogContent>
       </Dialog>
     </>

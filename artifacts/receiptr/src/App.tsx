@@ -56,6 +56,13 @@ const clerkPubKey = publishableKeyFromHost(
 );
 
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+/**
+ * @clerk/react 6.7.3 no longer accepts the public clerkJSVersion prop. The
+ * loader reads __internal_clerkJSVersion and otherwise requests
+ * /npm/@clerk/clerk-js@6/..., which 307s to this exact build (checked
+ * 10 Nov 2026). Pinning it skips that redirect.
+ */
+const CLERK_JS_VERSION = "6.42.3";
 
 function stripBase(path: string): string {
   return basePath && path.startsWith(basePath)
@@ -356,6 +363,7 @@ function ClerkProviderWithRoutes() {
     <ClerkProvider
       publishableKey={clerkPubKey}
       proxyUrl={clerkProxyUrl}
+      {...{ __internal_clerkJSVersion: CLERK_JS_VERSION }}
       appearance={clerkAppearance}
       localization={clerkLocalization}
       signInUrl={`${basePath}/sign-in`}

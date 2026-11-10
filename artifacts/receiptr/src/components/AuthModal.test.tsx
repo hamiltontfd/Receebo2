@@ -1,15 +1,20 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
+const { navigate, clerk } = vi.hoisted(() => ({ navigate: vi.fn(), clerk: { loaded: true } }));
 vi.mock("wouter", () => ({ useLocation: () => ["/sign-up", navigate] }));
 vi.mock("@/pages/landing", () => ({ default: () => <h1>Receebo homepage</h1> }));
+vi.mock("@clerk/react", () => ({
+  ClerkLoading: ({ children }: { children?: unknown }) => clerk.loaded ? null : children,
+  ClerkLoaded: ({ children }: { children?: unknown }) => clerk.loaded ? children : null,
+}));
 
 import AuthModal from "./AuthModal";
 
 beforeEach(() => {
   navigate.mockClear();
   sessionStorage.clear();
+  clerk.loaded = true;
 });
 
 describe("AuthModal", () => {
@@ -27,6 +32,13 @@ describe("AuthModal", () => {
     fireEvent.click(screen.getByRole("button", { name }));
     expect(navigate).toHaveBeenCalledWith("/", { replace: true });
     expect(sessionStorage.getItem("receebo:pendingPlan")).toBeNull();
+  });
+
+  it("shows a spinner instead of an empty dialog while Clerk is loading", () => {
+    clerk.loaded = false;
+    render(<AuthModal title="Sign in to Receebo"><input aria-label="Email" /></AuthModal>);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading");
+    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
   });
 
   it("allows Escape to dismiss the dialog", () => {
