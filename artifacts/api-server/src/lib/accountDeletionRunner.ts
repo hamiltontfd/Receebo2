@@ -232,6 +232,7 @@ export async function performAccountDeletion(
         sql`DELETE FROM account_deletion_codes WHERE user_id = ${userId}`,
         sql`DELETE FROM account_lifecycle WHERE user_id = ${userId}`,
         sql`DELETE FROM recurring_suppliers WHERE user_id = ${userId}`,
+        sql`DELETE FROM ad_attributions WHERE user_id = ${userId}`,
       ]) {
         try { await db.execute(statement); } catch (err) { logger.warn({ err, userId }, "Account deletion: auxiliary cleanup skipped"); }
       }

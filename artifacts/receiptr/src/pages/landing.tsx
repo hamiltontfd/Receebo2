@@ -11,6 +11,8 @@ import { useAppLocale } from "@/lib/locale";
 import { useCreateCheckout } from "@/hooks/useBilling";
 import type { ReactNode } from "react";
 import { sendLandingEvent } from "@/lib/landingBeacon";
+import { OPEN_COOKIE_SETTINGS } from "@/components/CookieConsent";
+import { cookieText } from "@/lib/cookieCopy";
 import { useLandingCta } from "./landing/useLandingCta";
 import UsReturnsSection from "./landing/UsReturnsSection";
 
@@ -152,6 +154,28 @@ export function LandingContent({ variant, isSignedIn = false, checkout, marketSe
                 >
                   {lt("Privacy", "Privacidade")}
                 </Link>
+                <Link
+                  href={us ? "/cookies?region=us" : "/cookies"}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {cookieText("cookiePolicy", us ? "en" : undefined)}
+                </Link>
+                <button
+                  type="button"
+                  className="text-left text-muted-foreground hover:text-foreground"
+                  onClick={() => window.dispatchEvent(new Event(OPEN_COOKIE_SETTINGS))}
+                >
+                  {cookieText("cookieSettings", us ? "en" : undefined)}
+                </button>
+                {us && (
+                  <button
+                    type="button"
+                    className="text-left text-muted-foreground hover:text-foreground"
+                    onClick={() => window.dispatchEvent(new Event(OPEN_COOKIE_SETTINGS))}
+                  >
+                    {cookieText("doNotSell", "en")}
+                  </button>
+                )}
                 <Link
                   href="/terms"
                   className="text-muted-foreground hover:text-foreground transition-colors"

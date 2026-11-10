@@ -1,4 +1,6 @@
 import { LegalPageLayout } from "@/components/LegalPageLayout";
+import { LegalDraftNotice } from "@/components/LegalDraftNotice";
+import { Link } from "wouter";
 
 export default function PrivacyPolicy() {
   return (
@@ -77,8 +79,21 @@ export default function PrivacyPolicy() {
           <strong>Landing page counts:</strong> when our public pages load or
           you tap a sign-up button there, we add one to a daily total for that
           page and, if the link came from one of our ads, its ad label
-          (utm_content). No cookie or identifier is set and nothing that
-          identifies you is kept.
+          (utm_content). No cookie or identifier is set for that count.
+        </li>
+        <li>
+          {/* DRAFT pending legal review */}
+          <strong>Ad attribution and measurement:</strong> if the address that
+          opened Receebo includes campaign parameters (utm_source, utm_medium,
+          utm_campaign, utm_content, utm_term) or a Meta click id (fbclid), and
+          your cookie choice allows attribution, Receebo stores that first link
+          on this browser for 90 days and, when you create an account, saves it
+          with the account so we can tell which campaign started the trial.
+          If your choice also allows marketing, Receebo uses the Meta Pixel in
+          the browser and the Meta Conversions API on our server for page views,
+          completed registration and subscription, sharing an event id so the
+          same action is not counted twice. See the{" "}
+          <Link href="/cookies">Cookie Policy</Link>.
         </li>
       </ul>
 
@@ -143,6 +158,12 @@ export default function PrivacyPolicy() {
           classification, OCR, and structured data extraction.
         </li>
         <li><strong>Stripe:</strong> checkout, trials, subscriptions, invoices, and payments.</li>
+        <li>
+          {/* DRAFT pending legal review */}
+          <strong>Meta:</strong> when marketing measurement is allowed, page
+          views, new accounts and subscriptions may be sent to Meta through the
+          Pixel and the Conversions API.
+        </li>
         <li>
           <strong>Microsoft:</strong> optional Microsoft account sign-in (OAuth)
           and read-only receipt retrieval through Microsoft Graph when you
@@ -302,13 +323,17 @@ export default function PrivacyPolicy() {
       </p>
 
       <h2>10. Cookies and local storage</h2>
+      {/* DRAFT pending legal review */}
+      <LegalDraftNotice />
       <p>
-        Receebo uses essential authentication/session technologies and browser
-        storage needed for login, security, plan selection, the installable web
-        app, and temporary onboarding continuity. Receebo currently does not use
-        advertising cookies or enable non-essential analytics cookies. If that
-        changes, Receebo will update this policy and request consent before
-        activating non-essential technologies where required.
+        Receebo uses essential authentication and payment technologies (Clerk
+        and Stripe), preference storage, optional ad-attribution storage, and,
+        only when your choice allows marketing, the Meta Pixel and a matching
+        server event. In the EU and UK, non-essential storage stays off until
+        you accept it. On US pages you can refuse sale or sharing, and a Global
+        Privacy Control signal is treated as that refusal until you explicitly
+        accept marketing. The details, durations and how to change your choice
+        are in the <Link href="/cookies">Cookie Policy</Link>.
       </p>
 
       <h2>11. Changes and contact</h2>

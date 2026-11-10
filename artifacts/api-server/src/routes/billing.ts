@@ -171,7 +171,8 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
     });
     return;
   }
-  const { planType } = req.body as { planType?: string };
+  const { planType, metaEventId: rawEventId } = req.body as { planType?: string; metaEventId?: unknown };
+  const metaEventId = typeof rawEventId === "string" && /^[A-Za-z0-9_-]{8,80}$/.test(rawEventId) ? rawEventId : undefined;
   if (!planType || !["monthly", "yearly"].includes(planType)) {
     res.status(400).json({ error: "planType must be 'monthly' or 'yearly'" });
     return;
@@ -296,11 +297,18 @@ router.post("/billing/create-checkout-session", requireAuth, requireCurrentLegal
       mode: "subscription",
       ...(fixedCurrency ? { currency: wantCurrency.toLowerCase(), adaptive_pricing: { enabled: false } } : {}),
       subscription_data: { metadata: { userId, offer: "founding_customer" } },
+      metadata: { userId, ...(metaEventId ? { meta_event_id: metaEventId } : {}) },
       success_url: `${base}/search?checkout=success`,
       cancel_url: `${base}/search?checkout=cancel${attemptId ? `&attempt=${attemptId}` : ""}`,
     });
 
-    res.json({ url: session.url });
+    const currency = wantCurrency;
+    const unit = price.currency_options?.[currency.toLowerCase()]?.unit_amount
+      ?? (price.currency?.toLowerCase() === currency.toLowerCase() ? price.unit_amount : null);
+    res.json({
+      url: session.url,
+      ...(metaEventId ? { meta: { eventId: metaEventId, currency, value: typeof unit === "number" ? unit / 100 : null } } : {}),
+    });
   } catch (err) {
     logger.error({ err }, "billing: create-checkout-session failed");
     res.status(500).json({ error: "Failed to create checkout session" });

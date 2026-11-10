@@ -1,10 +1,9 @@
 import { appText } from "@/lib/appCopy";
-import { useEffect } from "react";
+import { useContext, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/react";
 import {
   getSubscriptionStatus,
-  createCheckoutSession,
   createPortalSession,
   customFetch,
   ApiError,
@@ -12,6 +11,10 @@ import {
 } from "@workspace/api-client-react";
 import { toast } from "@/hooks/use-toast";
 import { recordCheckoutCancellation } from "@/lib/trialFunnel";
+import { rememberPurchaseEvent } from "@/components/AdsRuntime";
+import { CONSENT_STORAGE_KEY, consentRegion, effectiveConsent, parseConsent } from "@/lib/adConsent";
+import { metaPixelId, newEventId } from "@/lib/metaPixel";
+import { MarketContext } from "@/components/MarketProvider";
 import {
   TRIAL_RECEIPT_LIMIT, TRIAL_LENGTH_DAYS, TRIAL_CAP_MESSAGE, TRIAL_EXPIRED_MESSAGE, TRIAL_AI_READS_MESSAGE,
 } from "@/lib/trialCopy";
@@ -205,8 +208,27 @@ export function useRefreshBilling() {
 
 /** Explicit, user-initiated paid checkout. Charged immediately (no Stripe trial). */
 export function useCreateCheckout() {
+  const market = useContext(MarketContext);
   return useMutation({
-    mutationFn: (planType: "monthly" | "yearly") => createCheckoutSession(base, planType),
+    mutationFn: (planType: "monthly" | "yearly") => {
+      let stored = null;
+      try { stored = parseConsent(localStorage.getItem(CONSENT_STORAGE_KEY)); } catch { /* private mode */ }
+      const gpc = typeof navigator !== "undefined" && (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
+      const region = consentRegion(window.location.pathname, market?.confirmed ? market.market : window.location.pathname.startsWith("/us") ? "US" : null);
+      const eventId = effectiveConsent(stored, region, gpc).marketing && metaPixelId() ? newEventId() : undefined;
+      // The committed checkout client only types `{ url }`. The server still
+      // accepts metaEventId and may return the purchase handoff beside it.
+      return customFetch<{ url: string; meta?: { eventId: string; currency: string; value: number | null } }>(
+        `${base}api/billing/create-checkout-session`,
+        {
+          method: "POST",
+          body: JSON.stringify({ planType, ...(eventId ? { metaEventId: eventId } : {}) }),
+        },
+      ).then((result) => {
+        if (result.meta) rememberPurchaseEvent(result.meta);
+        return result;
+      });
+    },
     onSuccess: ({ url }) => {
       if (url) window.location.href = url;
     },

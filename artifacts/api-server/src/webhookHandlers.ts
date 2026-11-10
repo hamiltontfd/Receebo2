@@ -5,6 +5,8 @@ import { logger } from "./lib/logger";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { sendTrialEndingEmail } from "./lib/emailService";
 import { confirmPaidFunnel, safeFunnel } from "./lib/trialFunnel";
+import { sendMetaEvent } from "./lib/metaCapi";
+import { marketingConsentFor } from "./lib/adAttributionStore";
 import { notifyPaymentFailure } from "./lib/paymentAttention";
 import { amountForCurrency, type BillingCurrency } from "./lib/billingConfig";
 
@@ -52,6 +54,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
   if (!customerId) return;
   await upsertUserBilling(customerId, subscriptionId ?? null);
   logger.info({ customerId, subscriptionId }, "webhookHandlers: checkout completed — Pro access granted");
+  const eventId = session.metadata?.meta_event_id;
+  const userId = session.metadata?.userId;
+  if (!eventId || !userId) return;
+  try {
+    if (!(await marketingConsentFor(userId))) return;
+    const value = typeof session.amount_total === "number" ? session.amount_total / 100 : null;
+    const currency = session.currency ? session.currency.toUpperCase() : null;
+    const shared = { eventId, userId, value, currency, eventSourceUrl: session.success_url ?? null };
+    await sendMetaEvent({ ...shared, eventName: "Purchase" });
+    await sendMetaEvent({ ...shared, eventName: "Subscribe" });
+  } catch (err) {
+    logger.warn({ err }, "webhookHandlers: conversions api purchase was not sent");
+  }
 }
 
 /**

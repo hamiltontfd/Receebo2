@@ -27,10 +27,14 @@ import RecurringSuppliersPage from "@/pages/recurring-suppliers";
 import GetStarted from "@/pages/get-started";
 import PrivacyPolicy from "@/pages/privacy";
 import TermsOfService from "@/pages/terms";
+import CookiePolicy from "@/pages/cookies";
+import { CookieConsent } from "@/components/CookieConsent";
+import { AdsRuntime } from "@/components/AdsRuntime";
+import { consentRegion } from "@/lib/adConsent";
 import AppShell from "@/components/AppShell";
 import AuthModal from "@/components/AuthModal";
 import PwaStatus from "@/components/PwaStatus";
-import { MarketProvider } from "@/components/MarketProvider";
+import { MarketProvider, useMarket } from "@/components/MarketProvider";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import InstallBar from "@/components/InstallBar";
 import { PlanSelectionGate } from "@/components/PlanSelectionGate";
@@ -375,6 +379,7 @@ function ClerkProviderWithRoutes() {
             <Route path="/us"><Landing variant="us" /></Route>
             <Route path="/privacy" component={PrivacyPolicy} />
             <Route path="/terms" component={TermsOfService} />
+            <Route path="/cookies" component={CookiePolicy} />
             <Route path="/search/worth-keeping">
               <ProtectedShell><WorthKeepingPage /></ProtectedShell>
             </Route>
@@ -407,12 +412,23 @@ function ClerkProviderWithRoutes() {
           </Switch>
           </OnboardingProvider>
           <Toaster />
+          <CookieAndAds />
         </TooltipProvider>
         </MarketProvider>
         </LanguageProvider>
       </QueryClientProvider>
     </ClerkProvider>
   );
+}
+
+function CookieAndAds() {
+  const [path] = useLocation();
+  const market = useMarket();
+  const region = consentRegion(path, market.confirmed ? market.market : path.startsWith("/us") ? "US" : null);
+  return <>
+    <CookieConsent region={region} />
+    <AdsRuntime />
+  </>;
 }
 
 function RouteMetadata() {

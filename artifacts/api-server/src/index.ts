@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { billingOrigin } from "./lib/billingUrls";
 import { migrateTrialFunnel } from "./lib/trialFunnelMigration";
 import { migrateAccountMarket } from "./lib/marketMigration";
+import { migrateAdAttribution } from "./lib/adAttributionStore";
 import { migrateLifecycleEmails } from "./lib/lifecycleEmailStore";
 import { migrateLandingEventCounts } from "./lib/landingEvents";
 import { migrateMarketInterestCounts } from "./lib/marketInterest";
@@ -453,6 +454,7 @@ async function start(): Promise<void> {
   await runStartupMigrations();
   await migrateTrialFunnel();
   await migrateAccountMarket();
+  await migrateAdAttribution();
   await migrateMarketInterestCounts();
   await migrateLandingEventCounts();
   await migrateLifecycleEmails();

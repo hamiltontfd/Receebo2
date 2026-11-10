@@ -13,6 +13,10 @@ export const publicPages = {
     title: "Terms of Service — Receebo",
     description: "The terms that apply when using Receebo's receipt-management service.",
   },
+  "/cookies": {
+    title: "Cookie Policy — Receebo",
+    description: "Cookies and similar technologies used by Receebo, and how to change your choice.",
+  },
 } as const;
 
 export function pageMetadata(path: string, origin: string) {

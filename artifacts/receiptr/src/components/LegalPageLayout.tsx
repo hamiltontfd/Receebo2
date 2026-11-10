@@ -1,4 +1,5 @@
 import DisputeResolutionLine from "@/components/DisputeResolutionLine";
+import { OPEN_COOKIE_SETTINGS } from "@/components/CookieConsent";
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
@@ -58,6 +59,12 @@ export function LegalPageLayout({
             <Link href="/privacy" className="hover:text-foreground">
               Privacy Policy
             </Link>
+            <Link href="/cookies" className="hover:text-foreground">
+              Cookie Policy
+            </Link>
+            <button type="button" className="hover:text-foreground" onClick={() => window.dispatchEvent(new Event(OPEN_COOKIE_SETTINGS))}>
+              Cookie settings
+            </button>
             <Link href="/terms" className="hover:text-foreground">
               Terms of Service
             </Link>

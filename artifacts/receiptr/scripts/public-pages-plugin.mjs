@@ -44,7 +44,7 @@ export function publicPagesPlugin(root, base, origin) {
         // Keep a separate, non-indexable shell for valid client-only routes.
         this.emitFile({ type: "asset", fileName: "app.html", source: document("/app", false) });
         shell.source = document("/");
-        for (const route of ["/privacy", "/terms"]) {
+        for (const route of ["/privacy", "/terms", "/cookies"]) {
           this.emitFile({ type: "asset", fileName: `${route.slice(1)}/index.html`, source: document(route) });
         }
         this.emitFile({ type: "asset", fileName: "404.html", source: document("/404") });
