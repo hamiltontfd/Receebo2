@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CATEGORIES, categoryIcon, categoryStyle } from "@/lib/categories";
-import { BILLING_QUERY_KEY, isAtTrialCap, type BillingStatus } from "@/hooks/useBilling";
+import { BILLING_QUERY_KEY, fetchBillingStatus, isAtTrialCap, type BillingStatus } from "@/hooks/useBilling";
 import { usePendingImportActions } from "@/hooks/usePendingImportActions";
 import { MAIL_PROVIDER_LABELS } from "@/lib/mailConnection";
 import { deriveConsumerRights } from "@/lib/consumerRights";
@@ -268,7 +268,7 @@ export function PendingImportSheet({ importId, open, onClose }: PendingImportShe
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { approve, dismiss, alwaysImport, busy } = usePendingImportActions();
-  const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, enabled: false });
+  const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, queryFn: fetchBillingStatus, enabled: false });
   const atCap = isAtTrialCap(billing);
 
   const { data: detail, isLoading, isError } = useQuery({

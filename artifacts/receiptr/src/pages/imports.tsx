@@ -19,7 +19,7 @@ import { useMailStatus } from "@/components/MailConnections";
 import { useToast } from "@/hooks/use-toast";
 import { usePendingImportActions } from "@/hooks/usePendingImportActions";
 import {
-  BILLING_QUERY_KEY, isAtTrialCap, resolveAccessState, type BillingStatus,
+  BILLING_QUERY_KEY, fetchBillingStatus, isAtTrialCap, resolveAccessState, type BillingStatus,
 } from "@/hooks/useBilling";
 import { categoryIcon, categoryStyle } from "@/lib/categories";
 import { syncMail } from "@/lib/mailConnection";
@@ -130,7 +130,7 @@ export default function ImportsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data, isLoading, isError, refetch } = usePendingImports();
-  const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, enabled: false });
+  const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, queryFn: fetchBillingStatus, enabled: false });
   const { data: mailStatus } = useMailStatus();
   const { approve, dismiss, bulkApprove, bulkDismiss, busy } = usePendingImportActions();
 

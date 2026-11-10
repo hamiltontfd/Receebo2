@@ -143,6 +143,10 @@ function isCheckoutSuccess() {
   return new URLSearchParams(window.location.search).get("checkout") === "success";
 }
 
+export function fetchBillingStatus(): Promise<BillingStatus> {
+  return getSubscriptionStatus(base) as Promise<BillingStatus>;
+}
+
 export function useBillingStatus() {
   const { isSignedIn } = useAuth();
   const afterCheckout = isCheckoutSuccess();
@@ -152,7 +156,7 @@ export function useBillingStatus() {
 
   return useQuery<BillingStatus>({
     queryKey: BILLING_QUERY_KEY,
-    queryFn: () => getSubscriptionStatus(base) as Promise<BillingStatus>,
+    queryFn: fetchBillingStatus,
     enabled: !!isSignedIn,
     staleTime: 0,
     // Poll so uploads/payments made on another device show up here. After

@@ -7,7 +7,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useMailStatus } from "@/components/MailConnections";
 import { PendingImportSheet } from "@/components/PendingImportSheet";
-import { BILLING_QUERY_KEY, isAtTrialCap, type BillingStatus } from "@/hooks/useBilling";
+import { BILLING_QUERY_KEY, fetchBillingStatus, isAtTrialCap, type BillingStatus } from "@/hooks/useBilling";
 import { usePendingImportActions } from "@/hooks/usePendingImportActions";
 import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON, SUBSCRIBE_HREF } from "@/lib/trialCopy";
 import { categoryIcon, categoryStyle } from "@/lib/categories";
@@ -142,7 +142,7 @@ export function PendingImportCard({
 export default function PendingImports() {
   useAppLocale();
   // Read the billing status from the shared cache (fetched by the app shell).
-  const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, enabled: false });
+  const { data: billing } = useQuery<BillingStatus>({ queryKey: BILLING_QUERY_KEY, queryFn: fetchBillingStatus, enabled: false });
   const atCap = isAtTrialCap(billing);
   const { data, isLoading } = usePendingImports();
   const { approve, dismiss, alwaysImport, busy } = usePendingImportActions();
