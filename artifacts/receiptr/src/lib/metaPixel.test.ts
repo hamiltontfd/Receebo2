@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadMetaPixel, metaPixelId, newEventId, trackMetaEvent } from "./metaPixel";
 
 afterEach(() => {
   document.getElementById("meta-pixel")?.remove();
   delete window.fbq;
   delete window._fbq;
+  vi.unstubAllEnvs();
 });
 
 describe("meta pixel", () => {
   it("does nothing when the pixel id is unset or marketing is not allowed", () => {
+    vi.stubEnv("VITE_META_PIXEL_ID", "");
     expect(metaPixelId("")).toBe("");
     expect(metaPixelId(undefined)).toBe("");
     expect(trackMetaEvent({ name: "PageView", eventId: "evt-1" }, true, "")).toBe(false);

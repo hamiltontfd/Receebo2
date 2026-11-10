@@ -21,8 +21,9 @@ declare global {
   }
 }
 
-export function metaPixelId(env: string | undefined = import.meta.env.VITE_META_PIXEL_ID): string {
-  return typeof env === "string" ? env.trim() : "";
+export function metaPixelId(env?: string): string {
+  const value = env ?? import.meta.env.VITE_META_PIXEL_ID;
+  return typeof value === "string" ? value.trim() : "";
 }
 
 export function newEventId(): string {
