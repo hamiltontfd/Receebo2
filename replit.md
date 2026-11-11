@@ -4,6 +4,26 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Run & Operate
 
+### Mandatory pre-publish login gate
+
+Before **every production publish**, run `pnpm run test:login-gate` against the
+current Replit DEV preview candidate. A failure blocks publishing; rerun after
+any candidate changes. This is a manual pre-publish requirement, not a scheduler
+or an automatic hook into Replit's Publish button.
+
+The command first runs only the Clerk proxy unit tests with an isolated Vitest
+config (no database setup), then signed-out desktop/mobile browser checks.
+It must not target production. The origin defaults to `https://$REPLIT_DEV_DOMAIN`;
+`LOGIN_GATE_ORIGIN` can override it for the DEV preview. Do not set
+`LOGIN_GATE_ALLOW_PROD=1` during release checks (it is an explicit safety override).
+DEV currently uses Clerk directly; the production-only proxy is covered by the
+isolated unit tests, not by the DEV browser run. No real login is submitted.
+Screenshots are saved under `generated-artifacts/login-gate`.
+`LOGIN_GATE_FAIL_DEMO=1 pnpm run test:login-gate` must fail against a temporary
+local broken-login page; alternatively run
+`pnpm --filter @workspace/receiptr run test:login-gate --fail-demo`.
+Use `CHROMIUM_PATH` or `PWA_CHROMIUM_PATH` if Chromium is not auto-detected.
+
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages

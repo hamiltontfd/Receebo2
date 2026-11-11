@@ -41,6 +41,27 @@ Never point development or staging at a personal mailbox or live Stripe customer
 
 ## 3. Pre-deploy checks
 
+**Mandatory login gate, immediately before every publish:** run
+`pnpm run test:login-gate` against the exact DEV workspace candidate about to be
+published. **If it fails, do not publish.** Rerun after changing the candidate.
+This is a manual release requirement, not a periodic check or a platform Publish
+button hook. Never target production for this gate.
+
+The default target is `https://$REPLIT_DEV_DOMAIN`; override only for a DEV preview
+with `LOGIN_GATE_ORIGIN=https://<dev-preview> pnpm run test:login-gate`.
+The gate first runs `clerkProxyMiddleware.test.ts` with
+`vitest.clerk-proxy.config.ts` (no globalSetup or database writes), then tests
+signed-out desktop/mobile login rendering. Do **not** substitute `test:api`, whose
+globalSetup writes to DEV. DEV currently talks directly to Clerk because its
+proxy URL is unset and the API proxy is production-only; the production proxy
+path is covered by isolated unit tests rather than the DEV browser request path.
+Screenshots: `generated-artifacts/login-gate`.
+
+Validate the failure guard with `LOGIN_GATE_FAIL_DEMO=1 pnpm run test:login-gate`
+(or `pnpm --filter @workspace/receiptr run test:login-gate --fail-demo`): this must
+exit non-zero using a temporary local loading/502 fixture, not the real app.
+Browser executable overrides: `CHROMIUM_PATH` / `PWA_CHROMIUM_PATH`.
+
 Run:
 
 ```sh
