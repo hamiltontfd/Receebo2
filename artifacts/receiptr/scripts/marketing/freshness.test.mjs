@@ -196,6 +196,7 @@ test("localized locators use real save/search labels and testid for the original
     getByRole: (role, options) => { calls.push(["role", role, options]); return locator; },
     getByPlaceholder: (value, options) => { calls.push(["placeholder", value, options]); return locator; },
     getByTestId: value => { calls.push(["testid", value]); return locator; },
+    locator: value => { calls.push(["css", value]); return locator; },
   };
   for (const language of ["en", "pt-PT", "pt-BR"]) {
     calls.length = 0;
@@ -203,7 +204,17 @@ test("localized locators use real save/search labels and testid for the original
     assert.deepEqual(calls[0], ["role", "button", { name: captureLabels[language].save, exact: true }]);
     assert.deepEqual(calls[1], ["placeholder", captureLabels[language].search, { exact: true }]);
     assert.deepEqual(calls[2], ["testid", "button-view-original"]);
+    assert.deepEqual(calls[3], ["css", `[aria-label=${JSON.stringify(captureLabels[language].dismissOriginal)}]`]);
+    assert.deepEqual(calls[4], ["locator", "img"]);
+    assert.equal(calls.filter(call => call[0] === "role").length, 1, "Only Save uses role, never the fullscreen overlay");
   }
+});
+
+test("show-to-store wait uses the standard failure dump before decoding", async () => {
+  const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
+  assert.match(record, /await requireVisible\(phone\.page, phoneUi\.originalImage, "show-to-store image", phone\.unexpected\);\s*await phoneUi\.originalImage\.evaluate\(img => img\.decode\(\)\)/);
+  assert.match(record, /sources\/failure\.png/);
+  assert.match(record, /sources\/failure\.json/);
 });
 
 test("every market has the same six hero scenes and shared capture dimensions", async () => {

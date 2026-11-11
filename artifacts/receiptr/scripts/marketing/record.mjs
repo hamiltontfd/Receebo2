@@ -231,7 +231,7 @@ try {
   const phoneUi = captureLocators(phone.page, capture.language);
   await phoneUi.original.scrollIntoViewIfNeeded();
   await phoneUi.original.click();
-  await phoneUi.originalImage.waitFor();
+  await requireVisible(phone.page, phoneUi.originalImage, "show-to-store image", phone.unexpected);
   await phoneUi.originalImage.evaluate(img => img.decode());
   await phone.page.waitForTimeout(600);
   await still(phone.page, "show-to-store");

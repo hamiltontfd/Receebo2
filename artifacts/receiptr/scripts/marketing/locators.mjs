@@ -24,6 +24,8 @@ export function captureLocators(page, language) {
     save: page.getByRole("button", { name: labels.save, exact: true }),
     search: page.getByPlaceholder(labels.search, { exact: true }),
     original: page.getByTestId("button-view-original"),
-    originalImage: page.getByRole("button", { name: labels.dismissOriginal, exact: true }).locator("img"),
+    // StoreFullscreen has a nested Close button. Locate its overlay directly
+    // instead of relying on the accessibility role tree for that nested markup.
+    originalImage: page.locator(`[aria-label=${JSON.stringify(labels.dismissOriginal)}]`).locator("img"),
   };
 }
