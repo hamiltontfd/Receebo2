@@ -13,7 +13,7 @@ function capturePreview() {
   return {
     name: "receebo-capture-preview",
     transformIndexHtml(html: string) {
-      return html.replace(
+      return html.replace('lang="en"', `lang="${capture.language}"`).replace(
         "<head>",
         `<head><meta name="receebo-capture-at" content="${capture.capturedAt}"><meta name="color-scheme" content="light">`,
       );
@@ -30,7 +30,7 @@ function capturePreview() {
         if (!url.startsWith("/api/")) return next();
         const action = session.answer(req.method ?? "GET", `http://127.0.0.1:5199${url}`);
         if (action.fulfill?.sample) {
-          if (!samplePdf) { res.statusCode = 404; res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ error: "EU sample image is written by record.mjs" })); return; }
+          if (!samplePdf || action.fulfill.contentType !== "application/pdf") { res.statusCode = 404; res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ error: "Sample image is written and intercepted by record.mjs" })); return; }
           res.setHeader("Content-Type", action.fulfill.contentType);
           res.end(samplePdf);
           return;

@@ -1,28 +1,63 @@
 // The pictured sample and the fixture lines are the same words.
 // This is not a retailer logo and not a policy document.
 
-export function moneyLabel(receipt, amount) {
-  const formatted = Number(amount).toFixed(2);
-  return receipt.currency === "USD" ? `$${formatted}` : `€${formatted}`;
+const documentCopy = {
+  en: {
+    locale: "en-US", sample: "FICTIONAL SAMPLE · NOT VALID FOR PURCHASE",
+    online: "Online purchase", store: "In-store purchase", country: "Purchase country",
+    missingCountry: "Purchase country not stated", delivery: "Delivered",
+    note: "Illustrative sample for Receebo. Not a store policy.",
+  },
+  "pt-PT": {
+    locale: "pt-PT", sample: "EXEMPLO FICTÍCIO · NÃO É UM COMPROVATIVO DE COMPRA",
+    online: "Compra online", store: "Compra em loja", country: "País da compra",
+    missingCountry: "País da compra não indicado", delivery: "Entregue em",
+    note: "Exemplo fictício para o Receebo. Não é uma política de loja.",
+  },
+  "pt-BR": {
+    locale: "pt-BR", sample: "EXEMPLO FICTÍCIO · NÃO É UM COMPROVANTE DE COMPRA",
+    online: "Compra online", store: "Compra em loja", country: "País da compra",
+    missingCountry: "País da compra não informado", delivery: "Entregue em",
+    note: "Exemplo fictício para o Receebo. Não é uma política de loja.",
+  },
+};
+
+export function receiptLanguage(receipt) {
+  return receipt.currency === "BRL" ? "pt-BR" : receipt.currency === "USD" ? "en" : "pt-PT";
 }
 
-export function sampleDocumentLines(receipt) {
+export function moneyLabel(receipt, amount, language = receiptLanguage(receipt)) {
+  return new Intl.NumberFormat(documentCopy[language].locale, {
+    style: "currency", currency: receipt.currency,
+  }).format(amount);
+}
+
+export function sampleDocumentLines(receipt, language = receiptLanguage(receipt)) {
+  const copy = documentCopy[language];
+  if (!copy) throw new Error("Unsupported sample document language");
   const lines = [
-    "FICTIONAL SAMPLE · NOT VALID FOR PURCHASE",
+    copy.sample,
     receipt.merchant,
-    receipt.isOnlinePurchase ? "Online purchase" : "In-store purchase",
-    receipt.purchaseCountry ? `Purchase country ${receipt.purchaseCountry}` : "Purchase country not stated",
+    receipt.isOnlinePurchase ? copy.online : copy.store,
+    receipt.purchaseCountry ? `${copy.country} ${receipt.purchaseCountry}` : copy.missingCountry,
     receipt.purchaseDate,
   ];
+  if (receipt.deliveryDate) lines.push(`${copy.delivery} ${receipt.deliveryDate}`);
   for (const product of receipt.products) {
-    lines.push(`${product.name}    ${product.quantity ?? 1} x ${moneyLabel(receipt, product.price)}`);
+    lines.push(`${product.name}    ${product.quantity ?? 1} x ${moneyLabel(receipt, product.price, language)}`);
   }
-  lines.push(`Total ${moneyLabel(receipt, receipt.total)}`);
-  lines.push("Illustrative sample for Receebo. Not a store policy.");
+  lines.push(`Total ${moneyLabel(receipt, receipt.total, language)}`);
+  lines.push(copy.note);
   const evidence = [];
   for (const product of receipt.products) {
     for (const coverage of product.coverages ?? []) {
-      if (coverage.evidence && !evidence.includes(coverage.evidence)) evidence.push(coverage.evidence);
+      // Only fictional manufacturer terms from this receipt, never legal rules.
+      // Existing EU fixtures have English evidence; express the same stated
+      // duration in Portuguese in the sample document, not an invented policy.
+      const text = language === "pt-PT" && coverage.warrantyType === "manufacturer" && coverage.lengthMonths
+        ? `Exemplo fictício: ${product.name}, garantia do fabricante de ${coverage.lengthMonths} meses.`
+        : coverage.evidence;
+      if (text && !evidence.includes(text)) evidence.push(text);
     }
   }
   return lines.concat(evidence);
@@ -64,7 +99,7 @@ export function illustrativePdf(lines) {
   return Buffer.from(pdf, "latin1");
 }
 
-export function sampleDocumentHtml(lines) {
+export function sampleDocumentHtml(lines, language = "en") {
   const body = lines.map(line => `<p>${line.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p>`).join("");
-  return `<html><body style="margin:0;padding:48px;background:#fff;font:20px monospace;color:#171717">${body}</body></html>`;
+  return `<html lang="${language}"><meta charset="utf-8"><body style="margin:0;padding:40px;background:#fff;font:18px monospace;color:#171717">${body}</body></html>`;
 }

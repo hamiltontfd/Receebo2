@@ -1,6 +1,8 @@
 import sampleItemRights from "./sample-item-rights.json" with { type: "json" };
 import usItemRights from "./us-item-rights.json" with { type: "json" };
 import { usCapturedAt, usReceipts, usSearchQuery } from "./us-collection.mjs";
+import brItemRights from "./br-item-rights.json" with { type: "json" };
+import { brCapturedAt, brReceipts } from "./br-collection.mjs";
 
 export const euCapturedAt = "2026-10-27T12:00:00Z";
 // Illustrative capture collection only. itemRights is the saved output of
@@ -16,10 +18,10 @@ const at = date => ({ createdAt: `${date}T12:00:00Z`, updatedAt: `${date}T12:00:
 const euReceipts = [
   {
     ...base, ...at("2026-10-23"), id: 901, merchant: "Casa Lumen Electrónica", category: "Electronics",
-    purchaseDate: "2026-10-23", total: 649,
+    purchaseDate: "2026-10-23", deliveryDate: "2026-10-25", isOnlinePurchase: true, total: 649,
     products: [
       {
-        lineId: "l_samplecasa0001", name: "55\" 4K Smart TV", price: 480, quantity: 1,
+        lineId: "l_samplecasa0001", name: "Smart TV 4K de 55 polegadas", price: 480, quantity: 1,
         category: "Electronics", categorySource: "extraction",
         coverages: [{
           id: "c_samplecasa0001", kind: "warranty", warrantyType: "manufacturer", basis: "stated",
@@ -28,7 +30,7 @@ const euReceipts = [
         }],
       },
       {
-        lineId: "l_samplecasa0002", name: "Sample soundbar", price: 149, quantity: 1,
+        lineId: "l_samplecasa0002", name: "Soundbar de exemplo", price: 149, quantity: 1,
         category: "Electronics", categorySource: "extraction",
         coverages: [{
           id: "c_samplecasa0002", kind: "warranty", warrantyType: "manufacturer", basis: "stated",
@@ -36,22 +38,22 @@ const euReceipts = [
           evidence: "Illustrative sample text: Sample soundbar, 12-month manufacturer warranty.", source: "extraction",
         }],
       },
-      { lineId: "l_samplecasa0003", name: "HDMI cable", price: 12, quantity: 1 },
-      { lineId: "l_samplecasa0004", name: "Wall screws", price: 5, quantity: 1 },
-      { lineId: "l_samplecasa0005", name: "Cleaning cloth", price: 3, quantity: 1 },
+      { lineId: "l_samplecasa0003", name: "Cabo HDMI", price: 12, quantity: 1 },
+      { lineId: "l_samplecasa0004", name: "Parafusos de parede", price: 5, quantity: 1 },
+      { lineId: "l_samplecasa0005", name: "Pano de limpeza", price: 3, quantity: 1 },
     ],
     notableItems: [
-      { name: "55\" 4K Smart TV", price: 480, category: "Electronics", reason: "Illustrative sample highlight. Not a store policy." },
-      { name: "Sample soundbar", price: 149, category: "Electronics", reason: "Illustrative sample highlight. Not a store policy." },
+      { name: "Smart TV 4K de 55 polegadas", price: 480, category: "Electronics", reason: "Destaque fictício de exemplo." },
+      { name: "Soundbar de exemplo", price: 149, category: "Electronics", reason: "Destaque fictício de exemplo." },
     ],
-    summary: "In-store purchase at fictional Casa Lumen Electrónica. Sample only: a television and a soundbar with different manufacturer terms, plus small items with no stated coverage.",
+    summary: "Compra online fictícia na Casa Lumen Electrónica, entregue em Portugal. Dados de exemplo: televisão, soundbar e pequenos acessórios.",
     warranty: "Illustrative sample. The television line states a 2-year manufacturer warranty. This receipt text is not copied onto other items.",
   },
   {
     ...base, ...at("2026-10-12"), id: 902, merchant: "Casa & Jardim Braga", category: "Home",
     purchaseDate: "2026-10-12", total: 229,
     products: [{
-      lineId: "l_samplejardim01", name: "Cordless vacuum", price: 229, quantity: 1,
+      lineId: "l_samplejardim01", name: "Aspirador sem fios", price: 229, quantity: 1,
       category: "Home", categorySource: "extraction",
       coverages: [{
         id: "c_samplejardim01", kind: "warranty", warrantyType: "manufacturer", basis: "stated",
@@ -59,31 +61,31 @@ const euReceipts = [
         evidence: "Illustrative sample text: Cordless vacuum, 2-year manufacturer warranty.", source: "extraction",
       }],
     }],
-    notableItems: [{ name: "Cordless vacuum", price: 229, category: "Home", reason: "Illustrative sample highlight. Not a store policy." }],
-    summary: "A cordless vacuum cleaner. Fictional sample purchase.",
+    notableItems: [{ name: "Aspirador sem fios", price: 229, category: "Home", reason: "Destaque fictício de exemplo." }],
+    summary: "Aspirador sem fios. Compra fictícia de exemplo.",
     warranty: "Illustrative sample. The vacuum line states a 2-year manufacturer warranty. This receipt text is not a store policy.",
   },
   {
     ...base, ...at("2026-10-19"), id: 903, merchant: "Mercado Verde", category: "Groceries",
     purchaseDate: "2026-10-19", total: 38.47,
     products: [
-      { lineId: "l_sampleverde001", name: "Olive oil", price: 9.99, quantity: 1 },
-      { lineId: "l_sampleverde002", name: "Coffee beans", price: 8.49, quantity: 1 },
-      { lineId: "l_sampleverde003", name: "Fresh fruit", price: 6.79, quantity: 1 },
-      { lineId: "l_sampleverde004", name: "Cheese", price: 5.5, quantity: 1 },
-      { lineId: "l_sampleverde005", name: "Yoghurt pack", price: 4.5, quantity: 1 },
-      { lineId: "l_sampleverde006", name: "Sourdough loaf", price: 3.2, quantity: 1 },
+      { lineId: "l_sampleverde001", name: "Azeite", price: 9.99, quantity: 1 },
+      { lineId: "l_sampleverde002", name: "Café em grão", price: 8.49, quantity: 1 },
+      { lineId: "l_sampleverde003", name: "Fruta fresca", price: 6.79, quantity: 1 },
+      { lineId: "l_sampleverde004", name: "Queijo", price: 5.5, quantity: 1 },
+      { lineId: "l_sampleverde005", name: "Iogurtes", price: 4.5, quantity: 1 },
+      { lineId: "l_sampleverde006", name: "Pão de massa-mãe", price: 3.2, quantity: 1 },
     ],
-    notableItems: [], summary: "Weekly groceries. Fictional sample purchase.", warranty: null,
+    notableItems: [], summary: "Compras semanais de supermercado. Compra fictícia de exemplo.", warranty: null,
   },
   {
     ...base, ...at("2026-10-04"), id: 904, merchant: "Atelier Norte", category: "Clothing & Apparel",
     purchaseDate: "2026-10-04", total: 59.9,
     products: [
-      { lineId: "l_samplenorte001", name: "Cotton shirt", price: 35, quantity: 1 },
-      { lineId: "l_samplenorte002", name: "Wool scarf", price: 24.9, quantity: 1 },
+      { lineId: "l_samplenorte001", name: "Camisa de algodão", price: 35, quantity: 1 },
+      { lineId: "l_samplenorte002", name: "Cachecol de lã", price: 24.9, quantity: 1 },
     ],
-    notableItems: [], summary: "A cotton shirt and a wool scarf. Fictional sample purchase.", warranty: null,
+    notableItems: [], summary: "Camisa de algodão e cachecol de lã. Compra fictícia de exemplo.", warranty: null,
   },
 ].map((receipt, index) => ({ ...receipt, itemRights: sampleItemRights[index] }));
 
@@ -91,27 +93,37 @@ const usWithRights = usReceipts.map((receipt, index) => ({ ...receipt, itemRight
 
 export const euCapture = {
   name: "eu", market: "PT", country: "PT", capturedAt: euCapturedAt,
-  locale: "en-GB", timezoneId: "Europe/Lisbon", searchQuery: "TV",
+  language: "pt-PT", locale: "pt-PT", timezoneId: "Europe/Lisbon", searchQuery: "TV",
+  output: "generated-artifacts/receebo-marketing",
   phone: { width: 390, height: 844, deviceScaleFactor: 2 },
   receipts: euReceipts,
 };
 export const usCapture = {
   name: "us", market: "US", country: "US", capturedAt: usCapturedAt,
-  locale: "en-US", timezoneId: "UTC", searchQuery: usSearchQuery,
-  phone: { width: 390, height: 844, deviceScaleFactor: 3 },
+  language: "en", locale: "en-US", timezoneId: "UTC", searchQuery: usSearchQuery,
+  output: "generated-artifacts/receebo-marketing-us",
+  phone: { width: 390, height: 844, deviceScaleFactor: 2 },
   receipts: usWithRights,
 };
+export const brCapture = {
+  name: "br", market: "BR", country: "BR", capturedAt: brCapturedAt,
+  language: "pt-BR", locale: "pt-BR", timezoneId: "America/Sao_Paulo", searchQuery: "TV",
+  output: "generated-artifacts/receebo-marketing-br",
+  phone: { width: 390, height: 844, deviceScaleFactor: 2 },
+  receipts: brReceipts.map((receipt, index) => ({ ...receipt, itemRights: brItemRights[index] })),
+};
 
-export function activeCapture() {
-  return process.env.CAPTURE_CONTEXT === "us" ? usCapture : euCapture;
+export function activeCapture(value = process.env.CAPTURE_CONTEXT ?? "eu") {
+  const capture = { eu: euCapture, pt: euCapture, us: usCapture, br: brCapture }[value];
+  if (!capture) throw new Error(`Unknown CAPTURE_CONTEXT: choose eu, pt, us or br`);
+  return capture;
 }
 
 export const capturedAt = activeCapture().capturedAt;
 export const receipts = activeCapture().receipts;
 
 // One allowlist for Playwright and for the loopback preview server.
-export function createCaptureSession() {
-  const capture = activeCapture();
+export function createCaptureSession(capture = activeCapture()) {
   const sample = capture.receipts;
   const hero = sample[0];
   const totalSpent = Math.round(sample.reduce((sum, item) => sum + item.total, 0) * 100) / 100;
@@ -140,7 +152,7 @@ export function createCaptureSession() {
       }
       if (p === `/api/receipts/${hero.id}` && method === "PATCH" && created) return { fulfill: { json: null }, patch: true };
       if (p === "/api/account/market" && method === "GET") return json({ market: capture.market, country: capture.country });
-      if (p === "/api/account/language" && method === "GET") return json({ language: "en" });
+      if (p === "/api/account/language" && method === "GET") return json({ language: capture.language });
       if (p === "/api/account/detected-language" && (method === "PUT" || method === "POST")) {
         return { fulfill: { status: 200, json: {} } };
       }

@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { euCapture, usCapture } from "../../../receiptr/scripts/marketing/fixtures.mjs";
+import { euCapture, usCapture, brCapture } from "../../../receiptr/scripts/marketing/fixtures.mjs";
 import { findUsStorePolicy } from "./usStorePolicies";
 import { acceptExtractedLines, evaluateItemRights } from "./itemCoverage";
 
 const euAsOf = "2026-10-27";
 const usAsOf = "2026-11-08";
 
-function rightsFor(receipt: { products: unknown; purchaseDate: string; merchant: string }, region: "PT" | "US") {
+function rightsFor(receipt: { products: unknown; purchaseDate: string; merchant: string; deliveryDate?: string | null; isOnlinePurchase?: boolean }, region: "PT" | "US") {
   return evaluateItemRights(receipt.products as never, {
     region,
     purchaseDate: receipt.purchaseDate,
-    deliveryDate: null,
+    deliveryDate: receipt.deliveryDate ?? null,
     purchaseCountry: region === "US" ? "US" : "PT",
     currency: region === "US" ? "USD" : "EUR",
     merchant: receipt.merchant,
-    isOnlinePurchase: false,
+    isOnlinePurchase: receipt.isOnlinePurchase ?? false,
     purchaseType: "goods",
     asOf: region === "US" ? usAsOf : euAsOf,
   });
@@ -34,9 +34,9 @@ describe("marketing capture fixtures", () => {
     const cableWarranty = rights[2].contracts.find((c) => c.kind === "warranty");
     expect(tvMaker).toMatchObject({ certainty: "estimated", status: "open", endDate: "2028-10-23", lengthMonths: 24 });
     expect(barMaker).toMatchObject({ certainty: "estimated", status: "open", endDate: "2027-10-23", lengthMonths: 12 });
-    expect(rights[0].contracts.find((c) => c.ruleId === "PT:DL-84/2021")).toMatchObject({ certainty: "estimated", endDate: "2029-10-23" });
+    expect(rights[0].contracts.find((c) => c.ruleId === "PT:DL-84/2021")).toMatchObject({ certainty: "estimated", endDate: "2029-10-25" });
     expect(cableWarranty).toMatchObject({ status: "unknown", endDate: null });
-    expect(rights[2].contracts.find((c) => c.kind === "return")).toMatchObject({ status: "unknown", endDate: null });
+    expect(rights[2].contracts.find((c) => c.kind === "return")).toMatchObject({ status: "open", startDate: receipt.deliveryDate });
     expect(receipt.itemRights).toEqual(rights);
     expect(JSON.stringify(rights)).not.toContain("US:");
   });
@@ -52,7 +52,7 @@ describe("marketing capture fixtures", () => {
   it("evaluates the US sample with stated periods and no Portugal rule", () => {
     expect(usCapture.market).toBe("US");
     expect(usCapture.locale).toBe("en-US");
-    expect(usCapture.phone).toEqual({ width: 390, height: 844, deviceScaleFactor: 3 });
+    expect(usCapture.phone).toEqual({ width: 390, height: 844, deviceScaleFactor: 2 });
     expect(usCapture.receipts.length).toBeGreaterThanOrEqual(4);
     expect(usCapture.receipts.length).toBeLessThanOrEqual(6);
     for (const receipt of usCapture.receipts) {
@@ -97,5 +97,37 @@ describe("marketing capture fixtures", () => {
     expect(accepted[1].coverages?.map((c) => c.lengthMonths ?? c.lengthDays)).toEqual([18, 45]);
     expect(accepted[2].coverages).toBeUndefined();
     expect(accepted[0].coverages?.every((c) => c.certainty === "estimated" && c.basis === "stated")).toBe(true);
+  });
+
+  it("locks the fictional Brazil collection to freshly evaluated CDC rights, not PT or US rules", () => {
+    expect(brCapture).toMatchObject({ market: "BR", country: "BR", language: "pt-BR", locale: "pt-BR" });
+    const hero = brCapture.receipts[0];
+    expect(hero).toMatchObject({ isOnlinePurchase: true, purchaseCountry: "BR", deliveryDate: "2026-11-05" });
+    expect(brCapture.receipts).toHaveLength(4);
+    for (const receipt of brCapture.receipts) {
+      expect(receipt.currency).toBe("BRL");
+      expect(receipt.merchant).toContain("Fictíc");
+      const fresh = evaluateItemRights(receipt.products, {
+        region: "PT", // Non-US branch; BR purchase country selects CDC, not PT law.
+        purchaseCountry: receipt.purchaseCountry,
+        currency: receipt.currency,
+        merchant: receipt.merchant,
+        purchaseDate: receipt.purchaseDate,
+        deliveryDate: receipt.deliveryDate,
+        isOnlinePurchase: receipt.isOnlinePurchase,
+        purchaseType: "goods",
+        asOf: brCapture.capturedAt.slice(0, 10),
+      });
+      expect(receipt.itemRights).toEqual(fresh);
+      const rules = fresh.flatMap(row => row.contracts).filter(c => c.ruleId);
+      expect(rules.every(c => !/^(PT|EU|US):/.test(c.ruleId!))).toBe(true);
+      for (const contract of rules.filter(c => c.ruleId!.startsWith("BR:"))) {
+        expect(contract.legalReviewPending).toBe(true);
+      }
+    }
+    const contracts = hero.itemRights[0].contracts;
+    expect(contracts.some(c => c.kind === "return" && c.basis === "rule" && c.status === "open")).toBe(true);
+    expect(contracts.some(c => c.warrantyType === "legal" && c.legalReviewPending)).toBe(true);
+    expect(contracts.some(c => c.warrantyType === "manufacturer")).toBe(true);
   });
 });

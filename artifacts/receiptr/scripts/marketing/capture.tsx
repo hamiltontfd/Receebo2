@@ -15,6 +15,7 @@ import ReceiptDetail from "@/pages/receipt-detail";
 import Settings from "@/pages/settings";
 import { Toaster } from "@/components/ui/toaster";
 import "./capture.css";
+import { captureLabels } from "./locators.mjs";
 
 // Existing product pages, not recreated marketing UI. This entry has no
 // production route and is served only by the independent loopback config.
@@ -41,7 +42,7 @@ createRoot(document.getElementById("root")!).render(
       <LanguageProvider><MarketProvider><GuestProvider><TooltipProvider><MotionConfig reducedMotion="always">
         <OnboardingProvider>
         <div data-capture-disclosure className="bg-violet-50 text-violet-950 text-center text-xs font-semibold py-2">
-          Sample data · fictional purchases · simulated extraction
+          {captureLabels[document.documentElement.lang as keyof typeof captureLabels].disclosure}
         </div>
         <AppShell><Switch>
           <Route path="/scan" component={Scan} />

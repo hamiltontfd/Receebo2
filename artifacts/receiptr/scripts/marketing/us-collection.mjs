@@ -3,8 +3,8 @@
 // Stated periods are sample text, not a US legal minimum and not a retailer policy.
 const base = {
   status: "completed", currency: "USD", purchaseCountry: "US",
-  isOnlinePurchase: false, deliveryDate: null, isDraft: false, contentType: "application/pdf",
-  objectPath: "/objects/sample-receipt.pdf", originalFileName: "northwind-sample.pdf",
+  isOnlinePurchase: false, deliveryDate: null, isDraft: false, contentType: "image/png",
+  objectPath: "/objects/sample-receipt.png", originalFileName: "northwind-sample.png",
   attachments: [], transactionNumber: null,
 };
 const at = date => ({ createdAt: `${date}T16:00:00Z`, updatedAt: `${date}T16:00:00Z` });

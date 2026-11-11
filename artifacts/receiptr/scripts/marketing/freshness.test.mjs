@@ -7,8 +7,9 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { changedFiles, fingerprint, validateApproval, exportHashes, workspace } from "./freshness.mjs";
-import { isolate, receipts, createCaptureSession } from "./fixtures.mjs";
-import { illustrativePdf, sampleDocumentLines } from "./sample-document.mjs";
+import { isolate, receipts, createCaptureSession, activeCapture } from "./fixtures.mjs";
+import { illustrativePdf, sampleDocumentLines, sampleDocumentHtml, moneyLabel } from "./sample-document.mjs";
+import { captureLabels, captureLocators } from "./locators.mjs";
 
 test("detects added, edited, and deleted media inputs", () => {
   assert.deepEqual(changedFiles({ deleted: "a", edited: "a", stable: "a" }, { added: "b", edited: "b", stable: "a" }),
@@ -102,24 +103,24 @@ test("fixture requests never reach account services; unknown calls fail closed",
   assert.equal(unexpected.length, 5);
   const session = createCaptureSession();
   assert.equal(session.answer("GET", `${origin}/api/account/market`).fulfill.json.market, "PT");
-  assert.equal(session.answer("GET", `${origin}/api/account/language`).fulfill.json.language, "en");
+  assert.equal(session.answer("GET", `${origin}/api/account/language`).fulfill.json.language, "pt-PT");
   assert.equal(session.answer("GET", `${origin}/api/account/onboarding`).fulfill.json.dismissed, true);
   assert.equal(session.answer("GET", `${origin}/api/receipts`).fulfill.json.items.length, 4);
 });
 
-test("CAPTURE_CLIPS=0 skips video for EU and US, and the defaults stay", async () => {
+test("all markets record all clips by default; explicit CAPTURE_CLIPS=0 skips video", async () => {
   const { clipsEnabled } = await import("./record.mjs");
   assert.equal(clipsEnabled(false, undefined), true);
   assert.equal(clipsEnabled(false, "1"), true);
   assert.equal(clipsEnabled(false, "0"), false);
-  assert.equal(clipsEnabled(true, undefined), false);
+  assert.equal(clipsEnabled(true, undefined), true);
   assert.equal(clipsEnabled(true, "1"), true);
   assert.equal(clipsEnabled(true, "0"), false);
 });
 
-test("US and EU capture contexts stay separate and the published binaries stay put", async () => {
+test("capture contexts stay separate and the published binaries stay put", async () => {
   const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
-  assert.match(record, /View original receipt/);
+  assert.match(record, /captureLocators/);
   assert.match(record, /section-warranty/);
   assert.match(record, /scan-upload/);
   assert.match(record, /receipt-warranty/);
@@ -139,7 +140,8 @@ test("US and EU capture contexts stay separate and the published binaries stay p
   assert.doesNotMatch(appVite, /scripts\/marketing\/capture/);
   const replit = await readFile(path.join(workspace, ".replit"), "utf8");
   assert.doesNotMatch(replit, /5199/);
-  assert.match(captureUi, /Sample data · fictional purchases · simulated extraction/);
+  assert.match(captureUi, /captureLabels/);
+  assert.equal(captureLabels.en.disclosure, "Sample data · fictional purchases · simulated extraction");
   const guard = JSON.parse(await readFile(new URL("./published-media-guard.json", import.meta.url), "utf8"));
   for (const [file, expected] of Object.entries(guard.files)) {
     const hash = createHash("sha256").update(await readFile(path.join(workspace, file))).digest("hex");
@@ -148,6 +150,71 @@ test("US and EU capture contexts stay separate and the published binaries stay p
   const pdf = illustrativePdf(sampleDocumentLines(receipts[0]));
   assert.equal(pdf.subarray(0, 8).toString(), "%PDF-1.4");
   assert.match(pdf.toString("latin1"), /Casa Lumen Electr/);
+});
+
+test("each context returns its own language, market, frozen clock, output and 2x phone size", () => {
+  const origin = "http://127.0.0.1:5199";
+  const outputs = new Set();
+  for (const [name, market, language, locale, currency, zone] of [
+    ["eu", "PT", "pt-PT", "pt-PT", "EUR", "Europe/Lisbon"],
+    ["us", "US", "en", "en-US", "USD", "UTC"],
+    ["br", "BR", "pt-BR", "pt-BR", "BRL", "America/Sao_Paulo"],
+  ]) {
+    const capture = activeCapture(name);
+    const session = createCaptureSession(capture);
+    assert.deepEqual(session.answer("GET", `${origin}/api/account/market`).fulfill.json, { market, country: market });
+    assert.deepEqual(session.answer("GET", `${origin}/api/account/language`).fulfill.json, { language });
+    assert.equal(capture.locale, locale);
+    assert.equal(capture.timezoneId, zone);
+    assert.ok(Number.isFinite(Date.parse(capture.capturedAt)));
+    assert.deepEqual(capture.phone, { width: 390, height: 844, deviceScaleFactor: 2 });
+    assert.ok(capture.receipts.every(r => r.currency === currency && r.purchaseCountry === market && r.itemRights.length === r.products.length));
+    outputs.add(capture.output);
+    assert.ok(session.answer("POST", "https://receebo.net/api/receipts").abort);
+    assert.equal(session.answer("POST", `${origin}/api/billing/checkout`).fulfill.status, 403);
+    const lines = sampleDocumentLines(capture.receipts[0], language);
+    assert.match(lines[0], language === "en" ? /FICTIONAL SAMPLE/ : /EXEMPLO FICTÍCIO/);
+    assert.ok(lines.includes(`Total ${moneyLabel(capture.receipts[0], capture.receipts[0].total, language)}`));
+    assert.match(sampleDocumentHtml(lines, language), new RegExp(`lang="${language}"`));
+    if (name === "br") {
+      assert.ok(lines.some(line => line.includes("R$")));
+      assert.ok(lines.some(line => line.includes(capture.receipts[0].deliveryDate)));
+      // Sample receipt is not a newly authored legal policy.
+      assert.ok(!lines.some(line => /CDC|art\.?\s*49|art\.?\s*26/.test(line)));
+      assert.ok(!lines.some(line => /€|\$\d/.test(line)));
+    }
+  }
+  assert.equal(outputs.size, 3);
+  assert.equal(activeCapture("pt"), activeCapture("eu"));
+  assert.throws(() => activeCapture("unknown"), /CAPTURE_CONTEXT/);
+});
+
+test("localized locators use real save/search labels and testid for the original", () => {
+  const calls = [];
+  const locator = { locator: value => { calls.push(["locator", value]); return locator; } };
+  const page = {
+    getByRole: (role, options) => { calls.push(["role", role, options]); return locator; },
+    getByPlaceholder: (value, options) => { calls.push(["placeholder", value, options]); return locator; },
+    getByTestId: value => { calls.push(["testid", value]); return locator; },
+  };
+  for (const language of ["en", "pt-PT", "pt-BR"]) {
+    calls.length = 0;
+    captureLocators(page, language);
+    assert.deepEqual(calls[0], ["role", "button", { name: captureLabels[language].save, exact: true }]);
+    assert.deepEqual(calls[1], ["placeholder", captureLabels[language].search, { exact: true }]);
+    assert.deepEqual(calls[2], ["testid", "button-view-original"]);
+  }
+});
+
+test("every market has the same six hero scenes and shared capture dimensions", async () => {
+  const { captureSizes, heroScenes } = await import("./record.mjs");
+  assert.deepEqual(captureSizes.phone, { width: 390, height: 844, deviceScaleFactor: 2 });
+  assert.deepEqual(captureSizes.desktop, { width: 1440, height: 900, deviceScaleFactor: 2 });
+  assert.deepEqual(captureSizes.clip, { width: 960, height: 640, deviceScaleFactor: 1 });
+  assert.deepEqual(Object.keys(heroScenes), ["home", "upload", "review", "detail", "warranty", "home-desktop"]);
+  const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(record, /1170|2532|CAPTURE_DESKTOP/);
+  assert.match(record, /\[2880, 1800\].*\[780, 1688\]/);
 });
 
 test("CAPTURE_CONTEXT=us selects the dollar collection without Portugal rules", () => {
