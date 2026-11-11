@@ -24,7 +24,7 @@ function Card({ item, onOpen, inRow }: { item: WorthKeepingItem; onOpen: (receip
         <p className="font-mono font-bold text-base">{formatAmount(item.price, item.currency)}</p>
       )}
       {item.caption && (
-        <p className="mt-auto text-xs text-muted-foreground truncate">{item.caption}</p>
+        <p className="mt-auto text-xs text-muted-foreground whitespace-normal leading-tight">{item.caption}</p>
       )}
     </button>
   );

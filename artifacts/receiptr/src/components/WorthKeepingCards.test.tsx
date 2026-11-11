@@ -36,6 +36,20 @@ describe("Worth keeping on the Search home", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it.each(["row", "grid"] as const)("wraps the complete warranty caption in the %s layout", (layout) => {
+    const caption = "Garantia até 12 de outubro de 2029";
+    render(<WorthKeepingCards layout={layout} items={[{
+      name: "Televisor", price: 649, currency: "EUR", category: "Electronics",
+      receiptId: 1, caption,
+    }]} onOpen={() => {}} testId="long-caption" />);
+    const element = screen.getByText(caption, { exact: true });
+    expect(element.textContent).toBe(caption);
+    expect(element).toHaveClass("whitespace-normal", "leading-tight");
+    expect(element).not.toHaveClass("truncate");
+    expect(element.className).not.toMatch(/line-clamp/);
+    if (layout === "row") expect(element.closest("button")).toHaveClass("w-40");
+  });
+
   it("Search home: one horizontal row, open return windows first, See all link; a last See all card only when there are more", () => {
     const added = receipts.map((x) => ({ ...x, createdAt: "2026-10-28T10:00:00Z" }));
     const items = durableKeeping(added, now);
