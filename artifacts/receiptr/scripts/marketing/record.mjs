@@ -33,6 +33,30 @@ export function capturePlan(only = process.env.CAPTURE_ONLY, clipFlag = process.
 
 export const reviewHoldMs = 3000;
 
+export function captureLaunchArgs(locale) {
+  return [
+    "--no-sandbox", `--lang=${locale}`,
+    "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream",
+  ];
+}
+
+export async function waitForSavedToast(page, language, onFailure) {
+  const title = { en: "Purchase saved", "pt-PT": "Compra guardada", "pt-BR": "Compra salva" }[language];
+  if (!title) throw new Error(`Unsupported saved-toast language: ${language}`);
+  try {
+    // Match the visual Radix toast, not its separate screen-reader announcement.
+    const toast = page.locator("[data-state][data-swipe-direction]")
+      .filter({ has: page.getByText(title, { exact: true }) });
+    // Outside the viewport: (0, 0) is inside the mobile toast viewport's padding.
+    await page.mouse.move(-10, -10);
+    await toast.waitFor({ state: "visible", timeout: 10000 });
+    await toast.waitFor({ state: "hidden", timeout: 15000 });
+  } catch (error) {
+    await onFailure(error);
+    throw error;
+  }
+}
+
 export const captureSizes = {
   phone: { width: 390, height: 844, deviceScaleFactor: 2 },
   desktop: { width: 1440, height: 900, deviceScaleFactor: 2 },
@@ -58,7 +82,7 @@ const processLocale = `${capture.locale.replace("-", "_")}.UTF-8`;
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH,
   headless: true,
-  args: ["--no-sandbox", `--lang=${capture.locale}`],
+  args: captureLaunchArgs(capture.locale),
   env: { ...process.env, LANG: processLocale, LC_ALL: processLocale, LANGUAGE: capture.locale.replace("-", "_") },
 });
 const errors = [];
@@ -88,6 +112,7 @@ try {
       viewport: { width, height }, deviceScaleFactor,
       locale: capture.locale, timezoneId: capture.timezoneId, colorScheme: "light", reducedMotion: "reduce",
       serviceWorkers: "block",
+      permissions: ["camera"],
       ...(record ? { recordVideo: { dir: `${out}/sources`, size: { width, height } } } : {}),
     });
     const unexpected = await isolate(ctx, receiptImage);
@@ -204,16 +229,19 @@ try {
     });
     await page.waitForTimeout(300);
   }
-  async function requireVisible(page, locator, label, seen = []) {
-    try {
-      await locator.waitFor({ timeout: 30000 });
-    } catch (error) {
+  async function dumpFailure(page, label, seen, error) {
       const body = await page.locator("body").innerText().catch(() => "");
       const buttons = await page.getByRole("button").evaluateAll(els => els.map(el => el.innerText.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 40)).catch(() => []);
       await page.screenshot({ path: `${out}/sources/failure.png` }).catch(() => {});
       await writeFile(`${out}/sources/failure.json`, JSON.stringify({
         label, message: String(error), pageErrors: errors, unexpected: seen, body: body.slice(0, 4000), buttons,
       }, null, 2));
+  }
+  async function requireVisible(page, locator, label, seen = []) {
+    try {
+      await locator.waitFor({ timeout: 30000 });
+    } catch (error) {
+      await dumpFailure(page, label, seen, error);
       throw error;
     }
   }
@@ -288,6 +316,8 @@ try {
   await still(phone.page, "scan-review-form");
   await phoneUi.save.scrollIntoViewIfNeeded();
   await phoneUi.save.click();
+  await waitForSavedToast(phone.page, capture.language,
+    error => dumpFailure(phone.page, "saved toast disappearance", phone.unexpected, error));
   await phone.page.waitForURL(`**/receipts/${receipts[0].id}`);
   const savedHeading = phone.page.getByRole("heading", { name: receipts[0].merchant, exact: true });
   await requireVisible(phone.page, savedHeading, "saved receipt confirmation", phone.unexpected);

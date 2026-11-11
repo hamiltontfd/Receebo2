@@ -52,9 +52,19 @@ node artifacts/receiptr/scripts/marketing/record.mjs
 Repeat with `us` and `br`, stopping only the isolated server between contexts.
 `CAPTURE_ONLY` accepts `review`, `capture`, or both; unknown names fail closed.
 Without the variable, the existing full capture is unchanged. `review` writes
-`scan-review` and its `review` alias (PNG/WebP); `capture` writes only the Capture
+`scan-review-form` (the pre-save form), then `scan-review` and its `review` alias
+(PNG/WebP) showing the real post-save black hero card. The recorder moves the
+pointer away and waits for the localized saved-purchase toast to become fully
+hidden, including its exit animation, before taking that hero still. A timeout
+writes the standard `sources/failure.png` and `sources/failure.json`.
+`capture` writes only the Capture
 video (MP4/WebM, plus its raw recording) and poster (PNG/WebP). The clip holds
 the fully visible TOTAL for three seconds before scrolling to Save.
+
+Only the isolated harness launches Chromium with `--use-fake-device-for-media-stream`
+and `--use-fake-ui-for-media-stream`, grants the context camera permission, and
+keeps `--no-sandbox` plus the context's `--lang`. This lets headless upload
+stills use a simulated camera without changing the product camera UI.
 
 Partial runs overwrite only the selected media in the usual context folder,
 use a temporary fictional input document, and write `manifest.partial.json`

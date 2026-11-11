@@ -143,6 +143,67 @@ test("Capture holds the visible TOTAL before its poster and the scroll to Save",
   assert.match(record, /if \(!plan\.partial\) await still\(phone\.page, "scan-upload"\)/);
 });
 
+test("isolated Chromium keeps market language and grants a simulated camera", async () => {
+  const { captureLaunchArgs } = await import("./record.mjs");
+  for (const locale of ["pt-PT", "en-US", "pt-BR"]) {
+    assert.deepEqual(captureLaunchArgs(locale), [
+      "--no-sandbox", `--lang=${locale}`,
+      "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream",
+    ]);
+  }
+  const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
+  assert.match(record, /args: captureLaunchArgs\(capture\.locale\)/);
+  assert.match(record, /permissions: \["camera"\]/);
+});
+
+test("saved-toast wait moves away and awaits the localized visual toast becoming hidden", async () => {
+  const { waitForSavedToast } = await import("./record.mjs");
+  for (const [language, title] of Object.entries({
+    en: "Purchase saved", "pt-PT": "Compra guardada", "pt-BR": "Compra salva",
+  })) {
+    const calls = [];
+    const toast = { waitFor: async options => calls.push(["wait", options]) };
+    const page = {
+      mouse: { move: async (...position) => calls.push(["move", ...position]) },
+      getByText: (text, options) => {
+        assert.equal(text, title);
+        assert.deepEqual(options, { exact: true });
+        return "localized-title";
+      },
+      locator: selector => {
+        assert.equal(selector, "[data-state][data-swipe-direction]");
+        return { filter: options => {
+          assert.deepEqual(options, { has: "localized-title" });
+          return toast;
+        } };
+      },
+    };
+    await waitForSavedToast(page, language, () => assert.fail("Unexpected failure dump"));
+    assert.deepEqual(calls, [
+      ["move", -10, -10],
+      ["wait", { state: "visible", timeout: 10000 }],
+      ["wait", { state: "hidden", timeout: 15000 }],
+    ]);
+    const timeout = new Error("Toast did not disappear");
+    const dumps = [];
+    toast.waitFor = async ({ state }) => { if (state === "hidden") throw timeout; };
+    await assert.rejects(waitForSavedToast(page, language, async error => dumps.push(error)), error => error === timeout);
+    assert.deepEqual(dumps, [timeout]);
+  }
+});
+
+test("review captures the saved hero only after the toast wait, with the standard failure dump", async () => {
+  const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
+  const save = record.indexOf("await phoneUi.save.click()");
+  const wait = record.indexOf("await waitForSavedToast(phone.page, capture.language", save);
+  const hero = record.indexOf('await still(phone.page, "scan-review")', wait);
+  assert.ok(save >= 0 && wait > save && hero > wait);
+  assert.match(record, /waitForSavedToast\(phone\.page, capture\.language,\s*error => dumpFailure\(phone\.page, "saved toast disappearance", phone\.unexpected, error\)\)/);
+  assert.match(record, /sources\/failure\.png/);
+  assert.match(record, /sources\/failure\.json/);
+  assert.match(record, /Saved receipt hero with merchant and total must be fully visible/);
+});
+
 test("capture contexts stay separate and the published binaries stay put", async () => {
   const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
   assert.match(record, /captureLocators/);
