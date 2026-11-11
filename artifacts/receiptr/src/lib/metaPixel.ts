@@ -12,7 +12,13 @@ export type MetaEvent = {
   currency?: string;
 };
 
-type Fbq = ((...args: unknown[]) => void) & { loaded?: boolean };
+type Fbq = ((...args: unknown[]) => void) & {
+  loaded?: boolean;
+  queue?: IArguments[];
+  push?: Fbq;
+  version?: string;
+  callMethod?: (...args: unknown[]) => void;
+};
 
 declare global {
   interface Window {
@@ -35,6 +41,19 @@ export function newEventId(): string {
 export function loadMetaPixel(id = metaPixelId()): boolean {
   if (!id || typeof document === "undefined") return false;
   if (window.fbq?.loaded) return true;
+  if (!window.fbq) {
+    // The remote SDK consumes this public queue, then installs callMethod.
+    const fbq: Fbq = function (...args: unknown[]) {
+      if (fbq.callMethod) fbq.callMethod.apply(fbq, args);
+      else fbq.queue!.push(arguments);
+    };
+    fbq.queue = [];
+    fbq.push = fbq;
+    fbq.loaded = true;
+    fbq.version = "2.0";
+    window.fbq = fbq;
+    if (!window._fbq) window._fbq = fbq;
+  }
   const scriptId = "meta-pixel";
   if (!document.getElementById(scriptId)) {
     const script = document.createElement("script");
@@ -42,14 +61,6 @@ export function loadMetaPixel(id = metaPixelId()): boolean {
     script.async = true;
     script.src = "https://connect.facebook.net/en_US/fbevents.js";
     document.head.appendChild(script);
-  }
-  if (!window.fbq) {
-    const queue: IArguments[] = [];
-    const fbq = function fbq(this: unknown) {
-      queue.push(arguments);
-    } as Fbq;
-    window.fbq = fbq;
-    window._fbq = fbq;
   }
   window.fbq("init", id);
   window.fbq.loaded = true;
