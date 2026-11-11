@@ -85,6 +85,15 @@ export function applyConsentPrivacy(consent: { marketing: boolean; attribution: 
     deleteFirstPartyCookie("_fbp");
     deleteFirstPartyCookie("_fbc");
     document.getElementById("meta-pixel")?.remove();
+    // The SDK injects untagged signals/config scripts in addition to its loader.
+    document.querySelectorAll<HTMLScriptElement>("script[src]").forEach(script => {
+      try {
+        const src = new URL(script.src, document.baseURI);
+        if (src.hostname === "connect.facebook.net" || /\/fbevents(?:\.min)?\.js$/i.test(src.pathname)) {
+          script.remove();
+        }
+      } catch { /* An unrelated malformed script URL must not interrupt revocation. */ }
+    });
   }
   if (!consent.attribution) {
     try { localStorage.removeItem("receebo:ad-attribution"); } catch { /* no storage */ }

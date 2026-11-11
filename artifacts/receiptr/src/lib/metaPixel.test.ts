@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadMetaPixel, metaPixelId, newEventId, trackMetaEvent } from "./metaPixel";
+import { applyConsentPrivacy, loadMetaPixel, metaPixelId, newEventId, trackMetaEvent } from "./metaPixel";
 
 afterEach(() => {
   document.getElementById("meta-pixel")?.remove();
@@ -60,5 +60,37 @@ describe("meta pixel", () => {
     ]);
     expect(dispatch.mock.contexts.slice(1)).toEqual([fbq, fbq]);
     expect(fbq.queue).toEqual([]);
+  });
+
+  it("removes the loader and injected Pixel scripts only when marketing is revoked", () => {
+    window.fbq = Object.assign(vi.fn(), { loaded: true });
+    const sources = [
+      "https://connect.facebook.net/en_US/fbevents.js",
+      "https://connect.facebook.net/signals/config/123?v=2",
+      "https://connect.facebook.net/signals/plugins/identity.js",
+      "https://pixel-assets.example/fbevents.js",
+      "https://pixel-assets.example/fbevents.min.js",
+      "https://app.example/app.js?ref=connect.facebook.net/fbevents.js",
+      "https://connect.facebook.net.example/unrelated.js",
+    ];
+    const scripts = sources.map((src, i) => {
+      const script = document.createElement("script");
+      script.src = src;
+      if (i === 0) script.id = "meta-pixel";
+      (i % 2 ? document.body : document.head).appendChild(script);
+      return script;
+    });
+    try {
+      applyConsentPrivacy({ marketing: true, attribution: true });
+      expect(scripts.every(script => script.isConnected)).toBe(true);
+      expect(window.fbq).not.toHaveBeenCalled();
+
+      applyConsentPrivacy({ marketing: false, attribution: true });
+      expect(window.fbq).toHaveBeenCalledWith("consent", "revoke");
+      expect(scripts.slice(0, 5).every(script => !script.isConnected)).toBe(true);
+      expect(scripts.slice(5).every(script => script.isConnected)).toBe(true);
+    } finally {
+      scripts.forEach(script => script.remove());
+    }
   });
 });
