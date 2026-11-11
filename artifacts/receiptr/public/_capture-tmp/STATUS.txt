@@ -1,0 +1,25 @@
+INICIADO: capturas EU -> US -> BR
+HEAD esperado: 08377322ace5524d02d36f5b58e7ab0ba4304f69
+Porta 5199 livre; Chromium /repl/tools/bin/chromium; ffmpeg e zip disponíveis.
+Sem alterações de código, commit, push, publish ou uploads. Workflows oficiais intocados.
+
+eu: INICIADO 2026-11-11T18:50:14Z
+Output anterior preservado em /home/runner/workspace/generated-artifacts/receebo-captures-2026-11-11/pre-existing-eu
+eu: servidor isolado HTTP 200; gravação com clips ligados.
+
+FALHOU: eu (exit 1). Não foram iniciados mercados seguintes.
+Logs: /home/runner/workspace/generated-artifacts/receebo-captures-2026-11-11/eu-server.log e /home/runner/workspace/generated-artifacts/receebo-captures-2026-11-11/eu-record.log
+
+HEAD final: 08377322ace5524d02d36f5b58e7ab0ba4304f69
+Git status --porcelain (vazio = tree limpa):
+?? artifacts/receiptr/public/_capture-tmp/
+Ficheiros staged:
+Tamanhos dos ZIPs:
+generated-artifacts ignorado: generated-artifacts/receebo-captures-2026-11-11/run-captures.sh
+
+Diagnóstico adicional: public/_capture-tmp/eu-failure.json
+O harness não gerou failure.png/json para este timeout; eu-failure.json é o resumo do erro do log.
+Último screenshot concluído (não é screenshot da falha): public/_capture-tmp/eu-last-receipt-warranty.png
+Cópias dos logs: public/_capture-tmp/eu-record.log e eu-server.log
+US e BR não iniciados; nenhum ZIP gerado.
+Tree não está limpa apenas pela pasta temporária untracked public/_capture-tmp, solicitada para downloads. Nenhum ficheiro staged.

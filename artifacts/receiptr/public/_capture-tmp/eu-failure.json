@@ -1,0 +1,15 @@
+{
+  "context": "eu",
+  "status": "failed",
+  "step": "show-to-store",
+  "error": "Timeout 30000ms waiting for localized fullscreen receipt image",
+  "locator": "getByRole(button, name: Fechar recibo em ecrã inteiro).locator(img)",
+  "source": "artifacts/receiptr/scripts/marketing/record.mjs:234",
+  "harnessFailurePngProduced": false,
+  "harnessFailureJsonProduced": false,
+  "lastCompletedScreenshot": "eu-last-receipt-warranty.png",
+  "recordLog": "eu-record.log",
+  "serverLog": "eu-server.log",
+  "nextContextsStarted": false,
+  "zipProduced": false
+}
