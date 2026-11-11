@@ -44,14 +44,14 @@ export function acceptAll(now = new Date().toISOString()): ConsentState {
   return { essential: true, preferences: true, attribution: true, marketing: true, choice: "accept", updatedAt: now };
 }
 
-/** What is allowed before or without a stored banner choice. */
+/** Explicit saved choices take precedence over jurisdiction/GPC defaults. */
 export function effectiveConsent(
   stored: ConsentState | null,
   region: ConsentRegion,
   globalPrivacyControl: boolean,
 ): ConsentState {
+  if (stored?.choice) return stored;
   if (region === "UNKNOWN") return emptyConsent();
-  if (stored?.choice) return region === "US" && globalPrivacyControl ? { ...stored, marketing: false } : stored;
   if (region === "EU") return emptyConsent();
   return {
     essential: true,

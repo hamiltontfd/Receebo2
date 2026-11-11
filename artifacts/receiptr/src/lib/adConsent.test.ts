@@ -9,19 +9,52 @@ describe("ad consent", () => {
     }
     expect(consentRegion("US")).toBe("US");
     expect(consentRegion(null)).toBe("UNKNOWN");
-    expect(effectiveConsent(acceptAll(), "UNKNOWN", false).marketing).toBe(false);
+    expect(effectiveConsent(acceptAll(), "UNKNOWN", false).marketing).toBe(true);
     expect(consentCountry("PT", "?dev_country=US", false)).toBe("PT");
     expect(consentCountry(null, "?dev_country=US", true)).toBe("US");
     expect(consentCountry("US", "?dev_country=PT", true)).toBe("PT");
   });
 
-  it("keeps EU non-essential storage off until a choice, and honors Global Privacy Control in the US", () => {
+  it("keeps opt-in regions off without a choice and uses GPC only for US defaults", () => {
     expect(effectiveConsent(null, "EU", false).marketing).toBe(false);
     expect(effectiveConsent(null, "EU", false).attribution).toBe(false);
     expect(effectiveConsent(null, "US", false).marketing).toBe(true);
     expect(effectiveConsent(null, "US", true).marketing).toBe(false);
-    expect(effectiveConsent(acceptAll(), "US", true).marketing).toBe(false);
+    expect(effectiveConsent(acceptAll(), "US", true).marketing).toBe(true);
     expect(effectiveConsent(emptyConsent(), "US", false).marketing).toBe(false);
+  });
+
+  it("honors saved Accept, Reject and Preferences before country and GPC defaults", () => {
+    const choices = [
+      acceptAll(),
+      emptyConsent(),
+      { ...acceptAll(), choice: "preferences" as const },
+      { ...acceptAll(), choice: "preferences" as const, marketing: false },
+    ];
+    for (const region of ["UNKNOWN", "EU", "US"] as const) {
+      for (const gpc of [false, true]) {
+        for (const stored of choices) {
+          expect(effectiveConsent(stored, region, gpc)).toBe(stored);
+        }
+      }
+    }
+  });
+
+  it("keeps every non-essential category off for an unknown country without a choice", () => {
+    for (const gpc of [false, true]) {
+      expect(effectiveConsent(null, "UNKNOWN", gpc)).toMatchObject({
+        essential: true, preferences: false, attribution: false, marketing: false,
+      });
+      expect(effectiveConsent(null, "EU", gpc)).toMatchObject({
+        preferences: false, attribution: false, marketing: false,
+      });
+    }
+    expect(effectiveConsent(null, "US", true)).toMatchObject({
+      preferences: true, attribution: true, marketing: false,
+    });
+    expect(effectiveConsent(null, "US", false)).toMatchObject({
+      preferences: true, attribution: true, marketing: true,
+    });
   });
 
   it("marks the consent cookie Secure even for a rejection", () => {

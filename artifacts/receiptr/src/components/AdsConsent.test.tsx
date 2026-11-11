@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ContextType } from "react";
 import { MarketContext } from "./MarketProvider";
 import { CookieConsent } from "./CookieConsent";
 import { AdsRuntime } from "./AdsRuntime";
-import { acceptAll, CONSENT_CHANGED, CONSENT_STORAGE_KEY } from "@/lib/adConsent";
+import { acceptAll, emptyConsent, CONSENT_CHANGED, CONSENT_STORAGE_KEY } from "@/lib/adConsent";
 import { en, pt } from "@/pages/cookies";
 
 const { send, auth } = vi.hoisted(() => ({ send: vi.fn(async (_path: string, _options?: RequestInit) => ({ created: false })), auth: { isSignedIn: false, userId: null as string | null } }));
@@ -32,6 +32,29 @@ function view(country: string | null, banner = true) {
 describe("live cookie choices", () => {
   it.each(["PT", "IS", "LI", "NO", "GB", "CH", "BR", null])("keeps Meta off before a choice in %s", (country) => {
     view(country);
+    expect(document.getElementById("meta-pixel")).toBeNull();
+  });
+  it.each([
+    { ...acceptAll() },
+    { ...emptyConsent() },
+    { ...acceptAll(), choice: "preferences" as const },
+    { ...acceptAll(), choice: "preferences" as const, marketing: false },
+  ])("syncs explicit $choice marketing=$marketing even with unknown country", async stored => {
+    auth.isSignedIn = true; auth.userId = "account-test";
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(stored));
+    window.fbq = Object.assign(vi.fn(), { loaded: true });
+    view(null, false);
+    await waitFor(() => expect(send).toHaveBeenCalledWith(
+      expect.stringContaining("/attribution/consent"),
+      expect.objectContaining({ body: JSON.stringify({ marketingConsent: stored.marketing }) }),
+    ));
+    if (stored.marketing) expect(window.fbq).toHaveBeenCalledWith("consent", "grant");
+    else expect(window.fbq).toHaveBeenCalledWith("consent", "revoke");
+  });
+  it("does not sync implied defaults for a signed-in user with unknown country", async () => {
+    auth.isSignedIn = true; auth.userId = "account-test";
+    await act(async () => { view(null, false); });
+    expect(send).not.toHaveBeenCalled();
     expect(document.getElementById("meta-pixel")).toBeNull();
   });
   it("US loads then Reject revokes immediately and deletes Meta and attribution cookies/storage", async () => {
