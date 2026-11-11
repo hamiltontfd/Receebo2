@@ -16,9 +16,9 @@ describe("formatting", () => {
     expect(formatMoney(1299.99, "USD", "en-US")).toBe("$1,299.99");
     expect(formatMoney(12.5, "EUR", "en-US")).toBe("€12.50");
   });
-  it("en (PT/EU accounts): unchanged", () => {
+  it("en keeps British date order but shares the English money format", () => {
     expect(formatEmailDate("2028-11-27")).toBe("27 Nov 2028");
-    expect(formatMoney(1299.99, "USD")).toBe("US$1,299.99");
+    expect(formatMoney(1299.99, "USD")).toBe("$1,299.99");
     expect(formatMoney(12.5, "EUR", "en")).toBe("€12.50");
   });
 });
@@ -53,7 +53,7 @@ describe("US reminder copy", () => {
   });
   it("the same receipt on a PT account keeps the PT format", () => {
     const m = renderWarrantyReminder({ ...tv, kind: "manufacturer", expiresOn: "2028-11-27" });
-    expect(m.subject).toBe('Manufacturer warranty for LG 65" OLED TV (US$1,299.99) ends on 27 Nov 2028');
+    expect(m.subject).toBe('Manufacturer warranty for LG 65" OLED TV ($1,299.99) ends on 27 Nov 2028');
     expect(renderWarrantyReminder({ ...tv, region: "PT", kind: "manufacturer", expiresOn: "2028-11-27" })).toEqual(m);
   });
   it("deletion warning date", () => {

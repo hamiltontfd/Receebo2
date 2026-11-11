@@ -22,7 +22,7 @@ export function isPlanCurrency(value: unknown): value is PlanCurrency {
   return value === "EUR" || value === "BRL" || value === "USD";
 }
 
-/** en "€2.99" / "US$3.50" / "R$20.00". English uses en-IE so USD stays "US$" and not a bare "$". */
+/** Prices use the UI locale and the plan currency, through the shared formatter. */
 export function formatPlanPrice(plan: PlanKey, currency: PlanCurrency, locale: AppLocale): string {
   return formatLocaleMoney(PLAN_AMOUNTS[currency][plan], locale, currency);
 }

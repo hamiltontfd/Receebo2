@@ -3,7 +3,6 @@ import { getAppLocale, formatLocaleDate, formatLocaleMoney } from "./locale";
 import type { MailProviderId } from "@/lib/mailConnection";
 import { SYNC_IN_PROGRESS_CODE, SYNC_IN_PROGRESS_COPY } from "@/lib/mailImportCopy";
 import { TRIAL_CAP_MESSAGE } from "@/lib/trialCopy";
-import { currencySymbol } from "@/lib/currency";
 import type { PurchaseType } from "@/lib/purchaseType";
 
 /** The server refused the approval because the free-trial receipt cap is reached. */
@@ -222,8 +221,7 @@ export async function bulkDismissPending(ids: number[]): Promise<BulkDismissResu
 
 export function formatMoney(amount: number | null | undefined, currency: string | null | undefined): string {
   if (amount === null || amount === undefined) return "";
-  if (getAppLocale() !== "en") return formatLocaleMoney(amount, getAppLocale(), currency ?? "USD");
-  return `${currencySymbol(currency)}${amount.toFixed(2)}`;
+  return formatLocaleMoney(amount, getAppLocale(), currency || "USD");
 }
 
 /** "Soundbar 3.1 Dolby Atmos + 1 more", or the AI summary when no line items were read. */

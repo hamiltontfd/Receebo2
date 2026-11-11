@@ -96,8 +96,8 @@ describe("/us landing (C + D)", () => {
     expect(screen.getByText("Consumer rights info")).toBeTruthy();
     home.unmount();
     render(<PricingSection variant="us" />);
-    expect(screen.getByText("US$3.50")).toBeTruthy();
-    expect(screen.getByText("US$28.50")).toBeTruthy();
+    expect(screen.getByText("$3.50")).toBeTruthy();
+    expect(screen.getByText("$28.50")).toBeTruthy();
   });
 
   it("utm_content comes from the URL only", () => {

@@ -1,7 +1,6 @@
 import { appText, categoryText } from "@/lib/appCopy";
-import { useAppLocale } from "@/lib/locale";
+import { useAppLocale, formatLocaleMoney } from "@/lib/locale";
 import type { NotableItem } from "@workspace/api-client-react";
-import { currencySymbol } from "@/lib/currency";
 
 interface NotableItemsBannerProps {
   items: NotableItem[];
@@ -9,7 +8,7 @@ interface NotableItemsBannerProps {
 }
 
 export function NotableItemsBanner({ items, currency }: NotableItemsBannerProps) {
-  useAppLocale();
+  const locale = useAppLocale();
   if (!items || items.length === 0) return null;
 
   return (
@@ -24,7 +23,7 @@ export function NotableItemsBanner({ items, currency }: NotableItemsBannerProps)
               <span className="text-sm font-semibold leading-tight">{item.name}</span>
               {item.price != null && (
                 <span className="text-sm font-mono font-medium shrink-0">
-                  {currencySymbol(currency)}{item.price.toFixed(2)}
+                  {formatLocaleMoney(item.price, locale, currency || "USD")}
                 </span>
               )}
             </div>

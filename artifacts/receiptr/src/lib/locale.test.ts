@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 import { formatLocaleDate, formatLocaleMoney, getAppLocale, resolveLocale } from "./locale";
 import { LEGAL_DOCUMENTS, legalMarketFor } from "./legalDocuments";
 import { rightsCopy } from "./rightsCopy";
@@ -33,6 +37,37 @@ describe("locale scaffolding", () => {
     expect(formatLocaleMoney(449, "pt-PT")).toBe("449,00 €");
     expect(formatLocaleMoney(449, "pt-BR")).toBe("€ 449,00");
   });
+  it("formats each amount's currency with the UI locale and plain spaces", () => {
+    expect(formatLocaleMoney(649, "pt-PT", "EUR")).toBe("649,00 €");
+    expect(formatLocaleMoney(3199, "pt-BR", "BRL")).toBe("R$ 3.199,00");
+    expect(formatLocaleMoney(486, "en", "USD")).toBe("$486.00");
+    expect(formatLocaleMoney(649, "en", "EUR")).toBe("€649.00");
+    expect(formatLocaleMoney(3199, "en", "BRL")).toBe("R$3,199.00");
+    expect(formatLocaleMoney(3199, "pt-BR", "BRL")).not.toMatch(/[\u00a0\u202f]/);
+  });
+  it.each(["America/Sao_Paulo", "UTC", "Europe/Lisbon"])(
+    "preserves calendar days in %s without changing timestamp semantics",
+    (timeZone) => {
+      // A child process gives each test a real timezone, independent of Vitest's worker.
+      const require = createRequire(resolve("../../scripts/package.json"));
+      const source = pathToFileURL(resolve("src/lib/locale.ts")).href;
+      const result = execFileSync(process.execPath, [
+        "--import", pathToFileURL(require.resolve("tsx")).href, "--input-type=module", "-e",
+        `import { formatLocaleDate } from ${JSON.stringify(source)};
+         console.log(JSON.stringify([
+           formatLocaleDate("2026-11-02", "pt-PT"),
+           formatLocaleDate("2026-11-02", "pt-BR"),
+           formatLocaleDate("2026-11-02", "en"),
+           formatLocaleDate(new Date(2026, 10, 2), "pt-PT"),
+           formatLocaleDate("2026-11-02T00:00:00Z", "pt-PT")
+         ]));`,
+      ], { encoding: "utf8", env: { ...process.env, TZ: timeZone } });
+      expect(JSON.parse(result)).toEqual([
+        "2 nov 2026", "2 de nov. de 2026", "Nov 2, 2026", "2 nov 2026",
+        timeZone === "America/Sao_Paulo" ? "1 nov 2026" : "2 nov 2026",
+      ]);
+    },
+  );
 });
 
 describe("legal structure", () => {

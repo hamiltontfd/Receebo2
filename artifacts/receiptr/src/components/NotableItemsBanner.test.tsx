@@ -56,10 +56,11 @@ describe("NotableItemsBanner", () => {
     expect(price2).toBeInTheDocument();
   });
 
-  it("shows ISO code prefix for unknown currencies", () => {
+  it("formats JPY using Intl's symbol and zero-decimal minor units", () => {
     render(<NotableItemsBanner items={items} currency="JPY" />);
-    const price = screen.getByText("JPY 999.99");
+    const price = screen.getByText("¥1,000");
     expect(price).toBeInTheDocument();
+    expect(screen.getByText("¥50")).toBeInTheDocument();
   });
 
   it("renders item names and reasons", () => {

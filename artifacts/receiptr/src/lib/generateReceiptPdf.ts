@@ -1,6 +1,5 @@
-import { format } from "date-fns";
 import { appText, categoryText } from "./appCopy";
-import { getAppLocale, formatLocaleDate } from "./locale";
+import { getAppLocale, formatLocaleDate, formatLocaleMoney } from "./locale";
 
 export type ReceiptForPdf = {
   merchant?: string | null;
@@ -21,7 +20,9 @@ const BLACK: [number, number, number] = [15, 15, 15];
 const MUTED: [number, number, number] = [120, 120, 120];
 const DIVIDER: [number, number, number] = [220, 220, 220];
 
-export async function generateReceiptPdf(receipt: ReceiptForPdf, currencySymbol: string): Promise<Blob> {
+export async function generateReceiptPdf(receipt: ReceiptForPdf): Promise<Blob> {
+  const locale = getAppLocale();
+  const money = (amount: number) => formatLocaleMoney(amount, locale, receipt.currency || "USD");
   const { default: jsPDF } = await import("jspdf");
   const doc = new jsPDF({ format: "a4", unit: "pt" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -79,8 +80,8 @@ export async function generateReceiptPdf(receipt: ReceiptForPdf, currencySymbol:
 
   // Date + category
   const dateStr = receipt.purchaseDate
-    ? formatLocaleDate(new Date(receipt.purchaseDate), getAppLocale())
-    : formatLocaleDate(new Date(receipt.createdAt), getAppLocale());
+    ? formatLocaleDate(receipt.purchaseDate, locale)
+    : formatLocaleDate(receipt.createdAt, locale);
   const dateCat = receipt.category ? `${dateStr}  ·  ${categoryText(receipt.category)}` : dateStr;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
@@ -102,7 +103,7 @@ export async function generateReceiptPdf(receipt: ReceiptForPdf, currencySymbol:
     doc.setFont("helvetica", "bold");
     doc.setFontSize(40);
     doc.setTextColor(...BLACK);
-    doc.text(`${currencySymbol}${receipt.total.toFixed(2)}`, margin, y);
+    doc.text(money(receipt.total), margin, y);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
@@ -139,7 +140,7 @@ export async function generateReceiptPdf(receipt: ReceiptForPdf, currencySymbol:
       doc.text(nameLines, margin, y);
 
       if (item.price != null) {
-        doc.text(`${currencySymbol}${item.price.toFixed(2)}`, pageW - margin, y, { align: "right" });
+        doc.text(money(item.price), pageW - margin, y, { align: "right" });
       }
       y += nameLines.length * 14;
 
@@ -172,7 +173,7 @@ export async function generateReceiptPdf(receipt: ReceiptForPdf, currencySymbol:
 
       if (product.price != null) {
         doc.setFont("helvetica", "bold");
-        doc.text(`${currencySymbol}${product.price.toFixed(2)}`, pageW - margin, y, { align: "right" });
+        doc.text(money(product.price), pageW - margin, y, { align: "right" });
       }
       y += nameLines.length * 14 + 4;
     }

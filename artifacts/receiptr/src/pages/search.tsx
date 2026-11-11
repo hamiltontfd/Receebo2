@@ -1,7 +1,7 @@
 import { actionWaitMessage } from "@/lib/actionLimit";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { appText, categoryText } from "@/lib/appCopy";
-import { useAppLocale, formatLocaleDate } from "@/lib/locale";
+import { useAppLocale, formatLocaleDate, formatLocaleMoney } from "@/lib/locale";
 import { X } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@clerk/react";
@@ -32,7 +32,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useListReceipts, useInfiniteListReceipts } from "@workspace/api-client-react";
 import type { Receipt } from "@workspace/api-client-react";
-import { currencySymbol } from "@/lib/currency";
 import { CATEGORIES, categoryStyle, categoryIcon } from "@/lib/categories";
 import {
   PageTransition,
@@ -131,7 +130,7 @@ function DemoReceiptSheet({
   onClose: () => void;
 }) {
   const isDesktop = useIsDesktop();
-  useAppLocale();
+  const locale = useAppLocale();
   if (!receipt) return null;
   const Icon = categoryIcon(receipt.category);
   return (
@@ -180,7 +179,7 @@ function DemoReceiptSheet({
             <h2 className="text-2xl font-extrabold tracking-tight">{receipt.merchant}</h2>
             <p className="text-sm opacity-70">{receipt.date}</p>
             <p className="text-4xl font-extrabold tracking-tight font-mono">
-              ${receipt.total.toFixed(2)}
+              {formatLocaleMoney(receipt.total, locale, "USD")}
             </p>
           </div>
 
@@ -190,7 +189,7 @@ function DemoReceiptSheet({
               {receipt.products.map((p, i) => (
                 <li key={i} className="flex justify-between text-sm">
                   <span>{p.qty > 1 ? `×${p.qty} ` : ""}{p.name}</span>
-                  <span className="font-mono font-medium">${p.price.toFixed(2)}</span>
+                  <span className="font-mono font-medium">{formatLocaleMoney(p.price, locale, "USD")}</span>
                 </li>
               ))}
             </ul>
@@ -207,7 +206,7 @@ function DemoReceiptSheet({
 }
 
 function DemoView({ onScan }: { onScan: () => void }) {
-  useAppLocale();
+  const locale = useAppLocale();
   const [selected, setSelected] = useState<DemoReceipt | null>(null);
   return (
     <>
@@ -248,7 +247,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
                         <CardIcon className="w-[1.1rem] h-[1.1rem]" />
                       </span>
                       <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
-                      <p className="font-mono font-bold text-base">${item.price.toFixed(2)}</p>
+                      <p className="font-mono font-bold text-base">{formatLocaleMoney(item.price, locale, "USD")}</p>
                       <div className="mt-auto">
                         <p className="text-xs text-muted-foreground truncate">{item.merchant}</p>
                       </div>
@@ -282,7 +281,7 @@ function DemoView({ onScan }: { onScan: () => void }) {
                         </div>
                       </div>
                     </div>
-                    <span className="font-mono font-semibold shrink-0">${r.total.toFixed(2)}</span>
+                    <span className="font-mono font-semibold shrink-0">{formatLocaleMoney(r.total, locale, "USD")}</span>
                   </button>
                 </li>
               );
@@ -369,14 +368,14 @@ function ReceiptRow({ r, onOpen, query }: { r: Receipt; onOpen: (id: number) => 
             </p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="text-xs text-muted-foreground">
-                {formatLocaleDate(new Date(r.purchaseDate || r.createdAt), locale)}
+                {formatLocaleDate(r.purchaseDate || r.createdAt, locale)}
               </span>
             </div>
           </div>
         </div>
         {r.total != null && (
           <span className="font-mono font-semibold shrink-0">
-            {currencySymbol(r.currency)}{r.total.toFixed(2)}
+            {formatLocaleMoney(r.total, locale, r.currency || "USD")}
           </span>
         )}
       </button>
@@ -394,7 +393,7 @@ function ReceiptRow({ r, onOpen, query }: { r: Receipt; onOpen: (id: number) => 
               <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
               {item.price != null && (
                 <p className="font-mono font-bold text-base">
-                  {currencySymbol(r.currency)}{item.price.toFixed(2)}
+                  {formatLocaleMoney(item.price, locale, r.currency || "USD")}
                 </p>
               )}
             </button>

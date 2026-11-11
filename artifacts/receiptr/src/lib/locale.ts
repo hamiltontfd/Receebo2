@@ -7,8 +7,7 @@
  * - Signed-out visitors always use browser language, ignoring legacy local overrides.
  * - Browser/sign-up fallback: pt-BR → pt-BR, any other pt* → pt-PT, else en.
  * - Without a saved override, browser language selects the UI locale.
- * - Money is EUR for everyone (the subscription), formatted per locale.
- *   Receipt amounts keep the receipt's own currency.
+ * - Money uses the amount's own currency, formatted per UI locale.
  */
 import { useSyncExternalStore } from "react";
 
@@ -57,7 +56,11 @@ export function getAppLocale(
 const PT_MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 /** en "Dec 12, 2026" · pt-PT "12 dez 2026" · pt-BR "12 de dez. de 2026" (date-only values, no timezone shift). */
-export function formatLocaleDate(date: Date, locale: AppLocale): string {
+export function formatLocaleDate(value: Date | string, locale: AppLocale): string {
+  // A date without a time is a calendar day, not an instant at UTC midnight.
+  const date = typeof value === "string"
+    ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value)
+    : value;
   if (locale === "pt-PT") return `${date.getDate()} ${PT_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
   return new Intl.DateTimeFormat(locale === "pt-BR" ? "pt-BR" : "en-US", {
     day: "numeric", month: "short", year: "numeric",
@@ -66,6 +69,6 @@ export function formatLocaleDate(date: Date, locale: AppLocale): string {
 
 /** en "€449.00" · pt-PT "449,00 €" · pt-BR "€ 449,00" (plain spaces; HTML callers can swap in &nbsp;). */
 export function formatLocaleMoney(amount: number, locale: AppLocale, currency = "EUR"): string {
-  const tag = locale === "en" ? "en-IE" : locale;
+  const tag = locale === "en" ? "en-US" : locale;
   return new Intl.NumberFormat(tag, { style: "currency", currency }).format(amount).replace(/\u00a0|\u202f/g, " ");
 }

@@ -23,7 +23,6 @@ import { WarrantyQuickPick } from "@/components/WarrantyQuickPick";
 import { PurchaseCountryField } from "@/components/PurchaseCountryField";
 import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
 import { ItemCoverageSections } from "@/components/ItemCoverageSections";
-import { currencySymbol } from "@/lib/currency";
 import { showDeliveryDateField } from "@/lib/consumerRights";
 
 interface ReviewFields {
@@ -225,7 +224,7 @@ export function ReceiptReview({ receiptId, doneHref }: { receiptId: number; done
           products={receipt.products ?? []}
           notableItems={receipt.notableItems}
           itemRights={receipt.itemRights}
-          symbol={currencySymbol(receipt.currency)}
+          currency={receipt.currency}
           receipt={{ ...receipt, ...fields, purchaseCountry: fields.purchaseCountry || null, warranty: fields.warranty }}
         />
         <ConsumerRightsPanel

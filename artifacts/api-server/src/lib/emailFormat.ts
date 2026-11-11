@@ -1,18 +1,18 @@
 /** Money and date formatting shared by emails and reminder copy (no side effects). */
 
 /**
- * "en" = en-GB style (PT/EU accounts, unchanged); "en-US" = US-market accounts
- * writing in English (US mode G, 2 Nov 2026): "Nov 27, 2028", "$1,299.99".
+ * English money follows en-US, matching the web. Dates keep en-GB order for
+ * "en" and en-US order for US-market accounts writing in English.
  */
 export type FormatLocale = "en" | "en-US" | "pt-PT" | "pt-BR";
 const intlLocale = (locale: FormatLocale) => (locale === "en" ? "en-GB" : locale);
 
-/** "€12.50", "£3.00", "US$9.99" (en-US: "$9.99"); falls back to "12.50 XYZ" for unknown codes. */
+/** "€12.50", "£3.00", "$9.99"; falls back to "12.50 XYZ" for invalid codes. */
 export function formatMoney(amount: number, currency?: string | null, locale: FormatLocale = "en"): string {
   const code = (currency ?? "").trim().toUpperCase();
   if (/^[A-Z]{3}$/.test(code)) {
     try {
-      return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: code }).format(amount);
+      return new Intl.NumberFormat(locale === "en" ? "en-US" : intlLocale(locale), { style: "currency", currency: code }).format(amount);
     } catch {
       // Unknown ISO code: fall through.
     }

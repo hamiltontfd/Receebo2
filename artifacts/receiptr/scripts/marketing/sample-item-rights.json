@@ -16,7 +16,7 @@
           "startDate": "2026-10-23",
           "endDate": "2028-10-23",
           "ruleId": null,
-          "evidence": "Illustrative sample text: 55\" 4K Smart TV, 2-year manufacturer warranty.",
+          "evidence": "Texto fictício de exemplo: Smart TV 4K de 55 polegadas, garantia do fabricante de 2 anos.",
           "conflict": false,
           "legalReviewPending": false
         },
@@ -70,7 +70,7 @@
           "startDate": "2026-10-23",
           "endDate": "2027-10-23",
           "ruleId": null,
-          "evidence": "Illustrative sample text: Sample soundbar, 12-month manufacturer warranty.",
+          "evidence": "Texto fictício de exemplo: soundbar de exemplo, garantia do fabricante de 12 meses.",
           "conflict": false,
           "legalReviewPending": false
         },
@@ -240,7 +240,7 @@
           "startDate": "2026-10-12",
           "endDate": "2028-10-12",
           "ruleId": null,
-          "evidence": "Illustrative sample text: Cordless vacuum, 2-year manufacturer warranty.",
+          "evidence": "Texto fictício de exemplo: aspirador sem fios, garantia do fabricante de 2 anos.",
           "conflict": false,
           "legalReviewPending": false
         },

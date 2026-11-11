@@ -9,7 +9,7 @@ exports[`PT golden outputs (must not change) > reminder copy, money and dates 1`
   ],
   "money": [
     "€1,299.99",
-    "US$1,299.99",
+    "$1,299.99",
     "£3.00",
     "XYZ 5.00",
     "5.00",
@@ -31,15 +31,15 @@ exports[`PT golden outputs (must not change) > reminder copy, money and dates 1`
   "returnStore": {
     "body": "If you're not keeping it, start your return with Best Buy by 31 Oct 2026. Your receipt is saved in Receebo, so you'll have it if they ask.",
     "footer": "You're getting this because return reminders are on.",
-    "itemLine": "Sony WH-1000XM5 headphones and Case · US$1,299.99 · Best Buy, bought 12 Oct 2026",
+    "itemLine": "Sony WH-1000XM5 headphones and Case · $1,299.99 · Best Buy, bought 12 Oct 2026",
     "note": "Based on Best Buy's return policy. Conditions vary, so check your receipt or the store's site.",
     "preheader": "Bought at Best Buy on 12 Oct 2026. Last day: 31 Oct 2026.",
     "push": {
-      "body": "Sony WH-1000XM5 headphones · US$1,299.99 · Best Buy",
+      "body": "Sony WH-1000XM5 headphones · $1,299.99 · Best Buy",
       "title": "Return window closes tomorrow",
     },
     "secondary": "Still happy with your Sony WH-1000XM5 headphones?",
-    "subject": "Return window for Sony WH-1000XM5 headphones (US$1,299.99) closes tomorrow",
+    "subject": "Return window for Sony WH-1000XM5 headphones ($1,299.99) closes tomorrow",
     "title": "Sony WH-1000XM5 headphones: return window closes 31 Oct 2026",
   },
   "warrantyLegal": {
@@ -59,15 +59,15 @@ exports[`PT golden outputs (must not change) > reminder copy, money and dates 1`
   "warrantyMaker": {
     "body": "If something isn't working as it should, contact the manufacturer before 27 Nov 2028. Your receipt is saved in Receebo as proof of purchase.",
     "footer": "You're getting this because warranty reminders are on.",
-    "itemLine": "Sony WH-1000XM5 headphones and Case · US$1,299.99 · Best Buy, bought 12 Oct 2026",
+    "itemLine": "Sony WH-1000XM5 headphones and Case · $1,299.99 · Best Buy, bought 12 Oct 2026",
     "note": null,
     "preheader": "Bought at Best Buy on 12 Oct 2026.",
     "push": {
-      "body": "Sony WH-1000XM5 headphones · US$1,299.99 · Best Buy",
+      "body": "Sony WH-1000XM5 headphones · $1,299.99 · Best Buy",
       "title": "Manufacturer warranty ends 27 Nov 2028",
     },
     "secondary": null,
-    "subject": "Manufacturer warranty for Sony WH-1000XM5 headphones (US$1,299.99) ends on 27 Nov 2028",
+    "subject": "Manufacturer warranty for Sony WH-1000XM5 headphones ($1,299.99) ends on 27 Nov 2028",
     "title": "Sony WH-1000XM5 headphones: manufacturer warranty ends 27 Nov 2028",
   },
 }

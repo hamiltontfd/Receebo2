@@ -390,7 +390,5 @@ export function deadlineUrgency(daysLeft: number | null, bucket: Bucket): "red" 
 /** "€2,431.80" / "$349.00"; never converted. */
 export function formatAmount(amount: number, currency: string | null | undefined): string {
   const c = (currency ?? "EUR").toUpperCase();
-  if (getAppLocale() !== "en") return formatLocaleMoney(amount, getAppLocale(), c);
-  const sym = c === "EUR" ? "\u20AC" : c === "USD" ? "$" : c === "GBP" ? "\u00A3" : c === "BRL" ? "R$" : `${c} `;
-  return `${sym}${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatLocaleMoney(amount, getAppLocale(), c);
 }

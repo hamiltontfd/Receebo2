@@ -1,6 +1,6 @@
 import { actionWaitMessage, receiptPollInterval } from "@/lib/actionLimit";
 import { appText, categoryText } from "@/lib/appCopy";
-import { useAppLocale, formatLocaleDate } from "@/lib/locale";
+import { useAppLocale, formatLocaleDate, formatLocaleMoney } from "@/lib/locale";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRoute, Link, useLocation, useSearch } from "wouter";
@@ -38,7 +38,6 @@ import { PurchaseCountryField, PurchaseCountryValue } from "@/components/Purchas
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
 import { StoreFullscreen } from "@/components/StoreFullscreen";
 import { PageTransition, listVariants, itemVariants } from "@/components/PageTransition";
-import { currencySymbol } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
@@ -195,9 +194,9 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
     const summary = receipt
       ? `${receipt.merchant || receipt.originalFileName} - ${
           receipt.total != null
-            ? `${currencySymbol(receipt.currency)}${receipt.total.toFixed(2)}`
+            ? formatLocaleMoney(receipt.total, locale, receipt.currency || "USD")
             : ""
-        } (${receipt.purchaseDate ? formatLocaleDate(new Date(receipt.purchaseDate), locale) : ""})`
+        } (${receipt.purchaseDate ? formatLocaleDate(receipt.purchaseDate, locale) : ""})`
       : "";
     try {
       if (navigator.share) {
@@ -301,7 +300,6 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
 
   const fileUrl = privateFileUrl(receipt.objectPath);
   const isProcessing = receipt.status === "processing";
-  const symbol = currencySymbol(receipt.currency);
   const isImage = receipt.contentType.startsWith("image/");
 
   return (
@@ -338,8 +336,8 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
             <p className="text-sm opacity-70 mt-1">
               {receipt.merchant ? `${receipt.merchant} · ` : ""}
               {receipt.purchaseDate
-                ? formatLocaleDate(new Date(receipt.purchaseDate), locale)
-                : formatLocaleDate(new Date(receipt.createdAt), locale)}
+                ? formatLocaleDate(receipt.purchaseDate, locale)
+                : formatLocaleDate(receipt.createdAt, locale)}
             </p>
             {receipt.transactionNumber && (
               <p className="text-xs opacity-60 mt-1 font-mono">
@@ -348,7 +346,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
             )}
           </div>
           <p className="text-4xl font-extrabold tracking-tight font-mono">
-            {receipt.total != null ? `${symbol}${receipt.total.toFixed(2)}` : "--"}
+            {receipt.total != null ? formatLocaleMoney(receipt.total, locale, receipt.currency || "USD") : "--"}
           </p>
           {isProcessing && (
             <p className="text-sm opacity-80 flex items-center gap-2">
@@ -534,7 +532,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
               <span className="text-muted-foreground font-medium">{appText("Date")}</span>
               <span className="font-semibold">
                 {receipt.purchaseDate
-                  ? formatLocaleDate(new Date(receipt.purchaseDate), locale)
+                  ? formatLocaleDate(receipt.purchaseDate, locale)
                   : appText("Unknown")}
               </span>
             </div>
@@ -576,7 +574,7 @@ function ReceiptDetailView({ receiptId }: { receiptId: number }) {
             products={receipt.products ?? []}
             notableItems={receipt.notableItems}
             itemRights={receipt.itemRights}
-            symbol={symbol}
+            currency={receipt.currency}
             receipt={receipt}
           />
         )}

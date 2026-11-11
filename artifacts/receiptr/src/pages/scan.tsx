@@ -1,6 +1,6 @@
 import { actionWaitMessage, receiptPollInterval } from "@/lib/actionLimit";
 import { appText, categoryText } from "@/lib/appCopy";
-import { useAppLocale } from "@/lib/locale";
+import { useAppLocale, formatLocaleMoney } from "@/lib/locale";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScrollText, Square, ChevronDown, Zap, ZapOff } from "lucide-react";
@@ -164,7 +164,7 @@ function useCameraStream(enabled: boolean) {
 }
 
 export default function Scan() {
-  useAppLocale();
+  const locale = useAppLocale();
   // Conservative: capture permission, image conversion, stitching, extraction,
   // retake drafts and review all belong to this session. Leave Scan to update.
   usePwaUpdateBlocker(true);
@@ -1247,7 +1247,7 @@ export default function Scan() {
                         {p.quantity && p.quantity > 1 ? `×${p.quantity} ` : ""}{p.name}
                       </span>
                       {p.price != null && (
-                        <span className="shrink-0 whitespace-nowrap font-mono">{currencySymbol(receipt.currency)}{p.price.toFixed(2)}</span>
+                        <span className="shrink-0 whitespace-nowrap font-mono">{formatLocaleMoney(p.price, locale, receipt.currency || "USD")}</span>
                       )}
                     </li>
                   ))}
@@ -1279,7 +1279,7 @@ export default function Scan() {
               products={receipt.products ?? []}
               notableItems={receipt.notableItems}
               itemRights={receipt.itemRights}
-              symbol={currencySymbol(receipt.currency)}
+              currency={receipt.currency}
               receipt={{
                 purchaseDate: form.purchaseDate || receipt.purchaseDate,
                 deliveryDate: form.deliveryDate || null,

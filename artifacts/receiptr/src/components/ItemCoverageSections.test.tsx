@@ -65,7 +65,7 @@ describe("highlight reading cards", () => {
           { name: "Shelf speaker", price: 90, category: "Electronics" },
         ]}
         itemRights={rights}
-        symbol="$"
+        currency="USD"
       />,
     );
     const returns = screen.getAllByTestId("row-return").map((row) => row.textContent ?? "");
@@ -104,7 +104,7 @@ describe("highlight reading cards", () => {
             { id: "shop", kind: "warranty", warrantyType: "commercial", basis: "user", certainty: "confirmed", status: "open", endDate: "2031-10-23", lengthMonths: 60 },
           ],
         }]}
-        symbol="€"
+        currency="EUR"
       />,
     );
     const card = screen.getByTestId("row-warranty");
@@ -132,7 +132,7 @@ describe("highlight reading cards", () => {
             { id: "term", kind: "warranty", warrantyType: "manufacturer", basis: "stated", certainty: "estimated", status: "open", endDate: "2027-10-23", lengthMonths: months },
           ],
         }]}
-        symbol="€"
+        currency="EUR"
       />,
     );
     for (const [locale, oneYear, oneMonth, many] of [
@@ -155,7 +155,7 @@ describe("highlight reading cards", () => {
   });
 
   it("keeps every line when there are no highlights", () => {
-    render(<ItemCoverageSections products={products} notableItems={[]} itemRights={rights} symbol="$" />);
+    render(<ItemCoverageSections products={products} notableItems={[]} itemRights={rights} currency="USD" />);
     expect(screen.queryByTestId("section-highlights")).toBeNull();
     expect(screen.getAllByTestId("row-return")).toHaveLength(5);
     expect(screen.getAllByTestId("row-warranty")).toHaveLength(5);

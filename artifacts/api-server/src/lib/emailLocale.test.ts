@@ -154,7 +154,7 @@ it.each(["en", "pt-PT", "pt-BR"] as EmailLocale[])("does not mutate dates/curren
   const before = timestamp.toISOString();
   expect(formatEmailDate(timestamp, locale)).toContain("2026");
   expect(formatEmailDate("not-a-date", locale)).toBeNull();
-  expect(formatMoney(449, "BRL", locale)).toBe(new Intl.NumberFormat(locale === "en" ? "en-GB" : locale, { style: "currency", currency: "BRL" }).format(449));
+  expect(formatMoney(449, "BRL", locale)).toBe(new Intl.NumberFormat(locale === "en" ? "en-US" : locale, { style: "currency", currency: "BRL" }).format(449));
   expect(timestamp.toISOString()).toBe(before);
 });
 

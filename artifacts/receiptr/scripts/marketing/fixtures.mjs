@@ -12,7 +12,7 @@ const base = {
   status: "completed", currency: "EUR", purchaseCountry: "PT",
   isOnlinePurchase: false, deliveryDate: null, isDraft: false, contentType: "image/png",
   objectPath: "/objects/sample-receipt.png", originalFileName: "casa-lumen-sample.png",
-  attachments: [], transactionNumber: null, ocrText: "FICTIONAL SAMPLE RECEIPT",
+  attachments: [], transactionNumber: null, ocrText: "RECIBO FICTÍCIO DE EXEMPLO",
 };
 const at = date => ({ createdAt: `${date}T12:00:00Z`, updatedAt: `${date}T12:00:00Z` });
 const euReceipts = [
@@ -26,7 +26,7 @@ const euReceipts = [
         coverages: [{
           id: "c_samplecasa0001", kind: "warranty", warrantyType: "manufacturer", basis: "stated",
           certainty: "estimated", lengthDays: null, lengthMonths: 24, endDate: null,
-          evidence: "Illustrative sample text: 55\" 4K Smart TV, 2-year manufacturer warranty.", source: "extraction",
+          evidence: "Texto fictício de exemplo: Smart TV 4K de 55 polegadas, garantia do fabricante de 2 anos.", source: "extraction",
         }],
       },
       {
@@ -35,7 +35,7 @@ const euReceipts = [
         coverages: [{
           id: "c_samplecasa0002", kind: "warranty", warrantyType: "manufacturer", basis: "stated",
           certainty: "estimated", lengthDays: null, lengthMonths: 12, endDate: null,
-          evidence: "Illustrative sample text: Sample soundbar, 12-month manufacturer warranty.", source: "extraction",
+          evidence: "Texto fictício de exemplo: soundbar de exemplo, garantia do fabricante de 12 meses.", source: "extraction",
         }],
       },
       { lineId: "l_samplecasa0003", name: "Cabo HDMI", price: 12, quantity: 1 },
@@ -47,7 +47,7 @@ const euReceipts = [
       { name: "Soundbar de exemplo", price: 149, category: "Electronics", reason: "Destaque fictício de exemplo." },
     ],
     summary: "Compra online fictícia na Casa Lumen Electrónica, entregue em Portugal. Dados de exemplo: televisão, soundbar e pequenos acessórios.",
-    warranty: "Illustrative sample. The television line states a 2-year manufacturer warranty. This receipt text is not copied onto other items.",
+    warranty: "Exemplo fictício. A linha do televisor indica uma garantia do fabricante de 2 anos. Este texto do recibo não é aplicado aos outros artigos.",
   },
   {
     ...base, ...at("2026-10-12"), id: 902, merchant: "Casa & Jardim Braga", category: "Home",
@@ -58,12 +58,12 @@ const euReceipts = [
       coverages: [{
         id: "c_samplejardim01", kind: "warranty", warrantyType: "manufacturer", basis: "stated",
         certainty: "estimated", lengthDays: null, lengthMonths: 24, endDate: null,
-        evidence: "Illustrative sample text: Cordless vacuum, 2-year manufacturer warranty.", source: "extraction",
+        evidence: "Texto fictício de exemplo: aspirador sem fios, garantia do fabricante de 2 anos.", source: "extraction",
       }],
     }],
     notableItems: [{ name: "Aspirador sem fios", price: 229, category: "Home", reason: "Destaque fictício de exemplo." }],
     summary: "Aspirador sem fios. Compra fictícia de exemplo.",
-    warranty: "Illustrative sample. The vacuum line states a 2-year manufacturer warranty. This receipt text is not a store policy.",
+    warranty: "Exemplo fictício. A linha do aspirador indica uma garantia do fabricante de 2 anos. Este texto do recibo não é uma política da loja.",
   },
   {
     ...base, ...at("2026-10-19"), id: 903, merchant: "Mercado Verde", category: "Groceries",

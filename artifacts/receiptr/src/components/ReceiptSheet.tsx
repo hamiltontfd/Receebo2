@@ -23,7 +23,7 @@ import { showDeliveryDateField } from "@/lib/consumerRights";
 import { useAccountRegion } from "@/lib/region";
 import { usStoreReturnWindow } from "@/lib/usStorePolicies";
 import { WarrantyQuickPick } from "@/components/WarrantyQuickPick";
-import { useAppLocale, formatLocaleDate } from "@/lib/locale";
+import { useAppLocale, formatLocaleDate, formatLocaleMoney } from "@/lib/locale";
 import { hasNoConsumerDates } from "@/lib/purchaseType";
 import { Switch } from "@/components/ui/switch";
 import { PurchaseCountryField } from "@/components/PurchaseCountryField";
@@ -58,7 +58,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { StoreFullscreen } from "@/components/StoreFullscreen";
 import { generateReceiptPdf } from "@/lib/generateReceiptPdf";
-import { currencySymbol } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AutosizeTextarea } from "@/components/ui/autosize-textarea";
@@ -277,9 +276,8 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
   const handleShare = async () => {
     if (!receipt) return;
     const merchant = receipt.merchant || receipt.originalFileName;
-    const sym = currencySymbol(receipt.currency);
     try {
-      const pdfBlob = await generateReceiptPdf(receipt, sym);
+      const pdfBlob = await generateReceiptPdf(receipt);
       const fileName = `${merchant.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-receipt.pdf`;
       const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
@@ -364,7 +362,6 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
     ? privateFileUrl(receipt.objectPath)
     : "";
   const isProcessing = receipt?.status === "processing";
-  const symbol = currencySymbol(receipt?.currency);
   const isImage = receipt?.contentType.startsWith("image/") ?? false;
 
   return (
@@ -443,13 +440,13 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {receipt.purchaseDate
-                        ? formatLocaleDate(new Date(receipt.purchaseDate), locale)
-                        : formatLocaleDate(new Date(receipt.createdAt), locale)}
+                        ? formatLocaleDate(receipt.purchaseDate, locale)
+                        : formatLocaleDate(receipt.createdAt, locale)}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="font-bold font-mono leading-tight">
-                      {receipt.total != null ? `${symbol}${receipt.total.toFixed(2)}` : ""}
+                      {receipt.total != null ? formatLocaleMoney(receipt.total, locale, receipt.currency || "USD") : ""}
                     </p>
                     {receipt.transactionNumber && (
                       <p className="text-xs text-muted-foreground font-mono mt-0.5">
@@ -739,7 +736,7 @@ export function ReceiptSheet({ receiptId, open, onClose }: ReceiptSheetProps) {
                       products={receipt.products ?? []}
                       notableItems={receipt.notableItems}
                       itemRights={receipt.itemRights}
-                      symbol={symbol}
+                      currency={receipt.currency}
                       receipt={receipt}
                     />
                   )}

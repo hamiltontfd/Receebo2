@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { formatEmailDate } from "./emailFormat";
+import { formatEmailDate, formatMoney, type FormatLocale } from "./emailFormat";
 import { localizedReturnReminder, localizedWarrantyReminder } from "./reminderEmailCopy";
+
+describe("money matches the web's readable locale format", () => {
+  it.each<[number, string, FormatLocale, string]>([
+    [649, "EUR", "pt-PT", "649,00 €"],
+    [3199, "BRL", "pt-BR", "R$ 3.199,00"],
+    [486, "USD", "en", "$486.00"],
+    [486, "USD", "en-US", "$486.00"],
+    [649, "EUR", "en", "€649.00"],
+  ])("%s %s in %s", (amount, currency, locale, expected) => {
+    expect(formatMoney(amount, currency, locale).replace(/[\u00a0\u202f]/g, " ")).toBe(expected);
+  });
+});
 
 describe("formatEmailDate", () => {
   it("English keeps the short month (en-GB and en-US)", () => {

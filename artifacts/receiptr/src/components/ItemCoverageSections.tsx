@@ -4,7 +4,7 @@ import { WarrantyInfo, type RightsReceipt } from "@/components/ConsumerRightsPan
 import { deriveConsumerRights, merchantSuggestsOnline, unknownChannelRetailerNote } from "@/lib/consumerRights";
 import { hasNoConsumerDates } from "@/lib/purchaseType";
 import { useAccountRegion } from "@/lib/region";
-import { formatLocaleDate, useAppLocale, type AppLocale } from "@/lib/locale";
+import { formatLocaleDate, formatLocaleMoney, useAppLocale, type AppLocale } from "@/lib/locale";
 
 export interface ShownContract {
   id: string;
@@ -147,13 +147,13 @@ export function ItemCoverageSections({
   products,
   notableItems,
   itemRights,
-  symbol,
+  currency,
   receipt,
 }: {
   products: ShownLine[];
   notableItems?: ReadonlyArray<{ name: string; price?: number | null; category?: string | null }> | null;
   itemRights?: ShownRights[] | null;
-  symbol: string;
+  currency?: string | null;
   receipt?: RightsReceipt | null;
 }) {
   const locale = useAppLocale();
@@ -238,7 +238,7 @@ export function ItemCoverageSections({
                     <Icon className="w-[1.1rem] h-[1.1rem]" />
                   </span>
                   <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
-                  {item.price != null && <p className="font-mono font-bold text-base">{symbol}{item.price.toFixed(2)}</p>}
+                  {item.price != null && <p className="font-mono font-bold text-base">{formatLocaleMoney(item.price, locale, currency || "USD")}</p>}
                   {tags.map((tag) => (
                     <span
                       key={tag.id}
@@ -322,7 +322,7 @@ export function ItemCoverageSections({
                   </p>
                 )}
               </div>
-              {line.price != null && <span className="font-mono text-sm font-semibold shrink-0">{symbol}{line.price.toFixed(2)}</span>}
+              {line.price != null && <span className="font-mono text-sm font-semibold shrink-0">{formatLocaleMoney(line.price, locale, currency || "USD")}</span>}
             </li>
           ))}
         </ul>
