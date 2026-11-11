@@ -39,6 +39,30 @@ Phone stills are 390×844 at 2x (780×1688); desktop library is 1440×900 at
 capture of the current item-coverage UI, not a fixed-size old rights card.
 `CAPTURE_CLIPS=0` explicitly requests stills only. The default records all clips.
 
+### Partial review / Capture recapture
+
+With the isolated server running in the matching context, from the repository root:
+
+```sh
+CAPTURE_CONTEXT=eu CAPTURE_ONLY=review,capture CAPTURE_CLIPS=1 \
+CHROMIUM_PATH=/repl/tools/bin/chromium \
+node artifacts/receiptr/scripts/marketing/record.mjs
+```
+
+Repeat with `us` and `br`, stopping only the isolated server between contexts.
+`CAPTURE_ONLY` accepts `review`, `capture`, or both; unknown names fail closed.
+Without the variable, the existing full capture is unchanged. `review` writes
+`scan-review` and its `review` alias (PNG/WebP); `capture` writes only the Capture
+video (MP4/WebM, plus its raw recording) and poster (PNG/WebP). The clip holds
+the fully visible TOTAL for three seconds before scrolling to Save.
+
+Partial runs overwrite only the selected media in the usual context folder,
+use a temporary fictional input document, and write `manifest.partial.json`
+and `sources/layout.partial.json`. They leave the previous full manifest,
+fixture document and unrelated media untouched; partial evidence is not a full
+capture approval. Download copies belong only in the gitignored
+`artifacts/receiptr/public/_capture-tmp/{eu,us,br}/`; never force-add those files.
+
 The receipt input and Show-to-store original use the context's language and
 currency. All three use a PNG generated from a fictional document, so the real
 app opens its fullscreen receipt view (PDF originals open a separate browser tab).

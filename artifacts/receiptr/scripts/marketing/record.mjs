@@ -1,4 +1,5 @@
-import { mkdir, writeFile, readFile, copyFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile, copyFile, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
@@ -11,6 +12,26 @@ import { captureLocators } from "./locators.mjs";
 export function clipsEnabled(_usContext, flag = process.env.CAPTURE_CLIPS) {
   return flag !== "0";
 }
+
+/** No filter preserves the full capture. Unknown names fail before writing files. */
+export function capturePlan(only = process.env.CAPTURE_ONLY, clipFlag = process.env.CAPTURE_CLIPS) {
+  const selected = only?.trim() ? [...new Set(only.split(",").map(name => name.trim()))] : null;
+  if (selected?.some(name => !["review", "capture"].includes(name))) {
+    throw new Error("CAPTURE_ONLY accepts review,capture (or either name alone)");
+  }
+  if (selected?.includes("capture") && !clipsEnabled(false, clipFlag)) {
+    throw new Error("CAPTURE_ONLY=capture requires clips; remove CAPTURE_CLIPS=0");
+  }
+  return {
+    partial: selected !== null,
+    review: selected === null || selected.includes("review"),
+    clips: clipsEnabled(false, clipFlag)
+      ? ["capture", "find", "protect"].filter(name => selected === null || selected.includes(name))
+      : [],
+  };
+}
+
+export const reviewHoldMs = 3000;
 
 export const captureSizes = {
   phone: { width: 390, height: 844, deviceScaleFactor: 2 },
@@ -26,7 +47,7 @@ const invokedDirectly = process.argv[1]
   && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 if (invokedDirectly) {
 const capture = activeCapture();
-const us = capture.name === "us";
+const plan = capturePlan();
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
@@ -39,8 +60,9 @@ const browser = await chromium.launch({
   args: ["--no-sandbox"],
 });
 const errors = [];
-const manifest = { capturedAt, context: capture.name, market: capture.market, language: capture.language, sampleData: true, clips: {}, screens: [], unexpected: [] };
+const manifest = { capturedAt, context: capture.name, market: capture.market, language: capture.language, sampleData: true, partial: plan.partial, reviewTotals: {}, clips: {}, screens: [], unexpected: [] };
 const ff = args => execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", ...args]);
+let inputDirectory;
 
 function pngSize(bytes) {
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
@@ -51,7 +73,9 @@ try {
   const lines = sampleDocumentLines(receipts[0], capture.language);
   // Image originals exercise the app's real fullscreen Show-to-store in every
   // market. PDF originals open a separate browser tab, not that app view.
-  const receiptImage = `${out}/sources/sample-receipt.png`;
+  // Partial runs must not overwrite the input/source assets of a previous full run.
+  inputDirectory = plan.partial ? await mkdtemp(path.join(tmpdir(), "receebo-review-input-")) : null;
+  const receiptImage = `${inputDirectory ?? `${out}/sources`}/sample-receipt.png`;
   const input = await browser.newPage({ viewport: { width: 720, height: 900 }, deviceScaleFactor: 1, colorScheme: "light" });
   await input.setContent(sampleDocumentHtml(lines, capture.language));
   await input.screenshot({ path: receiptImage });
@@ -195,7 +219,20 @@ try {
     manifest.unexpected.push(...c.unexpected);
     await c.ctx.close();
   }
-  {
+  async function reviewTotal(c) {
+    const prefix = c.page.getByTestId("text-total-currency");
+    await requireVisible(c.page, prefix, "scan review TOTAL", c.unexpected);
+    await prefix.scrollIntoViewIfNeeded();
+    return prefix.evaluate(el => {
+      const input = el.parentElement.querySelector("input");
+      const box = el.parentElement.getBoundingClientRect();
+      if (!input || box.top < 0 || box.bottom > innerHeight || box.left < 0 || box.right > innerWidth) {
+        throw new Error("Review TOTAL must be fully visible before capture");
+      }
+      return { prefix: el.textContent.trim(), value: input.value, type: input.type, inputMode: input.inputMode };
+    });
+  }
+  if (!plan.partial) {
     const desk = await context(captureSizes.desktop);
     await ready(desk.page);
     await requireVisible(desk.page, heroButton(desk.page), "desktop library", desk.unexpected);
@@ -213,7 +250,10 @@ try {
     await close(desk);
   }
 
+  if (plan.review) {
   const phone = await context(captureSizes.phone);
+  const phoneUi = captureLocators(phone.page, capture.language);
+  if (!plan.partial) {
   await ready(phone.page);
   await requireVisible(phone.page, heroButton(phone.page), "phone library", phone.unexpected);
   await still(phone.page, "library-phone");
@@ -228,23 +268,25 @@ try {
   await showWarrantyTerms(phone.page);
   await still(phone.page, "receipt-warranty");
   await measure(phone.page, "receipt-warranty");
-  const phoneUi = captureLocators(phone.page, capture.language);
   await phoneUi.original.scrollIntoViewIfNeeded();
   await phoneUi.original.click();
   await requireVisible(phone.page, phoneUi.originalImage, "show-to-store image", phone.unexpected);
   await phoneUi.originalImage.evaluate(img => img.decode());
   await phone.page.waitForTimeout(600);
   await still(phone.page, "show-to-store");
+  }
 
   await ready(phone.page, "/scan");
-  await still(phone.page, "scan-upload");
+  if (!plan.partial) await still(phone.page, "scan-upload");
   await phone.page.locator('input[type="file"]').setInputFiles(receiptImage);
   await phoneUi.save.waitFor({ timeout: 20000 });
   await requireVisible(phone.page, phone.page.getByTestId("item-coverage"), "scan review", phone.unexpected);
+  manifest.reviewTotals.review = await reviewTotal(phone);
   await phone.page.waitForTimeout(400);
   await still(phone.page, "scan-review");
   await measure(phone.page, "scan-review");
   for (const [name, source] of Object.entries(heroScenes)) {
+    if (plan.partial && name !== "review") continue;
     await alias(name, source);
     const size = pngSize(await readFile(`${out}/sources/${name}.png`));
     const expected = name === "home-desktop" ? [2880, 1800] : [780, 1688];
@@ -253,8 +295,9 @@ try {
     }
   }
   await close(phone);
+  }
 
-  if (clipsEnabled(us)) for (const clip of ["capture", "find", "protect"]) {
+  for (const clip of plan.clips) {
     const c = await context({ ...captureSizes.clip, record: true });
     const ui = captureLocators(c.page, capture.language);
     const video = c.page.video();
@@ -265,7 +308,8 @@ try {
       await c.page.waitForTimeout(900);
       await c.page.locator('input[type="file"]').setInputFiles(receiptImage);
       await ui.save.waitFor({ timeout: 20000 });
-      await c.page.waitForTimeout(900);
+      manifest.reviewTotals.capture = await reviewTotal(c);
+      await c.page.waitForTimeout(reviewHoldMs);
       await still(c.page, "capture-poster");
       await ui.save.scrollIntoViewIfNeeded();
       await c.page.waitForTimeout(1200);
@@ -297,16 +341,17 @@ try {
     // Strip the initial load, preserve the genuine interaction at real speed.
     ff(["-ss", "1.2", "-i", source, "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "23", "-pix_fmt", "yuv420p", "-movflags", "+faststart", target]);
     ff(["-ss", "1.2", "-i", source, "-an", "-c:v", "libvpx-vp9", "-crf", "33", "-b:v", "0", "-pix_fmt", "yuv420p", `${out}/web/${clip}.webm`]);
-    manifest.clips[clip] = { source: path.basename(source), duration, viewport: "960x640", file: `${clip}.mp4` };
+    manifest.clips[clip] = { source: path.basename(source), duration, viewport: "960x640", file: `${clip}.mp4`,
+      ...(clip === "capture" ? { reviewHoldMs } : {}) };
   }
-  await writeFile(`${out}/sources/fixtures.json`, JSON.stringify(receipts, null, 2));
-  await writeFile(`${out}/sources/layout.json`, JSON.stringify({ capturedAt, context: capture.name, dprNote: "centerYInPixels uses the actual DPR; centerYAtDpr3 is retained only for older analysis tools", layout }, null, 2));
-  await writeFile(`${out}/manifest.json`, JSON.stringify({ ...manifest, layout, errors }, null, 2));
+  if (!plan.partial) await writeFile(`${out}/sources/fixtures.json`, JSON.stringify(receipts, null, 2));
+  await writeFile(`${out}/sources/layout${plan.partial ? ".partial" : ""}.json`, JSON.stringify({ capturedAt, context: capture.name, dprNote: "centerYInPixels uses the actual DPR; centerYAtDpr3 is retained only for older analysis tools", layout }, null, 2));
+  // Never pass off a partial recapture as fresh evidence for all the other scenes.
+  await writeFile(`${out}/manifest${plan.partial ? ".partial" : ""}.json`, JSON.stringify({ ...manifest, layout, errors }, null, 2));
   if (errors.length || manifest.unexpected.length) throw new Error(JSON.stringify({ errors, unexpected: manifest.unexpected }));
-  console.log(clipsEnabled(us)
-    ? `Captured real screens and all three interactions. ${out}`
-    : `Captured ${capture.name} stills only. No video was encoded. ${out}`);
+  console.log(`Captured ${plan.partial ? "partial" : "full"} ${capture.name}: ${manifest.screens.join(", ")}; clips: ${plan.clips.join(", ") || "none"}. ${out}`);
 } finally {
   await browser.close();
+  if (inputDirectory) await rm(inputDirectory, { recursive: true, force: true });
 }
 }

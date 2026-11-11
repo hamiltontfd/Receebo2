@@ -118,6 +118,31 @@ test("all markets record all clips by default; explicit CAPTURE_CLIPS=0 skips vi
   assert.equal(clipsEnabled(true, "0"), false);
 });
 
+test("partial recapture selects only review and Capture while preserving the full default", async () => {
+  const { capturePlan } = await import("./record.mjs");
+  assert.deepEqual(capturePlan("", "1"), { partial: false, review: true, clips: ["capture", "find", "protect"] });
+  assert.deepEqual(capturePlan("", "0"), { partial: false, review: true, clips: [] });
+  assert.deepEqual(capturePlan("review,capture", "1"), { partial: true, review: true, clips: ["capture"] });
+  assert.deepEqual(capturePlan(" capture, review,review ", "1"), { partial: true, review: true, clips: ["capture"] });
+  assert.deepEqual(capturePlan("review", "0"), { partial: true, review: true, clips: [] });
+  assert.deepEqual(capturePlan("capture", "1"), { partial: true, review: false, clips: ["capture"] });
+  for (const value of ["unknown", "find", "review,", "review,protect"]) {
+    assert.throws(() => capturePlan(value, "1"), /CAPTURE_ONLY/);
+  }
+  assert.throws(() => capturePlan("capture", "0"), /CAPTURE_CLIPS=0/);
+});
+
+test("Capture holds the visible TOTAL before its poster and the scroll to Save", async () => {
+  const { reviewHoldMs } = await import("./record.mjs");
+  assert.ok(reviewHoldMs >= 3000);
+  const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
+  assert.match(record, /manifest\.reviewTotals\.capture = await reviewTotal\(c\);\s*await c\.page\.waitForTimeout\(reviewHoldMs\);\s*await still\(c\.page, "capture-poster"\);\s*await ui\.save\.scrollIntoViewIfNeeded\(\)/);
+  assert.match(record, /Review TOTAL must be fully visible/);
+  assert.match(record, /manifest\$\{plan\.partial \? "\.partial" : ""\}\.json/);
+  assert.match(record, /if \(plan\.partial && name !== "review"\) continue/);
+  assert.match(record, /if \(!plan\.partial\) await still\(phone\.page, "scan-upload"\)/);
+});
+
 test("capture contexts stay separate and the published binaries stay put", async () => {
   const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
   assert.match(record, /captureLocators/);
