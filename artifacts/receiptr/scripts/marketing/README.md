@@ -50,7 +50,11 @@ node artifacts/receiptr/scripts/marketing/record.mjs
 ```
 
 Repeat with `us` and `br`, stopping only the isolated server between contexts.
-`CAPTURE_ONLY` accepts `review`, `capture`, or both; unknown names fail closed.
+`CAPTURE_ONLY` accepts `upload`, `review`, `capture`, alone or combined; unknown names fail closed.
+For upload and Capture only, use `CAPTURE_ONLY=upload,capture CAPTURE_CLIPS=1`.
+An upload-only run (`CAPTURE_ONLY=upload CAPTURE_CLIPS=0`) opens `/scan`,
+writes `scan-upload` and its `upload` alias (780 × 1688 PNG, plus WebP), and
+never uploads the fictional file, enters review, or clicks Save.
 Without the variable, the existing full capture is unchanged. `review` writes
 `scan-review-form` (the pre-save form), then `scan-review` and its `review` alias
 (PNG/WebP) showing the real post-save black hero card. The recorder moves the
@@ -65,6 +69,10 @@ Only the isolated harness launches Chromium with `--use-fake-device-for-media-st
 and `--use-fake-ui-for-media-stream`, grants the context camera permission, and
 keeps `--no-sandbox` plus the context's `--lang`. This lets headless upload
 stills use a simulated camera without changing the product camera UI.
+The shared Playwright `isolate` init overrides `getUserMedia` with a live
+720 × 1280 canvas stream painted nearly black (`#0d0c0b`), rather than Chromium's
+green test pattern. This applies to both upload stills and Capture clips, keeps
+the real camera controls, and stops the repaint timer when the stream is stopped.
 
 Partial runs overwrite only the selected media in the usual context folder,
 use a temporary fictional input document, and write `manifest.partial.json`

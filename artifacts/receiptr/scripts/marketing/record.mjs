@@ -16,14 +16,15 @@ export function clipsEnabled(_usContext, flag = process.env.CAPTURE_CLIPS) {
 /** No filter preserves the full capture. Unknown names fail before writing files. */
 export function capturePlan(only = process.env.CAPTURE_ONLY, clipFlag = process.env.CAPTURE_CLIPS) {
   const selected = only?.trim() ? [...new Set(only.split(",").map(name => name.trim()))] : null;
-  if (selected?.some(name => !["review", "capture"].includes(name))) {
-    throw new Error("CAPTURE_ONLY accepts review,capture (or either name alone)");
+  if (selected?.some(name => !["upload", "review", "capture"].includes(name))) {
+    throw new Error("CAPTURE_ONLY accepts upload,review,capture (alone or combined)");
   }
   if (selected?.includes("capture") && !clipsEnabled(false, clipFlag)) {
     throw new Error("CAPTURE_ONLY=capture requires clips; remove CAPTURE_CLIPS=0");
   }
   return {
     partial: selected !== null,
+    upload: selected === null || selected.includes("upload"),
     review: selected === null || selected.includes("review"),
     clips: clipsEnabled(false, clipFlag)
       ? ["capture", "find", "protect"].filter(name => selected === null || selected.includes(name))
@@ -280,7 +281,7 @@ try {
     await close(desk);
   }
 
-  if (plan.review) {
+  if (plan.upload || plan.review) {
   const phone = await context(captureSizes.phone);
   const phoneUi = captureLocators(phone.page, capture.language);
   if (!plan.partial) {
@@ -307,7 +308,8 @@ try {
   }
 
   await ready(phone.page, "/scan");
-  if (!plan.partial) await still(phone.page, "scan-upload");
+  if (plan.upload) await still(phone.page, "scan-upload");
+  if (plan.review) {
   await phone.page.locator('input[type="file"]').setInputFiles(receiptImage);
   await phoneUi.save.waitFor({ timeout: 20000 });
   await requireVisible(phone.page, phone.page.getByTestId("item-coverage"), "scan review", phone.unexpected);
@@ -335,8 +337,9 @@ try {
   if (!heroVisible) throw new Error("Saved receipt hero with merchant and total must be fully visible before capture");
   await still(phone.page, "scan-review");
   await measure(phone.page, "scan-review");
+  }
   for (const [name, source] of Object.entries(heroScenes)) {
-    if (plan.partial && name !== "review") continue;
+    if (plan.partial && !(name === "review" && plan.review) && !(name === "upload" && plan.upload)) continue;
     await alias(name, source);
     const size = pngSize(await readFile(`${out}/sources/${name}.png`));
     const expected = name === "home-desktop" ? [2880, 1800] : [780, 1688];

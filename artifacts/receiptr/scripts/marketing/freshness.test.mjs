@@ -6,8 +6,9 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { runInNewContext } from "node:vm";
 import { changedFiles, fingerprint, validateApproval, exportHashes, workspace } from "./freshness.mjs";
-import { isolate, receipts, createCaptureSession, activeCapture } from "./fixtures.mjs";
+import { isolate, receipts, createCaptureSession, activeCapture, installDarkCameraStream } from "./fixtures.mjs";
 import { illustrativePdf, sampleDocumentLines, sampleDocumentHtml, moneyLabel } from "./sample-document.mjs";
 import { captureLabels, captureLocators } from "./locators.mjs";
 
@@ -120,12 +121,16 @@ test("all markets record all clips by default; explicit CAPTURE_CLIPS=0 skips vi
 
 test("partial recapture selects only review and Capture while preserving the full default", async () => {
   const { capturePlan } = await import("./record.mjs");
-  assert.deepEqual(capturePlan("", "1"), { partial: false, review: true, clips: ["capture", "find", "protect"] });
-  assert.deepEqual(capturePlan("", "0"), { partial: false, review: true, clips: [] });
-  assert.deepEqual(capturePlan("review,capture", "1"), { partial: true, review: true, clips: ["capture"] });
-  assert.deepEqual(capturePlan(" capture, review,review ", "1"), { partial: true, review: true, clips: ["capture"] });
-  assert.deepEqual(capturePlan("review", "0"), { partial: true, review: true, clips: [] });
-  assert.deepEqual(capturePlan("capture", "1"), { partial: true, review: false, clips: ["capture"] });
+  assert.deepEqual(capturePlan("", "1"), { partial: false, upload: true, review: true, clips: ["capture", "find", "protect"] });
+  assert.deepEqual(capturePlan("", "0"), { partial: false, upload: true, review: true, clips: [] });
+  assert.deepEqual(capturePlan("review,capture", "1"), { partial: true, upload: false, review: true, clips: ["capture"] });
+  assert.deepEqual(capturePlan(" capture, review,review ", "1"), { partial: true, upload: false, review: true, clips: ["capture"] });
+  assert.deepEqual(capturePlan("review", "0"), { partial: true, upload: false, review: true, clips: [] });
+  assert.deepEqual(capturePlan("capture", "1"), { partial: true, upload: false, review: false, clips: ["capture"] });
+  assert.deepEqual(capturePlan("upload", "0"), { partial: true, upload: true, review: false, clips: [] });
+  assert.deepEqual(capturePlan("upload,capture", "1"), { partial: true, upload: true, review: false, clips: ["capture"] });
+  assert.deepEqual(capturePlan("upload,review", "0"), { partial: true, upload: true, review: true, clips: [] });
+  assert.deepEqual(capturePlan("upload,review,capture", "1"), { partial: true, upload: true, review: true, clips: ["capture"] });
   for (const value of ["unknown", "find", "review,", "review,protect"]) {
     assert.throws(() => capturePlan(value, "1"), /CAPTURE_ONLY/);
   }
@@ -139,8 +144,39 @@ test("Capture holds the visible TOTAL before its poster and the scroll to Save",
   assert.match(record, /manifest\.reviewTotals\.capture = await reviewTotal\(c\);\s*await c\.page\.waitForTimeout\(reviewHoldMs\);\s*await still\(c\.page, "capture-poster"\);\s*await ui\.save\.scrollIntoViewIfNeeded\(\)/);
   assert.match(record, /Review TOTAL must be fully visible/);
   assert.match(record, /manifest\$\{plan\.partial \? "\.partial" : ""\}\.json/);
-  assert.match(record, /if \(plan\.partial && name !== "review"\) continue/);
-  assert.match(record, /if \(!plan\.partial\) await still\(phone\.page, "scan-upload"\)/);
+  assert.match(record, /if \(plan\.partial && !\(name === "review" && plan\.review\) && !\(name === "upload" && plan\.upload\)\) continue/);
+  assert.match(record, /if \(plan\.upload\) await still\(phone\.page, "scan-upload"\);\s*if \(plan\.review\) \{\s*await phone\.page\.locator\('input\[type="file"\]'\)\.setInputFiles/);
+});
+
+test("the isolated init provides a dark live canvas camera and stops its repaint timer", async () => {
+  const calls = [];
+  const track = { stop: () => calls.push("stop") };
+  const stream = { getTracks: () => [track] };
+  const paint = { fillRect: (...args) => calls.push(["paint", paint.fillStyle, ...args]) };
+  const canvas = {
+    getContext: type => { assert.equal(type, "2d"); return paint; },
+    captureStream: fps => { assert.equal(fps, 5); return stream; },
+  };
+  const navigator = { mediaDevices: {} };
+  runInNewContext(`(${installDarkCameraStream.toString()})()`, {
+    navigator, DOMException,
+    document: { createElement: tag => { assert.equal(tag, "canvas"); return canvas; } },
+    setInterval: (fn, ms) => { assert.equal(ms, 200); calls.push("timer"); return 7; },
+    clearInterval: id => calls.push(["clear", id]),
+  });
+  assert.equal(await navigator.mediaDevices.getUserMedia({ video: true }), stream);
+  assert.equal(canvas.width, 720);
+  assert.equal(canvas.height, 1280);
+  assert.deepEqual(calls[0], ["paint", "#0d0c0b", 0, 0, 720, 1280]);
+  track.stop();
+  assert.deepEqual(calls.slice(-2), [["clear", 7], "stop"]);
+  await assert.rejects(navigator.mediaDevices.getUserMedia({ audio: true }), /video only/);
+  const initScripts = [];
+  await isolate({
+    addInitScript: async fn => initScripts.push(fn),
+    route: async () => {},
+  }, "/sample.png");
+  assert.equal(initScripts[0], installDarkCameraStream);
 });
 
 test("isolated Chromium keeps market language and grants a simulated camera", async () => {

@@ -182,9 +182,38 @@ export function createCaptureSession(capture = activeCapture()) {
 }
 
 // Deterministic response interception, fail closed. No backend is contacted.
+/** Browser-only init for isolated captures; never accesses a physical camera. */
+export function installDarkCameraStream() {
+  if (!navigator.mediaDevices) throw new Error("Capture requires mediaDevices");
+  Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
+    configurable: true,
+    value: async (constraints) => {
+      if (!constraints?.video) throw new DOMException("Capture supports video only", "NotSupportedError");
+      const canvas = document.createElement("canvas");
+      canvas.width = 720;
+      canvas.height = 1280;
+      const paint = canvas.getContext("2d");
+      if (!paint) throw new Error("Capture requires a canvas 2D context");
+      const draw = () => {
+        paint.fillStyle = "#0d0c0b";
+        paint.fillRect(0, 0, canvas.width, canvas.height);
+      };
+      draw();
+      const stream = canvas.captureStream(5);
+      const timer = setInterval(draw, 200);
+      for (const track of stream.getTracks()) {
+        const stop = track.stop.bind(track);
+        track.stop = () => { clearInterval(timer); stop(); };
+      }
+      return stream;
+    },
+  });
+}
+
 export async function isolate(context, sampleFile) {
   const session = createCaptureSession();
   const unexpected = [];
+  await context.addInitScript(installDarkCameraStream);
   await context.addInitScript(({ capturedAt: frozen }) => {
     const RealDate = Date;
     class FixedDate extends RealDate {
