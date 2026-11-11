@@ -11,6 +11,7 @@ vi.mock("@workspace/api-client-react", () => ({
 import InstallBar from "./InstallBar";
 import { resetInstallStateForTests } from "@/lib/pwa";
 import { INSTALL_DISMISS_KEY, INSTALL_DISMISS_MS, shouldShowInstallBar } from "@/lib/installPrompt";
+import { acceptAll, CONSENT_STORAGE_KEY } from "@/lib/adConsent";
 
 const IPHONE_SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1";
 const IPHONE_CHROME = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 CriOS/130.0 Mobile/15E148 Safari/604.1";
@@ -43,6 +44,12 @@ function offerInstall(outcome: "accepted" | "dismissed" = "accepted") {
 }
 
 describe("install bar show rules", () => {
+  it("dismisses for this view without persisting optional preferences before consent", () => {
+    render(<InstallBar />);
+    act(() => screen.getByRole("button", { name: "Dismiss" }).click());
+    expect(bar()).not.toBeInTheDocument();
+    expect(localStorage.getItem(INSTALL_DISMISS_KEY)).toBeNull();
+  });
   it("is shown to a signed-in user with a saved receipt on a phone", () => {
     render(<InstallBar />);
     expect(bar()).toBeInTheDocument();
@@ -73,11 +80,15 @@ describe("install bar show rules", () => {
     expect(bar()).not.toBeInTheDocument();
   });
   it("hides for 30 days after X and comes back afterwards", () => {
+    // DEV-only jurisdiction override; existing browser preferences were accepted.
+    window.history.replaceState({}, "", "/?dev_country=PT");
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(acceptAll()));
     const first = render(<InstallBar />);
     act(() => screen.getByRole("button", { name: "Dismiss" }).click());
     expect(bar()).not.toBeInTheDocument();
     const saved = Number(localStorage.getItem(INSTALL_DISMISS_KEY));
     expect(saved).toBeGreaterThan(0);
+    window.history.replaceState({}, "", "/");
     first.unmount();
     render(<InstallBar />);
     expect(bar()).not.toBeInTheDocument();

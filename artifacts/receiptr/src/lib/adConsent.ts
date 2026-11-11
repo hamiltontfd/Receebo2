@@ -4,7 +4,7 @@
  * California opt-out / Global Privacy Control behaviour before this is treated
  * as final policy.
  */
-export type ConsentRegion = "US" | "EU";
+export type ConsentRegion = "US" | "EU" | "UNKNOWN";
 
 export type ConsentState = {
   essential: true;
@@ -19,9 +19,21 @@ export type ConsentState = {
 export const CONSENT_STORAGE_KEY = "receebo:cookie-consent";
 const NINETY_DAYS = 90 * 24 * 60 * 60;
 
-export function consentRegion(path: string, market: string | null | undefined): ConsentRegion {
-  if (path === "/us" || path.startsWith("/us/") || market === "US") return "US";
-  return "EU";
+export const CONSENT_CHANGED = "receebo:consent-changed";
+
+/** Only the actual request country determines jurisdiction, never route or market. */
+export function consentRegion(country: string | null | undefined): ConsentRegion {
+  if (!country) return "UNKNOWN";
+  return country.toUpperCase() === "US" ? "US" : "EU";
+}
+
+export function consentCountry(country: string | null | undefined, search = window.location.search, dev = import.meta.env.DEV): string | null {
+  const override = dev ? new URLSearchParams(search).get("dev_country")?.toUpperCase() : null;
+  return override && /^[A-Z]{2}$/.test(override) ? override : country ?? null;
+}
+
+export function readStoredConsent(): ConsentState | null {
+  try { return parseConsent(localStorage.getItem(CONSENT_STORAGE_KEY)); } catch { return null; }
 }
 
 export function emptyConsent(now = new Date().toISOString()): ConsentState {
@@ -38,7 +50,8 @@ export function effectiveConsent(
   region: ConsentRegion,
   globalPrivacyControl: boolean,
 ): ConsentState {
-  if (stored?.choice) return stored;
+  if (region === "UNKNOWN") return emptyConsent();
+  if (stored?.choice) return region === "US" && globalPrivacyControl ? { ...stored, marketing: false } : stored;
   if (region === "EU") return emptyConsent();
   return {
     essential: true,
@@ -68,5 +81,5 @@ export function parseConsent(raw: string | null): ConsentState | null {
 }
 
 export function consentCookie(state: ConsentState): string {
-  return `${CONSENT_STORAGE_KEY}=${encodeURIComponent(JSON.stringify(state))}; Path=/; Max-Age=${NINETY_DAYS}; SameSite=Lax`;
+  return `${CONSENT_STORAGE_KEY}=${encodeURIComponent(JSON.stringify(state))}; Path=/; Max-Age=${NINETY_DAYS}; SameSite=Lax; Secure`;
 }

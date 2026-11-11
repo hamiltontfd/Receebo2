@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { acceptAll, consentRegion, effectiveConsent, emptyConsent, parseConsent } from "./adConsent";
+import { acceptAll, consentCookie, consentCountry, consentRegion, effectiveConsent, emptyConsent, parseConsent } from "./adConsent";
 
 describe("ad consent", () => {
-  it("treats /us and a US account as the opt-out region", () => {
-    expect(consentRegion("/us", null)).toBe("US");
-    expect(consentRegion("/search", "US")).toBe("US");
-    expect(consentRegion("/", "PT")).toBe("EU");
-    expect(consentRegion("/search", null)).toBe("EU");
+  it("uses the country alone: EU/EEA/GB/CH/BR opt in regardless of /us or chosen market", () => {
+    for (const code of ["PT", "DE", "IS", "LI", "NO", "GB", "CH", "BR", "JP"]) {
+      expect(consentRegion(code)).toBe("EU");
+      expect(effectiveConsent(null, consentRegion(code), false).marketing).toBe(false);
+    }
+    expect(consentRegion("US")).toBe("US");
+    expect(consentRegion(null)).toBe("UNKNOWN");
+    expect(effectiveConsent(acceptAll(), "UNKNOWN", false).marketing).toBe(false);
+    expect(consentCountry("PT", "?dev_country=US", false)).toBe("PT");
+    expect(consentCountry(null, "?dev_country=US", true)).toBe("US");
+    expect(consentCountry("US", "?dev_country=PT", true)).toBe("PT");
   });
 
   it("keeps EU non-essential storage off until a choice, and honors Global Privacy Control in the US", () => {
@@ -14,8 +20,12 @@ describe("ad consent", () => {
     expect(effectiveConsent(null, "EU", false).attribution).toBe(false);
     expect(effectiveConsent(null, "US", false).marketing).toBe(true);
     expect(effectiveConsent(null, "US", true).marketing).toBe(false);
-    expect(effectiveConsent(acceptAll(), "US", true).marketing).toBe(true);
+    expect(effectiveConsent(acceptAll(), "US", true).marketing).toBe(false);
     expect(effectiveConsent(emptyConsent(), "US", false).marketing).toBe(false);
+  });
+
+  it("marks the consent cookie Secure even for a rejection", () => {
+    expect(consentCookie(emptyConsent())).toMatch(/; Secure$/);
   });
 
   it("ignores a stored value that is not a real choice", () => {

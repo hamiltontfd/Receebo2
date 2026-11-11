@@ -12,7 +12,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { recordCheckoutCancellation } from "@/lib/trialFunnel";
 import { rememberPurchaseEvent } from "@/components/AdsRuntime";
-import { CONSENT_STORAGE_KEY, consentRegion, effectiveConsent, parseConsent } from "@/lib/adConsent";
+import { CONSENT_STORAGE_KEY, consentCountry, consentRegion, effectiveConsent, parseConsent } from "@/lib/adConsent";
 import { metaPixelId, newEventId } from "@/lib/metaPixel";
 import { MarketContext } from "@/components/MarketProvider";
 import {
@@ -218,7 +218,7 @@ export function useCreateCheckout() {
       let stored = null;
       try { stored = parseConsent(localStorage.getItem(CONSENT_STORAGE_KEY)); } catch { /* private mode */ }
       const gpc = typeof navigator !== "undefined" && (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
-      const region = consentRegion(window.location.pathname, market?.confirmed ? market.market : window.location.pathname.startsWith("/us") ? "US" : null);
+      const region = consentRegion(consentCountry(market?.country));
       const eventId = effectiveConsent(stored, region, gpc).marketing && metaPixelId() ? newEventId() : undefined;
       // The committed checkout client only types `{ url }`. The server still
       // accepts metaEventId and may return the purchase handoff beside it.

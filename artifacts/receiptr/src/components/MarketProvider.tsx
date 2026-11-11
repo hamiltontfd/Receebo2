@@ -66,6 +66,21 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
   const failedChoice = useRef<Market | null>(null);
   const mutationBusy = useRef(false);
 
+  // Country is independent of market selection/revision. A manual choice must
+  // not cancel the jurisdiction lookup or be overwritten by its suggestion.
+  useEffect(() => {
+    if (!ready || userId) return;
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 8000);
+    void request<MarketSuggestion>("market/suggestion", { signal: abort.signal }).then(result => {
+      if (abort.signal.aborted) return;
+      setCountry(result.country ?? null);
+      if (!readVisitorMarket()) setSuggestion(isMarket(result.market) ? result.market : null);
+    }).catch(() => { /* Safe opt-in fallback: country remains unknown. */ })
+      .finally(() => clearTimeout(timeout));
+    return () => { clearTimeout(timeout); abort.abort(); };
+  }, [ready, userId, reload]);
+
   useEffect(() => {
     active.current = true;
     return () => { active.current = false; };
@@ -136,17 +151,7 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
         } else {
           chosen = readVisitorMarket();
           if (current()) setVisitor(chosen);
-          // Server-side GeoIP only. No third-party lookup: the visitor's IP never
-          // leaves our server. Unknown stays unknown (manual choice remains).
-          if (!chosen) {
-            let result: MarketSuggestion = { country: null, market: null };
-            try {
-              result = await request<MarketSuggestion>("market/suggestion", { signal: abort.signal });
-            } catch { /* unknown */ }
-            if (!current() || abort.signal.aborted) return;
-            setCountry(result.country ?? null);
-            setSuggestion(isMarket(result.market) ? result.market : null);
-          }
+          // The separate country lookup always runs, including with a saved market.
         }
       } catch (err) {
         // Before legal consent nothing is read or stored; a pending landing

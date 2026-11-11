@@ -12,6 +12,7 @@ import {
   INSTALL_COPY, installPlatform, isMobileDevice, readDismissedAt, saveDismissedAt, shouldShowInstallBar,
 } from "@/lib/installPrompt";
 import { useAppLocale } from "@/lib/locale";
+import { useCookieConsent } from "@/lib/useCookieConsent";
 
 /** iOS Share glyph (square with an up arrow), drawn inline. */
 function ShareIcon() {
@@ -29,6 +30,7 @@ function Step({ text }: { text: string }) {
 }
 
 export default function InstallBar() {
+  const { consent } = useCookieConsent();
   useEffect(() => { startInstallCapture(); }, []);
   const { isSignedIn } = useAuth();
   const installEvent = useSyncExternalStore(subscribeInstall, getInstallEvent);
@@ -79,7 +81,7 @@ export default function InstallBar() {
 
   const dismiss = () => {
     const now = Date.now();
-    saveDismissedAt(now);
+    if (consent.preferences) saveDismissedAt(now);
     setDismissedAt(now);
     setSheetOpen(false);
   };

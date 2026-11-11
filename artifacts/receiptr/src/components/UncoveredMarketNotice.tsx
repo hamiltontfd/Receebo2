@@ -9,7 +9,7 @@
  * The browser only remembers, per country, that it already sent (so the count
  * isn't inflated) or that the notice was closed in this session.
  */
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useRef } from "react";
 import { Globe2, X } from "lucide-react";
 import { MarketContext } from "@/components/MarketProvider";
 import { MarketSelector } from "@/components/MarketSelector";
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { countryName } from "@/lib/countries";
+import { useCookieConsent } from "@/lib/useCookieConsent";
 import { useAppLocale, type AppLocale } from "@/lib/locale";
 
 function useNarrowViewport() {
@@ -79,6 +80,9 @@ const read = (storage: () => Storage, key: string) => { try { return storage().g
 const write = (storage: () => Storage, key: string) => { try { storage().setItem(key, "1"); } catch { /* no storage */ } };
 
 export function UncoveredMarketNotice({ variant = "inline" }: { variant?: "inline" | "floating" }) {
+  const { consent } = useCookieConsent();
+  const preferencesAllowed = useRef(consent.preferences);
+  preferencesAllowed.current = consent.preferences;
   const locale = useAppLocale();
   const ctx = useContext(MarketContext);
   const country = ctx?.country ?? null;
@@ -101,7 +105,7 @@ export function UncoveredMarketNotice({ variant = "inline" }: { variant?: "inlin
         body: JSON.stringify({ country: code }),
       });
       if (!res.ok && res.status !== 429) throw new Error(String(res.status));
-      write(() => localStorage, interestSentKey(code));
+      if (preferencesAllowed.current) write(() => localStorage, interestSentKey(code));
       setState("sent");
     } catch {
       setState("error");

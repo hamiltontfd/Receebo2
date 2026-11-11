@@ -1,10 +1,20 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../middlewares/requireAuth";
-import { saveFirstTouch } from "../lib/adAttributionStore";
+import { saveFirstTouch, updateMarketingConsent } from "../lib/adAttributionStore";
 import { sendMetaEvent } from "../lib/metaCapi";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
+
+router.patch("/account/attribution/consent", requireAuth, async (req, res): Promise<void> => {
+  if (typeof req.body?.marketingConsent !== "boolean") {
+    res.status(400).json({ error: "marketingConsent must be a boolean" });
+    return;
+  }
+  await updateMarketingConsent(req.userId!, req.body.marketingConsent);
+  res.setHeader("Cache-Control", "private, no-store");
+  res.json({ marketingConsent: req.body.marketingConsent });
+});
 
 function text(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;

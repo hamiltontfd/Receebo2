@@ -16,6 +16,7 @@ declare global {
 // chosen or filled from the IP only after legal consent; before it nothing is stored.
 const LEGAL_EXEMPT_PATHS = new Set([
   "/account/language",
+  "/account/attribution/consent",
   "/legal/acceptance",
   "/account",
   "/account/export",

@@ -3,8 +3,9 @@ import { Link } from "wouter";
 import { cookieText } from "@/lib/cookieCopy";
 import {
   acceptAll, consentCookie, CONSENT_STORAGE_KEY, effectiveConsent, emptyConsent,
-  parseConsent, type ConsentRegion, type ConsentState,
+  parseConsent, CONSENT_CHANGED, type ConsentRegion, type ConsentState,
 } from "@/lib/adConsent";
+import { applyConsentPrivacy } from "@/lib/metaPixel";
 
 export const OPEN_COOKIE_SETTINGS = "receebo:open-cookie-settings";
 
@@ -14,8 +15,10 @@ function readStored(): ConsentState | null {
 }
 
 function writeStored(state: ConsentState) {
-  localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(state));
+  try { localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(state)); } catch { /* storage unavailable */ }
   document.cookie = consentCookie(state);
+  applyConsentPrivacy(state);
+  window.dispatchEvent(new Event(CONSENT_CHANGED));
 }
 
 export function globalPrivacyControl(): boolean {
@@ -34,7 +37,7 @@ export function CookieConsent({ region }: { region: ConsentRegion }) {
     setStored(saved);
     setOpen(!saved?.choice);
     const show = () => {
-      setDraft(saved ?? effectiveConsent(null, region, gpc));
+      setDraft(readStored() ?? effectiveConsent(null, region, gpc));
       setPrefs(true);
       setOpen(true);
     };

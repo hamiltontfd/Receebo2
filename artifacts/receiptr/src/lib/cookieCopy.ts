@@ -26,9 +26,9 @@ const COPY: Copy = {
   ],
   prefs: ["Preferences", "Preferências", "Preferências"],
   prefsHelp: [
-    "Remembers language and similar choices on this browser.",
-    "Recorda o idioma e escolhas semelhantes neste navegador.",
-    "Lembra o idioma e escolhas semelhantes neste navegador.",
+    "Remembers optional installation-bar dismissals and country-interest submissions.",
+    "Recorda o fecho opcional do aviso de instalação e o interesse já enviado num país.",
+    "Lembra o fechamento opcional do aviso de instalação e o interesse já enviado em um país.",
   ],
   attribution: ["Ad attribution", "Atribuição de anúncios", "Atribuição de anúncios"],
   attributionHelp: [

@@ -1,21 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { useLocation } from "wouter";
 import { ATTRIBUTION_STORAGE_KEY, firstTouch, parseTouch, touchFromSearch, type AdTouch } from "@/lib/adAttribution";
-import { CONSENT_STORAGE_KEY, effectiveConsent, parseConsent, consentRegion } from "@/lib/adConsent";
-import { metaPixelId, newEventId, trackMetaEvent } from "@/lib/metaPixel";
-import { useMarket } from "@/components/MarketProvider";
+import { useCookieConsent } from "@/lib/useCookieConsent";
+import { applyConsentPrivacy, metaPixelId, newEventId, trackMetaEvent } from "@/lib/metaPixel";
 import { customFetch } from "@workspace/api-client-react";
 
 const PURCHASE_KEY = "receebo:purchase-event";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-
-function readConsent(path: string, market: string | null | undefined) {
-  let stored = null;
-  try { stored = parseConsent(localStorage.getItem(CONSENT_STORAGE_KEY)); } catch { /* private mode */ }
-  const gpc = typeof navigator !== "undefined" && (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
-  return effectiveConsent(stored, consentRegion(path, market), gpc);
-}
 
 function readTouch(): AdTouch | null {
   try { return parseTouch(localStorage.getItem(ATTRIBUTION_STORAGE_KEY)); }
@@ -24,15 +16,29 @@ function readTouch(): AdTouch | null {
 
 function writeTouch(touch: AdTouch) {
   localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(touch));
-  document.cookie = `${ATTRIBUTION_STORAGE_KEY}=${encodeURIComponent(JSON.stringify(touch))}; Path=/; Max-Age=${90 * 24 * 60 * 60}; SameSite=Lax`;
+  document.cookie = `${ATTRIBUTION_STORAGE_KEY}=${encodeURIComponent(JSON.stringify(touch))}; Path=/; Max-Age=${90 * 24 * 60 * 60}; SameSite=Lax; Secure`;
 }
 
 /** Page views, first-touch campaign storage, registration and purchase events. */
 export function AdsRuntime() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
   const [path] = useLocation();
-  const market = useMarket();
-  const consent = readConsent(path, market.confirmed ? market.market : path.startsWith("/us") ? "US" : null);
+  const { consent, stored, region } = useCookieConsent();
+  const [syncFailed, setSyncFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const refresh = () => setRetry(value => value + 1);
+    window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
+    return () => { window.removeEventListener("online", refresh); window.removeEventListener("focus", refresh); };
+  }, []);
+  const latest = useRef(consent);
+  latest.current = consent;
+  const account = useRef(userId);
+  account.current = userId;
+  const syncQueue = useRef(Promise.resolve());
+
+  useEffect(() => { applyConsentPrivacy(consent); }, [consent.marketing, consent.attribution]);
 
   useEffect(() => {
     if (!consent.attribution) return;
@@ -47,19 +53,28 @@ export function AdsRuntime() {
   }, [consent.marketing, path]);
 
   useEffect(() => {
-    if (!isSignedIn || !consent.attribution) return;
-    const touch = readTouch();
-    if (!touch) return;
+    if (!isSignedIn || !userId || (region === "UNKNOWN" && !stored?.choice)) return;
+    const touch = consent.attribution ? readTouch() : null;
     const eventId = newEventId();
-    void customFetch<{ created: boolean }>(`${base}/api/account/attribution`, {
-      method: "POST",
-      body: JSON.stringify({ ...touch, marketingConsent: consent.marketing, eventId }),
-    }).then((result) => {
-      if (result.created && consent.marketing) {
-        trackMetaEvent({ name: "CompleteRegistration", eventId }, true);
+    // Serialize changes so a slow earlier Accept cannot overwrite a later Reject.
+    const marketingConsent = consent.marketing;
+    syncQueue.current = syncQueue.current.catch(() => undefined).then(async () => {
+      if (account.current !== userId) return;
+      if (touch) {
+        const result = await customFetch<{ created: boolean }>(`${base}/api/account/attribution`, {
+          method: "POST", body: JSON.stringify({ ...touch, marketingConsent, eventId }),
+        }).catch(() => null);
+        if (result?.created && latest.current.marketing && account.current === userId) {
+          trackMetaEvent({ name: "CompleteRegistration", eventId }, true);
+        }
       }
-    }).catch(() => undefined);
-  }, [isSignedIn, consent.attribution, consent.marketing]);
+      if (account.current !== userId) return;
+      await customFetch(`${base}/api/account/attribution/consent`, {
+        method: "PATCH", body: JSON.stringify({ marketingConsent }),
+      });
+      if (account.current === userId) setSyncFailed(false);
+    }).catch(() => { if (account.current === userId) setSyncFailed(true); });
+  }, [isSignedIn, userId, region, consent.attribution, consent.marketing, stored?.choice, retry]);
 
   useEffect(() => {
     if (!consent.marketing || !window.location.search.includes("checkout=success")) return;
@@ -73,7 +88,10 @@ export function AdsRuntime() {
     } catch { /* ignore a broken handoff */ }
   }, [consent.marketing, path]);
 
-  return null;
+  return syncFailed ? <p role="alert" className="fixed bottom-4 left-4 z-[90] max-w-sm rounded-xl border bg-background p-3 text-sm">
+    Your browser choice is saved, but account marketing consent could not be updated.
+    <button className="ml-2 underline" onClick={() => setRetry(value => value + 1)}>Retry</button>
+  </p> : null;
 }
 
 export function rememberPurchaseEvent(meta: { eventId: string; value?: number | null; currency?: string | null } | undefined) {

@@ -81,11 +81,14 @@ describe("market resolution and session isolation", () => {
     await waitFor(() => expect(state().loading).toBe(false));
     expect(state()).toMatchObject({ market: null, source: "unknown", confirmed: false });
   });
-  it("explicit browser choice survives reload and no IP call overrides it", async () => {
+  it("explicit browser choice survives reload while IP country is still fetched without replacing market", async () => {
     localStorage.setItem(VISITOR_MARKET_KEY, "BR");
+    mocks.request.mockResolvedValue({ country: "PT", market: "PT" });
     const first = view();
     await waitFor(() => expect(state()).toMatchObject({ market: "BR", confirmed: true }));
-    expect(mocks.request).not.toHaveBeenCalled();
+    await waitFor(() => expect(state().country).toBe("PT"));
+    expect(mocks.request).toHaveBeenCalledWith("/api/market/suggestion", expect.anything());
+    expect(state().market).toBe("BR");
     first.unmount();
     view();
     await waitFor(() => expect(state().source).toBe("visitor"));

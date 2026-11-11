@@ -3,8 +3,8 @@ import { db } from "@workspace/db";
 
 /**
  * Additive table for the origin of a trial. Created on API startup with
- * IF NOT EXISTS. No backfill. Existing accounts stay without a row until the
- * browser sends a first touch after sign-up.
+ * IF NOT EXISTS. No backfill. A normal account consent change may create a
+ * consent-only row; first-touch fields are filled once when supplied later.
  * DRAFT pending legal review.
  */
 export async function migrateAdAttribution(): Promise<void> {
@@ -38,7 +38,7 @@ export type StoredTouch = {
   capturedAt?: string;
 };
 
-/** Inserts the first touch only. A second call does not replace it. */
+/** Records the first touch, including after a consent-only row; never replaces a real touch or its latest consent. */
 export async function saveFirstTouch(userId: string, touch: StoredTouch): Promise<{ created: boolean }> {
   const inserted = await db.execute(sql`
     INSERT INTO ad_attributions (
@@ -47,12 +47,28 @@ export async function saveFirstTouch(userId: string, touch: StoredTouch): Promis
     ) VALUES (
       ${userId}, ${touch.utmSource ?? null}, ${touch.utmMedium ?? null}, ${touch.utmCampaign ?? null},
       ${touch.utmContent ?? null}, ${touch.utmTerm ?? null}, ${touch.fbclid ?? null}, ${touch.fbc ?? null},
-      ${touch.fbp ?? null}, ${touch.marketingConsent}, ${touch.capturedAt ? new Date(touch.capturedAt) : null}
+      ${touch.fbp ?? null}, ${touch.marketingConsent}, ${touch.capturedAt ? new Date(touch.capturedAt) : new Date()}
     )
-    ON CONFLICT (user_id) DO NOTHING
+    ON CONFLICT (user_id) DO UPDATE SET
+      utm_source = EXCLUDED.utm_source, utm_medium = EXCLUDED.utm_medium,
+      utm_campaign = EXCLUDED.utm_campaign, utm_content = EXCLUDED.utm_content,
+      utm_term = EXCLUDED.utm_term, fbclid = EXCLUDED.fbclid,
+      fbc = EXCLUDED.fbc, fbp = EXCLUDED.fbp, captured_at = EXCLUDED.captured_at
+    WHERE ad_attributions.captured_at IS NULL
+      AND ad_attributions.utm_source IS NULL AND ad_attributions.utm_medium IS NULL
+      AND ad_attributions.utm_campaign IS NULL AND ad_attributions.utm_content IS NULL
+      AND ad_attributions.utm_term IS NULL AND ad_attributions.fbclid IS NULL
+      AND ad_attributions.fbc IS NULL AND ad_attributions.fbp IS NULL
     RETURNING user_id`);
   const rows = Array.isArray(inserted) ? inserted : (inserted as { rows?: unknown[] }).rows ?? [];
   return { created: rows.length > 0 };
+}
+
+/** Only the current authenticated account; preserve every first-touch field. No backfill. */
+export async function updateMarketingConsent(userId: string, allowed: boolean): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO ad_attributions (user_id, marketing_consent) VALUES (${userId}, ${allowed})
+    ON CONFLICT (user_id) DO UPDATE SET marketing_consent = EXCLUDED.marketing_consent`);
 }
 
 export async function marketingConsentFor(userId: string): Promise<boolean> {

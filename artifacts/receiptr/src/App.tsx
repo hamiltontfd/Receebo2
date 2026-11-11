@@ -30,7 +30,7 @@ import TermsOfService from "@/pages/terms";
 import CookiePolicy from "@/pages/cookies";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AdsRuntime } from "@/components/AdsRuntime";
-import { consentRegion } from "@/lib/adConsent";
+import { useCookieConsent } from "@/lib/useCookieConsent";
 import AppShell from "@/components/AppShell";
 import AuthModal from "@/components/AuthModal";
 import PwaStatus from "@/components/PwaStatus";
@@ -431,9 +431,7 @@ function ClerkProviderWithRoutes() {
 }
 
 function CookieAndAds() {
-  const [path] = useLocation();
-  const market = useMarket();
-  const region = consentRegion(path, market.confirmed ? market.market : path.startsWith("/us") ? "US" : null);
+  const { region } = useCookieConsent();
   return <>
     <CookieConsent region={region} />
     <AdsRuntime />

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MarketContext, type MarketState } from "./MarketProvider";
 import { UncoveredMarketNotice, interestSentKey } from "./UncoveredMarketNotice";
 import { setAccountLocale } from "@/lib/locale";
+import { acceptAll, CONSENT_STORAGE_KEY } from "@/lib/adConsent";
 
 const market = (country: string | null): MarketState => ({
   market: null, country, source: "unknown", confirmed: false, loading: false, saving: false, error: null,
@@ -23,6 +24,12 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("UncoveredMarketNotice", () => {
+  it("stores the already-sent preference only after preferences are allowed", async () => {
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(acceptAll()));
+    render(<MarketContext.Provider value={market("ES")}><UncoveredMarketNotice /></MarketContext.Provider>);
+    fireEvent.click(screen.getByRole("button", { name: /interested/i }));
+    await waitFor(() => expect(localStorage.getItem(interestSentKey("ES"))).toBe("1"));
+  });
   it("hidden for covered countries and when the country is unknown", () => {
     for (const c of ["PT", "BR", "US", null]) {
       const { unmount } = mount(c);
@@ -41,7 +48,7 @@ describe("UncoveredMarketNotice", () => {
     expect(String(url)).toMatch(/\/api\/market\/interest$/);
     expect(JSON.parse(init.body)).toEqual({ country: "ES" });
     expect(init.credentials).toBe("omit");
-    expect(localStorage.getItem(interestSentKey("ES"))).toBe("1");
+    expect(localStorage.getItem(interestSentKey("ES"))).toBeNull();
   });
   it("after sending once, it doesn't come back for that country", () => {
     localStorage.setItem(interestSentKey("JP"), "1");
