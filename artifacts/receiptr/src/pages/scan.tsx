@@ -1,6 +1,6 @@
 import { actionWaitMessage, receiptPollInterval } from "@/lib/actionLimit";
 import { appText, categoryText } from "@/lib/appCopy";
-import { useAppLocale, formatLocaleMoney } from "@/lib/locale";
+import { useAppLocale, formatLocaleMoney, formatCurrencySymbol, formatMoneyInput, parseMoneyInput } from "@/lib/locale";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { AlertTriangle, Camera, Upload, Check, Loader2, X, ScrollText, Square, ChevronDown, Zap, ZapOff } from "lucide-react";
@@ -23,7 +23,6 @@ import {
   type SimilarReceiptMatch,
 } from "@workspace/api-client-react";
 import { NotableItemsBanner } from "@/components/NotableItemsBanner";
-import { currencySymbol } from "@/lib/currency";
 import { PurchaseCountryField } from "@/components/PurchaseCountryField";
 import { ConsumerRightsPanel } from "@/components/ConsumerRightsPanel";
 import { ItemCoverageSections } from "@/components/ItemCoverageSections";
@@ -165,6 +164,7 @@ function useCameraStream(enabled: boolean) {
 
 export default function Scan() {
   const locale = useAppLocale();
+  const totalInputRef = useRef<HTMLInputElement>(null);
   // Conservative: capture permission, image conversion, stitching, extraction,
   // retake drafts and review all belong to this session. Leave Scan to update.
   usePwaUpdateBlocker(true);
@@ -427,7 +427,7 @@ export default function Scan() {
         merchant: receipt.merchant ?? "",
         purchaseDate: receipt.purchaseDate ?? "",
         deliveryDate: receipt.deliveryDate ?? "",
-        total: receipt.total != null ? String(receipt.total) : "",
+        total: receipt.total != null ? formatMoneyInput(receipt.total, locale) : "",
         category: receipt.category ?? "",
         warranty: receipt.warranty ?? "",
         purchaseCountry: receipt.purchaseCountry ?? "",
@@ -454,6 +454,7 @@ export default function Scan() {
       }
       setDismissedIncomplete(false);
     }
+    // Initialize on a new review, not on a locale change while the user is typing.
   }, [phase, receipt]);
 
   const uploadFile = useCallback(
@@ -598,13 +599,19 @@ export default function Scan() {
 
   const handleSave = async () => {
     if (receiptId == null) return;
+    const total = parseMoneyInput(form.total);
+    if (form.total.trim() !== "" && total === undefined) {
+      totalInputRef.current?.setCustomValidity(appText("Enter a valid total"));
+      totalInputRef.current?.reportValidity();
+      return;
+    }
     try {
       await updateReceipt.mutateAsync({
         id: receiptId,
         data: {
           merchant: form.merchant || undefined,
           purchaseDate: form.purchaseDate || undefined,
-          total: form.total !== "" ? Number(form.total) : undefined,
+          total,
           category: form.category || undefined,
           warranty: form.warranty || undefined,
           purchaseCountry: form.purchaseCountry || null,
@@ -1166,14 +1173,19 @@ export default function Scan() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{appText("Total")}</p>
                 <div className="flex items-center gap-1">
                   <span data-testid="text-total-currency" className="shrink-0 whitespace-nowrap font-mono font-semibold text-muted-foreground select-none">
-                    {currencySymbol(receipt?.currency).trim()}
+                    {formatCurrencySymbol(locale, receipt?.currency)}
                   </span>
                   <Input
-                    type="number"
-                    step="0.01"
+                    ref={totalInputRef}
+                    type="text"
+                    inputMode="decimal"
+                    aria-label={appText("Total")}
                     value={form.total}
-                    onChange={(e) => setForm((f) => ({ ...f, total: e.target.value }))}
-                    placeholder="0.00"
+                    onChange={(e) => {
+                      e.target.setCustomValidity("");
+                      setForm((f) => ({ ...f, total: e.target.value }));
+                    }}
+                    placeholder={formatMoneyInput(0, locale)}
                     className="min-w-0 border-0 px-0 font-mono font-semibold focus-visible:ring-0 shadow-none"
                   />
                 </div>

@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
-import { formatLocaleDate, formatLocaleMoney, getAppLocale, resolveLocale } from "./locale";
+import { formatLocaleDate, formatLocaleMoney, formatCurrencySymbol, formatMoneyInput, parseMoneyInput, getAppLocale, resolveLocale, type AppLocale } from "./locale";
 import { LEGAL_DOCUMENTS, legalMarketFor } from "./legalDocuments";
 import { rightsCopy } from "./rightsCopy";
 
@@ -45,6 +45,34 @@ describe("locale scaffolding", () => {
     expect(formatLocaleMoney(3199, "en", "BRL")).toBe("R$3,199.00");
     expect(formatLocaleMoney(3199, "pt-BR", "BRL")).not.toMatch(/[\u00a0\u202f]/);
   });
+  it.each<[AppLocale, string, number, string, string]>([
+    ["pt-PT", "EUR", 649, "€", "649,00"],
+    ["pt-BR", "BRL", 3199, "R$", "3199,00"],
+    ["en", "USD", 486, "$", "486.00"],
+    ["en", "EUR", 649, "€", "649.00"],
+  ])("formats editable money in %s / %s without grouping", (locale, currency, amount, symbol, input) => {
+    expect(formatCurrencySymbol(locale, currency)).toBe(symbol);
+    expect(formatMoneyInput(amount, locale)).toBe(input);
+    expect(formatMoneyInput(0, locale)).toBe(locale === "en" ? "0.00" : "0,00");
+  });
+  it("keeps a dollar prefix when the receipt currency is missing", () => {
+    for (const locale of ["en", "pt-PT", "pt-BR"] as const) {
+      for (const currency of [undefined, null, ""]) expect(formatCurrencySymbol(locale, currency)).toBe("$");
+    }
+  });
+  it.each([
+    ["649,00", 649], ["649.00", 649], ["3199,00", 3199],
+    ["3.199,00", 3199], ["3,199.00", 3199],
+    ["1.234.567,89", 1234567.89], ["1,234,567.89", 1234567.89],
+    ["649,", 649], ["649.", 649], [",50", 0.5], [".50", 0.5],
+    ["-12,50", -12.5], ["+12.50", 12.5], [" 0,00 ", 0],
+  ])("parses editable amount %s as %s", (input, expected) => {
+    expect(parseMoneyInput(String(input))).toBe(expected);
+  });
+  it.each(["", "   ", "abc", "NaN", "Infinity", "12abc", "1e3", "-", ",", "1..2", "1,2,3", "9".repeat(400)])(
+    "never returns NaN or infinity for empty/invalid input %s",
+    input => expect(parseMoneyInput(input)).toBeUndefined(),
+  );
   it.each(["America/Sao_Paulo", "UTC", "Europe/Lisbon"])(
     "preserves calendar days in %s without changing timestamp semantics",
     (timeZone) => {

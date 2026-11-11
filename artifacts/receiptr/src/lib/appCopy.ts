@@ -287,6 +287,7 @@ export const APP_COPY: Record<string, readonly [string, string?]> = {
   "Select category": ["Selecionar categoria"],
   "Select": ["Selecionar"],
   "Total": ["Total"],
+  "Enter a valid total": ["Introduza um total válido", "Digite um total válido"],
   "Currency": ["Moeda"],
   "Warranty": ["Garantia"],
   "e.g. 2-year manufacturer warranty": ["Ex.: garantia do fabricante de 2 anos"],

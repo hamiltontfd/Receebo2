@@ -2,7 +2,7 @@ import { act, fireEvent, render, waitFor, screen } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   create: vi.fn(), update: vi.fn(), remove: vi.fn(), customFetch: vi.fn(),
   toast: vi.fn(), stop: vi.fn(), getUserMedia: vi.fn(),
@@ -40,9 +40,12 @@ vi.mock("@/lib/compressImage", () => ({
 }));
 import Scan from "./scan";
 import { rememberTab, setPendingUpload, takePendingUpload } from "@/lib/navState";
+import { setAccountLocale } from "@/lib/locale";
 
 const track = { stop: vi.fn(), getCapabilities: vi.fn(() => ({})), applyConstraints: vi.fn(async () => undefined) };
+afterEach(() => setAccountLocale(undefined));
 beforeEach(() => {
+  setAccountLocale("en");
   vi.clearAllMocks();
   mocks.receipt = undefined;
   takePendingUpload();
@@ -143,13 +146,13 @@ describe("Add sheet → Upload file handoff", () => {
 });
 
 async function shootPhoto(result: ReturnType<typeof mount>) {
-  await waitFor(() => expect(screen.getByRole("button", { name: "Take photo" })).not.toBeDisabled());
+  await waitFor(() => expect(screen.getByTestId("button-shutter")).not.toBeDisabled());
   const video = result.container.querySelector("video")!;
   Object.defineProperty(video, "videoWidth", { configurable: true, value: 100 });
   Object.defineProperty(video, "videoHeight", { configurable: true, value: 200 });
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
   vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((done) => done(new Blob(["camera"], { type: "image/jpeg" })));
-  await act(async () => screen.getByRole("button", { name: "Take photo" }).click());
+  await act(async () => screen.getByTestId("button-shutter").click());
   await waitFor(() => expect(mocks.create).toHaveBeenCalled());
 }
 
@@ -176,7 +179,8 @@ describe("after reading", () => {
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
-  it("never wraps a currency code next to the total (BRL on a 390px phone)", async () => {
+  it("never wraps the narrow currency symbol next to the localized total (BRL on a 390px phone)", async () => {
+    setAccountLocale("pt-BR");
     mocks.receipt = {
       id: 42, status: "completed", merchant: "LLT", purchaseDate: "2026-08-12", total: 56.9, currency: "BRL",
       products: [{ name: "Cimento", quantity: 1, price: 35.5 }], notableItems: [],
@@ -184,8 +188,63 @@ describe("after reading", () => {
     const result = mount();
     await shootPhoto(result);
     const code = await screen.findByTestId("text-total-currency", {}, { timeout: 3000 });
-    expect(code.textContent).toBe("BRL");
+    expect(code.textContent).toBe("R$");
     expect(code).toHaveClass("shrink-0", "whitespace-nowrap");
-    expect(screen.getByDisplayValue("56.9")).toHaveClass("min-w-0");
+    const input = screen.getByRole("textbox", { name: "Total" });
+    expect(input).toHaveValue("56,90");
+    expect(input).toHaveClass("min-w-0");
+    expect(input).toHaveAttribute("type", "text");
+    expect(input).toHaveAttribute("inputmode", "decimal");
+    expect(input).toHaveAttribute("placeholder", "0,00");
+    fireEvent.change(input, { target: { value: "3199,00" } });
+    expect(input).toHaveValue("3199,00");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar compra" }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
+      id: 42, data: expect.objectContaining({ total: 3199 }),
+    })));
+  });
+
+  it.each(["649,00", "649.00", "3.199,00", "3,199.00", "649,"])(
+    "keeps raw typing and saves %s as a finite numeric total",
+    async (typed) => {
+      mocks.receipt = {
+        id: 42, status: "completed", merchant: "Sample store", total: 486, currency: "USD",
+        products: [], notableItems: [],
+      };
+      const result = mount();
+      await shootPhoto(result);
+      const input = await screen.findByRole("textbox", { name: "Total" });
+      expect(input).toHaveValue("486.00");
+      expect(input).toHaveAttribute("placeholder", "0.00");
+      fireEvent.change(input, { target: { value: typed } });
+      expect(input).toHaveValue(typed);
+      fireEvent.blur(input);
+      expect(input).toHaveValue(typed);
+      fireEvent.click(screen.getByRole("button", { name: "Save Purchase" }));
+      const expected = typed.startsWith("3") ? 3199 : 649;
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
+        id: 42, data: expect.objectContaining({ total: expected }),
+      })));
+    },
+  );
+
+  it("blocks invalid totals and clears the validation error when corrected", async () => {
+    mocks.receipt = {
+      id: 42, status: "completed", merchant: "Sample store", total: 486, currency: "USD",
+      products: [], notableItems: [],
+    };
+    const result = mount();
+    await shootPhoto(result);
+    const input = await screen.findByRole("textbox", { name: "Total" });
+    fireEvent.change(input, { target: { value: "invalid" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Purchase" }));
+    expect(input).toBeInvalid();
+    expect(mocks.update).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "" } });
+    expect(input).toBeValid();
+    fireEvent.click(screen.getByRole("button", { name: "Save Purchase" }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
+      id: 42, data: expect.objectContaining({ total: undefined }),
+    })));
   });
 });

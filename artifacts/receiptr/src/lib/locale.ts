@@ -72,3 +72,39 @@ export function formatLocaleMoney(amount: number, locale: AppLocale, currency = 
   const tag = locale === "en" ? "en-US" : locale;
   return new Intl.NumberFormat(tag, { style: "currency", currency }).format(amount).replace(/\u00a0|\u202f/g, " ");
 }
+
+/** Currency-only prefix for editable amounts; an absent currency keeps the USD fallback. */
+export function formatCurrencySymbol(locale: AppLocale, currency?: string | null): string {
+  const tag = locale === "en" ? "en-US" : locale;
+  const symbol = new Intl.NumberFormat(tag, {
+    style: "currency", currency: currency || "USD", currencyDisplay: "narrowSymbol",
+  }).formatToParts(0).find(part => part.type === "currency")?.value ?? "$";
+  return symbol.replace(/\u00a0|\u202f/g, " ");
+}
+
+/** Two decimal places without grouping, only for initializing an editable money field. */
+export function formatMoneyInput(amount: number, locale: AppLocale): string {
+  const tag = locale === "en" ? "en-US" : locale;
+  return new Intl.NumberFormat(tag, {
+    useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2,
+  }).format(amount).replace(/\u00a0|\u202f/g, " ");
+}
+
+/** Both decimal styles are accepted. Mixed separators use the last mark as decimal. */
+export function parseMoneyInput(value: string): number | undefined {
+  const text = value.trim();
+  if (!text || !/^[+-]?(?:\d+(?:[.,]\d+)*[.,]?|[.,]\d+)$/.test(text)) return undefined;
+  const comma = text.lastIndexOf(",");
+  const dot = text.lastIndexOf(".");
+  let normalized: string;
+  if (comma >= 0 && dot >= 0) {
+    const decimal = Math.max(comma, dot);
+    normalized = `${text.slice(0, decimal).replace(/[.,]/g, "")}.${text.slice(decimal + 1)}`;
+  } else {
+    // Repeated marks of only one kind are ambiguous, not a valid decimal value.
+    if ((text.match(/[.,]/g)?.length ?? 0) > 1) return undefined;
+    normalized = text.replace(",", ".");
+  }
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : undefined;
+}
