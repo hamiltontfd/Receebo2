@@ -1,7 +1,7 @@
 import express from "express";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CLERK_JS_IMMUTABLE_CACHE,
   clerkNpmPath,
@@ -111,18 +111,24 @@ describe("clerk npm asset paths", () => {
 describe("clerk proxy middleware", () => {
   const previousEnv = process.env.NODE_ENV;
   const previousKey = process.env.CLERK_SECRET_KEY;
+  const previousProxyFlag = process.env.CLERK_PROXY_ENABLED;
   let server: Server | undefined;
 
   afterEach(async () => {
-    process.env.NODE_ENV = previousEnv;
+    if (previousEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnv;
+    if (previousProxyFlag === undefined) delete process.env.CLERK_PROXY_ENABLED;
+    else process.env.CLERK_PROXY_ENABLED = previousProxyFlag;
     if (previousKey === undefined) delete process.env.CLERK_SECRET_KEY;
     else process.env.CLERK_SECRET_KEY = previousKey;
     if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
     server = undefined;
   });
 
-  it("stays a no-op outside production", async () => {
+  it.each([undefined, "", "0", "false", "no", "off"])("stays a no-op in development with flag %s", async (flag) => {
     process.env.NODE_ENV = "development";
+    if (flag === undefined) delete process.env.CLERK_PROXY_ENABLED;
+    else process.env.CLERK_PROXY_ENABLED = flag;
     process.env.CLERK_SECRET_KEY = "sk_test";
     const app = express();
     app.use("/api/__clerk", clerkProxyMiddleware({
@@ -136,8 +142,45 @@ describe("clerk proxy middleware", () => {
     expect(response.status).toBe(204);
   });
 
+  it.each(["1", "true", "yes", "on", " TRUE "])("activates in development with flag %s and a key", async (flag) => {
+    process.env.NODE_ENV = "development";
+    process.env.CLERK_PROXY_ENABLED = flag;
+    process.env.CLERK_SECRET_KEY = "sk_test";
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => scriptResponse());
+    const app = express();
+    app.use("/api/__clerk", clerkProxyMiddleware({ fetchImpl: fetchImpl as typeof fetch }));
+    server = app.listen(0, "127.0.0.1");
+    await new Promise<void>((resolve) => server!.once("listening", resolve));
+    const port = (server.address() as AddressInfo).port;
+    const response = await fetch(`http://127.0.0.1:${port}/api/__clerk/npm/@clerk/ui@1.42.4/dist/ui.browser.js`);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(script);
+    expect(response.headers.get("cache-control")).toBe(CLERK_JS_IMMUTABLE_CACHE);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(fetchImpl.mock.calls[0][1]?.headers).toMatchObject({
+      "Clerk-Secret-Key": "sk_test",
+      "Clerk-Proxy-Url": `https://127.0.0.1:${port}/api/__clerk`,
+    });
+  });
+
+  it.each(["development", "production"])("requires a key even when enabled in %s", async (env) => {
+    process.env.NODE_ENV = env;
+    process.env.CLERK_PROXY_ENABLED = "1";
+    delete process.env.CLERK_SECRET_KEY;
+    const app = express();
+    app.use("/api/__clerk", clerkProxyMiddleware({
+      fetchImpl: (() => { throw new Error("fetch should not run"); }) as typeof fetch,
+    }));
+    app.use((_req, res) => res.status(204).end());
+    server = app.listen(0, "127.0.0.1");
+    await new Promise<void>((resolve) => server!.once("listening", resolve));
+    const port = (server.address() as AddressInfo).port;
+    expect((await fetch(`http://127.0.0.1:${port}/api/__clerk/v1/environment`)).status).toBe(204);
+  });
+
   it.each(["clerk-js@6.42.3/dist/clerk.browser.js", "ui@1.42.4/dist/ui.browser.js"])("returns versioned %s with an immutable cache header", async (asset) => {
     process.env.NODE_ENV = "production";
+    delete process.env.CLERK_PROXY_ENABLED;
     process.env.CLERK_SECRET_KEY = "sk_test";
     const headers: HeadersInit[] = [];
     const app = express();
@@ -163,6 +206,7 @@ describe("clerk proxy middleware", () => {
     ["ui@1/dist/ui.browser.js", "ui@1.42.4/dist/ui.browser.js"],
   ])("follows proxy redirects for floating %s without caching", async (floating, exact) => {
     process.env.NODE_ENV = "production";
+    delete process.env.CLERK_PROXY_ENABLED;
     process.env.CLERK_SECRET_KEY = "sk_test";
     const app = express();
     app.use("/api/__clerk", clerkProxyMiddleware({

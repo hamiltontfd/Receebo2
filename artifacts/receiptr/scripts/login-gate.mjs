@@ -56,6 +56,7 @@ async function checkViewport(origin, scenario) {
   const page = await context.newPage();
   const failures = new Set();
   const required = new Set();
+  const requiredNames = ["clerk.browser.js", "ui.browser.js", "npm chunk", "/v1/environment", "/v1/client"];
   const inFlight = new Set();
   let proxyUsed = false;
   let uiPassed = false;
@@ -63,7 +64,11 @@ async function checkViewport(origin, scenario) {
   const inspect = request => {
     const url = new URL(request.url());
     if (!clerkRequest(url)) return false;
-    proxyUsed ||= url.pathname.startsWith("/api/__clerk/");
+    const throughProxy = url.origin === origin && url.pathname.startsWith("/api/__clerk/");
+    proxyUsed ||= throughProxy;
+    const mustUseProxy = url.pathname.includes("/npm/@clerk/") ||
+      /\/v1\/(?:environment|client)(?:\/|$)/.test(url.pathname);
+    if (mustUseProxy && !throughProxy) fail(`Clerk request bypassed the DEV proxy: ${url.pathname}`);
     const pkg = url.pathname.match(/\/npm\/@clerk\/(clerk-js|ui)@([^/]+)/);
     if (pkg && !/^\d+\.\d+\.\d+$/.test(pkg[2])) fail(`Non-exact Clerk version: ${url.pathname}`);
     return true;
@@ -78,16 +83,19 @@ async function checkViewport(origin, scenario) {
   context.on("response", response => {
     const request = response.request();
     if (!inspect(request)) return;
-    const path = new URL(response.url()).pathname;
+    const url = new URL(response.url());
+    const path = url.pathname;
     const status = response.status();
     console.log(`[${scenario.name}] ${status} ${path}`); // No query strings or headers.
     const successful = status >= 200 && status < 300;
     const relevant = path.startsWith("/api/__clerk/") || path.includes("/npm/@clerk/") ||
       /\/v1\/(?:environment|client)\/?$/.test(path);
     if (status >= 500 || (relevant && !successful)) fail(`Clerk HTTP ${status}: ${path}`);
-    if (successful) {
+    if (successful && url.origin === origin && path.startsWith("/api/__clerk/")) {
       if (/\/clerk\.browser\.js$/.test(path)) required.add("clerk.browser.js");
       if (/\/ui\.browser\.js$/.test(path)) required.add("ui.browser.js");
+      if (path.includes("/npm/@clerk/") && /\.js$/.test(path) &&
+          !/\/(?:clerk|ui)\.browser\.js$/.test(path)) required.add("npm chunk");
       if (/\/v1\/environment\/?$/.test(path)) required.add("/v1/environment");
       if (/\/v1\/client\/?$/.test(path)) required.add("/v1/client");
     }
@@ -129,8 +137,8 @@ async function checkViewport(origin, scenario) {
       timeout, message: "Clerk must show an email field or Google control",
     }).toBe(true);
     await expect.poll(() => required.size, {
-      timeout, message: "Both Clerk bundles and environment/client must return 2xx",
-    }).toBe(4);
+      timeout, message: "Clerk bundles, chunks and environment/client must return 2xx through the DEV proxy",
+    }).toBe(requiredNames.length);
     await expect.poll(() => inFlight.size, {
       timeout, message: "Requested Clerk assets must finish",
     }).toBe(0);
@@ -143,10 +151,10 @@ async function checkViewport(origin, scenario) {
       .catch(() => fail("Could not save diagnostic screenshot."));
     await context.close();
   }
-  for (const name of ["clerk.browser.js", "ui.browser.js", "/v1/environment", "/v1/client"]) {
+  for (const name of requiredNames) {
     if (!required.has(name)) fail(`Missing successful response: ${name}`);
   }
-  if (!proxyUsed) console.log(`[${scenario.name}] DEV uses direct Clerk; production proxy path is covered by the isolated unit tests.`);
+  if (!proxyUsed) fail("No Clerk requests used the DEV /api/__clerk proxy; direct Clerk is not a passing gate.");
   for (const failure of failures) console.error(`[${scenario.name}] FAIL: ${failure}`);
   console.log(`[${scenario.name}] ${failures.size ? "FAIL" : "PASS"}`);
   return failures.size === 0;

@@ -16,8 +16,14 @@ config (no database setup), then signed-out desktop/mobile browser checks.
 It must not target production. The origin defaults to `https://$REPLIT_DEV_DOMAIN`;
 `LOGIN_GATE_ORIGIN` can override it for the DEV preview. Do not set
 `LOGIN_GATE_ALLOW_PROD=1` during release checks (it is an explicit safety override).
-DEV currently uses Clerk directly; the production-only proxy is covered by the
-isolated unit tests, not by the DEV browser run. No real login is submitted.
+DEV opts into the same first-party proxy path as production via development-only
+`CLERK_PROXY_ENABLED=1` and `VITE_CLERK_PROXY_URL=/api/__clerk`. The API still
+requires its existing Clerk key. Production remains enabled independently of
+this flag. The browser gate requires the Clerk bundles, requested npm chunks,
+environment and client requests to succeed through the DEV `/api/__clerk` proxy;
+direct Clerk requests cannot pass. No real login is submitted.
+Changing these settings requires starting/restarting the services to load them.
+Do not do that without approval: API startup executes migrations and backfills.
 Screenshots are saved under `generated-artifacts/login-gate`.
 `LOGIN_GATE_FAIL_DEMO=1 pnpm run test:login-gate` must fail against a temporary
 local broken-login page; alternatively run

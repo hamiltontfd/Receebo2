@@ -52,9 +52,16 @@ with `LOGIN_GATE_ORIGIN=https://<dev-preview> pnpm run test:login-gate`.
 The gate first runs `clerkProxyMiddleware.test.ts` with
 `vitest.clerk-proxy.config.ts` (no globalSetup or database writes), then tests
 signed-out desktop/mobile login rendering. Do **not** substitute `test:api`, whose
-globalSetup writes to DEV. DEV currently talks directly to Clerk because its
-proxy URL is unset and the API proxy is production-only; the production proxy
-path is covered by isolated unit tests rather than the DEV browser request path.
+globalSetup writes to DEV. Development-only settings
+`CLERK_PROXY_ENABLED=1` and `VITE_CLERK_PROXY_URL=/api/__clerk` opt DEV into the same
+first-party proxy path as production, using its existing development Clerk key.
+Production behavior is unchanged and does not depend on the flag.
+The browser gate requires the pinned bundles, requested npm chunks,
+`/v1/environment` and `/v1/client` to return 2xx through the DEV `/api/__clerk`
+proxy; it fails if those requests go directly to Clerk.
+Services must load these settings before the live gate can run. Starting the API
+executes migrations/backfills: obtain explicit approval before starting or
+restarting either workflow; do not start them just to run an inspection.
 Screenshots: `generated-artifacts/login-gate`.
 
 Validate the failure guard with `LOGIN_GATE_FAIL_DEMO=1 pnpm run test:login-gate`

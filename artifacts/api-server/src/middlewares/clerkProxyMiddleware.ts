@@ -11,7 +11,10 @@
  * dashboard — all auth configuration is done through the Auth pane.
  *
  * IMPORTANT:
- * - Only active in production (Clerk proxying doesn't work for dev instances)
+ * - Active in production, or explicitly enabled in DEV with CLERK_PROXY_ENABLED.
+ *   The historical production-only restriction was a local default, not a
+ *   current Clerk limitation: development instances also support FAPI proxying.
+ * - A Clerk secret key is required in every environment.
  * - Must be mounted BEFORE express.json() middleware
  *
  * Usage in app.ts:
@@ -147,8 +150,9 @@ export async function fetchClerkNpmAsset(
 }
 
 export function clerkProxyMiddleware(options?: { fetchImpl?: typeof fetch }): RequestHandler {
-  // Only run proxy in production — Clerk proxying doesn't work for dev instances
-  if (process.env.NODE_ENV !== "production") {
+  // Preserve production behavior; non-production must opt in explicitly.
+  const explicitlyEnabled = /^(1|true|yes|on)$/i.test(process.env.CLERK_PROXY_ENABLED?.trim() ?? "");
+  if (process.env.NODE_ENV !== "production" && !explicitlyEnabled) {
     return (_req, _res, next) => next();
   }
 
