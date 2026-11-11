@@ -28,7 +28,7 @@ const CLERK_FAPI_HOST = "frontend-api.clerk.dev";
 export const CLERK_PROXY_PATH = "/api/__clerk";
 export const CLERK_JS_IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
 const MAX_NPM_REDIRECTS = 3;
-const VERSIONED_CLERK_JS = /\/npm\/@clerk\/clerk-js@\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?(?:\/|$)/;
+const VERSIONED_CLERK_JS = /\/npm\/@clerk\/(?:clerk-js|ui)@\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?(?:\/|$)/;
 
 /** Path under the Clerk frontend API, e.g. `/npm/@clerk/clerk-js@6.42.3/dist/clerk.browser.js`. */
 export function clerkNpmPath(url: string | undefined): string | null {
@@ -39,7 +39,7 @@ export function clerkNpmPath(url: string | undefined): string | null {
   return path.slice(at);
 }
 
-/** Long cache only for an exact clerk-js version. A floating tag such as `@6` must stay uncached. */
+/** Long cache only for exact clerk-js/UI versions. Floating tags must stay uncached. */
 export function versionedClerkJsCacheControl(npmPath: string): string | null {
   return VERSIONED_CLERK_JS.test(npmPath) ? CLERK_JS_IMMUTABLE_CACHE : null;
 }
@@ -92,6 +92,8 @@ function clerkProxyHeaders(req: { headers: IncomingHttpHeaders; socket?: { remot
  * http-proxy-middleware would hand that redirect to the browser, and the
  * follow-up request to frontend-api.clerk.dev hangs. Follow it here instead,
  * and only to that host over HTTPS so the proxy cannot be pointed elsewhere.
+ * With Clerk-Proxy-Url, Clerk redirects back to our proxy instead: map only
+ * that exact origin/path prefix back to FAPI, never fetch our own server.
  */
 export async function fetchClerkNpmAsset(
   npmPath: string,
@@ -99,10 +101,26 @@ export async function fetchClerkNpmAsset(
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ status: number; contentType: string | null; body: Buffer } | { error: "redirect" }> {
   let current = new URL(npmPath, CLERK_FAPI);
+  const proxyUrlHeader = proxyHeaders["Clerk-Proxy-Url"];
+  let ownProxy: URL | undefined;
+  if (proxyUrlHeader) {
+    try {
+      const parsed = new URL(proxyUrlHeader);
+      if (parsed.protocol === "https:" && parsed.pathname === CLERK_PROXY_PATH &&
+        !parsed.username && !parsed.password) ownProxy = parsed;
+    } catch {
+      return { error: "redirect" };
+    }
+  }
   for (let hop = 0; hop <= MAX_NPM_REDIRECTS; hop++) {
-    if (current.protocol !== "https:" || current.host !== CLERK_FAPI_HOST) return { error: "redirect" };
+    if (current.protocol !== "https:" || current.host !== CLERK_FAPI_HOST ||
+      current.username || current.password) return { error: "redirect" };
     const response = await fetchImpl(current, { redirect: "manual", headers: proxyHeaders });
-    if (response.status < 300 || response.status >= 400) {
+    if (![301, 302, 303, 307, 308].includes(response.status)) {
+      // Opaque redirects expose status 0. Never pass an invalid HTTP status
+      // or an unsupported 3xx response to Express.
+      if (!Number.isInteger(response.status) || response.status < 200 || response.status > 599 ||
+        (response.status >= 300 && response.status < 400)) return { error: "redirect" };
       return {
         status: response.status,
         contentType: response.headers.get("content-type"),
@@ -110,8 +128,20 @@ export async function fetchClerkNpmAsset(
       };
     }
     const location = response.headers.get("location");
+    await response.body?.cancel();
     if (!location) return { error: "redirect" };
-    current = new URL(location, current);
+    try {
+      const target = new URL(location, current);
+      if (ownProxy && target.origin === ownProxy.origin &&
+        target.pathname.startsWith(`${ownProxy.pathname}/npm/@clerk/`) &&
+        !target.username && !target.password) {
+        current = new URL(target.pathname.slice(ownProxy.pathname.length) + target.search, CLERK_FAPI);
+      } else {
+        current = target;
+      }
+    } catch {
+      return { error: "redirect" };
+    }
   }
   return { error: "redirect" };
 }
@@ -158,7 +188,7 @@ export function clerkProxyMiddleware(options?: { fetchImpl?: typeof fetch }): Re
         }
         if (result.contentType) res.setHeader("Content-Type", result.contentType);
         const cache = versionedClerkJsCacheControl(npmPath);
-        res.setHeader("Cache-Control", cache ?? "private, no-store");
+        res.setHeader("Cache-Control", result.status >= 200 && result.status < 300 && cache ? cache : "private, no-store");
         res.status(result.status).send(result.body);
       })
       .catch(() => {

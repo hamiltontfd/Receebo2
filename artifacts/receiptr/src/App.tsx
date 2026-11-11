@@ -63,6 +63,7 @@ const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
  * 10 Nov 2026). Pinning it skips that redirect.
  */
 const CLERK_JS_VERSION = "6.42.3";
+const CLERK_UI_VERSION = "1.42.4";
 
 function stripBase(path: string): string {
   return basePath && path.startsWith(basePath)
@@ -363,7 +364,7 @@ function ClerkProviderWithRoutes() {
     <ClerkProvider
       publishableKey={clerkPubKey}
       proxyUrl={clerkProxyUrl}
-      {...{ __internal_clerkJSVersion: CLERK_JS_VERSION }}
+      {...{ __internal_clerkJSVersion: CLERK_JS_VERSION, __internal_clerkUIVersion: CLERK_UI_VERSION }}
       appearance={clerkAppearance}
       localization={clerkLocalization}
       signInUrl={`${basePath}/sign-in`}
