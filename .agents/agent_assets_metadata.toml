@@ -47,3 +47,45 @@ mtime_ms = 1793540351066
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/14991bbf-f5b1-4aec-bb54-36f43179253a/f71c4cc7-cf77-436e-9837-3a7322c56b4a"
 storage_version_token = "1793540488148573"
 content_type = "image/png"
+
+[[outputs]]
+id = "yY1yXknqgWTgcv3Qmsbf4"
+uri = "file://artifacts/receiptr/public/_capture-tmp/eu/web/capture.mp4"
+type = "video"
+title = "EU — updated Capture clip"
+description = "Isolated pt-PT capture. Review TOTAL shows € 649,00 with a three-second hold before scrolling to Save."
+logical_id = "776b4c39-e396-4919-a34a-1db6d70d3d17"
+content_hash = "sha256:b1370a60db5f34f58760c9600cbeaa0a943f5138d0168875d1e1fdc3295fd782"
+size = 171046
+mtime_ms = 1794427947990
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/776b4c39-e396-4919-a34a-1db6d70d3d17/8857bd42-8837-44c3-91da-632668e3a4d9"
+storage_version_token = "1794427996415246"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "utprjBRUlTx_AAIv1tHTS"
+uri = "file://artifacts/receiptr/public/_capture-tmp/us/web/capture.mp4"
+type = "video"
+title = "US — updated Capture clip"
+description = "Isolated en-US capture. Review TOTAL shows $ 486.00 with a three-second hold before scrolling to Save."
+logical_id = "4b2c8465-c48f-460d-8494-74e81baa271d"
+content_hash = "sha256:7800582d3812b3925a542e7bb9ce22f6df9c5e89ef01c632cfabb429b0f6e048"
+size = 165464
+mtime_ms = 1794427949839
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/4b2c8465-c48f-460d-8494-74e81baa271d/e8cb9d0b-0856-4463-9b1e-b55fb66de746"
+storage_version_token = "1794427997583439"
+content_type = "video/mp4"
+
+[[outputs]]
+id = "_FZ7B9hsT35Z09YFoeVZH"
+uri = "file://artifacts/receiptr/public/_capture-tmp/br/web/capture.mp4"
+type = "video"
+title = "Brazil — updated Capture clip"
+description = "Isolated pt-BR capture. Review TOTAL shows R$ 3199,00 with a three-second hold before scrolling to Save."
+logical_id = "bccfcdf7-fdd0-43b5-82c2-91d270ffcd2a"
+content_hash = "sha256:5735d37aac2e9848df10e56289589c925282af432c13509283080fa8ce9900a1"
+size = 188434
+mtime_ms = 1794427951673
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/bccfcdf7-fdd0-43b5-82c2-91d270ffcd2a/c626b751-0513-40dc-8ada-de7ff4faa502"
+storage_version_token = "1794427998369238"
+content_type = "video/mp4"
