@@ -54,10 +54,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const out = path.resolve(capture.output);
 await mkdir(`${out}/sources`, { recursive: true });
 await mkdir(`${out}/web`, { recursive: true });
+const processLocale = `${capture.locale.replace("-", "_")}.UTF-8`;
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH,
   headless: true,
-  args: ["--no-sandbox"],
+  args: ["--no-sandbox", `--lang=${capture.locale}`],
+  env: { ...process.env, LANG: processLocale, LC_ALL: processLocale, LANGUAGE: capture.locale.replace("-", "_") },
 });
 const errors = [];
 const manifest = { capturedAt, context: capture.name, market: capture.market, language: capture.language, sampleData: true, partial: plan.partial, reviewTotals: {}, clips: {}, screens: [], unexpected: [] };
@@ -283,6 +285,24 @@ try {
   await requireVisible(phone.page, phone.page.getByTestId("item-coverage"), "scan review", phone.unexpected);
   manifest.reviewTotals.review = await reviewTotal(phone);
   await phone.page.waitForTimeout(400);
+  await still(phone.page, "scan-review-form");
+  await phoneUi.save.scrollIntoViewIfNeeded();
+  await phoneUi.save.click();
+  await phone.page.waitForURL(`**/receipts/${receipts[0].id}`);
+  const savedHeading = phone.page.getByRole("heading", { name: receipts[0].merchant, exact: true });
+  await requireVisible(phone.page, savedHeading, "saved receipt confirmation", phone.unexpected);
+  await phone.page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  // Let the real page transition settle; never replace the product card with a mock.
+  await phone.page.waitForTimeout(600);
+  const savedHero = phone.page.locator(".rounded-2xl.bg-foreground.text-background").filter({ has: savedHeading });
+  await requireVisible(phone.page, savedHero, "saved receipt hero card", phone.unexpected);
+  const heroVisible = await savedHero.evaluate(card => {
+    const box = card.getBoundingClientRect();
+    const total = card.querySelector("p.font-mono");
+    return box.top >= 0 && box.bottom <= innerHeight && box.left >= 0 && box.right <= innerWidth
+      && Boolean(total?.textContent?.trim()) && total.textContent.trim() !== "--";
+  });
+  if (!heroVisible) throw new Error("Saved receipt hero with merchant and total must be fully visible before capture");
   await still(phone.page, "scan-review");
   await measure(phone.page, "scan-review");
   for (const [name, source] of Object.entries(heroScenes)) {

@@ -17,7 +17,7 @@ const base = {
 const at = date => ({ createdAt: `${date}T12:00:00Z`, updatedAt: `${date}T12:00:00Z` });
 const euReceipts = [
   {
-    ...base, ...at("2026-10-23"), id: 901, merchant: "Casa Lumen Electrónica", category: "Electronics",
+    ...base, ...at("2026-10-23"), id: 901, merchant: "Casa Lumen Eletrónica", category: "Electronics",
     purchaseDate: "2026-10-23", deliveryDate: "2026-10-25", isOnlinePurchase: true, total: 649,
     products: [
       {
@@ -46,7 +46,7 @@ const euReceipts = [
       { name: "Smart TV 4K de 55 polegadas", price: 480, category: "Electronics", reason: "Destaque fictício de exemplo." },
       { name: "Soundbar de exemplo", price: 149, category: "Electronics", reason: "Destaque fictício de exemplo." },
     ],
-    summary: "Compra online fictícia na Casa Lumen Electrónica, entregue em Portugal. Dados de exemplo: televisão, soundbar e pequenos acessórios.",
+    summary: "Compra online fictícia na Casa Lumen Eletrónica, entregue em Portugal. Dados de exemplo: televisão, soundbar e pequenos acessórios.",
     warranty: "Exemplo fictício. A linha do televisor indica uma garantia do fabricante de 2 anos. Este texto do recibo não é aplicado aos outros artigos.",
   },
   {

@@ -174,7 +174,7 @@ test("capture contexts stay separate and the published binaries stay put", async
   }
   const pdf = illustrativePdf(sampleDocumentLines(receipts[0]));
   assert.equal(pdf.subarray(0, 8).toString(), "%PDF-1.4");
-  assert.match(pdf.toString("latin1"), /Casa Lumen Electr/);
+  assert.match(pdf.toString("latin1"), /Casa Lumen Eletr/);
 });
 
 test("each context returns its own language, market, frozen clock, output and 2x phone size", () => {
