@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ toast: vi.fn(), navigate: vi.fn() }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mocks.toast }) }));
-vi.mock("@workspace/api-client-react", () => ({ customFetch: () => new Promise(() => {}) }));
+vi.mock("@workspace/api-client-react", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@workspace/api-client-react")>(),
+  customFetch: () => new Promise(() => {}),
+}));
 vi.mock("wouter", () => ({
   useLocation: () => ["/search", mocks.navigate],
   Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,

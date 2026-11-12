@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 export type ServerMetaEvent = {
-  eventName: "CompleteRegistration" | "Purchase" | "Subscribe";
+  eventName: "CompleteRegistration" | "FirstReceiptSaved" | "Purchase" | "Subscribe";
   eventId: string;
   userId: string;
   email?: string | null;

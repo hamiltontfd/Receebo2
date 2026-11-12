@@ -10,6 +10,7 @@ import { accountTrialStatus, TRIAL_CAP_ERROR } from "./accountTrial";
 import { pendingPurchaseType } from "./pendingImportRanking";
 import type { PurchaseType } from "./purchaseType";
 import { refreshWarrantyExpiries } from "./warrantyExpiryStore";
+import { withFirstReceiptEvent, type MetaMilestone } from "./metaMilestones";
 
 export type ApproveTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -116,19 +117,19 @@ export async function approvePendingBatch(
   rows: ReadonlyArray<{ id: number }>,
   trial: Awaited<ReturnType<typeof accountTrialStatus>>,
   categoryFor: (id: number) => string | undefined = () => undefined,
-): Promise<{ approved: Array<{ id: number; receiptId: number }>; skipped: number[] }> {
+): Promise<{ approved: Array<{ id: number; receiptId: number }>; skipped: number[]; metaEvent?: MetaMilestone }> {
   const limit = trial ? trial.remaining : rows.length;
   const toApprove = rows.slice(0, limit);
   const skipped = rows.slice(limit).map((r) => r.id);
-  const approved = await db.transaction(async (tx) => {
+  const { value: approved, event } = await withFirstReceiptEvent(userId, () => db.transaction(async (tx) => {
     const done: Array<{ id: number; receiptId: number }> = [];
     for (const row of toApprove) {
       const receipt = await approvePendingInTx(tx, userId, row.id, trial, categoryFor(row.id));
       if (receipt) done.push({ id: row.id, receiptId: receipt.id });
     }
     return done;
-  });
+  }));
   // Warranty end dates now (none for subscriptions/digital/tickets), not at the next daily sweep.
   for (const { receiptId } of approved) await refreshWarrantyExpiries(receiptId);
-  return { approved, skipped };
+  return { approved, skipped, ...(event ? { metaEvent: event } : {}) };
 }

@@ -3,7 +3,7 @@
  * and marketing consent allows it. The server Conversions API uses META_PIXEL_ID
  * and META_CAPI_ACCESS_TOKEN separately.
  */
-export type MetaEventName = "PageView" | "CompleteRegistration" | "Purchase" | "Subscribe";
+export type MetaEventName = "PageView" | "CompleteRegistration" | "Purchase" | "Subscribe" | "FirstReceiptSaved" | "AppReturned";
 
 export type MetaEvent = {
   name: MetaEventName;
@@ -84,6 +84,11 @@ export function applyConsentPrivacy(consent: { marketing: boolean; attribution: 
     window.fbq?.("consent", "revoke");
     deleteFirstPartyCookie("_fbp");
     deleteFirstPartyCookie("_fbc");
+    try {
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith("receebo:app-open:")) localStorage.removeItem(key);
+      }
+    } catch { /* storage unavailable */ }
     document.getElementById("meta-pixel")?.remove();
     // The SDK injects untagged signals/config scripts in addition to its loader.
     document.querySelectorAll<HTMLScriptElement>("script[src]").forEach(script => {
@@ -108,6 +113,7 @@ export function trackMetaEvent(event: MetaEvent, allowed: boolean, id = metaPixe
   const payload = event.value != null && event.currency
     ? { value: event.value, currency: event.currency }
     : {};
-  window.fbq("track", event.name, payload, { eventID: event.eventId });
+  const method = event.name === "FirstReceiptSaved" || event.name === "AppReturned" ? "trackCustom" : "track";
+  window.fbq(method, event.name, payload, { eventID: event.eventId });
   return true;
 }

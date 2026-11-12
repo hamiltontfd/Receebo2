@@ -8,6 +8,14 @@ import {
 import { applyConsentPrivacy } from "@/lib/metaPixel";
 
 export const OPEN_COOKIE_SETTINGS = "receebo:open-cookie-settings";
+export const OPT_OUT_SHARING = "receebo:opt-out-sharing";
+
+export function SharingOptOutButton() {
+  return <button type="button" className="text-left text-muted-foreground hover:text-foreground"
+    onClick={() => window.dispatchEvent(new Event(OPT_OUT_SHARING))}>
+    {cookieText("doNotSell", "en")}
+  </button>;
+}
 
 function readStored(): ConsentState | null {
   try { return parseConsent(localStorage.getItem(CONSENT_STORAGE_KEY)); }
@@ -30,6 +38,7 @@ export function CookieConsent({ region }: { region: ConsentRegion }) {
   const [open, setOpen] = useState(false);
   const [prefs, setPrefs] = useState(false);
   const [draft, setDraft] = useState<ConsentState>(emptyConsent());
+  const [optOutConfirmed, setOptOutConfirmed] = useState(false);
   const gpc = globalPrivacyControl();
 
   useEffect(() => {
@@ -42,7 +51,22 @@ export function CookieConsent({ region }: { region: ConsentRegion }) {
       setOpen(true);
     };
     window.addEventListener(OPEN_COOKIE_SETTINGS, show);
-    return () => window.removeEventListener(OPEN_COOKIE_SETTINGS, show);
+    const optOut = () => {
+      const state: ConsentState = {
+        ...(readStored() ?? emptyConsent()), marketing: false, attribution: false,
+        choice: "preferences", updatedAt: new Date().toISOString(),
+      };
+      writeStored(state);
+      setStored(state);
+      setOpen(false);
+      setPrefs(false);
+      setOptOutConfirmed(true);
+    };
+    window.addEventListener(OPT_OUT_SHARING, optOut);
+    return () => {
+      window.removeEventListener(OPEN_COOKIE_SETTINGS, show);
+      window.removeEventListener(OPT_OUT_SHARING, optOut);
+    };
   }, [region, gpc]);
 
   const choose = (state: ConsentState) => {
@@ -50,9 +74,10 @@ export function CookieConsent({ region }: { region: ConsentRegion }) {
     setStored(state);
     setOpen(false);
     setPrefs(false);
+    setOptOutConfirmed(false);
   };
 
-  if (!open) return null;
+  if (!open) return optOutConfirmed ? <p role="status" className="fixed bottom-4 left-4 right-4 z-[80] rounded-xl border bg-background p-4 text-sm shadow-lg">{cookieText("optOutConfirmed")}</p> : null;
   const active = prefs ? draft : effectiveConsent(stored, region, gpc);
   return (
     <div role="dialog" aria-labelledby="cookie-title" data-testid="cookie-banner" className="fixed inset-x-0 bottom-0 z-[80] border-t bg-background p-4 shadow-lg sm:p-6">

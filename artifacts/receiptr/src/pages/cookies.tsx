@@ -20,7 +20,8 @@ export const en: Row[] = [
   { name: "GAESA", purpose: "Hosting/platform-managed cookie, not set by the app or controlled by its marketing choice.", duration: "Managed by the hosting platform.", party: "Hosting (infrastructure)" },
   { name: "Landing event beacon", purpose: "Aggregate-only event counts: no browser identifier, cookie or browser storage.", duration: "No browser storage; aggregate server counts.", party: "Receebo (aggregate measurement)" },
   { name: "receebo:ad-attribution", purpose: "Stores the first ad link (UTM fields and fbclid) until you create an account.", duration: "90 days, or until sign-up is recorded.", party: "Receebo (attribution)" },
-  { name: "Meta Pixel and Conversions API", purpose: "Measures page views, new accounts and subscriptions after the choice that allows marketing.", duration: "Meta’s own cookies, commonly up to 90 days. The server event is sent only for that action.", party: "Meta (marketing)" },
+  { name: "receebo:app-open:*", purpose: "Last permitted authenticated open day (UTC), per account in this browser, to measure a return on a later day. Used only when marketing is allowed.", duration: "Until cleared or marketing is revoked.", party: "Receebo (marketing)" },
+  { name: "Meta Pixel and Conversions API", purpose: "Measures page views, trial starts, the first saved trial receipt, browser return visits and subscriptions after the choice that allows marketing.", duration: "Meta’s own cookies, commonly up to 90 days. The server event is sent only for that action.", party: "Meta (marketing)" },
 ];
 
 export const pt: Row[] = [
@@ -36,7 +37,8 @@ export const pt: Row[] = [
   { name: "GAESA", purpose: "Cookie da plataforma de alojamento, não definido pela aplicação nem controlado pela escolha de marketing.", duration: "Gerido pela plataforma de alojamento.", party: "Alojamento (infraestrutura)" },
   { name: "Landing event beacon", purpose: "Apenas contagens agregadas: sem identificador do navegador, cookie ou armazenamento no navegador.", duration: "Sem armazenamento no navegador; contagens agregadas no servidor.", party: "Receebo (medição agregada)" },
   { name: "receebo:ad-attribution", purpose: "Guarda a primeira ligação de anúncio (campos UTM e fbclid) até criar conta.", duration: "90 dias, ou até o registo ficar gravado.", party: "Receebo (atribuição)" },
-  { name: "Pixel da Meta e API de conversões", purpose: "Mede páginas, contas novas e subscrições depois da escolha que permite marketing.", duration: "Cookies da Meta, em geral até 90 dias. O evento de servidor só é enviado nessa ação.", party: "Meta (marketing)" },
+  { name: "receebo:app-open:*", purpose: "Último dia UTC de abertura autenticada permitida, por conta neste navegador, para medir o regresso noutro dia. Só é usado quando o marketing está permitido.", duration: "Até ser apagado ou o marketing ser revogado.", party: "Receebo (marketing)" },
+  { name: "Pixel da Meta e API de conversões", purpose: "Mede páginas, início do trial, primeiro recibo do trial guardado, regressos no navegador e subscrições depois da escolha que permite marketing.", duration: "Cookies da Meta, em geral até 90 dias. O evento de servidor só é enviado nessa ação.", party: "Meta (marketing)" },
 ];
 
 export default function CookiePolicy() {
@@ -82,7 +84,7 @@ export default function CookiePolicy() {
       <h2>{english ? "How to refuse or change" : "Como recusar ou alterar"}</h2>
       <p>
         {english
-          ? "Use Accept, Reject or Preferences on the cookie banner. Reject leaves only essential cookies. You can reopen Preferences later from Cookie settings in the footer. On the US pages, Do Not Sell or Share My Personal Information opens the same choices. A browser Global Privacy Control signal is treated as an opt-out of sale or sharing until you explicitly accept marketing."
+          ? "Use Accept, Reject or Preferences on the cookie banner. Reject leaves only essential cookies. You can reopen Preferences later from Cookie settings in the footer. On the US pages, Do Not Sell or Share My Personal Information immediately turns off marketing and ad attribution and confirms your choice. A browser Global Privacy Control signal is treated as an opt-out of sale or sharing until you explicitly accept marketing."
           : "Use Aceitar, Recusar ou Preferências no aviso. Recusar deixa só os cookies essenciais. Pode reabrir as Preferências em Definições de cookies no rodapé. Um sinal Global Privacy Control do navegador conta como oposição à venda ou partilha até aceitar marketing explicitamente."}
       </p>
     </LegalPageLayout>

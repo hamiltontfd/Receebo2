@@ -20,6 +20,7 @@ import { TRIAL_CAP_ERROR } from "../lib/accountTrial";
 import { normalizeCategory } from "../lib/categories";
 import { rankPendingImports } from "../lib/pendingImportRanking";
 import { approvePendingBatch, checkApproveAccess } from "../lib/pendingApproval";
+import { returnMetaMilestone } from "../lib/metaMilestones";
 import {
   loadSupplierOverview, saveSupplierDecision, sortSupplierViews, SUPPLIER_DECISIONS,
   type SupplierDecision, type SupplierView,
@@ -126,8 +127,9 @@ router.post(
         senderDomains: pending.map((p) => p.extractionData?.senderDomain),
       });
       const supplierCategory = row.category ?? undefined;
-      const { approved, skipped } = await approvePendingBatch(req.userId!, ordered, access.trial,
+      const { approved, skipped, metaEvent } = await approvePendingBatch(req.userId!, ordered, access.trial,
         (id) => (id === firstId && category) ? category : supplierCategory);
+      returnMetaMilestone(res, metaEvent);
       logger.info({ userId: req.userId, supplier: view.supplierKey, approved: approved.length, skipped: skipped.length },
         "Recurring supplier set to always import");
       res.json({

@@ -9,6 +9,10 @@ afterEach(() => {
 });
 
 describe("meta pixel", () => {
+  it.each(["FirstReceiptSaved", "AppReturned"] as const)("uses trackCustom for %s with an empty payload and shared id", (name) => {
+    expect(trackMetaEvent({ name, eventId: "shared-id" }, true, "test-pixel")).toBe(true);
+    expect(Array.from(window.fbq!.queue!.at(-1)!)).toEqual(["trackCustom", name, {}, { eventID: "shared-id" }]);
+  });
   it("does nothing when the pixel id is unset or marketing is not allowed", () => {
     vi.stubEnv("VITE_META_PIXEL_ID", "");
     expect(metaPixelId("")).toBe("");

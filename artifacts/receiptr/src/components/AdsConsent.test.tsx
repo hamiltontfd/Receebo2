@@ -9,7 +9,9 @@ import { en, pt } from "@/pages/cookies";
 
 const { send, auth } = vi.hoisted(() => ({ send: vi.fn(async (_path: string, _options?: RequestInit) => ({ created: false })), auth: { isSignedIn: false, userId: null as string | null } }));
 vi.mock("@clerk/react", () => ({ useAuth: () => auth }));
-vi.mock("@workspace/api-client-react", () => ({ customFetch: send }));
+vi.mock("@workspace/api-client-react", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@workspace/api-client-react")>(), customFetch: send,
+}));
 vi.mock("@/components/LegalPageLayout", () => ({ LegalPageLayout: ({ children }: { children: unknown }) => children }));
 
 beforeEach(() => {
@@ -30,6 +32,22 @@ function view(country: string | null, banner = true) {
   </MarketContext.Provider>);
 }
 describe("live cookie choices", () => {
+  it("does not emit registration when attribution is first saved", async () => {
+    auth.isSignedIn = true; auth.userId = "account-test";
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(acceptAll()));
+    localStorage.setItem("receebo:ad-attribution", JSON.stringify({ utmSource: "test", capturedAt: new Date().toISOString() }));
+    send.mockResolvedValueOnce({ created: true });
+    const fbq = Object.assign(vi.fn(), { loaded: true });
+    window.fbq = fbq;
+    view("PT", false);
+    await waitFor(() => expect(send).toHaveBeenCalledWith(
+      expect.stringContaining("/account/attribution"), expect.anything(),
+    ));
+    await waitFor(() => expect(send).toHaveBeenCalledWith(
+      expect.stringContaining("/account/attribution/consent"), expect.anything(),
+    ));
+    expect(fbq.mock.calls.some(call => call[1] === "CompleteRegistration")).toBe(false);
+  });
   it.each(["PT", "IS", "LI", "NO", "GB", "CH", "BR", null])("keeps Meta off before a choice in %s", (country) => {
     view(country);
     expect(document.getElementById("meta-pixel")).toBeNull();

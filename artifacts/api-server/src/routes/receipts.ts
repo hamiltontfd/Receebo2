@@ -32,6 +32,7 @@ import { normalizeCategory } from "../lib/categories";
 import {
   consumeTrialReservation, accountTrialStatus, confirmTrialReceiptSaved, releaseTrialDraft, TRIAL_CAP_ERROR,
 } from "../lib/accountTrial";
+import { returnMetaMilestone, withFirstReceiptEvent } from "../lib/metaMilestones";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -429,7 +430,7 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   // Saving a reviewed draft is the moment a trial upload counts.
   const savingDraft = parsed.data.isDraft === false && existing.isDraft && !manualAcceptance;
   let overCap = false;
-  const receipt = await db.transaction(async tx => {
+  const { value: receipt, event } = await withFirstReceiptEvent(req.userId!, () => db.transaction(async tx => {
   if (savingDraft && !(await confirmTrialReceiptSaved(tx, req.userId!, existing.objectPath))) {
     overCap = true;
     return undefined;
@@ -474,7 +475,7 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
     await rememberOnboardingReceipt(req.userId!, tx);
   }
   return updated;
-  });
+  }));
 
   if (overCap) {
     res.status(403).json(TRIAL_CAP_ERROR);
@@ -486,6 +487,7 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   }
   await refreshWarrantyExpiries(receipt.id);
 
+  returnMetaMilestone(res, event);
   res.json(UpdateReceiptResponse.parse({ ...receipt, itemRights: await itemRightsFor(req.userId!, receipt, req.savedCountry) }));
 }));
 

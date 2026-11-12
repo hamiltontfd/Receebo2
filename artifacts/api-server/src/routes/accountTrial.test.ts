@@ -14,7 +14,10 @@ const fixture = vi.hoisted(() => ({
   extraction: vi.fn(), check: vi.fn(), checkout: vi.fn(),
   returnEmail: vi.fn(), push: vi.fn(), warrantyEmail: vi.fn(),
   liveSubscriptions: [] as Array<{ status: string }>,
+  marketingConsent: vi.fn(), metaEvent: vi.fn(),
 }));
+vi.mock("../lib/adAttributionStore", () => ({ marketingConsentFor: fixture.marketingConsent }));
+vi.mock("../lib/metaCapi", () => ({ sendMetaEvent: fixture.metaEvent }));
 // Authentication only is replaced for this local HTTP harness. Entitlements,
 // transactions, cross-connection advisory locks and quota persistence are real.
 vi.mock("../middlewares/requireAuth", () => ({
@@ -91,6 +94,7 @@ import { calcReturnWindow } from "../lib/returnWindowCalc";
 import { refreshWarrantyExpiries } from "../lib/warrantyExpiryStore";
 import { migrateTrialAiReads, TRIAL_AI_READ_LIMIT, TRIAL_AI_READS_MESSAGE, claimTrialAiRead, countTrialAiReads } from "../lib/trialAiReads";
 import { sql } from "drizzle-orm";
+import { migrateTrialFunnel } from "../lib/trialFunnelMigration";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -108,6 +112,7 @@ const extractionData = {
 
 beforeAll(async () => {
   await migrateTrialAiReads();
+  await migrateTrialFunnel();
   const app = express();
   app.use(express.json(), (req, _res, next) => {
     req.log = { error() {}, warn() {}, info() {} } as any;
@@ -145,6 +150,8 @@ beforeEach(() => {
   fixture.extraction.mockReset().mockResolvedValue(extractionData);
   fixture.checkout.mockReset().mockResolvedValue({ url: "https://checkout.stripe.com/fixture" });
   fixture.liveSubscriptions = [];
+  fixture.marketingConsent.mockReset().mockResolvedValue(false);
+  fixture.metaEvent.mockReset().mockResolvedValue({ sent: true });
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -186,6 +193,44 @@ async function upload() {
 }
 
 describe("durable no-card account trial (real PostgreSQL, isolated users)", () => {
+  it("sends the first saved trial receipt milestone once, not on review or later saves", async () => {
+    await start();
+    fixture.marketingConsent.mockResolvedValue(true);
+    const draft = await uploadDraft();
+    expect(fixture.metaEvent).not.toHaveBeenCalled();
+    const first = await request(`/receipts/${draft.id}`, { isDraft: false }, "PATCH");
+    expect(first.status).toBe(200);
+    const event = JSON.parse(first.headers.get("X-Receebo-Meta-Event")!);
+    expect(event.name).toBe("FirstReceiptSaved");
+    expect(fixture.metaEvent).toHaveBeenCalledExactlyOnceWith({
+      eventName: "FirstReceiptSaved", userId, eventId: event.eventId,
+    });
+    const repeat = await request(`/receipts/${draft.id}`, { isDraft: false }, "PATCH");
+    expect(repeat.status).toBe(200);
+    expect(repeat.headers.get("X-Receebo-Meta-Event")).toBeNull();
+    await upload();
+    expect(fixture.metaEvent).toHaveBeenCalledTimes(1);
+  }, 15000);
+  it("emits registration once on a real trial insert, sharing the CAPI id with the browser", async () => {
+    fixture.marketingConsent.mockResolvedValue(true);
+    const responses = await Promise.all([request("/billing/start-trial", {}), request("/billing/start-trial", {})]);
+    expect(responses.map(r => r.status)).toEqual([200, 200]);
+    const headers = responses.map(r => r.headers.get("X-Receebo-Meta-Event")).filter(Boolean);
+    expect(headers).toHaveLength(1);
+    const event = JSON.parse(headers[0]!);
+    expect(event.name).toBe("CompleteRegistration");
+    expect(fixture.metaEvent).toHaveBeenCalledExactlyOnceWith({
+      eventName: "CompleteRegistration", userId, eventId: event.eventId,
+    });
+    expect((await request("/billing/start-trial", {})).headers.get("X-Receebo-Meta-Event")).toBeNull();
+    expect(fixture.metaEvent).toHaveBeenCalledTimes(1);
+  });
+  it("starts a trial without emitting registration when marketing is off", async () => {
+    const response = await request("/billing/start-trial", {});
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-Receebo-Meta-Event")).toBeNull();
+    expect(fixture.metaEvent).not.toHaveBeenCalled();
+  });
   it("starts only after consent, once across simultaneous devices, without a customer", async () => {
     expect((await request("/billing/start-trial", {}, "POST", false)).status).toBe(428);
     expect((await getSubscriptionStatus(userId)).accessState).toBe("not_started");

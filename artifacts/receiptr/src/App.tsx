@@ -30,6 +30,7 @@ import TermsOfService from "@/pages/terms";
 import CookiePolicy from "@/pages/cookies";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AdsRuntime } from "@/components/AdsRuntime";
+import { AuthenticatedAdsOpen } from "@/components/AuthenticatedAdsOpen";
 import { useCookieConsent } from "@/lib/useCookieConsent";
 import AppShell from "@/components/AppShell";
 import AuthModal from "@/components/AuthModal";
@@ -190,7 +191,7 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
       <Show when="signed-in">
         <LegalConsentGate key={userId}>
           <PlanSelectionGate>
-            <AppShell>{children}</AppShell>
+            <AppShell><AuthenticatedAdsOpen />{children}</AppShell>
             <InstallBar />
           </PlanSelectionGate>
         </LegalConsentGate>

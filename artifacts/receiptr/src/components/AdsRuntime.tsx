@@ -4,7 +4,9 @@ import { useLocation } from "wouter";
 import { ATTRIBUTION_STORAGE_KEY, firstTouch, parseTouch, touchFromSearch, type AdTouch } from "@/lib/adAttribution";
 import { useCookieConsent } from "@/lib/useCookieConsent";
 import { applyConsentPrivacy, metaPixelId, newEventId, trackMetaEvent } from "@/lib/metaPixel";
-import { customFetch } from "@workspace/api-client-react";
+import { customFetch, setResponseObserver } from "@workspace/api-client-react";
+import { effectiveConsent, readStoredConsent } from "@/lib/adConsent";
+import { trackMilestoneResponse } from "@/lib/metaLifecycle";
 
 const PURCHASE_KEY = "receebo:purchase-event";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -37,6 +39,17 @@ export function AdsRuntime() {
   const account = useRef(userId);
   account.current = userId;
   const syncQueue = useRef(Promise.resolve());
+  const currentRegion = useRef(region);
+  currentRegion.current = region;
+
+  useEffect(() => {
+    setResponseObserver(response => {
+      const gpc = (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
+      const allowed = effectiveConsent(readStoredConsent(), currentRegion.current, gpc).marketing;
+      trackMilestoneResponse(response, allowed && !!account.current);
+    });
+    return () => setResponseObserver(undefined);
+  }, []);
 
   useEffect(() => { applyConsentPrivacy(consent); }, [consent.marketing, consent.attribution]);
 
@@ -55,18 +68,14 @@ export function AdsRuntime() {
   useEffect(() => {
     if (!isSignedIn || !userId || (region === "UNKNOWN" && !stored?.choice)) return;
     const touch = consent.attribution ? readTouch() : null;
-    const eventId = newEventId();
     // Serialize changes so a slow earlier Accept cannot overwrite a later Reject.
     const marketingConsent = consent.marketing;
     syncQueue.current = syncQueue.current.catch(() => undefined).then(async () => {
       if (account.current !== userId) return;
       if (touch) {
-        const result = await customFetch<{ created: boolean }>(`${base}/api/account/attribution`, {
-          method: "POST", body: JSON.stringify({ ...touch, marketingConsent, eventId }),
+        await customFetch<{ created: boolean }>(`${base}/api/account/attribution`, {
+          method: "POST", body: JSON.stringify({ ...touch, marketingConsent }),
         }).catch(() => null);
-        if (result?.created && latest.current.marketing && account.current === userId) {
-          trackMetaEvent({ name: "CompleteRegistration", eventId }, true);
-        }
       }
       if (account.current !== userId) return;
       await customFetch(`${base}/api/account/attribution/consent`, {

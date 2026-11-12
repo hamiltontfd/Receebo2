@@ -94,9 +94,14 @@ export default function PrivacyPolicy() {
           on this browser for 90 days and, when you create an account, saves it
           with the account so we can tell which campaign started the trial.
           If your choice also allows marketing, Receebo uses the Meta Pixel in
-          the browser and the Meta Conversions API on our server for page views,
-          completed registration and subscription, sharing an event id so the
-          same action is not counted twice. See the{" "}
+          the browser and the Meta Conversions API on our server to measure trial
+          starts, the first saved trial receipt and subscriptions. Page views
+          and a return to the authenticated app on a later UTC day are measured
+          in the browser. The return measurement keeps the last permitted open
+          day in this browser, separately for each account. Receipt contents,
+          merchant names and receipt amounts are not included in trial-start,
+          first-receipt or return event parameters. Browser and server events
+          share an event id so the same action is not counted twice. See the{" "}
           <Link href="/cookies">Cookie Policy</Link>.
         </li>
       </ul>
@@ -328,7 +333,7 @@ export default function PrivacyPolicy() {
 
       <h2>10. Cookies and local storage</h2>
       {/* DRAFT pending legal review */}
-      <LegalDraftNotice />
+      <LegalDraftNotice forHamilton />
       <p>
         Receebo uses essential authentication and payment technologies (Clerk
         and Stripe), preference storage, optional ad-attribution storage, and,

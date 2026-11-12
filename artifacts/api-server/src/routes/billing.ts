@@ -4,6 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, userBillingTable, accountTrialsTable, trialFunnelCheckoutsTable } from "@workspace/db";
 import { funnelSubject, recordFunnelEvent, paywallReason, safeFunnel, createFunnelCheckout, confirmPaidFunnel } from "../lib/trialFunnel";
 import { TRIAL_DURATION_MS } from "../lib/accountTrial";
+import { returnMetaMilestone, sendMilestone } from "../lib/metaMilestones";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireCurrentLegalAcceptance } from "../lib/legalAcceptance";
 import { lockUserDataMutation } from "../lib/userDataLock";
@@ -151,13 +152,14 @@ router.post("/billing/start-trial", requireAuth, requireCurrentLegalAcceptance,
     if (status.accessState === "not_started") {
       const startedAt = new Date();
       const market = await getAccountMarket(req.userId!).catch(() => null);
-      await db.insert(accountTrialsTable).values({
+      const inserted = await db.insert(accountTrialsTable).values({
         userId: req.userId!,
         startedAt,
         endsAt: new Date(startedAt.getTime() + TRIAL_DURATION_MS),
         monthlyPriceId: billingPriceId("monthly", market),
         yearlyPriceId: billingPriceId("yearly", market),
-      }).onConflictDoNothing();
+      }).onConflictDoNothing().returning({ userId: accountTrialsTable.userId });
+      if (inserted.length) returnMetaMilestone(res, await sendMilestone(req.userId!, "CompleteRegistration"));
     }
     res.json({ started: true });
   }));

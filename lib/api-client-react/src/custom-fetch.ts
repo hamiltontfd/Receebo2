@@ -8,6 +8,16 @@ export type BodyType<T> = T;
 
 export type AuthTokenGetter = () => Promise<string | null> | string | null;
 
+// Optional response metadata consumer. It must never interrupt a successful API call.
+let responseObserver: ((response: Response) => void) | undefined;
+export function setResponseObserver(observer: ((response: Response) => void) | undefined) {
+  responseObserver = observer;
+}
+export function observeResponse(response: Response) {
+  if (!response.ok) return;
+  try { responseObserver?.(response); } catch { /* optional observer */ }
+}
+
 const NO_BODY_STATUS = new Set([204, 205, 304]);
 const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
@@ -407,5 +417,6 @@ export async function customFetch<T = unknown>(
     throw error;
   }
 
+  observeResponse(response);
   return (await parseSuccessBody(response, responseType, requestInfo)) as T;
 }

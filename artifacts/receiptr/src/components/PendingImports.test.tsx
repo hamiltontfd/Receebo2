@@ -10,7 +10,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock("@clerk/react", () => ({ useAuth: () => ({ isSignedIn: true }) }));
 vi.mock("@/components/MailConnections", () => ({ useMailStatus: () => ({ data: mocks.mailStatus }) }));
-vi.mock("@workspace/api-client-react", () => ({ customFetch: () => new Promise(() => {}) }));
+vi.mock("@workspace/api-client-react", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@workspace/api-client-react")>(),
+  customFetch: () => new Promise(() => {}),
+}));
 vi.mock("wouter", () => ({
   useLocation: () => ["/search", mocks.navigate],
   Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,

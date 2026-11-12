@@ -15,6 +15,11 @@ const COPY: Copy = {
     "Usamos cookies para o Receebo funcionar e, salvo oposição, para medir nossos anúncios.",
   ],
   accept: ["Accept", "Aceitar", "Aceitar"],
+  optOutConfirmed: [
+    "Your opt-out is saved. Marketing and ad attribution are off.",
+    "A sua oposição foi guardada. O marketing e a atribuição de anúncios estão desligados.",
+    "Sua opção foi salva. Marketing e atribuição de anúncios estão desativados.",
+  ],
   reject: ["Reject", "Recusar", "Recusar"],
   preferences: ["Preferences", "Preferências", "Preferências"],
   save: ["Save choices", "Guardar escolhas", "Salvar escolhas"],

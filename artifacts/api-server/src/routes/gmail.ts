@@ -37,6 +37,7 @@ import {
 import { PURCHASE_TYPES, type PurchaseType } from "../lib/purchaseType";
 import { refreshWarrantyExpiries } from "../lib/warrantyExpiryStore";
 import { approvePendingBatch, approvePendingInTx, checkApproveAccess } from "../lib/pendingApproval";
+import { returnMetaMilestone, withFirstReceiptEvent } from "../lib/metaMilestones";
 import { isMixedStoreKey, loadSupplierOverview, pendingSupplierKey, type SupplierView } from "../lib/recurringSuppliers";
 
 const router = Router();
@@ -472,8 +473,8 @@ router.post(
         res.status(access.status).json(access.body);
         return;
       }
-      const receipt = await db.transaction((tx) =>
-        approvePendingInTx(tx, req.userId!, id, access.trial, categoryOverride, purchaseTypeOverride));
+      const { value: receipt, event } = await withFirstReceiptEvent(req.userId!, () => db.transaction((tx) =>
+        approvePendingInTx(tx, req.userId!, id, access.trial, categoryOverride, purchaseTypeOverride)));
 
       if (!receipt) {
         const [existing] = await db
@@ -505,6 +506,7 @@ router.post(
         { userId: req.userId, importId: id, receiptId: receipt.id, provider: receipt.provider },
         `${receipt.provider === "outlook" ? "Outlook" : "Gmail"} import approved`,
       );
+      returnMetaMilestone(res, event);
       res.json({ approved: true, receiptId: receipt.id });
     } catch (err) {
       logger.error({ err }, "POST /gmail/pending/:id/approve failed");
@@ -536,7 +538,8 @@ router.post(
         return;
       }
       const rows = rankPendingImports(await selectUserPending(req.userId!, ids));
-      const { approved, skipped } = await approvePendingBatch(req.userId!, rows, access.trial);
+      const { approved, skipped, metaEvent } = await approvePendingBatch(req.userId!, rows, access.trial);
+      returnMetaMilestone(res, metaEvent);
       const handled = new Set([...approved.map((a) => a.id), ...skipped]);
       const notFound = ids.filter((id) => !handled.has(id));
       logger.info(

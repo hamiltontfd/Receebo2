@@ -15,6 +15,7 @@ vi.mock("../lib/logger", () => ({ logger: { warn: vi.fn() } }));
 vi.mock("../lib/metaCapi", () => ({ sendMetaEvent: vi.fn() }));
 import router from "./attribution";
 import { marketingConsentFor, saveFirstTouch } from "../lib/adAttributionStore";
+import { sendMetaEvent } from "../lib/metaCapi";
 
 let server: Server;
 let origin: string;
@@ -73,5 +74,15 @@ describe("latest marketing choice, no migrations or backfill", () => {
     expect((await patch(true, false)).status).toBe(401);
     expect((await patch("true")).status).toBe(400);
     expect(execute).not.toHaveBeenCalled();
+  });
+  it("never sends CompleteRegistration from first-touch attribution", async () => {
+    const response = await fetch(`${origin}/api/account/attribution`, {
+      method: "POST", headers: { "Content-Type": "application/json", "x-test-user": "account-A" },
+      body: JSON.stringify({ utmSource: "test-campaign", marketingConsent: true, eventId: "ignored-event-id" }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ created: true });
+    expect(response.headers.get("X-Receebo-Meta-Event")).toBeNull();
+    expect(sendMetaEvent).not.toHaveBeenCalled();
   });
 });

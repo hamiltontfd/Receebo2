@@ -4,6 +4,7 @@ import type { MailProviderId } from "@/lib/mailConnection";
 import { SYNC_IN_PROGRESS_CODE, SYNC_IN_PROGRESS_COPY } from "@/lib/mailImportCopy";
 import { TRIAL_CAP_MESSAGE } from "@/lib/trialCopy";
 import type { PurchaseType } from "@/lib/purchaseType";
+import { observeResponse } from "@workspace/api-client-react";
 
 /** The server refused the approval because the free-trial receipt cap is reached. */
 export class TrialCapError extends Error {
@@ -154,6 +155,7 @@ export async function approvePending(
     }
     throw new Error("Failed to approve");
   }
+  observeResponse(res);
   return res.json() as Promise<{ approved: boolean; receiptId: number }>;
 }
 
@@ -185,6 +187,7 @@ async function bulk<T>(action: "bulk-approve" | "bulk-dismiss", ids: number[]): 
     }
     throw new Error(action === "bulk-approve" ? "Failed to approve" : "Failed to dismiss");
   }
+  observeResponse(res);
   return res.json() as Promise<T>;
 }
 
@@ -364,5 +367,6 @@ export async function alwaysImportSupplier(
     }
     throw new Error("Failed to import from this supplier");
   }
+  observeResponse(res);
   return res.json() as Promise<AlwaysImportResult>;
 }
