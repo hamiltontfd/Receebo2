@@ -41,8 +41,9 @@ Starting/restarting only the official **web** workflow activates this opt-in
 middleware; do not restart the API for marketing work. Restarting web invalidates
 previous URLs. Remove the activation marker after upload confirmation and restart
 web when convenient to remove the temporary endpoint. The production build has
-no middleware. The homes keep `PROMO_READY` false until each market's six files
-exist and are reviewed; no missing promo URL or old promo is requested meanwhile.
+no middleware. All six promo files per market have now been uploaded and verified,
+and `PROMO_READY` is true for EU, US and BR. Each home requests its own v4 batch;
+the still fallback remains available through an explicit readiness override.
 
 Tooling only: real app components, fictional auth/receipts, fail-closed API
 responses. This is not an application route and never needs the web/API workflows.

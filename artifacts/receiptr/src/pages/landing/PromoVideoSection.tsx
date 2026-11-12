@@ -11,12 +11,11 @@ import { mediaCopy } from "./mediaCopy";
 const WIDE_QUERY = "(min-width: 768px)";
 
 /**
- * Per-batch promo readiness. v4 promos are not uploaded yet, so every batch is
- * false: the section shows a real still and requests no video files. Flip a
- * batch to true only after its six files exist in storage:
+ * Per-batch promo readiness. All six files per market have been uploaded and
+ * verified, so the three batches are enabled:
  *   v4/{batch}/receebo-promo-{16x9,9x16}.{webm,mp4} and receebo-promo-{16x9,9x16}-poster.webp
  */
-export const PROMO_READY: Record<MediaMarket, boolean> = { eu: false, us: false, br: false };
+export const PROMO_READY: Record<MediaMarket, boolean> = { eu: true, us: true, br: true };
 
 export const promoFile = (ratio: "16x9" | "9x16", ext: "webm" | "mp4" | "poster.webp") =>
   ext === "poster.webp" ? `receebo-promo-${ratio}-poster.webp` : `receebo-promo-${ratio}.${ext}`;

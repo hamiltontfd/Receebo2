@@ -90,14 +90,27 @@ describe("PromoVideoSection", () => {
     expect(container.innerHTML).toContain("/v4/us/receebo-promo-9x16-poster.webp");
   });
 
-  it("every batch defaults to not ready", () => {
-    expect(PROMO_READY).toEqual({ eu: false, us: false, br: false });
+  it("every verified v4 batch defaults to ready", () => {
+    expect(PROMO_READY).toEqual({ eu: true, us: true, br: true });
+  });
+
+  it.each(["eu", "us", "br"] as const)("plays the verified %s batch by default without a readiness override", (m) => {
+    mockViewport(true);
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    const { container } = render(<LandingMediaProvider market={m}><PromoVideoSection /></LandingMediaProvider>);
+    expect(container.querySelectorAll("video")).toHaveLength(1);
+    expect(screen.queryByTestId("promo-still")).toBeNull();
+    expect(screen.getByTestId("promo-video-section")).toHaveAttribute("data-promo-state", "video");
+    expect(screen.getByTestId("promo-video")).toHaveAttribute("poster", promoMedia("receebo-promo-16x9-poster.webp", m));
+    for (const ext of ["webm", "mp4"]) {
+      expect(container.querySelector(`source[type="video/${ext}"]`)).toHaveAttribute("src", promoMedia(`receebo-promo-16x9.${ext}`, m));
+    }
   });
 
   it.each(["eu", "us", "br"] as const)("missing %s promo shows a real still and requests no promo files", (m) => {
     mockViewport(true);
     const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
-    const { container } = render(<LandingMediaProvider market={m}><PromoVideoSection /></LandingMediaProvider>);
+    const { container } = render(<LandingMediaProvider market={m}><PromoVideoSection ready={false} /></LandingMediaProvider>);
     expect(container.querySelector("video")).toBeNull();
     expect(container.innerHTML).not.toContain("receebo-promo");
     expect(container.innerHTML).not.toContain("/media/");

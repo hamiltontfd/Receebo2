@@ -26,7 +26,7 @@ try {
       let blockedWrites = 0;
       page.on("pageerror", error => errors.push(error.message));
       page.on("response", response => {
-        if (new URL(response.url()).pathname.includes("/receebo-real-app/v4/") && response.status() !== 200) {
+        if (new URL(response.url()).pathname.includes("/receebo-real-app/v4/") && ![200, 206].includes(response.status())) {
           mediaFailures.push({ pathname: new URL(response.url()).pathname, status: response.status() });
         }
       });
@@ -56,7 +56,18 @@ try {
       if (await reject.isVisible()) await reject.click();
       await page.screenshot({ path: path.join(output, `${batch}-${name}-hero.png`) });
       await expect(page.locator('a[href="#demo"]').first()).toBeVisible();
-      expect(await page.locator('source[src*="receebo-promo-"]').count()).toBe(0);
+      const promo = page.getByTestId("promo-video");
+      await expect(promo).toHaveCount(1);
+      const ratio = name === "desktop" ? "16x9" : "9x16";
+      await expect(promo).toHaveAttribute("poster", new RegExp(`/v4/${batch}/receebo-promo-${ratio}-poster.webp$`));
+      for (const extension of ["webm", "mp4"]) {
+        await expect(promo.locator(`source[type="video/${extension}"]`))
+          .toHaveAttribute("src", new RegExp(`/v4/${batch}/receebo-promo-${ratio}\\.${extension}$`));
+      }
+      await promo.scrollIntoViewIfNeeded();
+      await expect.poll(() => promo.evaluate(video => [video.videoWidth, video.videoHeight]), { timeout: 30_000 })
+        .toEqual(name === "desktop" ? [1280, 720] : [720, 1280]);
+      await page.getByTestId("promo-video-section").screenshot({ path: path.join(output, `${batch}-${name}-promo.png`) });
       if (batch === "us") {
         expect(await page.locator("body").innerText()).not.toContain("€");
         expect(await page.locator("img").evaluateAll(images => images.map(img => img.alt).join("\n"))).not.toContain("€");
