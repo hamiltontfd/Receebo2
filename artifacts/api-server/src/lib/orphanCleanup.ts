@@ -606,6 +606,7 @@ export async function runReturnWindowSweep(): Promise<void> {
       deadlineDate,
       daysRemaining,
       basis: window.basis,
+      estimated: window.estimated,
       holiday: window.holiday,
       ...(region === "US" ? { region } : {}),
       windowDays: window.days,

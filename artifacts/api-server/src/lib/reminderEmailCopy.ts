@@ -32,13 +32,15 @@ export function localizedReturnReminder(input: ReturnReminderInput, locale: Emai
   const when = days === 0 ? "hoje" : days === 1 ? "amanhã" : `em ${days} dias`;
   const what = `${p.what}${p.amount ? ` (${p.amount})` : ""}${!p.item && !p.amount && p.bought ? ` de ${p.bought}` : ""}`;
   return {
-    subject: `O prazo de devolução de ${what} termina ${when}`,
+    subject: `${input.estimated ? "Estimativa: " : ""}O prazo de devolução de ${what} termina ${when}`,
     preheader: `${p.boughtLine} Último dia: ${date}.`.trim(),
-    title: `${p.what}: prazo de devolução até ${date}`,
+    title: `${input.estimated ? "Estimativa: " : ""}${p.what}: prazo de devolução até ${date}`,
     itemLine: p.itemLine,
     secondary: p.item ? `${br ? "Ainda está satisfeito" : "Continua satisfeito"} com ${p.item}?` : null,
     body: `${br ? "Se não for ficar com a compra, inicie" : "Se não quiser ficar com a compra, inicie"} a devolução junto de ${p.merchant ?? "a loja"} até ${date}. O recibo está guardado no Receebo, caso seja necessário.`,
-    note: input.basis === "store" && p.merchant
+    note: input.estimated
+      ? "Compra online estimada. Confirme o tipo de compra e a data de entrega com a loja."
+      : input.basis === "store" && p.merchant
       ? `Com base na política de devolução ${input.holiday ? "de fim de ano " : ""}de ${p.merchant}. As condições variam; ${br ? "confira" : "consulte"} o recibo ou o site da loja.`
       : input.basis === "user"
         ? `Com base no prazo de devolução de ${input.windowDays ?? ""} dias que ${br ? "você salvou" : "guardou"} para este recibo.`.replace("de  dias", "")
@@ -91,7 +93,7 @@ export function returnReminderPush(input: ReturnReminderInput, locale: EmailLoca
     : days === 1
       ? "O prazo de devolução termina amanhã"
       : `O prazo de devolução termina em ${days} dias`;
-  return { title, body: ptPushBody(input, locale) };
+  return { title: `${input.estimated ? "Estimativa: " : ""}${title}`, body: ptPushBody(input, locale) };
 }
 
 /** Warranty push in the account's language; English unchanged. */

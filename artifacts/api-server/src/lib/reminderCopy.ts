@@ -122,6 +122,8 @@ export interface ReminderMessage {
 }
 
 export interface ReturnReminderInput extends ReminderPurchase {
+  /** The online channel was inferred, not explicitly confirmed. */
+  estimated?: boolean;
   deadline: Date | string;
   daysRemaining: number;
   /** "law": statutory withdrawal period of `windowDays`; "store": the retailer's policy; "user": the user's own window (US). */
@@ -157,15 +159,15 @@ export function renderReturnReminder(input: ReturnReminderInput): ReminderMessag
       : null;
   const pushTitle = days <= 0 ? "Last day to return" : days === 1 ? "Return window closes tomorrow" : `Return window closes in ${days} days`;
   return {
-    subject,
+    subject: input.estimated ? `Estimate: ${subject}` : subject,
     preheader,
-    title: `${capitalize(p.subjectItem)}: return window closes ${deadline}`,
+    title: `${input.estimated ? "Estimate: " : ""}${capitalize(p.subjectItem)}: return window closes ${deadline}`,
     itemLine: p.itemLine,
     secondary: p.item ? `Still happy with your ${p.item}?` : null,
     body: `If you're not keeping it, start your return with ${p.merchant ?? "the store"} by ${deadline}. Your receipt is saved in Receebo, so you'll have it if they ask.`,
-    note,
+    note: input.estimated ? `Estimated online purchase. Confirm the purchase channel and delivery date with the store. ${note ?? ""}`.trim() : note,
     footer: "You're getting this because return reminders are on.",
-    push: { title: pushTitle, body: p.pushBody },
+    push: { title: `${input.estimated ? "Estimate: " : ""}${pushTitle}`, body: p.pushBody },
   };
 }
 

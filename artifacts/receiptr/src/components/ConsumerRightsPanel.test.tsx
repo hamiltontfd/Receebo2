@@ -55,7 +55,7 @@ describe("ConsumerRightsPanel — same receipt, capture and later detail", () =>
     expect(screen.queryByTestId("card-return-window")).toBeNull();
   });
 
-  it("Amazon with an unknown channel asks for a correction and does not show a return countdown", () => {
+  it("Amazon with an unknown channel asks for a correction and shows only an estimated return deadline", () => {
     setAccountLocale("pt-BR");
     const choose = vi.fn();
     render(<ConsumerRightsPanel receipt={vacuum({ isOnlinePurchase: null, deliveryDate: null })} onChooseChannel={choose} />);
@@ -63,7 +63,8 @@ describe("ConsumerRightsPanel — same receipt, capture and later detail", () =>
     expect(screen.queryByText(/Não dá para saber pelo recibo/)).toBeNull();
     expect(screen.queryByText(/costuma aceitar devoluções/)).toBeNull();
     expect(screen.queryByTestId("card-return-window")).toBeNull();
-    expect(screen.queryByTestId("card-return-provisional")).toBeNull();
+    expect(screen.getByTestId("card-return-provisional").textContent).toMatch(/estim|confirmad/i);
+    expect(screen.getByTestId("text-delivery-missing").textContent).toMatch(/entrega/i);
     screen.getByTestId("button-channel-online").click();
     expect(choose).toHaveBeenCalledWith(true);
   });

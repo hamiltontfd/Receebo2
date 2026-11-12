@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { returnReminderPush, warrantyReminderPush } from "./reminderEmailCopy";
+import { returnReminderPush, warrantyReminderPush, localizedReturnReminder } from "./reminderEmailCopy";
 import { renderReturnReminder, renderWarrantyReminder } from "./reminderCopy";
 
 /** Intl uses no-break spaces in pt money ("1299,99\u00a0€"); compare with plain spaces. */
@@ -7,6 +7,18 @@ const nb = (s: string | undefined) => (s ?? "").replace(/[\u00a0\u202f]/g, " ");
 const tv = { merchant: "Worten", currency: "EUR", total: 1299.99, products: [{ name: 'Televisor LG OLED 65"', price: 1299.99 }] };
 
 describe("reminder push copy per account language", () => {
+  it("labels inferred Amazon windows as estimates in both push and email, in every account language", () => {
+    const input = { merchant: "Amazon", deadline: "2027-01-04", daysRemaining: 2, basis: "law" as const, windowDays: 14, estimated: true };
+    expect(renderReturnReminder(input).subject).toMatch(/^Estimate:/);
+    expect(renderReturnReminder(input).note).toMatch(/Confirm the purchase channel/);
+    for (const locale of ["en", "pt-PT", "pt-BR"] as const) {
+      expect(returnReminderPush(input, locale).title).toMatch(/^Estimat/);
+      if (locale !== "en") {
+        expect(localizedReturnReminder(input, locale).subject).toMatch(/^Estimativa:/);
+        expect(localizedReturnReminder(input, locale).note).toMatch(/Confirme/);
+      }
+    }
+  });
   it("English is the existing copy, unchanged (PT and US accounts)", () => {
     const ret = { ...tv, deadline: "2027-01-04", daysRemaining: 2 };
     expect(returnReminderPush(ret, "en")).toEqual(renderReturnReminder(ret).push);
