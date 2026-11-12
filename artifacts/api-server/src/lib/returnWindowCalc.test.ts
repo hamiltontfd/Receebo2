@@ -39,9 +39,9 @@ describe("return window start", () => {
     expect(w).toMatchObject({ days: 7, startsFrom: "purchase", basis: "law" });
     expect(w && isConfirmedStatutoryDeadline(w)).toBe(false);
   });
-  it("does not invent an online window for Amazon or an unknown channel", () => {
+  it("estimates Amazon only when its channel is unknown, never when explicitly in-store", () => {
     const today = new Date().toISOString().slice(0, 10);
-    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "BR", isOnlinePurchase: null, currency: "BRL", merchant: "Amazon.com.br" })).toBeNull();
+    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "BR", isOnlinePurchase: null, currency: "BRL", merchant: "Amazon.com.br" })).toMatchObject({ days: 7, estimated: true, basis: "law" });
     expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "BR", isOnlinePurchase: null, currency: "BRL", merchant: "Loja do bairro" })).toBeNull();
     expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "BR", isOnlinePurchase: false, currency: "BRL", merchant: "Amazon.com.br" })).toBeNull();
   });
@@ -88,9 +88,16 @@ describe("EU/EEA countries other than PT", () => {
 });
 
 describe("unknown purchase channel", () => {
-  it("gives no return deadline at a known retailer when the channel is unknown", () => {
+  it("estimates Amazon's statutory window but leaves ordinary unknown channels alone", () => {
     const today = new Date().toISOString().slice(0, 10);
-    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", isOnlinePurchase: null, currency: "EUR", merchant: "Amazon.es" })).toBeNull();
+    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", isOnlinePurchase: null, currency: "EUR", merchant: "Amazon.es" })).toMatchObject({ days: 14, estimated: true, basis: "law" });
+    for (const merchant of ["Zara", "Fnac", "Unknown"]) {
+      expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", isOnlinePurchase: null, currency: "EUR", merchant })).toBeNull();
+    }
+    const domainOnly = calcReturnWindow({ purchaseDate: today, deliveryDate: today, purchaseCountry: "PT", merchant: "Marketplace", storeDomain: "amazon.es" });
+    expect(domainOnly).toMatchObject({ days: 14, startsFrom: "delivery", estimated: true });
+    expect(domainOnly && isConfirmedStatutoryDeadline(domainOnly)).toBe(false);
+    expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", merchant: "Amazon", isOnlinePurchase: false })).toBeNull();
     expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", isOnlinePurchase: false, currency: "EUR", merchant: "Zara" })).toBeNull();
     expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", isOnlinePurchase: true, currency: "EUR", merchant: "Amazon.es" })?.daysRemaining).toBe(14);
   });

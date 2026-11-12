@@ -1,5 +1,7 @@
 import { formatLocaleDate, type AppLocale } from "./locale";
 import { rightsCopy } from "./rightsCopy";
+import { isOnlineForConsumerRights, merchantSuggestsOnline } from "@workspace/api-zod";
+export { merchantSuggestsOnline } from "@workspace/api-zod";
 import { hasNoConsumerDates } from "./purchaseType";
 import { addDaysIso, usReturnStart, usStoreReturnWindow, type UsReturnSuggestion } from "./usStorePolicies";
 
@@ -226,6 +228,7 @@ export function parseManufacturerWarrantyMonths(text: string | null | undefined)
 export type ReturnUrgency = "green" | "amber" | "red" | "expired";
 
 export interface ReturnWindowInfo {
+  estimated?: boolean;
   deadline: Date;
   daysLeft: number;
   isExpired: boolean;
@@ -289,11 +292,6 @@ export interface ConsumerRightsResult {
 // ── Main derivation ──────────────────────────────────────────────────────────
 
 /** Delivery date when known and not before the purchase; else the purchase date. */
-/** Amazon is indicated as online. A stored true/false from extraction still wins. */
-export function merchantSuggestsOnline(merchant?: string | null): boolean {
-  return !!merchant && merchant.toLowerCase().includes("amazon");
-}
-
 /** Delivery date is editable for online receipts, and for Amazon while the channel is still unknown. */
 export function showDeliveryDateField(isOnlinePurchase: boolean | null | undefined, merchant?: string | null): boolean {
   if (isOnlinePurchase === true) return true;
@@ -312,7 +310,8 @@ export function unknownChannelRetailerNote(locale: AppLocale | undefined, mercha
  * A statutory withdrawal that starts on the purchase date is an estimate.
  * Store-policy and user-saved windows are not statutory delivery periods.
  */
-export function isProvisionalLegalEstimate(window: { startsFrom: "delivery" | "purchase"; source: string }): boolean {
+export function isProvisionalLegalEstimate(window: { startsFrom: "delivery" | "purchase"; source: string; estimated?: boolean }): boolean {
+  if (window.estimated) return true;
   if (window.startsFrom !== "purchase") return false;
   return !/policy|política|politica|you saved|você salvou|guardado por si/i.test(window.source);
 }
@@ -333,6 +332,7 @@ export function returnWindowStartDate(
 }
 
 export function deriveConsumerRights(params: {
+  storeDomain?: string | null;
   purchaseDate?: string | null;
   deliveryDate?: string | null;
   category?: string | null;
@@ -379,11 +379,8 @@ export function deriveConsumerRights(params: {
   const isDurable = rule ? rule.durableCategories.includes(cat) : false;
   const retailer = findRetailer(merchant);
 
-  // Only an explicit online purchase gets a withdrawal deadline. With an unknown
-  // channel (null) at a known retailer we only point to the store's policy
-  // (a note, no countdown, no reminder): it may have been bought in store.
-  const isOnline = isOnlinePurchase === true;
-  const unknownChannelRetailer = isOnlinePurchase == null && retailer !== null ? retailer : null;
+  const isOnline = isOnlineForConsumerRights(isOnlinePurchase, merchant, params.storeDomain);
+  const unknownChannelRetailer = !isOnline && isOnlinePurchase == null && retailer !== null ? retailer : null;
 
   // ── Return window ──────────────────────────────────────────────────────────
   let returnWindow: ReturnWindowInfo | null = null;
@@ -416,6 +413,7 @@ export function deriveConsumerRights(params: {
         isExpired ? "expired" : daysLeft <= 1 ? "red" : daysLeft <= 7 ? "amber" : "green";
 
       returnWindow = {
+        ...(isOnlinePurchase == null ? { estimated: true } : {}),
         deadline,
         daysLeft,
         isExpired,

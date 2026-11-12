@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { isOnlineForConsumerRights } from "@workspace/api-zod";
 import { CANONICAL_CATEGORIES, type CanonicalCategory } from "./categories";
 import { hasNoConsumerDates } from "./purchaseType";
 import { detectCountry, returnWindowStart } from "./returnWindowCalc";
@@ -59,6 +60,9 @@ export interface ItemRights {
 }
 
 export interface ItemRulesContext {
+  /** Receipt category is a fallback, never a user-confirmed line classification. */
+  category?: string | null;
+  storeDomain?: string | null;
   /** Account rules region. US uses the store table and no federal legal warranty. */
   region: "US" | "PT";
   purchaseDate?: string | null;
@@ -432,14 +436,15 @@ function legalForLine(line: ReceiptProductItem, ctx: ItemRulesContext, asOf: str
       legalReviewPending: false,
     });
   }
-  const category = line.category ?? null;
+  const ownCategory = optionalLineCategory(line.category);
+  const category = ownCategory ?? optionalLineCategory(ctx.category) ?? "Other";
   if (!category || !ctx.purchaseDate || !isIsoDate(ctx.purchaseDate)) return null;
   const country = detectCountry({
     currency: ctx.currency, purchaseCountry: ctx.purchaseCountry, merchant: ctx.merchant,
   });
   if (!country) return null;
   const start = returnWindowStart(ctx.purchaseDate, ctx.deliveryDate);
-  const estimated = start.from === "purchase" || line.categorySource !== "user";
+  const estimated = !ownCategory || start.from === "purchase" || line.categorySource !== "user";
   if (country === "BR") {
     if (category === "Groceries") return null;
     const days = DURABLE.has(category) ? 90 : 30;
@@ -522,7 +527,7 @@ function returnForLine(line: ReceiptProductItem, ctx: ItemRulesContext, asOf: st
       legalReviewPending: false,
     });
   }
-  if (ctx.isOnlinePurchase !== true) return null;
+  if (!isOnlineForConsumerRights(ctx.isOnlinePurchase, ctx.merchant, ctx.storeDomain)) return null;
   const country = detectCountry({
     currency: ctx.currency, purchaseCountry: ctx.purchaseCountry, merchant: ctx.merchant,
   });
@@ -535,7 +540,7 @@ function returnForLine(line: ReceiptProductItem, ctx: ItemRulesContext, asOf: st
     kind: "return",
     warrantyType: null,
     basis: "rule",
-    certainty: start.from === "delivery" ? "confirmed" : "estimated",
+    certainty: start.from === "delivery" && ctx.isOnlinePurchase === true ? "confirmed" : "estimated",
     status: statusFor(endDate, asOf, "open"),
     lengthDays: days,
     lengthMonths: null,

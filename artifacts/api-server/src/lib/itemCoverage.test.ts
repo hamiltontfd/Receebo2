@@ -50,6 +50,53 @@ function line(over: Partial<ReceiptProductItem> = {}): ReceiptProductItem {
 const quote = (text: string) => `Order\n${text}\nTotal 10.00`;
 
 describe("item coverage foundation", () => {
+  it("uses a known receipt category, otherwise Other, without confirming the inferred category", () => {
+    for (const category of ["Electronics", "Other", null, "not a category"]) {
+      const product = line({ name: "Smartwatch", category: null, categorySource: null, coverages: [] });
+      const rights = evaluateItemRights([product], ctx({ category, isOnlinePurchase: false }));
+      expect(rights[0].contracts.find(c => c.warrantyType === "legal")).toMatchObject({
+        lengthMonths: 36, certainty: "estimated", ruleId: "PT:DL-84/2021",
+      });
+      expect(rights[0].contracts.find(c => c.kind === "return")).toMatchObject({ status: "unknown", endDate: null });
+      expect(product.category).toBeNull();
+    }
+    const groceries = evaluateItemRights([line({ category: null })], ctx({ category: "Groceries" }));
+    expect(groceries[0].contracts.some(c => c.warrantyType === "legal" && c.endDate)).toBe(false);
+  });
+
+  it("uses the purchase country, never the account rules region as proof of Portugal", () => {
+    for (const [purchaseCountry, months, ruleId] of [
+      ["PT", 36, "PT:DL-84/2021"], ["ES", 24, "EU:2019/771"], [null, 24, "EU:2019/771"],
+    ] as const) {
+      const rights = evaluateItemRights([line({ category: null })], ctx({
+        category: "Electronics", merchant: "amazon.es", purchaseCountry, currency: "EUR",
+      }));
+      expect(rights[0].contracts.find(c => c.warrantyType === "legal")).toMatchObject({
+        lengthMonths: months, ruleId, certainty: "estimated",
+      });
+    }
+  });
+
+  it("gives Amazon-only estimated statutory returns from a name or domain, never flipping false", () => {
+    for (const [purchaseCountry, currency, lengthDays] of [["PT", "EUR", 14], ["BR", "BRL", 7]] as const) {
+      for (const identity of [{ merchant: "Amazon" }, { merchant: "Marketplace", storeDomain: "amazon.es" }]) {
+        const rights = evaluateItemRights([line()], ctx({ ...identity, purchaseCountry, currency, isOnlinePurchase: null }));
+        expect(rights[0].contracts.find(c => c.kind === "return")).toMatchObject({ lengthDays, certainty: "estimated", startDate: "2026-11-02" });
+        const inStore = evaluateItemRights([line()], ctx({ ...identity, purchaseCountry, currency, isOnlinePurchase: false }));
+        expect(inStore[0].contracts.find(c => c.kind === "return")).toMatchObject({ status: "unknown", endDate: null });
+      }
+    }
+    for (const merchant of ["Zara", "Fnac", "Unknown"]) {
+      const rights = evaluateItemRights([line()], ctx({ merchant, isOnlinePurchase: null }));
+      expect(rights[0].contracts.find(c => c.kind === "return")).toMatchObject({ status: "unknown", endDate: null });
+    }
+  });
+
+  it("keeps delivery country empty without an address and respects printed Portuguese delivery", () => {
+    const base = { isReceipt: true, merchant: "Amazon", purchaseDate: "2026-11-01", currency: "EUR", isOnlinePurchase: true, storeDomain: "amazon.es" };
+    expect(parseExtraction(JSON.stringify({ ...base, deliveryCountry: "PT" }))).toMatchObject({ deliveryCountry: "PT", purchaseCountry: "PT" });
+    expect(parseExtraction(JSON.stringify(base))).toMatchObject({ deliveryCountry: null, purchaseCountry: "ES" });
+  });
   it("keeps two different stated contracts and does not copy the receipt warranty", () => {
     const ocr = quote("Fridge: 5 year commercial warranty. TV: 24 month manufacturer warranty.");
     const lines = acceptExtractedLines([
@@ -148,7 +195,7 @@ describe("item coverage foundation", () => {
     ]).ok).toBe(false);
   });
 
-  it("gives legacy lines ids only when they are replaced, and does not invent coverage", () => {
+  it("keeps legacy stored fields unchanged but computes an estimated goods warranty on read", () => {
     const legacy: ReceiptProductItem[] = [{ name: "Old TV", quantity: 1, price: 10 }];
     const replaced = mergeProductLines(legacy, [{ name: "Old TV", quantity: 1, price: 10 }]);
     if (!replaced.ok) throw new Error(replaced.error);
@@ -156,13 +203,14 @@ describe("item coverage foundation", () => {
     expect(replaced.products[0].coverages).toBeUndefined();
     const rights = evaluateItemRights(legacy, ctx({ isOnlinePurchase: false }));
     expect(rights[0].lineId).toBeNull();
-    expect(rights[0].contracts.every((c) => c.status === "unknown" && c.endDate == null)).toBe(true);
+    expect(rights[0].contracts.find(c => c.warrantyType === "legal")).toMatchObject({ certainty: "estimated", lengthMonths: 36, ruleId: "PT:DL-84/2021" });
+    expect(rights[0].contracts.find(c => c.kind === "return")).toMatchObject({ status: "unknown", endDate: null });
   });
 
   it("evaluates PT, BR, US and an unsupported country without sharing one deadline", () => {
     const tv = line({ name: "LG TV", category: "Electronics", categorySource: "user" });
     const fridge = line({ lineId: "l_fridge00000001", name: "Samsung fridge", category: "Home", categorySource: "user" });
-    const milk = line({ lineId: "l_milk0000000001", name: "Milk", category: null, categorySource: null });
+    const milk = line({ lineId: "l_milk0000000001", name: "Milk", category: "Groceries", categorySource: null });
 
     const pt = evaluateItemRights([tv], ctx());
     const legal = pt[0].contracts.find((c) => c.warrantyType === "legal");

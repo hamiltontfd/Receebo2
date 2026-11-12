@@ -158,6 +158,25 @@ describe("channel suggestion and provisional estimate", () => {
 });
 
 describe("unknown purchase channel", () => {
+  it("estimates statutory Amazon returns from the merchant or store domain without overriding in-store", () => {
+    for (const [purchaseCountry, currency, days] of [["PT", "EUR", 14], ["BR", "BRL", 7]] as const) {
+      for (const identity of [{ merchant: "Amazon" }, { merchant: "Marketplace", storeDomain: "amazon.es" }]) {
+        const base = { ...identity, purchaseCountry, currency, purchaseDate: "2026-01-01", deliveryDate: "2026-01-03", category: "Electronics" };
+        const rights = deriveConsumerRights({ ...base, isOnlinePurchase: null });
+        expect(rights.returnWindow).toMatchObject({ estimated: true, startsFrom: "delivery" });
+        expect(rights.returnWindow?.deadline.getDate()).toBe(3 + days);
+        expect(rights.returnWindow && isProvisionalLegalEstimate(rights.returnWindow)).toBe(true);
+        expect(deriveConsumerRights({ ...base, isOnlinePurchase: false }).returnWindow).toBeNull();
+      }
+    }
+  });
+  it("does not treat the account PT/EU rules region as the purchase country", () => {
+    for (const [purchaseCountry, citation] of [
+      ["PT", "Decree-Law 84/2021"], ["ES", "EU Directive 2019/771"], [null, "EU Directive 2019/771"],
+    ] as const) {
+      expect(deriveConsumerRights({ region: "PT", merchant: "amazon.es", currency: "EUR", purchaseCountry, category: "Electronics", purchaseDate: "2026-01-01" }).warranty?.citation).toBe(citation);
+    }
+  });
   it("shows the store policy as a note, with no deadline, at a known retailer", () => {
     const r = deriveConsumerRights({ purchaseCountry: "PT", currency: "EUR", merchant: "Zara", category: "Clothing & Apparel", isOnlinePurchase: null, purchaseDate: "2026-03-10" });
     expect(r.returnWindow).toBeNull();
@@ -205,11 +224,11 @@ describe("US accounts (region US)", () => {
   const today = local(0);
   const base = { region: "US", locale: "en" as const, currency: "USD", purchaseCountry: "US", category: "Electronics" };
   it("Best Buy in store: store window with countdown, no legal warranty, no [LEGAL REVIEW NEEDED]", () => {
-    // Freeze clock before Best Buy holiday purchaseFrom 2026-10-30 so local(-5) stays outside the holiday window.
+    // Fixed winter dates avoid both holiday policies and a DST boundary.
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 9, 20, 12, 0, 0)); // 2026-10-20
+    vi.setSystemTime(new Date(2026, 0, 20, 12, 0, 0)); // 2026-01-20
     try {
-      const r = deriveConsumerRights({ ...base, merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: local(-5), warrantyText: "2-year manufacturer warranty" });
+      const r = deriveConsumerRights({ ...base, merchant: "Best Buy", isOnlinePurchase: false, purchaseDate: "2026-01-15", warrantyText: "2-year manufacturer warranty" });
       expect(r.returnWindow).toMatchObject({ daysLeft: 10, startsFrom: "purchase" });
       expect(r.returnWindow?.source).toMatch(/^Best Buy: 15 days \(store policy, checked Oct 27, 2026\)$/);
       expect(r.warranty).toBeNull();

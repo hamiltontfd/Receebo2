@@ -489,6 +489,7 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
 
 async function itemRightsFor(userId: string, receipt: {
   products?: Parameters<typeof evaluateItemRights>[0];
+  category?: string | null;
   purchaseDate?: string | null;
   deliveryDate?: string | null;
   purchaseCountry?: string | null;
@@ -501,6 +502,7 @@ async function itemRightsFor(userId: string, receipt: {
   try { region = rulesRegionForMarket(await getAccountMarket(userId)); } catch { region = "PT"; }
   return evaluateItemRights(receipt.products, {
     region,
+    category: receipt.category,
     purchaseDate: receipt.purchaseDate,
     deliveryDate: receipt.deliveryDate,
     purchaseCountry: receipt.purchaseCountry,

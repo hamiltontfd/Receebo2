@@ -1,3 +1,4 @@
+import { isOnlineForConsumerRights } from "@workspace/api-zod";
 import { hasNoConsumerDates } from "./purchaseType";
 import { addDaysIso, usReturnStart, usStoreReturnWindow } from "./usStorePolicies";
 
@@ -85,6 +86,8 @@ function findRetailerDays(merchant?: string | null): number | null {
 }
 
 export interface ReturnWindowResult {
+  /** The purchase channel was inferred rather than explicitly saved. */
+  estimated?: boolean;
   deadlineDate: Date;
   daysRemaining: number;
   /** The window counts from the delivery date when known, else the purchase date. */
@@ -117,6 +120,7 @@ export function returnWindowStart(purchaseDate: string, deliveryDate?: string | 
  * Returns null if no applicable return window exists or the input is invalid.
  */
 export function calcReturnWindow(params: {
+  storeDomain?: string | null;
   purchaseDate: string;
   deliveryDate?: string | null;
   purchaseCountry?: string | null;
@@ -147,10 +151,8 @@ export function calcReturnWindow(params: {
 
   const retailerDays = findRetailerDays(merchant);
 
-  // Only an explicit online purchase has a withdrawal window. Unknown channel
-  // (null), even at a known retailer, gets no deadline or reminder: the app
-  // points to the store's policy instead.
-  const isOnline = isOnlinePurchase === true;
+  // Amazon alone can supply an estimated channel; an explicit false always wins.
+  const isOnline = isOnlineForConsumerRights(isOnlinePurchase, merchant, params.storeDomain);
   if (!isOnline) return null;
 
   const rule = JURISDICTION_RULES.find((r) => r.code === countryCode) ?? null;
@@ -175,7 +177,8 @@ export function calcReturnWindow(params: {
     (deadlineDate.getTime() - todayUtc.getTime()) / 86_400_000,
   );
 
-  return { deadlineDate, daysRemaining, startsFrom: start.from, days: returnDays, basis };
+  return { deadlineDate, daysRemaining, startsFrom: start.from, days: returnDays, basis,
+    ...(isOnlinePurchase == null ? { estimated: true } : {}) };
 }
 
 /**
@@ -183,9 +186,9 @@ export function calcReturnWindow(params: {
  * estimate until delivery is known. Reminders are unchanged: the sweep still
  * uses the same deadline calcReturnWindow already returned.
  */
-export function isConfirmedStatutoryDeadline(window: { basis: string; startsFrom: "delivery" | "purchase" }): boolean {
+export function isConfirmedStatutoryDeadline(window: { basis: string; startsFrom: "delivery" | "purchase"; estimated?: boolean }): boolean {
   if (window.basis !== "law") return true;
-  return window.startsFrom === "delivery";
+  return window.startsFrom === "delivery" && !window.estimated;
 }
 
 function daysUntil(deadlineIso: string): number {
