@@ -5,6 +5,8 @@ import { sql } from "drizzle-orm";
 export async function migrateAccountMarket(): Promise<void> {
   await db.execute(sql`ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS market text
     CHECK (market IS NULL OR market IN ('PT', 'BR', 'US'))`);
+  await db.execute(sql`ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS country text
+    CONSTRAINT user_preferences_country_check CHECK (country IS NULL OR country ~ '^[A-Z]{2}$')`);
   await db.execute(sql`ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS language text
     CHECK (language IS NULL OR language IN ('en', 'pt-PT', 'pt-BR'))`);
   // Browser language seen by the signed-in app (after legal consent), for emails
