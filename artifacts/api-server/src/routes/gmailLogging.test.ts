@@ -54,6 +54,7 @@ vi.mock("@workspace/db", () => {
   return {
     gmailConnectionsTable: {}, pendingImportsTable: {}, receiptsTable: {},
     gmailSeenMessagesTable: {},
+    userPreferencesTable: { userId: "user_id", language: "language", detectedLanguage: "detected_language" },
     db: { select: () => query, delete: () => query, update: () => query },
   };
 });

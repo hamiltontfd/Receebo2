@@ -6,9 +6,10 @@ import { acceptExtractedLines, evaluateItemRights } from "./itemCoverage";
 const euAsOf = "2026-10-27";
 const usAsOf = "2026-11-08";
 
-function rightsFor(receipt: { products: unknown; purchaseDate: string; merchant: string; deliveryDate?: string | null; isOnlinePurchase?: boolean }, region: "PT" | "US") {
+function rightsFor(receipt: { products: unknown; category?: string | null; purchaseDate: string; merchant: string; deliveryDate?: string | null; isOnlinePurchase?: boolean }, region: "PT" | "US") {
   return evaluateItemRights(receipt.products as never, {
     region,
+    category: receipt.category,
     purchaseDate: receipt.purchaseDate,
     deliveryDate: receipt.deliveryDate ?? null,
     purchaseCountry: region === "US" ? "US" : "PT",
@@ -31,11 +32,18 @@ describe("marketing capture fixtures", () => {
     const rights = rightsFor(receipt, "PT");
     const tvMaker = rights[0].contracts.find((c) => c.warrantyType === "manufacturer");
     const barMaker = rights[1].contracts.find((c) => c.warrantyType === "manufacturer");
-    const cableWarranty = rights[2].contracts.find((c) => c.kind === "warranty");
+    const cableWarranty = rights[2].contracts.find((c) => c.warrantyType === "legal");
     expect(tvMaker).toMatchObject({ certainty: "estimated", status: "open", endDate: "2028-10-23", lengthMonths: 24 });
     expect(barMaker).toMatchObject({ certainty: "estimated", status: "open", endDate: "2027-10-23", lengthMonths: 12 });
     expect(rights[0].contracts.find((c) => c.ruleId === "PT:DL-84/2021")).toMatchObject({ certainty: "estimated", endDate: "2029-10-25" });
-    expect(cableWarranty).toMatchObject({ status: "unknown", endDate: null });
+    expect(cableWarranty).toMatchObject({
+      kind: "warranty", warrantyType: "legal", basis: "rule", certainty: "estimated",
+      status: "open", lengthMonths: 36, startDate: receipt.deliveryDate,
+      endDate: "2029-10-25", ruleId: "PT:DL-84/2021",
+    });
+    for (const line of rights.slice(2)) {
+      expect(line.contracts.some(c => c.warrantyType === "manufacturer")).toBe(false);
+    }
     expect(rights[2].contracts.find((c) => c.kind === "return")).toMatchObject({ status: "open", startDate: receipt.deliveryDate });
     expect(receipt.itemRights).toEqual(rights);
     expect(JSON.stringify(rights)).not.toContain("US:");
@@ -46,6 +54,10 @@ describe("marketing capture fixtures", () => {
     expect(euCapture.receipts).toHaveLength(4);
     for (const receipt of euCapture.receipts.slice(1)) {
       expect(receipt.itemRights).toEqual(rightsFor(receipt, "PT"));
+      if (receipt.category === "Groceries") {
+        expect(receipt.itemRights.every(line =>
+          line.contracts.every(contract => contract.warrantyType !== "legal"))).toBe(true);
+      }
     }
   });
 
@@ -109,6 +121,7 @@ describe("marketing capture fixtures", () => {
       expect(receipt.merchant).toContain("Fictíc");
       const fresh = evaluateItemRights(receipt.products, {
         region: "PT", // Non-US branch; BR purchase country selects CDC, not PT law.
+        category: receipt.category,
         purchaseCountry: receipt.purchaseCountry,
         currency: receipt.currency,
         merchant: receipt.merchant,
@@ -119,6 +132,10 @@ describe("marketing capture fixtures", () => {
         asOf: brCapture.capturedAt.slice(0, 10),
       });
       expect(receipt.itemRights).toEqual(fresh);
+      if (receipt.category === "Groceries") {
+        expect(fresh.every(line =>
+          line.contracts.every(contract => contract.warrantyType !== "legal"))).toBe(true);
+      }
       const rules = fresh.flatMap(row => row.contracts).filter(c => c.ruleId);
       expect(rules.every(c => !/^(PT|EU|US):/.test(c.ruleId!))).toBe(true);
       for (const contract of rules.filter(c => c.ruleId!.startsWith("BR:"))) {
@@ -129,5 +146,12 @@ describe("marketing capture fixtures", () => {
     expect(contracts.some(c => c.kind === "return" && c.basis === "rule" && c.status === "open")).toBe(true);
     expect(contracts.some(c => c.warrantyType === "legal" && c.legalReviewPending)).toBe(true);
     expect(contracts.some(c => c.warrantyType === "manufacturer")).toBe(true);
+    const cable = hero.itemRights[2].contracts;
+    expect(cable.find(c => c.warrantyType === "legal")).toMatchObject({
+      kind: "warranty", basis: "rule", certainty: "estimated", status: "open",
+      lengthDays: 90, startDate: hero.deliveryDate, endDate: "2027-02-03",
+      ruleId: "BR:CDC-art-26", legalReviewPending: true,
+    });
+    expect(cable.some(c => c.warrantyType === "manufacturer")).toBe(false);
   });
 });

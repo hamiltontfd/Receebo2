@@ -469,7 +469,13 @@ exports[`PT golden outputs (must not change) > return windows and warranty end d
   },
   {
     "input": "null/EUR/Amazon/null/Electronics/2026-11-01/null",
-    "returnWindow": null,
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": 3,
+      "deadline": "2026-11-18",
+      "startsFrom": "delivery",
+    },
     "warranty": {
       "legal": "2028-11-04",
       "manufacturer": "2028-11-01",
@@ -477,7 +483,13 @@ exports[`PT golden outputs (must not change) > return windows and warranty end d
   },
   {
     "input": "null/EUR/Amazon/null/Home/2026-10-20/goods",
-    "returnWindow": null,
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": -12,
+      "deadline": "2026-11-03",
+      "startsFrom": "purchase",
+    },
     "warranty": {
       "legal": "2028-10-20",
       "manufacturer": null,
@@ -485,7 +497,13 @@ exports[`PT golden outputs (must not change) > return windows and warranty end d
   },
   {
     "input": "null/EUR/Amazon/null/Groceries/2026-11-10/null",
-    "returnWindow": null,
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": 9,
+      "deadline": "2026-11-24",
+      "startsFrom": "purchase",
+    },
     "warranty": {
       "legal": null,
       "manufacturer": null,
@@ -493,7 +511,13 @@ exports[`PT golden outputs (must not change) > return windows and warranty end d
   },
   {
     "input": "null/EUR/Amazon/null/Other/2024-02-29/null",
-    "returnWindow": null,
+    "returnWindow": {
+      "basis": "law",
+      "days": 14,
+      "daysRemaining": -976,
+      "deadline": "2024-03-14",
+      "startsFrom": "purchase",
+    },
     "warranty": {
       "legal": "2026-02-28",
       "manufacturer": "2025-02-28",
