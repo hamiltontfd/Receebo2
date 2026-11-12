@@ -151,14 +151,17 @@ export function LandingContent({ variant, isSignedIn = false, checkout, marketSe
         {/* ── Footer ──────────────────────────────────────────────────── */}
         <footer className="border-t bg-muted/20">
           <div className="max-w-6xl mx-auto px-6 py-10">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-5">
-              <div className="flex items-center gap-2.5">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap justify-between items-center gap-x-8 gap-y-5">
+              <div className="flex shrink-0 items-center gap-2.5">
                 <img src="/logo.svg" alt="Receebo" className="h-6 w-auto" />
                 <span className="text-sm text-muted-foreground">
                   © {new Date().getFullYear()} Receebo. {lt("All rights reserved.", "Todos os direitos reservados.")}
                 </span>
               </div>
-              <div className="flex items-center gap-6 text-sm">
+              <div
+                data-testid="landing-footer-links"
+                className="flex w-full min-w-0 flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm sm:w-auto sm:flex-1 sm:justify-end [&>a]:inline-flex [&>a]:min-h-11 [&>a]:shrink-0 [&>a]:items-center [&>a]:whitespace-nowrap [&>a]:break-normal [&>a]:[overflow-wrap:normal] [&>button]:inline-flex [&>button]:min-h-11 [&>button]:shrink-0 [&>button]:items-center [&>button]:whitespace-nowrap [&>button]:break-normal [&>button]:[overflow-wrap:normal]"
+              >
                 <Link
                   href="/privacy"
                   className="text-muted-foreground hover:text-foreground transition-colors"

@@ -4,6 +4,8 @@ import * as R from "react";
 
 vi.mock("framer-motion", () => ({
   useReducedMotion: () => true,
+  MotionConfig: ({ children }: { children: R.ReactNode }) => children,
+  AnimatePresence: ({ children }: { children: R.ReactNode }) => children,
   motion: new Proxy({}, {
     get: (_t, tag: string) => ({ children, variants: _v, initial: _i, animate: _a, whileInView: _wv, viewport: _vp, transition: _tr, whileHover: _h, whileTap: _w, ...props }: Record<string, unknown>) =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,6 +20,7 @@ import ComparisonSection from "./ComparisonSection";
 import PricingSection from "./PricingSection";
 import { MarketContext, type MarketState } from "@/components/MarketProvider";
 import { utmContentFromUrl } from "@/lib/landingBeacon";
+import { LandingContent } from "../landing";
 
 const market = (over: Partial<MarketState> = {}): MarketState => ({
   market: null, country: "US", source: "unknown", confirmed: false, loading: false, saving: false, error: null,
@@ -29,9 +32,38 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchSpy);
   window.history.replaceState(null, "", "/us?utm_source=meta&utm_content=bf-tv-1");
 });
-afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); localStorage.clear(); sessionStorage.clear(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); localStorage.clear(); sessionStorage.clear(); });
 
 describe("/us landing (C + D)", () => {
+  it.each([
+    ["en-US", "US", "us"],
+    ["en-US", "PT", undefined],
+    ["pt-PT", "PT", undefined],
+    ["pt-BR", "BR", undefined],
+  ] as const)("footer wraps whole, tappable labels for %s / %s", (language, selectedMarket, variant) => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue([language]);
+    const { unmount } = render(
+      <MarketContext.Provider value={market({ market: selectedMarket, country: selectedMarket })}>
+        <LandingContent variant={variant} />
+      </MarketContext.Provider>,
+    );
+    const links = screen.getByTestId("landing-footer-links");
+    expect(links).toHaveClass("flex-wrap", "w-full", "min-w-0", "gap-y-2");
+    for (const tag of ["a", "button"]) {
+      for (const rule of ["inline-flex", "min-h-11", "shrink-0", "items-center", "whitespace-nowrap", "break-normal", "[overflow-wrap:normal]"]) {
+        expect(links).toHaveClass(`[&>${tag}]:${rule}`);
+      }
+      expect(links.querySelector(tag)).not.toBeNull();
+    }
+    const footer = links.closest("footer")!;
+    expect(footer.querySelector('a[href="/privacy"]')).not.toBeNull();
+    expect(footer.querySelector('a[href="/sign-in"]')).not.toBeNull();
+    expect(footer.querySelector(`a[href="${variant === "us" ? "/cookies?region=us" : "/cookies"}"]`)).not.toBeNull();
+    expect(links.textContent?.includes("Do Not Sell or Share My Personal Information")).toBe(variant === "us");
+    unmount();
+    vi.restoreAllMocks();
+  });
+
   it("US hero stays on the US batch even when the market context says BR", () => {
     render(<MarketContext.Provider value={market({ market: "BR" })}><HeroSection variant="us" /></MarketContext.Provider>);
     expect(screen.getByTestId("img-hero-library-phone").getAttribute("src")).toContain("/v4/us/");
