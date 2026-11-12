@@ -37,8 +37,8 @@ export default function AIExtractionSection() {
                 your receipts.
               </motion.h2>
               <motion.p variants={fadeInUp} className="text-lg text-muted-foreground leading-relaxed">
-                Our AI reads every detail so you don't have to. In under 10 seconds,
-                your receipt is fully indexed and ready to search.
+                Our AI reads every detail so you don't have to. Your receipt is
+                fully indexed and ready to search.
               </motion.p>
             </div>
 

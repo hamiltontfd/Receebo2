@@ -3,7 +3,7 @@ import { withUsOffers } from "./publicPricing";
 export const publicPages = {
   "/": {
     title: "Receebo — Receipts. Easy to find.",
-    description: "Scan or import from Outlook. Find any purchase in seconds. Never miss a return or warranty date.",
+    description: "Scan or import from Outlook. Find any purchase. Never miss a return or warranty date.",
   },
   "/privacy": {
     title: "Privacy Policy — Receebo",

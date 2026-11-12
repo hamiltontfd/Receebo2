@@ -21,7 +21,7 @@ const ctx = (m: MarketState["market"]) => ({ market: m, country: null, source: "
 describe("HeroSection", () => {
   it("shows the hero subtitle and trial line", () => {
     render(<HeroSection />);
-    expect(screen.getByText("Scan or import from Outlook. Find any purchase in seconds. Never miss a return or warranty date.")).toBeTruthy();
+    expect(screen.getByText("Scan or import from Outlook. Find any purchase. Never miss a return or warranty date.")).toBeTruthy();
     expect(screen.getByText("15 days free, up to 5 receipts.")).toBeTruthy();
   });
 

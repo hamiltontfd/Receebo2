@@ -59,9 +59,9 @@ export default function HeroSection({ isSignedIn = false, variant }: { isSignedI
                 "Compraste uma TV na Black Friday? O Receebo conhece o prazo de devolução da Best Buy, Target, Walmart, Amazon e outras, na loja e online, e avisa-te antes de terminar. As garantias também.",
                 "Comprou uma TV na Black Friday? O Receebo conhece o prazo de devolução da Best Buy, Target, Walmart, Amazon e outras, na loja e online, e avisa você antes de terminar. As garantias também.",
               ) : lt(
-                "Scan or import from Outlook. Find any purchase in seconds. Never miss a return or warranty date.",
-                "Digitaliza ou importa do Outlook. Encontra qualquer compra em segundos. Nunca percas um prazo de devolução ou de garantia.",
-                "Escaneie ou importe do Outlook. Encontre qualquer compra em segundos. Nunca perca um prazo de devolução ou de garantia.",
+                "Scan or import from Outlook. Find any purchase. Never miss a return or warranty date.",
+                "Digitaliza ou importa do Outlook. Encontra qualquer compra. Nunca percas um prazo de devolução ou de garantia.",
+                "Escaneie ou importe do Outlook. Encontre qualquer compra. Nunca perca um prazo de devolução ou de garantia.",
               )}
             </motion.p>
 

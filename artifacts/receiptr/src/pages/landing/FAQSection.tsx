@@ -21,9 +21,9 @@ function buildFaqs(providers: AvailableMailProvider[], { monthly: m, yearly: y }
   {
     q: lt("How does Receebo work?", "Como funciona o Receebo?"),
     a: lt(
-      `Scan any paper receipt with your phone camera, upload a PDF or image, or connect ${inbox}. Our AI reads and indexes every detail — merchant, products, prices, warranties — in under 10 seconds. Everything becomes searchable in plain English.`,
-      `Digitaliza qualquer recibo em papel com a câmara do telemóvel, carrega um PDF ou imagem, ou liga ${inbox}. A nossa IA lê e indexa cada detalhe — loja, produtos, preços, garantias — em menos de 10 segundos. Tudo fica pesquisável em linguagem simples.`,
-      `Escaneie qualquer recibo em papel com a câmera do celular, envie um PDF ou imagem, ou conecte ${inbox}. Nossa IA lê e indexa cada detalhe — loja, produtos, preços, garantias — em menos de 10 segundos. Tudo fica pesquisável em linguagem simples.`,
+      `Scan any paper receipt with your phone camera, upload a PDF or image, or connect ${inbox}. Our AI reads and indexes every detail — merchant, products, prices, warranties. Everything becomes searchable in plain English.`,
+      `Digitaliza qualquer recibo em papel com a câmara do telemóvel, carrega um PDF ou imagem, ou liga ${inbox}. A nossa IA lê e indexa cada detalhe — loja, produtos, preços, garantias. Tudo fica pesquisável em linguagem simples.`,
+      `Escaneie qualquer recibo em papel com a câmera do celular, envie um PDF ou imagem, ou conecte ${inbox}. Nossa IA lê e indexa cada detalhe — loja, produtos, preços, garantias. Tudo fica pesquisável em linguagem simples.`,
     ),
   },
   {

@@ -12,13 +12,13 @@ const getDemos = (market: MediaMarket) => {
   return [
     {
       title: lt("Capture", "Capturar"),
-      body: lt("Scan, upload or import receipts in seconds.", "Digitaliza, carrega ou importa recibos em segundos.", "Escaneie, envie ou importe recibos em segundos."),
+      body: lt("Scan, upload or import receipts.", "Digitaliza, carrega ou importa recibos.", "Escaneie, envie ou importe recibos."),
       clip: "capture",
       description: copy.demoCapture,
     },
     {
       title: lt("Find", "Encontrar"),
-      body: lt("Search products, stores or brands and instantly find the receipt you need.", "Pesquisa produtos, lojas ou marcas e encontra logo o recibo de que precisas.", "Pesquise produtos, lojas ou marcas e encontre na hora o recibo de que precisa."),
+      body: lt("Search products, stores or brands and find the receipt you need.", "Pesquisa produtos, lojas ou marcas e encontra o recibo de que precisas.", "Pesquise produtos, lojas ou marcas e encontre o recibo de que precisa."),
       clip: "find",
       description: copy.demoFind,
     },

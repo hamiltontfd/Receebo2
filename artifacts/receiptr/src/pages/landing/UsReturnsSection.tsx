@@ -27,9 +27,9 @@ const getPoints = () => [
     icon: ShieldCheck,
     title: lt("Manufacturer warranty", "Garantia do fabricante", "Garantia do fabricante"),
     body: lt(
-      "Tap 1, 2 or 3 years and see the end date straight away.",
-      "Toca em 1, 2 ou 3 anos e vê logo a data de fim.",
-      "Toque em 1, 2 ou 3 anos e veja na hora a data de fim.",
+      "Tap 1, 2 or 3 years and see the end date.",
+      "Toca em 1, 2 ou 3 anos e vê a data de fim.",
+      "Toque em 1, 2 ou 3 anos e veja a data de fim.",
     ),
   },
   {
