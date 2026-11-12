@@ -11,6 +11,8 @@ import { changedFiles, fingerprint, validateApproval, exportHashes, workspace } 
 import { isolate, receipts, createCaptureSession, activeCapture, installDarkCameraStream } from "./fixtures.mjs";
 import { illustrativePdf, sampleDocumentLines, sampleDocumentHtml, moneyLabel } from "./sample-document.mjs";
 import { captureLabels, captureLocators } from "./locators.mjs";
+import { receiptPhotoHtml, installReceiptCameraStream } from "./receipt-photo.mjs";
+import { addFlowSize, addFlowDuration, playAddFlow } from "./add-flow.mjs";
 
 test("detects added, edited, and deleted media inputs", () => {
   assert.deepEqual(changedFiles({ deleted: "a", edited: "a", stable: "a" }, { added: "b", edited: "b", stable: "a" }),
@@ -146,6 +148,147 @@ test("Capture holds the visible TOTAL before its poster and the scroll to Save",
   assert.match(record, /manifest\$\{plan\.partial \? "\.partial" : ""\}\.json/);
   assert.match(record, /if \(plan\.partial && !\(name === "review" && plan\.review\) && !\(name === "upload" && plan\.upload\)\) continue/);
   assert.match(record, /if \(plan\.upload\) await still\(phone\.page, "scan-upload"\);\s*if \(plan\.review\) \{\s*await phone\.page\.locator\('input\[type="file"\]'\)\.setInputFiles/);
+});
+
+test("add outputs are opt-in, combine with old filters, and add-flow requires clips", async () => {
+  const { capturePlan, heroScenes } = await import("./record.mjs");
+  const names = ["upload", "review", "capture", "add-sheet", "camera", "add-flow"];
+  for (let mask = 1; mask < 64; mask++) {
+    const selected = names.filter((_, index) => mask & (1 << index));
+    const plan = capturePlan(selected.join(","), "1");
+    assert.equal(plan.partial, true);
+    assert.equal(plan.upload, selected.includes("upload"));
+    assert.equal(plan.review, selected.includes("review"));
+    assert.equal(Boolean(plan.addSheet), selected.includes("add-sheet"));
+    assert.equal(Boolean(plan.camera), selected.includes("camera"));
+    assert.deepEqual(plan.clips, ["capture", "add-flow"].filter(name => selected.includes(name)));
+    if (selected.includes("capture") || selected.includes("add-flow")) {
+      assert.throws(() => capturePlan(selected.join(","), "0"), /requires clips/);
+    } else {
+      assert.deepEqual(capturePlan(selected.join(","), "0").clips, []);
+    }
+  }
+  assert.deepEqual(capturePlan("", "1").clips, ["capture", "find", "protect"]);
+  assert.equal(capturePlan("", "1").addSheet, undefined);
+  assert.equal(capturePlan("", "1").camera, undefined);
+  assert.deepEqual(Object.keys(heroScenes), ["home", "upload", "review", "detail", "warranty", "home-desktop"]);
+});
+
+test("receipt photographs preserve fixture rows, local dates, places and manufacturer evidence", () => {
+  for (const [context, date, place] of [
+    ["eu", "23/10/2026", "Braga, Portugal"],
+    ["us", "11/02/2026", "United States"],
+    ["br", "02/11/2026", "Brasil"],
+  ]) {
+    const capture = activeCapture(context);
+    const hero = capture.receipts[0];
+    const html = receiptPhotoHtml(hero, capture.language, capture.market);
+    assert.ok(html.includes(hero.merchant));
+    assert.ok(html.includes(date));
+    assert.ok(html.includes(place));
+    assert.ok(html.includes(context === "us" ? "Fictional sample" : "Exemplo fictício"));
+    assert.ok(html.includes(moneyLabel(hero, hero.total, capture.language)));
+    assert.equal((html.match(/<tr>/g) ?? []).length, hero.products.length);
+    assert.match(html, /td\{[^}]*white-space:nowrap/);
+    for (const product of hero.products) {
+      assert.ok(html.includes(`<td>${product.quantity} × ${product.name}</td><td>${moneyLabel(hero, product.price, capture.language)}</td>`));
+      for (const coverage of product.coverages ?? []) {
+        if (coverage.warrantyType === "manufacturer") assert.ok(html.includes(coverage.evidence));
+      }
+    }
+    assert.ok(html.includes(hero.isOnlinePurchase ? "Compra online" : "In-store purchase"));
+    if (hero.deliveryDate) {
+      assert.ok(html.includes(context === "eu" ? "25/10/2026" : "05/11/2026"));
+    } else {
+      assert.ok(!html.includes("Delivered:"));
+    }
+    assert.doesNotMatch(html, /https?:\/\/|<script|@font-face|itemRights|CDC|84\/2021/);
+    assert.match(html, /width:720px;height:1280px/);
+    assert.match(html, /rotate\(-2deg\)/);
+    if (context !== "eu") assert.ok(!html.includes("Braga"));
+  }
+  const hero = activeCapture("eu").receipts[0];
+  const html = receiptPhotoHtml({ ...hero, merchant: '<script>alert("x")</script>' }, "pt-PT", "PT");
+  assert.ok(html.includes("&lt;script&gt;"));
+  assert.doesNotMatch(html, /<script>/);
+});
+
+test("receipt camera cover-fits decoded photograph and is installed only when requested", async () => {
+  const calls = [];
+  const track = { stop: () => calls.push("stop") };
+  const stream = { getTracks: () => [track] };
+  const paint = { drawImage: (image, ...args) => calls.push(["draw", image.src, ...args]) };
+  const canvas = {
+    getContext: () => paint,
+    captureStream: fps => { assert.equal(fps, 5); return stream; },
+  };
+  const navigator = { mediaDevices: {} };
+  const window = {};
+  class Image {
+    naturalWidth = 1000;
+    naturalHeight = 1000;
+    async decode() { calls.push("decode"); }
+  }
+  const dataUrl = "data:image/png;base64,c2FtcGxl";
+  runInNewContext(`(${installReceiptCameraStream.toString()})({dataUrl})`, {
+    navigator, window, Image, dataUrl, DOMException,
+    document: { createElement: () => canvas },
+    setInterval: (fn, ms) => { assert.equal(ms, 200); return 9; },
+    clearInterval: id => calls.push(["clear", id]),
+  });
+  assert.equal(await navigator.mediaDevices.getUserMedia({ video: true }), stream);
+  assert.equal(canvas.width, 720);
+  assert.equal(canvas.height, 1280);
+  assert.deepEqual(calls.slice(0, 2), ["decode", ["draw", dataUrl, -280, 0, 1280, 1280]]);
+  assert.equal(window.__receeboReceiptCameraReady, true);
+  track.stop();
+  assert.deepEqual(calls.slice(-2), [["clear", 9], "stop"]);
+  await assert.rejects(navigator.mediaDevices.getUserMedia({ audio: true }), /video only/);
+  const scripts = [];
+  await isolate({
+    addInitScript: async (fn, args) => scripts.push({ fn, args }),
+    route: async () => {},
+  }, "/sample.png", { cameraPhotoDataUrl: dataUrl });
+  assert.equal(scripts[0].fn, installReceiptCameraStream);
+  assert.deepEqual(scripts[0].args, { dataUrl });
+  assert.ok(!scripts.some(script => script.fn === installDarkCameraStream));
+});
+
+test("add-flow uses the real sheet and camera, with readable holds and a phone viewport", async () => {
+  const calls = [];
+  const page = {
+    getByTestId: id => ({
+      click: async () => calls.push(`click:${id}`),
+      waitFor: async options => { assert.equal(options.state, "visible"); calls.push(`visible:${id}`); },
+      evaluate: async fn => { await fn({ getAnimations: () => [] }); calls.push("sheet settled"); },
+    }),
+    waitForURL: async url => calls.push(url),
+    waitForFunction: async (fn, _, options) => {
+      assert.equal(options.timeout, 20000);
+      for (const [ready, state, width, expected] of [[false, 2, 720, false], [true, 1, 720, false], [true, 2, 0, false], [true, 2, 720, true]]) {
+        assert.equal(runInNewContext(`(${fn.toString()})()`, {
+          window: { __receeboReceiptCameraReady: ready },
+          document: { querySelector: () => ({ readyState: state, videoWidth: width, videoHeight: 1280 }) },
+        }), expected);
+      }
+      calls.push("receipt visible in video");
+    },
+    waitForTimeout: async ms => calls.push(ms),
+  };
+  await playAddFlow(page, async () => calls.push("poster"));
+  assert.deepEqual(calls, [
+    "click:tab-add", "visible:add-sheet", "visible:add-scan", "visible:add-upload", "sheet settled", 1200,
+    "click:add-scan", "**/scan", "visible:fullscreen-camera", "receipt visible in video", 1000, "poster",
+  ]);
+  assert.deepEqual(addFlowSize, { width: 390, height: 844, deviceScaleFactor: 1 });
+  assert.ok(addFlowDuration >= 2 && addFlowDuration <= 3);
+  const record = await readFile(new URL("./record.mjs", import.meta.url), "utf8");
+  assert.match(record, /clip === "add-flow" \? addFlowSize : captureSizes\.clip/);
+  assert.match(record, /receiptCamera: clip === "add-flow"/);
+  assert.match(record, /playAddFlow\(c\.page, \(\) => still\(c\.page, "add-flow-poster"\)\)/);
+  assert.match(record, /if \(plan\.addSheet\) await still\(phone\.page, "add-sheet"\)/);
+  assert.match(record, /await openReceiptCamera\(phone\.page\);\s*await still\(phone\.page, "camera"\)/);
+  assert.match(record, /if \(size\.width !== 780 \|\| size\.height !== 1688\)/);
 });
 
 test("the isolated init provides a dark live canvas camera and stops its repaint timer", async () => {

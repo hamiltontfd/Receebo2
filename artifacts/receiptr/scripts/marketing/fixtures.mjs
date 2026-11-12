@@ -3,6 +3,7 @@ import usItemRights from "./us-item-rights.json" with { type: "json" };
 import { usCapturedAt, usReceipts, usSearchQuery } from "./us-collection.mjs";
 import brItemRights from "./br-item-rights.json" with { type: "json" };
 import { brCapturedAt, brReceipts } from "./br-collection.mjs";
+import { installReceiptCameraStream } from "./receipt-photo.mjs";
 
 export const euCapturedAt = "2026-10-27T12:00:00Z";
 // Illustrative capture collection only. itemRights is the saved output of
@@ -210,10 +211,14 @@ export function installDarkCameraStream() {
   });
 }
 
-export async function isolate(context, sampleFile) {
+export async function isolate(context, sampleFile, { cameraPhotoDataUrl } = {}) {
   const session = createCaptureSession();
   const unexpected = [];
-  await context.addInitScript(installDarkCameraStream);
+  if (cameraPhotoDataUrl) {
+    await context.addInitScript(installReceiptCameraStream, { dataUrl: cameraPhotoDataUrl });
+  } else {
+    await context.addInitScript(installDarkCameraStream);
+  }
   await context.addInitScript(({ capturedAt: frozen }) => {
     const RealDate = Date;
     class FixedDate extends RealDate {

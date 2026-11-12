@@ -7,6 +7,8 @@ import { execFileSync } from "node:child_process";
 import { capturedAt, receipts, isolate, activeCapture } from "./fixtures.mjs";
 import { sampleDocumentHtml, sampleDocumentLines } from "./sample-document.mjs";
 import { captureLocators } from "./locators.mjs";
+import { receiptPhotoHtml } from "./receipt-photo.mjs";
+import { addFlowSize, addFlowDuration, openAddSheet, openReceiptCamera, playAddFlow } from "./add-flow.mjs";
 
 /** All contexts record clips by default. Explicit 0 is useful for still-only review. */
 export function clipsEnabled(_usContext, flag = process.env.CAPTURE_CLIPS) {
@@ -16,19 +18,27 @@ export function clipsEnabled(_usContext, flag = process.env.CAPTURE_CLIPS) {
 /** No filter preserves the full capture. Unknown names fail before writing files. */
 export function capturePlan(only = process.env.CAPTURE_ONLY, clipFlag = process.env.CAPTURE_CLIPS) {
   const selected = only?.trim() ? [...new Set(only.split(",").map(name => name.trim()))] : null;
-  if (selected?.some(name => !["upload", "review", "capture"].includes(name))) {
-    throw new Error("CAPTURE_ONLY accepts upload,review,capture (alone or combined)");
+  if (selected?.some(name => !["upload", "review", "capture", "add-sheet", "camera", "add-flow"].includes(name))) {
+    throw new Error("CAPTURE_ONLY accepts upload,review,capture,add-sheet,camera,add-flow (alone or combined)");
   }
   if (selected?.includes("capture") && !clipsEnabled(false, clipFlag)) {
     throw new Error("CAPTURE_ONLY=capture requires clips; remove CAPTURE_CLIPS=0");
+  }
+  if (selected?.includes("add-flow") && !clipsEnabled(false, clipFlag)) {
+    throw new Error("CAPTURE_ONLY=add-flow requires clips; remove CAPTURE_CLIPS=0");
   }
   return {
     partial: selected !== null,
     upload: selected === null || selected.includes("upload"),
     review: selected === null || selected.includes("review"),
     clips: clipsEnabled(false, clipFlag)
-      ? ["capture", "find", "protect"].filter(name => selected === null || selected.includes(name))
+      ? ["capture", "find", "protect", ...(selected?.includes("add-flow") ? ["add-flow"] : [])]
+        .filter(name => selected === null || selected.includes(name))
       : [],
+    ...(selected?.some(name => ["add-sheet", "camera", "add-flow"].includes(name)) ? {
+      addSheet: selected.includes("add-sheet"),
+      camera: selected.includes("camera"),
+    } : {}),
   };
 }
 
@@ -106,9 +116,18 @@ try {
   const input = await browser.newPage({ viewport: { width: 720, height: 900 }, deviceScaleFactor: 1, colorScheme: "light" });
   await input.setContent(sampleDocumentHtml(lines, capture.language));
   await input.screenshot({ path: receiptImage });
+  let cameraPhotoDataUrl;
+  if (plan.addSheet || plan.camera || plan.clips.includes("add-flow")) {
+    await input.setViewportSize({ width: 720, height: 1280 });
+    await input.setContent(receiptPhotoHtml(receipts[0], capture.language, capture.market));
+    const photo = await input.screenshot({ path: `${out}/sources/receipt-photo.png` });
+    cameraPhotoDataUrl = `data:image/png;base64,${photo.toString("base64")}`;
+    manifest.receiptCameraSource = "sources/receipt-photo.png";
+  }
   await input.close();
 
-  async function context({ width = 1440, height = 900, record = false, deviceScaleFactor = record ? 1 : 2 } = {}) {
+  async function context({ width = 1440, height = 900, record = false, deviceScaleFactor = record ? 1 : 2, receiptCamera = false } = {}) {
+    if (receiptCamera && !cameraPhotoDataUrl) throw new Error("Receipt camera requires the generated photograph");
     const ctx = await browser.newContext({
       viewport: { width, height }, deviceScaleFactor,
       locale: capture.locale, timezoneId: capture.timezoneId, colorScheme: "light", reducedMotion: "reduce",
@@ -116,7 +135,8 @@ try {
       permissions: ["camera"],
       ...(record ? { recordVideo: { dir: `${out}/sources`, size: { width, height } } } : {}),
     });
-    const unexpected = await isolate(ctx, receiptImage);
+    const unexpected = await isolate(ctx, receiptImage, receiptCamera ? { cameraPhotoDataUrl } : undefined);
+    const recordingStartedAt = Date.now();
     const page = await ctx.newPage();
     page.on("pageerror", e => errors.push(e.message));
     await page.addInitScript(showPointer => {
@@ -133,7 +153,7 @@ try {
         addEventListener("pointermove", e => { dot.style.left = `${e.clientX - 11}px`; dot.style.top = `${e.clientY - 11}px`; });
       });
     }, record);
-    return { ctx, page, unexpected };
+    return { ctx, page, unexpected, recordingStartedAt };
   }
   async function ready(page, route = "/search") {
     await page.goto(`http://127.0.0.1:5199${route}`);
@@ -350,13 +370,43 @@ try {
   await close(phone);
   }
 
+  if (plan.addSheet || plan.camera) {
+    const phone = await context({ ...captureSizes.phone, receiptCamera: true });
+    try {
+      await ready(phone.page, "/search");
+      await openAddSheet(phone.page);
+      if (plan.addSheet) await still(phone.page, "add-sheet");
+      if (plan.camera) {
+        await openReceiptCamera(phone.page);
+        await still(phone.page, "camera");
+      }
+      for (const name of [plan.addSheet && "add-sheet", plan.camera && "camera"].filter(Boolean)) {
+        const size = pngSize(await readFile(`${out}/sources/${name}.png`));
+        if (size.width !== 780 || size.height !== 1688) throw new Error(`${name} must be 780x1688`);
+      }
+    } catch (error) {
+      await dumpFailure(phone.page, "add receipt stills", phone.unexpected, error);
+      throw error;
+    } finally {
+      await close(phone);
+    }
+  }
+
   for (const clip of plan.clips) {
-    const c = await context({ ...captureSizes.clip, record: true });
+    const size = clip === "add-flow" ? addFlowSize : captureSizes.clip;
+    const c = await context({ ...size, record: true, receiptCamera: clip === "add-flow" });
     const ui = captureLocators(c.page, capture.language);
     const video = c.page.video();
     await ready(c.page, clip === "capture" ? "/scan" : "/search");
     const start = Date.now();
-    if (clip === "capture") {
+    if (clip === "add-flow") {
+      try {
+        await playAddFlow(c.page, () => still(c.page, "add-flow-poster"));
+      } catch (error) {
+        await dumpFailure(c.page, "add receipt interaction", c.unexpected, error);
+        throw error;
+      }
+    } else if (clip === "capture") {
       await c.page.mouse.move(450, 375);
       await c.page.waitForTimeout(900);
       await c.page.locator('input[type="file"]').setInputFiles(receiptImage);
@@ -391,10 +441,18 @@ try {
     await close(c);
     const source = await video.path();
     const target = `${out}/web/${clip}.mp4`;
+    // New phone interaction only: remove the actual initial load and normalize
+    // its two deliberate holds plus navigation to a short, silent 2.8s clip.
+    const timing = clip === "add-flow"
+      ? ["-ss", String((start - c.recordingStartedAt) / 1000), "-t", String(duration),
+        "-i", source, "-vf", `setpts=${addFlowDuration / duration}*(PTS-STARTPTS),fps=30`]
+      : ["-ss", "1.2", "-i", source];
     // Strip the initial load, preserve the genuine interaction at real speed.
-    ff(["-ss", "1.2", "-i", source, "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "23", "-pix_fmt", "yuv420p", "-movflags", "+faststart", target]);
-    ff(["-ss", "1.2", "-i", source, "-an", "-c:v", "libvpx-vp9", "-crf", "33", "-b:v", "0", "-pix_fmt", "yuv420p", `${out}/web/${clip}.webm`]);
-    manifest.clips[clip] = { source: path.basename(source), duration, viewport: "960x640", file: `${clip}.mp4`,
+    ff([...timing, "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "23", "-pix_fmt", "yuv420p", "-movflags", "+faststart", target]);
+    ff([...timing, "-an", "-c:v", "libvpx-vp9", "-crf", "33", "-b:v", "0", "-pix_fmt", "yuv420p", `${out}/web/${clip}.webm`]);
+    manifest.clips[clip] = { source: path.basename(source), duration: clip === "add-flow" ? addFlowDuration : duration,
+      viewport: `${size.width}x${size.height}`, file: `${clip}.mp4`,
+      ...(clip === "add-flow" ? { rawInteractionDuration: duration } : {}),
       ...(clip === "capture" ? { reviewHoldMs } : {}) };
   }
   if (!plan.partial) await writeFile(`${out}/sources/fixtures.json`, JSON.stringify(receipts, null, 2));
