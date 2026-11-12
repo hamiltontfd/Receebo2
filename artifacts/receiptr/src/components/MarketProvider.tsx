@@ -26,6 +26,7 @@ export type MarketState = {
   market: Market | null;
   /** ISO country the server detected from this request's IP (never stored); null when unknown. */
   country: string | null;
+  savedCountry?: string | null;
   source: "account" | "visitor" | "suggestion" | "unknown";
   confirmed: boolean;
   loading: boolean;
@@ -57,6 +58,7 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
   const [account, setAccount] = useState<Market | null>(null);
   const [suggestion, setSuggestion] = useState<Market | null>(null);
   const [country, setCountry] = useState<string | null>(null);
+  const [savedCountry, setSavedCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +148,7 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
           chosen = prefs.market;
           setAccount(chosen);
           setCountry(prefs.country ?? null);
+          setSavedCountry(prefs.savedCountry ?? null);
           pendingVisitor.current = null;
           try { sessionStorage.removeItem(pendingKey(userId)); } catch { /* no storage */ }
         } else {
@@ -190,6 +193,7 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
         });
         if (!current()) return;
         setAccount(result.market);
+        setSavedCountry(result.savedCountry ?? null);
         pendingVisitor.current = null;
         try { sessionStorage.removeItem(pendingKey(userId)); } catch { /* no storage */ }
       } else {
@@ -215,7 +219,7 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
   const confirmed = ready ? (userId ? account : visitor) : null;
   const market = ready ? confirmed ?? suggestion : null;
   return <Context.Provider value={{
-    market, country, source: confirmed ? (userId ? "account" : "visitor") : suggestion ? "suggestion" : "unknown",
+    market, country, savedCountry, source: confirmed ? (userId ? "account" : "visitor") : suggestion ? "suggestion" : "unknown",
     confirmed: !!confirmed, loading, saving, error, choose,
     retry: () => {
       if (failedChoice.current) void choose(failedChoice.current);

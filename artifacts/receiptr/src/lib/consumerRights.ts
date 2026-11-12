@@ -57,6 +57,17 @@ const JURISDICTION_RULES: JurisdictionRule[] = [
     returnCitation: "EU Directive 2011/83/EU",
   },
   {
+    code: "ES",
+    label: "Spain",
+    // RDL 7/2021 of 27 April, TRLGDCU art. 120.1; effective 1 January 2022.
+    // Digital/subscription/service/ticket exceptions still bypass all consumer dates.
+    warrantyYears: 3,
+    durableCategories: ["Electronics", "Home", "Clothing & Apparel", "Entertainment", "Other"],
+    onlineReturnDays: 14,
+    warrantyCitation: "Real Decreto-ley 7/2021, art. 120.1",
+    returnCitation: "EU Directive 2011/83/EU",
+  },
+  {
     code: "BR",
     label: "Brazil",
     // CDC Art. 26 (Lei 8.078/1990): 90 days durable, 30 days non-durable
@@ -138,7 +149,7 @@ function detectCountry(params: {
   if (purchaseCountry && purchaseCountry.length === 2) {
     const code = purchaseCountry.toUpperCase();
     // Other EU/EEA countries share the EU minimum rules (2-year warranty, 14-day withdrawal).
-    return EU_EEA_COUNTRIES.has(code) ? "EU" : code;
+    return code === "ES" ? "ES" : EU_EEA_COUNTRIES.has(code) ? "EU" : code;
   }
 
   if (!currency) return null;
@@ -332,6 +343,7 @@ export function returnWindowStartDate(
 }
 
 export function deriveConsumerRights(params: {
+  savedCountry?: string | null;
   storeDomain?: string | null;
   purchaseDate?: string | null;
   deliveryDate?: string | null;
@@ -370,7 +382,10 @@ export function deriveConsumerRights(params: {
   const purchaseDateObj = new Date(purchaseDate + "T00:00:00");
   if (isNaN(purchaseDateObj.getTime())) return none;
 
-  const countryCode = detectCountry({ currency, purchaseCountry, merchant });
+  const effectiveCountry = purchaseCountry ?? (
+    isOnlineForConsumerRights(isOnlinePurchase, merchant, params.storeDomain) ? params.savedCountry : null
+  );
+  const countryCode = detectCountry({ currency, purchaseCountry: effectiveCountry, merchant });
   if (!countryCode) return none;
 
   const rule = JURISDICTION_RULES.find((r) => r.code === countryCode) ?? null;

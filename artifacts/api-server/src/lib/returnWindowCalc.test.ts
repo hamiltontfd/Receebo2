@@ -88,6 +88,13 @@ describe("EU/EEA countries other than PT", () => {
 });
 
 describe("unknown purchase channel", () => {
+  it("uses the saved country for inferred Amazon, never for unknown non-Amazon or explicit in-store", () => {
+    const sample = { purchaseDate: "2026-01-01", merchant: "Amazon", currency: "EUR", purchaseCountry: null, savedCountry: "BR", isOnlinePurchase: null };
+    expect(calcReturnWindow(sample)).toMatchObject({ days: 7, estimated: true });
+    expect(calcReturnWindow({ ...sample, purchaseCountry: "ES" })).toMatchObject({ days: 14, estimated: true });
+    expect(calcReturnWindow({ ...sample, isOnlinePurchase: false })).toBeNull();
+    expect(calcReturnWindow({ ...sample, merchant: "Fnac" })).toBeNull();
+  });
   it("estimates Amazon's statutory window but leaves ordinary unknown channels alone", () => {
     const today = new Date().toISOString().slice(0, 10);
     expect(calcReturnWindow({ purchaseDate: today, purchaseCountry: "PT", isOnlinePurchase: null, currency: "EUR", merchant: "Amazon.es" })).toMatchObject({ days: 14, estimated: true, basis: "law" });

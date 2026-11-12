@@ -5,6 +5,8 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, receiptsTable, userPreferencesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+// Country persistence has separate integration coverage; fault injections here target onboarding only.
+vi.mock("../lib/accountCountry", () => ({ countryForRequest: async () => null, getAccountCountry: async () => null }));
 
 vi.mock("@clerk/express", () => ({
   getAuth: (req: express.Request) => ({ userId: req.headers["x-test-session"] ?? null }),

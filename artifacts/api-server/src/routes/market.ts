@@ -10,6 +10,9 @@ import { clientPublicIp, requestCountry } from "../lib/marketGeoip";
 import { interestCountry, recordMarketInterest } from "../lib/marketInterest";
 import { setMarketIfUnset } from "../lib/accountMarket";
 import { logger } from "../lib/logger";
+import { getAccountCountry } from "../lib/accountCountry";
+import { normalizeCountryCode } from "../lib/purchaseCountry";
+import { UpdateAccountCountryBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 router.get("/account/language", requireAuth, async (req, res): Promise<void> => {
@@ -93,7 +96,7 @@ router.get("/account/market", requireAuth, async (req, res): Promise<void> => {
       logger.warn({ err, userId: req.userId }, "Could not save the detected market; leaving it unset");
     }
   }
-  res.json({ market, country: detected.country });
+  res.json({ market, country: detected.country, savedCountry: await getAccountCountry(req.userId!).catch(() => null) });
 });
 
 router.patch("/account/market", requireAuth, lockUserDataMutation(async (req, res): Promise<void> => {
@@ -112,7 +115,23 @@ router.patch("/account/market", requireAuth, lockUserDataMutation(async (req, re
         updatedAt: new Date(),
       },
     }).returning({ market: userPreferencesTable.market });
-  res.json({ ...saved, country: requestCountry(req).country });
+  res.json({ ...saved, country: requestCountry(req).country, savedCountry: await getAccountCountry(req.userId!).catch(() => null) });
+}));
+
+router.patch("/account/country", requireAuth, lockUserDataMutation(async (req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const parsed = UpdateAccountCountryBody.strict().safeParse(req.body);
+  const country = parsed.success ? normalizeCountryCode(parsed.data.country) : null;
+  if (!country) {
+    res.status(400).json({ error: "Choose a valid two-letter ISO country code." });
+    return;
+  }
+  const [saved] = await db.insert(userPreferencesTable).values({ userId: req.userId!, country })
+    .onConflictDoUpdate({
+      target: userPreferencesTable.userId,
+      set: { country, updatedAt: new Date() },
+    }).returning({ savedCountry: userPreferencesTable.country });
+  res.json(saved);
 }));
 // "I'm interested" (uncovered countries): aggregate counts only. Two in-memory
 // limits: a global budget, and a per-client one keyed by a salted hash of the

@@ -1,4 +1,6 @@
 import express from "express";
+// Keep token-store mocks scoped to mail; country persistence has its own integration tests.
+vi.mock("../lib/accountCountry", () => ({ countryForRequest: async () => null, getAccountCountry: async () => null }));
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -74,6 +76,7 @@ vi.mock("../middlewares/requireAuth", () => ({
   },
 }));
 vi.mock("../lib/legalAcceptance", () => ({
+  hasCurrentLegalAcceptance: async () => true,
   requireCurrentLegalAcceptance: (_req: any, _res: any, next: () => void) => next(),
 }));
 

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
 import { rememberOnboardingReceipt } from "../lib/onboarding";
 import { validPurchaseCountry } from "../lib/purchaseCountry";
+import { getAccountCountry } from "../lib/accountCountry";
 import { and, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 import { db, receiptsTable, receiptAttachmentsTable, uploadIntentsTable, trialUploadsTable } from "@workspace/db";
 import {
@@ -173,6 +174,7 @@ router.post("/receipts", requireAuthOrGuest, lockUserDataMutation(async (req, re
 
   enqueueExtraction({
     userId,
+    savedCountry: req.savedCountry,
     receiptId: receipt!.id,
     objectPath: receipt!.objectPath,
     contentType: receipt!.contentType,
@@ -359,7 +361,7 @@ router.get("/receipts/:id", requireAuthOrGuest, receiptReadRateLimiter, async (r
     .from(receiptAttachmentsTable)
     .where(eq(receiptAttachmentsTable.receiptId, receipt.id));
 
-  res.json(GetReceiptResponse.parse({ ...receipt, attachments, itemRights: await itemRightsFor(req.userId!, receipt) }));
+  res.json(GetReceiptResponse.parse({ ...receipt, attachments, itemRights: await itemRightsFor(req.userId!, receipt, req.savedCountry) }));
 });
 
 router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (req, res): Promise<void> => {
@@ -484,7 +486,7 @@ router.patch("/receipts/:id", requireAuthOrGuest, lockUserDataMutation(async (re
   }
   await refreshWarrantyExpiries(receipt.id);
 
-  res.json(UpdateReceiptResponse.parse({ ...receipt, itemRights: await itemRightsFor(req.userId!, receipt) }));
+  res.json(UpdateReceiptResponse.parse({ ...receipt, itemRights: await itemRightsFor(req.userId!, receipt, req.savedCountry) }));
 }));
 
 async function itemRightsFor(userId: string, receipt: {
@@ -497,10 +499,11 @@ async function itemRightsFor(userId: string, receipt: {
   merchant?: string | null;
   isOnlinePurchase?: boolean | null;
   purchaseType?: string | null;
-}) {
+}, requestCountry?: string | null) {
   let region: "US" | "PT" = "PT";
   try { region = rulesRegionForMarket(await getAccountMarket(userId)); } catch { region = "PT"; }
   return evaluateItemRights(receipt.products, {
+    savedCountry: requestCountry ?? await getAccountCountry(userId).catch(() => null),
     region,
     category: receipt.category,
     purchaseDate: receipt.purchaseDate,

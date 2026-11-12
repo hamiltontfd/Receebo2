@@ -4,11 +4,22 @@ import { countryFromStoreDomain, resolvePurchaseCountry } from "./purchaseCountr
 
 const online = {
   isOnlinePurchase: true as const,
-  purchaseCountry: "LU",
+  purchaseCountry: null,
   sellerCountry: "LU",
 };
 
 describe("resolvePurchaseCountry", () => {
+  it("keeps stored country ahead of saved country; applies saved country only to online or inferred Amazon", () => {
+    const base = { ...online, deliveryCountry: null, storeDomain: "amazon.es", merchant: "Amazon", savedCountry: "PT" };
+    expect(resolvePurchaseCountry(base)).toBe("PT");
+    expect(resolvePurchaseCountry({ ...base, purchaseCountry: "ES" })).toBe("ES");
+    expect(resolvePurchaseCountry({ ...base, purchaseCountry: "ES", deliveryCountry: "BR" })).toBe("BR");
+    expect(resolvePurchaseCountry({ ...base, isOnlinePurchase: null })).toBe("PT");
+    expect(resolvePurchaseCountry({ ...base, isOnlinePurchase: false })).toBeNull();
+    for (const merchant of ["Zara", "Fnac"]) {
+      expect(resolvePurchaseCountry({ ...base, merchant, storeDomain: null, isOnlinePurchase: null })).toBeNull();
+    }
+  });
   it("uses the delivery address before the Amazon.es domain and the Luxembourg seat", () => {
     expect(resolvePurchaseCountry({
       ...online,
@@ -56,7 +67,7 @@ describe("resolvePurchaseCountry", () => {
       isOnlinePurchase: null,
       purchaseCountry: "BR",
       deliveryCountry: "PT",
-      storeDomain: "amazon.es",
+      storeDomain: "fnac.es",
       sellerCountry: "LU",
     })).toBe("BR");
   });
@@ -64,6 +75,14 @@ describe("resolvePurchaseCountry", () => {
 
 describe("parseExtraction purchase country", () => {
   const base = { isReceipt: true, merchant: "Amazon EU S.à r.l.", purchaseDate: "2026-10-01" };
+  it("ignores a model copy of seller seat online, but preserves a different stored purchase country", () => {
+    const sample = { ...base, currency: "EUR", isOnlinePurchase: true, purchaseCountry: "LU", sellerCountry: "LU", storeDomain: "amazon.es" };
+    expect(parseExtraction(JSON.stringify(sample), { savedCountry: "PT" }).purchaseCountry).toBe("PT");
+    expect(parseExtraction(JSON.stringify({ ...sample, purchaseCountry: "ES" }), { savedCountry: "PT" }).purchaseCountry).toBe("ES");
+    expect(parseExtraction(JSON.stringify({ ...sample, deliveryCountry: "BR" }), { savedCountry: "PT" }).purchaseCountry).toBe("BR");
+    expect(parseExtraction(JSON.stringify(sample)).purchaseCountry).toBe("ES");
+    expect(parseExtraction(JSON.stringify({ ...sample, isOnlinePurchase: false }), { savedCountry: "PT" }).purchaseCountry).toBe("LU");
+  });
 
   it("resolves an Amazon.es order delivered to Portugal as PT", () => {
     const parsed = parseExtraction(JSON.stringify({

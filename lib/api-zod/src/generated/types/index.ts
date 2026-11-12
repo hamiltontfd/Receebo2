@@ -41,6 +41,7 @@ export * from './similarReceiptMatch';
 export * from './trialFunnelInteraction';
 export * from './trialFunnelInteractionEvent';
 export * from './trialFunnelInteractionReason';
+export * from './updateAccountCountry200';
 export * from './uploadReservationRelease';
 export * from './uploadUrlRequest';
 export * from './uploadUrlResponse';

@@ -110,6 +110,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccountMarket"
+  /account/country:
+    patch:
+      operationId: updateAccountCountry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [country]
+              properties:
+                country:
+                  type: string
+                  pattern: "^[A-Za-z]{2}$"
+      responses:
+        "200":
+          description: Corrected saved country; UK is normalized to GB.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [savedCountry]
+                properties:
+                  savedCountry:
+                    type: string
+        "400":
+          description: Invalid ISO country code.
   /billing/trial-funnel:
     post:
       operationId: recordTrialFunnelInteraction
@@ -555,6 +583,9 @@ components:
         country:
           type: ["string", "null"]
           description: ISO country detected server-side from this request's IP (never stored); null when unknown.
+        savedCountry:
+          type: ["string", "null"]
+          description: Persisted actual user country, distinct from market and request GeoIP.
     MarketPreferenceInput:
       type: object
       additionalProperties: false

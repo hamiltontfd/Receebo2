@@ -50,6 +50,8 @@ const WATCHDOG_INTERVAL_MS = 60 * 1000;
 
 export interface ExtractionJob {
   userId: string;
+  /** Effective country for this request, including the non-fatal persistence fallback. */
+  savedCountry?: string | null;
   receiptId: number;
   objectPath: string;
   contentType: string;
@@ -102,7 +104,9 @@ async function processJobUnlocked(job: ExtractionJob, attempt: number): Promise<
     }
 
     const locale = await getUserEmailLocale(job.userId);
-    const data = await extractReceiptData(objectPath, contentType, { fullPageDocument, locale });
+    const { getAccountCountry } = await import("./accountCountry");
+    const savedCountry = job.savedCountry ?? await getAccountCountry(job.userId).catch(() => null);
+    const data = await extractReceiptData(objectPath, contentType, { fullPageDocument, locale, savedCountry });
 
     // Fallback guard: if the full extraction still returns isReceipt:false
     // (pre-check false positive), reject cleanly rather than writing null fields.

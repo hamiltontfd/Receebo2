@@ -35,6 +35,7 @@ import { getUserEmailLocale, type EmailLocale } from "./emailLocale";
 import { runDataRetentionSweep } from "./accountLifecycle";
 import { syncWarrantyExpiries, warrantyInputColumns } from "./warrantyExpiryStore";
 import { accountRegionLookup } from "./accountMarket";
+import { accountCountryLookup } from "./accountCountry";
 
 /**
  * Push language per sweep: the same account language as emails (Settings
@@ -569,6 +570,7 @@ export async function runReturnWindowSweep(): Promise<void> {
   const hasAccess = reminderAccessChecker();
   const localeOf = pushLocaleLookup();
   const regionOf = accountRegionLookup();
+  const countryOf = accountCountryLookup();
 
   for (const r of receipts) {
     if (!r.purchaseDate) continue;
@@ -577,6 +579,7 @@ export async function runReturnWindowSweep(): Promise<void> {
     const region = await regionOf(r.userId);
 
     const window = calcReturnWindow({
+      savedCountry: await countryOf(r.userId),
       purchaseDate: r.purchaseDate,
       deliveryDate: r.deliveryDate,
       purchaseCountry: r.purchaseCountry,

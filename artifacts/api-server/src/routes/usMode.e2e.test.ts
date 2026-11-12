@@ -82,11 +82,11 @@ const call = (path: string, user: string, body?: object) => fetch(`${base}${path
 describe("US mode end to end (real PostgreSQL)", () => {
   it("IP market -> account market -> user's return window -> US reminder; PT account keeps EU rules", async () => {
     process.env.MARKET_DEV_COUNTRY = "US";
-    expect(await (await call("/account/market", us)).json()).toEqual({ market: "US", country: "US" });
+    expect(await (await call("/account/market", us)).json()).toEqual({ market: "US", country: "US", savedCountry: "US" });
     process.env.MARKET_DEV_COUNTRY = "PT";
-    expect(await (await call("/account/market", pt)).json()).toEqual({ market: "PT", country: "PT" });
+    expect(await (await call("/account/market", pt)).json()).toEqual({ market: "PT", country: "PT", savedCountry: "PT" });
     // Later visits from elsewhere never replace the saved market.
-    expect(await (await call("/account/market", us)).json()).toEqual({ market: "US", country: "PT" });
+    expect(await (await call("/account/market", us)).json()).toEqual({ market: "US", country: "PT", savedCountry: "US" });
 
     // Unknown store: the user sets their own 10-day window on both receipts.
     for (const name of ["us", "pt"]) {

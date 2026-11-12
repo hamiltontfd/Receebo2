@@ -2,6 +2,8 @@ import express from "express";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+// This harness mocks the token database; country persistence is covered separately.
+vi.mock("../lib/accountCountry", () => ({ countryForRequest: async () => null, getAccountCountry: async () => null }));
 // The per-user action limiter (ed15809) needs the real DB pool, which this test
 // mocks away; it is covered by its own tests. Pass-through here.
 vi.mock("../middlewares/actionRateLimiter", () => {
@@ -80,6 +82,7 @@ vi.mock("../middlewares/requireAuth", () => ({
   },
 }));
 vi.mock("../lib/legalAcceptance", () => ({
+  hasCurrentLegalAcceptance: async () => true,
   requireCurrentLegalAcceptance: (_req: any, _res: any, next: () => void) => next(),
 }));
 

@@ -151,11 +151,12 @@ export function ConsumerRightsPanel({
   promptsOnly?: boolean;
 }) {
   const locale = useAppLocale();
-  const { region, ready } = useAccountRegion();
+  const { region, ready, savedCountry } = useAccountRegion();
   if (!ready) return null;
 
   const noDates = hasNoConsumerDates(receipt.purchaseType);
   const rights = deriveConsumerRights({
+    savedCountry,
     purchaseDate: receipt.purchaseDate,
     deliveryDate: receipt.deliveryDate,
     category: receipt.category,

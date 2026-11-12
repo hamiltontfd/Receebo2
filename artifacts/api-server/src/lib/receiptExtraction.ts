@@ -4,6 +4,7 @@ import { senderDomain } from "./mailProviders/merchants";
 import { normalizePurchaseType, type PurchaseType } from "./purchaseType";
 import { acceptExtractedLines } from "./itemCoverage";
 import { countryFromStoreDomain, normalizeCountryCode, resolvePurchaseCountry } from "./purchaseCountry";
+import { isOnlineForConsumerRights } from "@workspace/api-zod";
 import { ObjectStorageService } from "./objectStorage";
 import { logger } from "./logger";
 
@@ -239,7 +240,7 @@ function buildContentPart(base64: string, contentType: string, detail?: string) 
 export async function extractReceiptData(
   objectPath: string,
   contentType: string,
-  options: { fullPageDocument?: boolean; locale?: ExtractionLocale } = {},
+  options: { fullPageDocument?: boolean; locale?: ExtractionLocale; savedCountry?: string | null } = {},
 ): Promise<ExtractedReceipt> {
   const file = await objectStorageService.getObjectEntityFile(objectPath);
   const [buffer] = await file.download();
@@ -278,7 +279,7 @@ export async function extractReceiptData(
     completion = await request();
   }
 
-  return parseExtraction(completion.choices[0]?.message?.content ?? "{}");
+  return parseExtraction(completion.choices[0]?.message?.content ?? "{}", { savedCountry: options.savedCountry });
 }
 
 /** "YYYY-MM-DD" (or any parseable date) -> "YYYY-MM-DD"; null when missing or invalid. */
@@ -292,7 +293,7 @@ export function toIsoDateOrNull(value: unknown): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 }
 
-export function parseExtraction(raw: string, hints?: { storeDomain?: string | null }): ExtractedReceipt {
+export function parseExtraction(raw: string, hints?: { storeDomain?: string | null; savedCountry?: string | null }): ExtractedReceipt {
   let parsed: Partial<ExtractedReceipt> = {};
   try {
     parsed = JSON.parse(raw);
@@ -369,10 +370,14 @@ export function parseExtraction(raw: string, hints?: { storeDomain?: string | nu
     typeof isOnlinePurchaseRaw === "boolean" ? isOnlinePurchaseRaw : null;
   const purchaseCountry = resolvePurchaseCountry({
     isOnlinePurchase,
-    purchaseCountry: purchaseCountryRaw,
+    // A model echo of the seller's registered seat is not buyer-country evidence.
+    purchaseCountry: isOnlineForConsumerRights(isOnlinePurchase, toStringOrNull(parsed.merchant), storeDomain)
+      && purchaseCountryRaw === sellerCountry ? null : purchaseCountryRaw,
     deliveryCountry,
     storeDomain,
     sellerCountry,
+    savedCountry: hints?.savedCountry,
+    merchant: toStringOrNull(parsed.merchant),
   });
 
   return {
@@ -452,7 +457,7 @@ export async function precheckEmailIsReceipt(
  */
 export async function extractReceiptDataFromText(
   text: string,
-  meta: { subject?: string | null; from?: string | null; receivedAt?: string | null; locale?: ExtractionLocale } = {},
+  meta: { subject?: string | null; from?: string | null; receivedAt?: string | null; locale?: ExtractionLocale; savedCountry?: string | null } = {},
 ): Promise<ExtractedReceipt> {
   const header = [
     meta.from ? `From: ${meta.from}` : null,
@@ -475,5 +480,6 @@ export async function extractReceiptDataFromText(
 
   return parseExtraction(completion.choices[0]?.message?.content ?? "{}", {
     storeDomain: senderDomain(meta.from),
+    savedCountry: meta.savedCountry,
   });
 }

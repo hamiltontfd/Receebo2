@@ -19,9 +19,9 @@ export function rulesRegionForMarket(market: string | null | undefined): Account
  * changes rules; an unconfirmed suggestion never does. Outside the provider
  * (unit tests) it is PT and ready.
  */
-export function useAccountRegion(): { region: AccountRegion; ready: boolean } {
+export function useAccountRegion(): { region: AccountRegion; ready: boolean; savedCountry?: string | null } {
   const m = useContext(MarketContext);
   if (!m) return { region: "PT", ready: true };
   const region = m.confirmed ? rulesRegionForMarket(m.market) : "PT";
-  return { region, ready: m.confirmed || !m.loading };
+  return { region, ready: m.confirmed || !m.loading, savedCountry: m.savedCountry ?? null };
 }

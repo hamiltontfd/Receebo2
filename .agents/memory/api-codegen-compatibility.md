@@ -14,3 +14,12 @@ and infinite-query/pagination support, breaking existing consumers.
 **How to apply:** Review generation diffs against existing consumers and preserve
 the existing extensions until the specification/generator represents them.
 Rebuild shared library declarations before checking dependent applications.
+
+Inline request bodies can also generate a TypeScript alias with the same name
+as the Zod schema; wildcard re-exports then collide.
+
+**Why:** The generator emits both contracts successfully, but the shared package
+fails its declaration build with a duplicate export.
+
+**How to apply:** Prefer a named request schema, or keep the conflicting type
+out of the wildcard barrel; verify the shared-library build after generation.

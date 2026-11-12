@@ -66,7 +66,7 @@ describe("item coverage foundation", () => {
 
   it("uses the purchase country, never the account rules region as proof of Portugal", () => {
     for (const [purchaseCountry, months, ruleId] of [
-      ["PT", 36, "PT:DL-84/2021"], ["ES", 24, "EU:2019/771"], [null, 24, "EU:2019/771"],
+      ["PT", 36, "PT:DL-84/2021"], ["ES", 36, "ES:RDL-7/2021-art-120.1"], [null, 24, "EU:2019/771"],
     ] as const) {
       const rights = evaluateItemRights([line({ category: null })], ctx({
         category: "Electronics", merchant: "amazon.es", purchaseCountry, currency: "EUR",
@@ -89,6 +89,19 @@ describe("item coverage foundation", () => {
     for (const merchant of ["Zara", "Fnac", "Unknown"]) {
       const rights = evaluateItemRights([line()], ctx({ merchant, isOnlinePurchase: null }));
       expect(rights[0].contracts.find(c => c.kind === "return")).toMatchObject({ status: "unknown", endDate: null });
+    }
+  });
+  it("uses saved country for Amazon only after stored order country, with no account-market guess", () => {
+    const sample = ctx({ merchant: "Amazon", purchaseCountry: null, savedCountry: "PT", isOnlinePurchase: null });
+    expect(evaluateItemRights([line()], sample)[0].contracts.find(c => c.warrantyType === "legal"))
+      .toMatchObject({ lengthMonths: 36, ruleId: "PT:DL-84/2021", certainty: "estimated" });
+    expect(evaluateItemRights([line()], { ...sample, purchaseCountry: "ES" })[0].contracts.find(c => c.warrantyType === "legal"))
+      .toMatchObject({ lengthMonths: 36, ruleId: "ES:RDL-7/2021-art-120.1" });
+    expect(evaluateItemRights([line()], { ...sample, isOnlinePurchase: false })[0].contracts.find(c => c.warrantyType === "legal"))
+      .toMatchObject({ lengthMonths: 24, ruleId: "EU:2019/771" });
+    for (const purchaseType of ["digital", "subscription", "service", "ticket"]) {
+      const rights = evaluateItemRights([line()], { ...sample, purchaseCountry: "ES", purchaseType });
+      expect(rights[0].contracts.every(c => c.status === "not_applicable" && !c.endDate)).toBe(true);
     }
   });
 

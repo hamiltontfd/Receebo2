@@ -50,10 +50,15 @@ export interface AccountMarket {
   /** @nullable */
   market: AccountMarketMarket;
   /**
-   * ISO country detected server-side from this request's IP (never stored); null when unknown.
-   * @nullable
-   */
+     * ISO country detected server-side from this request's IP (never stored); null when unknown.
+     * @nullable
+     */
   country?: string | null;
+  /**
+     * Persisted actual user country, distinct from market and request GeoIP.
+     * @nullable
+     */
+  savedCountry?: string | null;
 }
 
 export type MarketPreferenceInputMarket = typeof MarketPreferenceInputMarket[keyof typeof MarketPreferenceInputMarket];
@@ -514,6 +519,15 @@ export interface BillingAccessStatus {
   /** For complimentary owners, indicates an existing Stripe customer whose billing portal remains available. */
   hasBillingAccount?: boolean;
 }
+
+export type UpdateAccountCountryBody = {
+  /** @pattern ^[A-Za-z]{2}$ */
+  country: string;
+};
+
+export type UpdateAccountCountry200 = {
+  savedCountry: string;
+};
 
 export type ListReceiptsParams = {
   limit?: number;

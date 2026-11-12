@@ -7,6 +7,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, emailFeedbackTable, emailSendsTable, receiptsTable } from "@workspace/db";
 import { calcReturnWindow } from "./returnWindowCalc";
 import { getAccountMarket, rulesRegionForMarket } from "./accountMarket";
+import { getAccountCountry } from "./accountCountry";
 import type { EmailLocale } from "./emailLocale";
 import type { FeedbackRating } from "./feedbackToken";
 
@@ -174,7 +175,7 @@ export async function getAccountReport(userId: string): Promise<AccountReport> {
     pLegal: receiptsTable.legalWarrantyPushSentFor,
     pMan: receiptsTable.manufacturerWarrantyPushSentFor,
   }).from(receiptsTable).where(and(eq(receiptsTable.userId, userId), eq(receiptsTable.isDraft, false)));
-  return reportFromRows(rows, region);
+  return reportFromRows(rows, region, await getAccountCountry(userId).catch(() => null));
 }
 
 type ReportRow = {
@@ -186,12 +187,13 @@ type ReportRow = {
   wMan: string | null; wLegal: string | null; pLegal: string | null; pMan: string | null;
 };
 
-export function reportFromRows(rows: ReportRow[], region: "US" | "PT" = "PT"): AccountReport {
+export function reportFromRows(rows: ReportRow[], region: "US" | "PT" = "PT", savedCountry?: string | null): AccountReport {
   let returnWindowsTracked = 0;
   let warrantiesTracked = 0;
   let alertsSent = 0;
   for (const r of rows) {
     const window = r.purchaseDate ? calcReturnWindow({
+      savedCountry,
       purchaseDate: r.purchaseDate, deliveryDate: r.deliveryDate, purchaseCountry: r.purchaseCountry,
       isOnlinePurchase: r.isOnlinePurchase, currency: r.currency, merchant: r.merchant, purchaseType: r.purchaseType,
       region, returnDays: r.returnDays ?? null,

@@ -2,12 +2,15 @@ import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
 import { hasCurrentLegalAcceptance, TERMS_VERSION, PRIVACY_VERSION } from "../lib/legalAcceptance";
 import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
+import { countryForRequest } from "../lib/accountCountry";
+import { requestCountry } from "../lib/marketGeoip";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       userId?: string;
+      savedCountry?: string | null;
     }
   }
 }
@@ -57,10 +60,11 @@ export async function requireAuth(
     });
     return;
   }
+  const legalAccepted = await hasCurrentLegalAcceptance(userId);
   if (
     !LEGAL_EXEMPT_PATHS.has(req.path) &&
     !isConsentWithdrawal(req) &&
-    !(await hasCurrentLegalAcceptance(userId))
+    !legalAccepted
   ) {
     res.status(428).json({
       error: "Current Terms, Privacy Policy, and 18+ confirmation are required",
@@ -69,6 +73,9 @@ export async function requireAuth(
       privacyVersion: PRIVACY_VERSION,
     });
     return;
+  }
+  if (legalAccepted) {
+    req.savedCountry = await countryForRequest(userId, requestCountry(req).country);
   }
   next();
 }

@@ -93,11 +93,21 @@ describe("manufacturer warranty parsing", () => {
 
 describe("EU/EEA countries other than PT", () => {
   it("get the EU 2-year legal warranty and 14-day online withdrawal", () => {
-    for (const c of ["DE", "ES", "FR", "NO"]) {
+    for (const c of ["DE", "FR", "NO"]) {
       const r = deriveConsumerRights({ purchaseCountry: c, currency: "EUR", merchant: "Shop", category: "Electronics", isOnlinePurchase: true, purchaseDate: "2026-03-10" });
       expect(r.countryLabel).toBe("EU");
       expect(r.warranty?.citation).toBe("EU Directive 2019/771");
       expect(r.returnWindow?.source).toBe("EU Directive 2011/83/EU");
+    }
+  });
+  it("Spain goods get three years with the Spanish citation and the EU withdrawal", () => {
+    const sample = { purchaseCountry: "ES", currency: "EUR", merchant: "amazon.es", category: "Electronics", purchaseDate: "2026-03-10", deliveryDate: "2026-03-15", isOnlinePurchase: true };
+    const rights = deriveConsumerRights(sample);
+    expect(rights.warranty).toMatchObject({ label: "3-year legal warranty", citation: "Real Decreto-ley 7/2021, art. 120.1" });
+    expect(rights.warranty?.expiry.getFullYear()).toBe(2029);
+    expect(rights.returnWindow?.source).toBe("EU Directive 2011/83/EU");
+    for (const purchaseType of ["digital", "subscription", "service", "ticket"]) {
+      expect(deriveConsumerRights({ ...sample, purchaseType })).toMatchObject({ warranty: null, returnWindow: null });
     }
   });
   it("leaves GB without EU rules", () => {
@@ -172,7 +182,7 @@ describe("unknown purchase channel", () => {
   });
   it("does not treat the account PT/EU rules region as the purchase country", () => {
     for (const [purchaseCountry, citation] of [
-      ["PT", "Decree-Law 84/2021"], ["ES", "EU Directive 2019/771"], [null, "EU Directive 2019/771"],
+      ["PT", "Decree-Law 84/2021"], ["ES", "Real Decreto-ley 7/2021, art. 120.1"], [null, "EU Directive 2019/771"],
     ] as const) {
       expect(deriveConsumerRights({ region: "PT", merchant: "amazon.es", currency: "EUR", purchaseCountry, category: "Electronics", purchaseDate: "2026-01-01" }).warranty?.citation).toBe(citation);
     }

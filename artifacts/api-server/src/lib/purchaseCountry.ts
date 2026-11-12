@@ -1,4 +1,5 @@
 import { countries } from "countries-list";
+import { isOnlineForConsumerRights } from "@workspace/api-zod";
 
 /** Account markets and pseudo regions (EU, XX) are not countries. */
 export function validPurchaseCountry(value: unknown): boolean {
@@ -79,18 +80,22 @@ export type PurchaseCountryInput = {
   storeDomain: string | null;
   /** Country of the seller's registered office. */
   sellerCountry: string | null;
+  savedCountry?: string | null;
+  merchant?: string | null;
 };
 
 /**
  * Country whose return-window and legal-warranty rules apply.
- * Online: delivery address, then store domain, then the seller's legal seat.
+ * Online (including inferred Amazon): delivery, stored purchase country,
+ * saved user country, store domain, then seller seat. Never rewrites old receipts.
  * In-store and unknown channel: the extracted purchase country, unchanged.
  */
 export function resolvePurchaseCountry(input: PurchaseCountryInput): string | null {
   const inferred = normalizeCountryCode(input.purchaseCountry);
-  if (input.isOnlinePurchase !== true) return inferred;
+  if (!isOnlineForConsumerRights(input.isOnlinePurchase, input.merchant, input.storeDomain)) return inferred;
   return normalizeCountryCode(input.deliveryCountry)
+    ?? inferred
+    ?? normalizeCountryCode(input.savedCountry)
     ?? countryFromStoreDomain(input.storeDomain)
-    ?? normalizeCountryCode(input.sellerCountry)
-    ?? inferred;
+    ?? normalizeCountryCode(input.sellerCountry);
 }

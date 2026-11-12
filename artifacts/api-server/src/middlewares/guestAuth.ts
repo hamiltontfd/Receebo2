@@ -2,6 +2,8 @@ import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
 import { hasCurrentLegalAcceptance } from "../lib/legalAcceptance";
 import { isAccountDeletionInProgress } from "../lib/accountDeletionState";
+import { countryForRequest } from "../lib/accountCountry";
+import { requestCountry } from "../lib/marketGeoip";
 
 /**
  * Signed-in Clerk users only. Guest mode is switched off on the server: the
@@ -35,6 +37,7 @@ export async function requireSignedInUser(
     return;
   }
   req.userId = clerkUserId;
+  req.savedCountry = await countryForRequest(clerkUserId, requestCountry(req).country);
   next();
 }
 

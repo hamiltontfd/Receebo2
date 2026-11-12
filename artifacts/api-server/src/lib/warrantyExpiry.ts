@@ -10,11 +10,13 @@
  */
 import { detectCountry, returnWindowStart } from "./returnWindowCalc";
 import { hasNoConsumerDates } from "./purchaseType";
+import { resolvePurchaseCountry } from "./purchaseCountry";
 
 /** Bump when the rules change so the startup backfill recomputes stored dates. */
-export const WARRANTY_CALC_VERSION = 3;
+export const WARRANTY_CALC_VERSION = 4;
 
-const LEGAL_WARRANTY_YEARS: Record<string, number> = { PT: 3, EU: 2 };
+// Spain: RDL 7/2021 (27 April), TRLGDCU art. 120.1, effective 1 Jan 2022.
+const LEGAL_WARRANTY_YEARS: Record<string, number> = { PT: 3, ES: 3, EU: 2 };
 // "Entertainment" keeps the same legal-warranty treatment as "Other" for
 // receipts without a purchase type. Tickets, subscriptions and digital
 // purchases lose their dates through purchaseType (Hamilton, 28 Oct 2026),
@@ -66,6 +68,11 @@ export function parseManufacturerWarrantyMonths(text: string | null | undefined)
 }
 
 export interface WarrantyExpiryInput {
+  savedCountry?: string | null;
+  isOnlinePurchase?: boolean | null;
+  storeDomain?: string | null;
+  deliveryCountry?: string | null;
+  sellerCountry?: string | null;
   purchaseDate: string | null;
   deliveryDate?: string | null;
   category?: string | null;
@@ -93,7 +100,12 @@ export function computeWarrantyExpiries(input: WarrantyExpiryInput): WarrantyExp
   if (hasNoConsumerDates(input.purchaseType)) return { legal: null, manufacturer: null };
   let legal: string | null = null;
   const start = legalStart(input);
-  const country = detectCountry({ currency: input.currency, purchaseCountry: input.purchaseCountry, merchant: input.merchant });
+  const purchaseCountry = resolvePurchaseCountry({
+    ...input, purchaseCountry: input.purchaseCountry ?? null, isOnlinePurchase: input.isOnlinePurchase ?? null,
+    deliveryCountry: input.deliveryCountry ?? null, storeDomain: input.storeDomain ?? null,
+    sellerCountry: input.sellerCountry ?? null,
+  });
+  const country = detectCountry({ currency: input.currency, purchaseCountry, merchant: input.merchant });
   const years = country ? LEGAL_WARRANTY_YEARS[country] : undefined;
   const category = input.category ?? "Other";
   if (start && years && DURABLE_CATEGORIES.has(category)) legal = addYearsClamped(start, years);

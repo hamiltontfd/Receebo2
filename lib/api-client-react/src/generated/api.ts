@@ -45,6 +45,8 @@ import type {
   ReceiptUpdate,
   SimilarReceiptMatch,
   TrialFunnelInteraction,
+  UpdateAccountCountry200,
+  UpdateAccountCountryBody,
   UploadReservationRelease,
   UploadUrlRequest,
   UploadUrlResponse
@@ -539,6 +541,71 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getUpdateAccountMarketMutationOptions(options));
+    }
+
+export const getUpdateAccountCountryUrl = () => {
+
+
+
+
+  return `/api/account/country`
+}
+
+export const updateAccountCountry = async (updateAccountCountryBody: UpdateAccountCountryBody, options?: RequestInit): Promise<UpdateAccountCountry200> => {
+
+  return customFetch<UpdateAccountCountry200>(getUpdateAccountCountryUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateAccountCountryBody,)
+  }
+);}
+
+
+
+
+export const getUpdateAccountCountryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountCountry>>, TError,{data: BodyType<UpdateAccountCountryBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAccountCountry>>, TError,{data: BodyType<UpdateAccountCountryBody>}, TContext> => {
+
+const mutationKey = ['updateAccountCountry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAccountCountry>>, {data: BodyType<UpdateAccountCountryBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAccountCountry(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAccountCountryMutationResult = NonNullable<Awaited<ReturnType<typeof updateAccountCountry>>>
+    export type UpdateAccountCountryMutationBody = BodyType<UpdateAccountCountryBody>
+    export type UpdateAccountCountryMutationError = ErrorType<void>
+
+    export const useUpdateAccountCountry = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountCountry>>, TError,{data: BodyType<UpdateAccountCountryBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAccountCountry>>,
+        TError,
+        {data: BodyType<UpdateAccountCountryBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateAccountCountryMutationOptions(options));
     }
 
 export const getRecordTrialFunnelInteractionUrl = () => {

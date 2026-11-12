@@ -39,7 +39,9 @@ const B = `market-fixture-${randomUUID()}`;
 let server: Server;
 let base: string;
 let receiptId: number;
+const initialDevCountry = process.env.MARKET_DEV_COUNTRY;
 beforeAll(async () => {
+  delete process.env.MARKET_DEV_COUNTRY;
   const app = express();
   app.use(express.json(), market, notifications, receipts);
   server = app.listen(0, "127.0.0.1");
@@ -54,6 +56,8 @@ beforeAll(async () => {
   receiptId = receipt.id;
 });
 afterAll(async () => {
+  if (initialDevCountry === undefined) delete process.env.MARKET_DEV_COUNTRY;
+  else process.env.MARKET_DEV_COUNTRY = initialDevCountry;
   await new Promise<void>((done) => server.close(() => done()));
   for (const user of [A, B]) {
     await db.delete(receiptsTable).where(eq(receiptsTable.userId, user));
@@ -82,11 +86,14 @@ describe("market API with real PostgreSQL", () => {
     expect(await response.json()).toEqual({ language: null });
   });
   it("public suggestion is uncached and rejects query/header supplied IPs from the private peer", async () => {
-    const response = await fetch(`${base}/market/suggestion?ip=8.8.8.8`, {
-      headers: { "x-forwarded-for": "8.8.8.8", "cf-connecting-ip": "8.8.8.8", "x-real-ip": "8.8.8.8" },
-    });
-    expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(await response.json()).toEqual({ country: null, market: null });
+    vi.stubEnv("MARKET_TRUSTED_PROXY_CIDRS", "");
+    try {
+      const response = await fetch(`${base}/market/suggestion?ip=8.8.8.8`, {
+        headers: { "x-forwarded-for": "8.8.8.8", "cf-connecting-ip": "8.8.8.8", "x-real-ip": "8.8.8.8" },
+      });
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(await response.json()).toEqual({ country: null, market: null });
+    } finally { vi.unstubAllEnvs(); }
   });
   it("requires a real session for reads/writes, rejects guest tokens and blocks deletion in progress", async () => {
     expect((await call("/account/market", null)).status).toBe(401);
@@ -97,7 +104,7 @@ describe("market API with real PostgreSQL", () => {
   it("starts absent, never silently PT, and GET does not create preferences", async () => {
     const response = await call("/account/market", A);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(await response.json()).toEqual({ market: null, country: null });
+    expect(await response.json()).toEqual({ market: null, country: null, savedCountry: null });
     expect(await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, A))).toHaveLength(0);
   });
   it("server-side GeoIP fills an empty account market once, never replaces one, and leaves uncovered countries empty", async () => {
@@ -106,16 +113,17 @@ describe("market API with real PostgreSQL", () => {
     const nodeEnv = process.env.NODE_ENV;
     try {
       process.env.MARKET_DEV_COUNTRY = "US";
-      expect(await (await call("/account/market", C)).json()).toEqual({ market: "US", country: "US" });
+      expect(await (await call("/account/market", C)).json()).toEqual({ market: "US", country: "US", savedCountry: "US" });
       const [row] = await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, C));
       expect(row.market).toBe("US");
       // Another country later (travel, VPN) never replaces the saved market.
       process.env.MARKET_DEV_COUNTRY = "BR";
-      expect(await (await call("/account/market", C)).json()).toEqual({ market: "US", country: "BR" });
+      expect(await (await call("/account/market", C)).json()).toEqual({ market: "US", country: "BR", savedCountry: "US" });
       // Uncovered country: nothing saved, the country is returned for the notice.
       process.env.MARKET_DEV_COUNTRY = "JP";
-      expect(await (await call("/account/market", D)).json()).toEqual({ market: null, country: "JP" });
-      expect(await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, D))).toHaveLength(0);
+      expect(await (await call("/account/market", D)).json()).toEqual({ market: null, country: "JP", savedCountry: "JP" });
+      expect(await db.select({ country: userPreferencesTable.country, market: userPreferencesTable.market })
+        .from(userPreferencesTable).where(eq(userPreferencesTable.userId, D))).toEqual([{ country: "JP", market: null }]);
       expect(await (await fetch(`${base}/market/suggestion`)).json()).toEqual({ country: "JP", market: null });
       // The dev override is ignored in production.
       process.env.NODE_ENV = "production";
@@ -141,7 +149,7 @@ describe("market API with real PostgreSQL", () => {
       expect(put.status).toBe(428);
       expect(await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, E))).toHaveLength(0);
       consent.missing.delete(E);
-      expect(await (await call("/account/market", E)).json()).toEqual({ market: "US", country: "US" });
+      expect(await (await call("/account/market", E)).json()).toEqual({ market: "US", country: "US", savedCountry: "US" });
       const [row] = await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, E));
       expect(row.market).toBe("US");
     } finally {
@@ -216,23 +224,23 @@ describe("market API with real PostgreSQL", () => {
     await db.insert(userPreferencesTable).values({ userId: A, notificationsOptOut: true });
     const response = await call("/account/market", A, { market: "BR" });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ market: "BR", country: null });
+    expect(await response.json()).toEqual({ market: "BR", country: null, savedCountry: null });
     const [row] = await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.userId, A));
     expect(row.notificationsOptOut).toBe(true);
-    expect(await (await call("/account/market", B)).json()).toEqual({ market: null, country: null });
+    expect(await (await call("/account/market", B)).json()).toEqual({ market: null, country: null, savedCountry: null });
   });
   it("notification update does not remove the saved market", async () => {
     expect((await call("/notifications/preferences", A, { optOut: false })).status).toBe(200);
-    expect(await (await call("/account/market", A)).json()).toEqual({ market: "BR", country: null });
+    expect(await (await call("/account/market", A)).json()).toEqual({ market: "BR", country: null, savedCountry: null });
   });
   it("atomic visitor adoption cannot override an existing choice", async () => {
-    expect(await (await call("/account/market", A, { market: "US", onlyIfUnset: true })).json()).toEqual({ market: "BR", country: null });
-    expect(await (await call("/account/market", B, { market: "US", onlyIfUnset: true })).json()).toEqual({ market: "US", country: null });
+    expect(await (await call("/account/market", A, { market: "US", onlyIfUnset: true })).json()).toEqual({ market: "BR", country: null, savedCountry: null });
+    expect(await (await call("/account/market", B, { market: "US", onlyIfUnset: true })).json()).toEqual({ market: "US", country: null, savedCountry: null });
     await Promise.all([
       call("/account/market", B, { market: "BR" }),
       call("/account/market", B, { market: "PT", onlyIfUnset: true }),
     ]);
-    expect(await (await call("/account/market", B)).json()).toEqual({ market: "BR", country: null });
+    expect(await (await call("/account/market", B)).json()).toEqual({ market: "BR", country: null, savedCountry: null });
   });
   it("account market change never rewrites purchase data or reminder state", async () => {
     const [before] = await db.select().from(receiptsTable).where(eq(receiptsTable.id, receiptId));
@@ -275,7 +283,7 @@ describe("market API with real PostgreSQL", () => {
     expect(row.legalWarrantyExpiresOn).toBe("2028-01-01");
     expect(row.returnReminderSent7dAt).toBeNull();
     expect(row.returnReminderSent2dAt).toBeNull();
-    expect(await (await call("/account/market", A)).json()).toEqual({ market: "US", country: null });
+    expect(await (await call("/account/market", A)).json()).toEqual({ market: "US", country: null, savedCountry: null });
   });
   it("can clear the purchase country to Unknown without deriving it from account or currency", async () => {
     expect((await call(`/receipts/${receiptId}`, A, { purchaseCountry: null })).status).toBe(200);

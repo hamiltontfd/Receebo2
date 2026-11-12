@@ -447,6 +447,7 @@ async function syncUserGmailUnlocked(
       try {
         extraction = await extractReceiptData(objectPath, "application/pdf", {
           locale: await (await import("./emailLocale")).getUserEmailLocale(userId),
+          savedCountry: await (await import("./accountCountry")).getAccountCountry(userId).catch(() => null),
         });
       } catch (err) {
         logger.warn({ err, objectPath }, "Gmail sync: extraction failed");

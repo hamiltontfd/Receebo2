@@ -1,4 +1,5 @@
-import { pgTable, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, boolean, timestamp, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /**
  * Lightweight per-user notification preferences.
@@ -8,6 +9,8 @@ import { pgTable, text, boolean, timestamp } from "drizzle-orm/pg-core";
 export const userPreferencesTable = pgTable("user_preferences", {
   userId: text("user_id").primaryKey(),
   market: text("market", { enum: ["PT", "BR", "US"] }),
+  /** Actual country, first detected after consent or manually corrected. Never an IP. */
+  country: text("country"),
   /** Manual choice in Settings (null = automatic). Always wins. */
   language: text("language", { enum: ["en", "pt-PT", "pt-BR"] }),
   /**
@@ -28,6 +31,8 @@ export const userPreferencesTable = pgTable("user_preferences", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-});
+}, (table) => [
+  check("user_preferences_country_check", sql`${table.country} IS NULL OR ${table.country} ~ '^[A-Z]{2}$'`),
+]);
 
 export type UserPreferences = typeof userPreferencesTable.$inferSelect;

@@ -11,8 +11,13 @@ export interface AccountMarket {
   /** @nullable */
   market: AccountMarketMarket;
   /**
-   * ISO country detected server-side from this request's IP (never stored); null when unknown.
-   * @nullable
-   */
+     * ISO country detected server-side from this request's IP (never stored); null when unknown.
+     * @nullable
+     */
   country?: string | null;
+  /**
+     * Persisted actual user country, distinct from market and request GeoIP.
+     * @nullable
+     */
+  savedCountry?: string | null;
 }

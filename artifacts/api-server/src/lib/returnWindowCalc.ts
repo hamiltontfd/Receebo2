@@ -1,4 +1,5 @@
 import { isOnlineForConsumerRights } from "@workspace/api-zod";
+import { resolvePurchaseCountry } from "./purchaseCountry";
 import { hasNoConsumerDates } from "./purchaseType";
 import { addDaysIso, usReturnStart, usStoreReturnWindow } from "./usStorePolicies";
 
@@ -15,6 +16,7 @@ interface JurisdictionRule {
 
 const JURISDICTION_RULES: JurisdictionRule[] = [
   { code: "PT", onlineReturnDays: 14 }, // EU CRD / DL 24/2014
+  { code: "ES", onlineReturnDays: 14 }, // EU withdrawal remains unchanged.
   { code: "EU", onlineReturnDays: 14 }, // EU Directive 2011/83/EU
   { code: "BR", onlineReturnDays: 7 },  // CDC Art. 49
   { code: "US", onlineReturnDays: null },
@@ -59,7 +61,7 @@ export function detectCountry(params: {
   if (purchaseCountry && purchaseCountry.length === 2) {
     const code = purchaseCountry.toUpperCase();
     // Other EU/EEA countries share the EU minimum rules.
-    return EU_EEA_COUNTRIES.has(code) ? "EU" : code;
+    return code === "ES" ? "ES" : EU_EEA_COUNTRIES.has(code) ? "EU" : code;
   }
   if (!currency) return null;
   const cur = currency.toUpperCase();
@@ -121,6 +123,9 @@ export function returnWindowStart(purchaseDate: string, deliveryDate?: string | 
  */
 export function calcReturnWindow(params: {
   storeDomain?: string | null;
+  savedCountry?: string | null;
+  deliveryCountry?: string | null;
+  sellerCountry?: string | null;
   purchaseDate: string;
   deliveryDate?: string | null;
   purchaseCountry?: string | null;
@@ -146,7 +151,12 @@ export function calcReturnWindow(params: {
   if (isNaN(purchaseDateObj.getTime())) return null;
   const start = returnWindowStart(purchaseDate, params.deliveryDate);
 
-  const countryCode = detectCountry({ currency, purchaseCountry, merchant });
+  const effectiveCountry = resolvePurchaseCountry({
+    ...params, isOnlinePurchase: isOnlinePurchase ?? null, purchaseCountry: purchaseCountry ?? null,
+    deliveryCountry: params.deliveryCountry ?? null, storeDomain: params.storeDomain ?? null,
+    sellerCountry: params.sellerCountry ?? null,
+  });
+  const countryCode = detectCountry({ currency, purchaseCountry: effectiveCountry, merchant });
   if (!countryCode) return null;
 
   const retailerDays = findRetailerDays(merchant);

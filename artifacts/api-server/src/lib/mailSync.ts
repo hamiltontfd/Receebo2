@@ -486,7 +486,10 @@ export async function syncMailboxClaimed(
           return { checked, queued, autoImported };
         }
         try {
-          extraction = await extractReceiptData(objectPath, "application/pdf", { locale: extractionLocale });
+          const { getAccountCountry } = await import("./accountCountry");
+          extraction = await extractReceiptData(objectPath, "application/pdf", {
+            locale: extractionLocale, savedCountry: await getAccountCountry(userId).catch(() => null),
+          });
         } catch (err) {
           logger.warn({ err, objectPath }, `${label} sync: extraction failed`);
           retryableFailure = true;
@@ -507,6 +510,7 @@ export async function syncMailboxClaimed(
             from: message.from,
             receivedAt: message.receivedAt,
             locale: extractionLocale,
+            savedCountry: await (await import("./accountCountry")).getAccountCountry(userId).catch(() => null),
           });
         } catch (err) {
           logger.warn({ err, messageId }, `${label} sync: body extraction failed`);

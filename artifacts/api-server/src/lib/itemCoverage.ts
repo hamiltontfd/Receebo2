@@ -3,6 +3,7 @@ import { isOnlineForConsumerRights } from "@workspace/api-zod";
 import { CANONICAL_CATEGORIES, type CanonicalCategory } from "./categories";
 import { hasNoConsumerDates } from "./purchaseType";
 import { detectCountry, returnWindowStart } from "./returnWindowCalc";
+import { resolvePurchaseCountry } from "./purchaseCountry";
 import { addDaysIso, usStoreReturnWindow } from "./usStorePolicies";
 import { addMonthsClamped, addYearsClamped, isIsoDate } from "./warrantyExpiry";
 import type { ReceiptProductItem } from "@workspace/db";
@@ -63,6 +64,9 @@ export interface ItemRulesContext {
   /** Receipt category is a fallback, never a user-confirmed line classification. */
   category?: string | null;
   storeDomain?: string | null;
+  savedCountry?: string | null;
+  deliveryCountry?: string | null;
+  sellerCountry?: string | null;
   /** Account rules region. US uses the store table and no federal legal warranty. */
   region: "US" | "PT";
   purchaseDate?: string | null;
@@ -79,9 +83,10 @@ export interface ItemRulesContext {
 const LINE_ID = /^[A-Za-z0-9_-]{8,64}$/;
 const INJECTION = /ignore (all |any )?(previous|prior) instructions|system prompt|<\s*script|javascript:/i;
 
-const LEGAL_WARRANTY_YEARS: Record<string, number> = { PT: 3, EU: 2 };
+// Spain: RDL 7/2021, 27 April, TRLGDCU art. 120.1; effective 1 Jan 2022.
+const LEGAL_WARRANTY_YEARS: Record<string, number> = { PT: 3, ES: 3, EU: 2 };
 const DURABLE = new Set(["Electronics", "Home", "Clothing & Apparel", "Entertainment", "Other"]);
-const ONLINE_RETURN_DAYS: Record<string, number> = { PT: 14, EU: 14, BR: 7, CA: 7 };
+const ONLINE_RETURN_DAYS: Record<string, number> = { PT: 14, ES: 14, EU: 14, BR: 7, CA: 7 };
 
 export function newLineId(): string {
   return `l_${randomBytes(8).toString("hex")}`;
@@ -478,7 +483,7 @@ function legalForLine(line: ReceiptProductItem, ctx: ItemRulesContext, asOf: str
     lengthMonths: years * 12,
     startDate: start.date,
     endDate,
-    ruleId: country === "PT" ? "PT:DL-84/2021" : "EU:2019/771",
+    ruleId: country === "PT" ? "PT:DL-84/2021" : country === "ES" ? "ES:RDL-7/2021-art-120.1" : "EU:2019/771",
     legalReviewPending: false,
   });
 }
@@ -553,6 +558,11 @@ function returnForLine(line: ReceiptProductItem, ctx: ItemRulesContext, asOf: st
 
 /** Read-side deadlines. Does not read or write reminder columns. */
 export function evaluateItemRights(lines: ReceiptProductItem[] | null | undefined, ctx: ItemRulesContext): ItemRights[] {
+  ctx = { ...ctx, purchaseCountry: resolvePurchaseCountry({
+    ...ctx, isOnlinePurchase: ctx.isOnlinePurchase ?? null, purchaseCountry: ctx.purchaseCountry ?? null,
+    deliveryCountry: ctx.deliveryCountry ?? null, storeDomain: ctx.storeDomain ?? null,
+    sellerCountry: ctx.sellerCountry ?? null,
+  }) };
   const asOf = asOfDate(ctx.asOf);
   return (lines ?? []).map((line, index) => {
     const stated = (line.coverages ?? []).map((coverage) => statedContract(line.lineId ?? "", coverage, ctx.purchaseDate ?? null, asOf));

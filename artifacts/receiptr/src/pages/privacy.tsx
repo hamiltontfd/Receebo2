@@ -61,9 +61,13 @@ export default function PrivacyPolicy() {
           <strong>Approximate country:</strong> our server looks up the country
           of your IP address in a local database (no third-party service) to
           tell you if your country is not covered yet and, after you accept the
-          Terms and this Privacy Policy, to set your account&apos;s region once,
-          which decides the return and warranty rules shown. Before that,
-          nothing is stored. We keep only the region, not the IP address. You can change the region in
+          Terms and this Privacy Policy, to fill your account&apos;s region and
+          save its actual country once. The saved country helps estimate the
+          rules for online purchases when the receipt has no delivery or purchase
+          country; it does not change a receipt&apos;s stored country. Travel or a
+          VPN does not replace the saved country, which can be corrected through
+          your account. Before consent, nothing is stored. We keep the region and
+          country, not the IP address used for this lookup. You can change the region in
           Settings. If you tap &quot;I&apos;m interested&quot; for a country we
           don&apos;t cover yet, we only add one to a count for that country,
           with nothing that identifies you.

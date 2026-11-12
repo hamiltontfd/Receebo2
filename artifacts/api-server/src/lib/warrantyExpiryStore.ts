@@ -2,9 +2,11 @@ import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { db, receiptsTable } from "@workspace/db";
 import { computeWarrantyExpiries, WARRANTY_CALC_VERSION, type WarrantyExpiryInput } from "./warrantyExpiry";
 import { logger } from "./logger";
+import { getAccountCountry } from "./accountCountry";
 
 type StoredRow = WarrantyExpiryInput & {
   id: number;
+  userId: string;
   legalWarrantyExpiresOn: string | null;
   manufacturerWarrantyExpiresOn: string | null;
   warrantyCalcVersion: number | null;
@@ -12,6 +14,8 @@ type StoredRow = WarrantyExpiryInput & {
 
 export const warrantyInputColumns = {
   id: receiptsTable.id,
+  userId: receiptsTable.userId,
+  isOnlinePurchase: receiptsTable.isOnlinePurchase,
   purchaseDate: receiptsTable.purchaseDate,
   deliveryDate: receiptsTable.deliveryDate,
   category: receiptsTable.category,
@@ -27,7 +31,8 @@ export const warrantyInputColumns = {
 
 /** Recompute a row's warranty dates and persist them if they changed. Returns the fresh dates. */
 export async function syncWarrantyExpiries(row: StoredRow): Promise<{ legal: string | null; manufacturer: string | null }> {
-  const next = computeWarrantyExpiries(row);
+  const savedCountry = await getAccountCountry(row.userId).catch(() => null);
+  const next = computeWarrantyExpiries({ ...row, savedCountry });
   if (next.legal !== row.legalWarrantyExpiresOn || next.manufacturer !== row.manufacturerWarrantyExpiresOn ||
       row.warrantyCalcVersion !== WARRANTY_CALC_VERSION) {
     await db.update(receiptsTable).set({
