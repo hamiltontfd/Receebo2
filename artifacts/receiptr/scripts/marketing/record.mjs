@@ -8,7 +8,7 @@ import { capturedAt, receipts, isolate, activeCapture } from "./fixtures.mjs";
 import { sampleDocumentHtml, sampleDocumentLines } from "./sample-document.mjs";
 import { captureLocators } from "./locators.mjs";
 import { receiptPhotoHtml } from "./receipt-photo.mjs";
-import { addFlowSize, addFlowDuration, openAddSheet, openReceiptCamera, playAddFlow } from "./add-flow.mjs";
+import { addFlowSize, addFlowDuration, addFlowTrimStart, openAddSheet, openReceiptCamera, playAddFlow } from "./add-flow.mjs";
 
 /** All contexts record clips by default. Explicit 0 is useful for still-only review. */
 export function clipsEnabled(_usContext, flag = process.env.CAPTURE_CLIPS) {
@@ -136,7 +136,6 @@ try {
       ...(record ? { recordVideo: { dir: `${out}/sources`, size: { width, height } } } : {}),
     });
     const unexpected = await isolate(ctx, receiptImage, receiptCamera ? { cameraPhotoDataUrl } : undefined);
-    const recordingStartedAt = Date.now();
     const page = await ctx.newPage();
     page.on("pageerror", e => errors.push(e.message));
     await page.addInitScript(showPointer => {
@@ -153,7 +152,7 @@ try {
         addEventListener("pointermove", e => { dot.style.left = `${e.clientX - 11}px`; dot.style.top = `${e.clientY - 11}px`; });
       });
     }, record);
-    return { ctx, page, unexpected, recordingStartedAt };
+    return { ctx, page, unexpected };
   }
   async function ready(page, route = "/search") {
     await page.goto(`http://127.0.0.1:5199${route}`);
@@ -443,8 +442,11 @@ try {
     const target = `${out}/web/${clip}.mp4`;
     // New phone interaction only: remove the actual initial load and normalize
     // its two deliberate holds plus navigation to a short, silent 2.8s clip.
+    const recordedSeconds = clip === "add-flow" ? Number(execFileSync("ffprobe", [
+      "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", source,
+    ], { encoding: "utf8" }).trim()) : null;
     const timing = clip === "add-flow"
-      ? ["-ss", String((start - c.recordingStartedAt) / 1000), "-t", String(duration),
+      ? ["-ss", String(addFlowTrimStart(recordedSeconds, duration)), "-t", String(duration),
         "-i", source, "-vf", `setpts=${addFlowDuration / duration}*(PTS-STARTPTS),fps=30`]
       : ["-ss", "1.2", "-i", source];
     // Strip the initial load, preserve the genuine interaction at real speed.

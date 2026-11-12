@@ -12,7 +12,7 @@ import { isolate, receipts, createCaptureSession, activeCapture, installDarkCame
 import { illustrativePdf, sampleDocumentLines, sampleDocumentHtml, moneyLabel } from "./sample-document.mjs";
 import { captureLabels, captureLocators } from "./locators.mjs";
 import { receiptPhotoHtml, installReceiptCameraStream } from "./receipt-photo.mjs";
-import { addFlowSize, addFlowDuration, playAddFlow } from "./add-flow.mjs";
+import { addFlowSize, addFlowDuration, addFlowTrimStart, playAddFlow } from "./add-flow.mjs";
 
 test("detects added, edited, and deleted media inputs", () => {
   assert.deepEqual(changedFiles({ deleted: "a", edited: "a", stable: "a" }, { added: "b", edited: "b", stable: "a" }),
@@ -252,6 +252,14 @@ test("receipt camera cover-fits decoded photograph and is installed only when re
   assert.equal(scripts[0].fn, installReceiptCameraStream);
   assert.deepEqual(scripts[0].args, { dataUrl });
   assert.ok(!scripts.some(script => script.fn === installDarkCameraStream));
+});
+
+test("add-flow trim uses the real recording tail, not the Node page-creation clock", () => {
+  assert.ok(Math.abs(addFlowTrimStart(8.44, 3.756) - 4.684) < 0.000001);
+  assert.equal(addFlowTrimStart(3, 3), 0);
+  for (const [recorded, interaction] of [[1, 2], [3, 0], [NaN, 2], [3, Infinity]]) {
+    assert.throws(() => addFlowTrimStart(recorded, interaction), /Invalid add-flow/);
+  }
 });
 
 test("add-flow uses the real sheet and camera, with readable holds and a phone viewport", async () => {

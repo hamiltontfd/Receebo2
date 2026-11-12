@@ -1,6 +1,16 @@
 export const addFlowSize = { width: 390, height: 844, deviceScaleFactor: 1 };
 export const addFlowDuration = 2.8;
 
+// Playwright's video clock starts after page creation; a Node wall-clock offset
+// can cut off the sheet. The interaction is the final segment of the recording.
+export function addFlowTrimStart(recordedSeconds, interactionSeconds) {
+  if (!Number.isFinite(recordedSeconds) || !Number.isFinite(interactionSeconds)
+    || interactionSeconds <= 0 || recordedSeconds < interactionSeconds) {
+    throw new Error("Invalid add-flow recording duration");
+  }
+  return recordedSeconds - interactionSeconds;
+}
+
 export async function openAddSheet(page) {
   await page.getByTestId("tab-add").click();
   await page.getByTestId("add-sheet").waitFor({ state: "visible" });

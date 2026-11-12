@@ -145,7 +145,8 @@ outputs are not full-capture approval evidence.
 - `add-flow`: record the same Add → sheet → Scan → camera interaction at the
   **phone viewport 390×844, 1x** (the sheet is hidden at desktop widths). Hold the
   sheet for 1.2 seconds and the ready camera for one second. Trim initial loading
-  using the recording offset, normalize the interaction to **2.8 seconds**, and
+  from the recording tail measured with `ffprobe` (not the Node page-creation
+  clock), normalize the interaction to **2.8 seconds**, and
   export silent `web/add-flow.mp4`, `web/add-flow.webm`, plus
   `sources/add-flow-poster.png` / `web/add-flow-poster.webp`.
 
