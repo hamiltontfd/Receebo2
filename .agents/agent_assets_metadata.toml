@@ -89,3 +89,31 @@ mtime_ms = 1794427951673
 storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/bccfcdf7-fdd0-43b5-82c2-91d270ffcd2a/c626b751-0513-40dc-8ada-de7ff4faa502"
 storage_version_token = "1794427998369238"
 content_type = "video/mp4"
+
+[[outputs]]
+id = "S8LAJtN-dq2ut9oQlP5Nh"
+uri = "file://artifacts/receiptr/public/_capture-tmp/meta-ads-prep/eu-cookie-banner.png"
+type = "image"
+title = "Banner de cookies UE"
+description = "Preview DEV com dev_country=PT, perfil limpo, 1280×800. Accept, Reject e Preferences visíveis."
+logical_id = "185180da-a2c6-480c-8128-282f1e3c8285"
+content_hash = "sha256:ec47b9b5fe514f4338ea8dfc54d6a283e9ffd263ee6510b428f5336406372036"
+size = 375775
+mtime_ms = 1794504482708
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/185180da-a2c6-480c-8128-282f1e3c8285/678835f7-92ba-4e73-a95f-722888e006d7"
+storage_version_token = "1794504500925397"
+content_type = "image/png"
+
+[[outputs]]
+id = "wsE0kJV7_F3Jlsq-f9fac"
+uri = "file://artifacts/receiptr/public/_capture-tmp/meta-ads-prep/us-footer-do-not-sell.png"
+type = "image"
+title = "Footer US — Do Not Sell or Share"
+description = "Preview DEV com dev_country=US, 1280×800. Cookies recusados, sem carregar em Accept."
+logical_id = "d6b42f14-b95d-4dd1-be2e-79163083374f"
+content_hash = "sha256:ba77cd5391990374a0f841464435c09633a2f2f8ef7dd5e125a6f0e983baa33d"
+size = 150321
+mtime_ms = 1794504443958
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:02feb0bc-b2aa-4b4d-94e9-f7333924aae3/d6b42f14-b95d-4dd1-be2e-79163083374f/8ffe2bee-0b65-40ec-a042-ab7b17df20c6"
+storage_version_token = "1794504501770359"
+content_type = "image/png"
