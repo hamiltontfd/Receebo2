@@ -1,7 +1,27 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { acceptAll, consentCookie, consentCountry, consentRegion, effectiveConsent, emptyConsent, parseConsent } from "./adConsent";
 
 describe("ad consent", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("keeps the supplied country without a search string or browser globals", () => {
+    vi.stubGlobal("window", undefined);
+    vi.stubGlobal("navigator", undefined);
+    expect(() => consentCountry("PT")).not.toThrow();
+    expect(consentCountry("PT")).toBe("PT");
+    expect(consentCountry("BR", undefined, true)).toBe("BR");
+    expect(consentCountry(null)).toBeNull();
+    expect(consentCountry("PT", "?dev_country=US", true)).toBe("US");
+    expect(consentCountry("PT", "?dev_country=US", false)).toBe("PT");
+  });
+
+  it("uses the browser search override only in development when search is omitted", () => {
+    vi.stubGlobal("window", { location: { search: "?dev_country=US" } });
+    expect(consentCountry("PT", undefined, true)).toBe("US");
+    expect(consentCountry("PT", undefined, false)).toBe("PT");
+    expect(consentCountry("PT", "?dev_country=BR", true)).toBe("BR");
+  });
+
   it("uses the country alone: EU/EEA/GB/CH/BR opt in regardless of /us or chosen market", () => {
     for (const code of ["PT", "DE", "IS", "LI", "NO", "GB", "CH", "BR", "JP"]) {
       expect(consentRegion(code)).toBe("EU");

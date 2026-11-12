@@ -17,6 +17,6 @@ export function useCookieConsent() {
     };
   }, []);
   const region = consentRegion(consentCountry(market?.country));
-  const gpc = (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
+  const gpc = typeof navigator !== "undefined" && (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
   return { stored, region, consent: effectiveConsent(stored, region, gpc) };
 }
