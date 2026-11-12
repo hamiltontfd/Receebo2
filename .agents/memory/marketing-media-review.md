@@ -15,3 +15,15 @@ explicit human review and a new version instead of overwriting a cached release.
 When stripping service credentials from capture child environments, preserve
 runtime/cache locations, including XDG_CACHE_HOME: Playwright's installed ffmpeg
 otherwise resolves to a different cache and recording fails despite installation.
+
+The user confirmed on 2026-11-12 that production uses the v3 marketing release.
+Keep that release and the older guarded public promo/US still files intact when
+integrating a newer release in DEV; new storage releases must be create-only.
+
+**Why:** A DEV upload must not silently replace bytes that production already
+references. A public asset upload can affect production even without publishing
+application code.
+
+**How to apply:** Use a new versioned prefix, preserve the published-media guard,
+and compare the old public bytes before and after uploads. Confirm which release
+is live before treating an older prefix as removable.

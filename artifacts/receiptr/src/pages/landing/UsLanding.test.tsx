@@ -32,17 +32,28 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); localStorage.clear(); sessionStorage.clear(); });
 
 describe("/us landing (C + D)", () => {
+  it("US hero stays on the US batch even when the market context says BR", () => {
+    render(<MarketContext.Provider value={market({ market: "BR" })}><HeroSection variant="us" /></MarketContext.Provider>);
+    expect(screen.getByTestId("img-hero-library-phone").getAttribute("src")).toContain("/v4/us/");
+  });
+
   it("US hero uses the real fictional sample screens, not the € captures or the placeholder", () => {
     render(<HeroSection variant="us" />);
     expect(screen.getByText("Returns, on time.")).toBeTruthy();
     expect(screen.getByText(/Best Buy, Target, Walmart, Amazon/)).toBeTruthy();
     expect(screen.queryByTestId("us-hero-placeholder")).toBeNull();
     expect(screen.queryByTestId("hero-phones")).toBeNull();
-    expect(screen.getByTestId("img-us-detail").getAttribute("src")).toContain("marketing/us/us-detail-390-top.png");
-    expect(screen.getByTestId("img-us-review").getAttribute("src")).toContain("marketing/us/us-review-390-bottom.png");
+    for (const [id, file] of [["img-hero-library-phone", "library-phone.webp"], ["img-hero-receipt-phone", "receipt-phone.webp"]]) {
+      const img = screen.getByTestId(id);
+      expect(img.getAttribute("src")).toContain(`/marketing/receebo-real-app/v4/us/${file}`);
+      expect(img).toHaveAttribute("width", "780");
+      expect(img).toHaveAttribute("height", "1688");
+      expect(img.style.marginTop).toBe(`${-(32 / 390) * 100}%`);
+    }
+    expect(document.body.innerHTML).not.toContain("marketing/us/");
+    expect(screen.getByTestId("us-hero-phones").textContent).toMatch(/Northwind Supply/);
     expect(screen.getByTestId("us-hero-phones").textContent).toMatch(/not a US legal guarantee/);
-    expect(screen.getByTestId("us-hero-phones").textContent).toMatch(/does not count them as the store's return window/);
-    expect(screen.queryByText("See it in action")).toBeNull();
+    expect(screen.getByText("See it in action").closest("a")).toHaveAttribute("href", "#demo");
     expect(document.body.textContent).not.toContain("€");
     expect(document.body.textContent).not.toContain("Placeholder");
   });

@@ -1,5 +1,49 @@
 # Isolated marketing captures
 
+## DEV-only v4 integration (never overwrite v3)
+
+The reviewed copies in `public/_capture-tmp/{eu,us,br}/web` can be uploaded with:
+
+```sh
+pnpm --filter @workspace/receiptr exec tsx scripts/marketing/upload-v4.ts upload
+```
+
+This copies, rather than moves, exactly four stills and the Capture/Find/Protect
+MP4/WebM/posters per market into ignored `generated-artifacts/marketing-v4`.
+It uploads only `marketing/receebo-real-app/v4/{eu,us,br}/`, with
+`ifGenerationMatch: 0`, public ACL metadata, correct MIME and public caching.
+An existing object is skipped; different bytes cause an explicit failure, never
+an overwrite. Verification checks all 39 public v4 URLs and hashes, all 13 v3
+URLs before/after, and the unchanged `published-media-guard.json` disk hashes.
+The report is ignored generated output. This does not approve new media or
+modify the previous v3 uploader/approved manifest.
+
+### Temporary signed promo PUTs
+
+The native Replit signer currently signs only `host` and ignores generation
+preconditions; direct IAM signing is unavailable. Do not advertise those URLs
+as enforced create-only URLs. The optional `promo-upload-gate.ts` is a **DEV Vite
+middleware**, not a production/API endpoint. It starts only in development
+serve mode when the ignored `generated-artifacts/marketing-v4/enable-promo-upload.json`
+contains an `expiresAt` timestamp no more than 120 minutes ahead.
+
+Its 18 HMAC-signed URLs allow only PUT to the exact EU/US/BR, 16x9/9x16
+MP4/WebM/poster names. The random signing key stays in process memory. Each PUT
+streams directly to App Storage with `ifGenerationMatch: 0`, public ACL metadata,
+MIME and cache headers; existing objects return 412. Send the matching
+`Content-Type` (`video/mp4`, `video/webm`, or `image/webp`).
+Expiry, altered destination, method and signature are rejected. Valid CORS
+preflight is read-only. There is no database import, account mutation, secret
+change or arbitrary-path upload. Capability URLs are written to a mode-0600 file
+in the OS temporary directory, never to public files or Git.
+
+Starting/restarting only the official **web** workflow activates this opt-in
+middleware; do not restart the API for marketing work. Restarting web invalidates
+previous URLs. Remove the activation marker after upload confirmation and restart
+web when convenient to remove the temporary endpoint. The production build has
+no middleware. The homes keep `PROMO_READY` false until each market's six files
+exist and are reviewed; no missing promo URL or old promo is requested meanwhile.
+
 Tooling only: real app components, fictional auth/receipts, fail-closed API
 responses. This is not an application route and never needs the web/API workflows.
 No recording or test uploads media, publishes the app, or approves a new release.

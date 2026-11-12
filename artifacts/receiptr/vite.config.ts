@@ -6,6 +6,7 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { VitePWA } from "vite-plugin-pwa";
 import { marketingSchemaPlugin } from "./build/marketingSchema";
 import { publicPagesPlugin } from "./scripts/public-pages-plugin.mjs";
+import { promoUploadGate } from "./scripts/marketing/promo-upload-gate";
 
 const rawPort = process.env.PORT;
 
@@ -37,6 +38,7 @@ if (!basePath) {
 export default defineConfig({
   base: basePath,
   plugins: [
+    promoUploadGate(path.resolve(import.meta.dirname, "../..")),
     marketingSchemaPlugin(process.env.VITE_APP_URL),
     react(),
     tailwindcss({ optimize: false }),

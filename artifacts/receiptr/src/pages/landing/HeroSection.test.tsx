@@ -14,6 +14,9 @@ vi.mock("@clerk/react", () => ({ useAuth: () => ({ isSignedIn: false }) }));
 vi.mock("@/hooks/useBilling", () => ({ useCreateCheckout: () => ({ mutate: vi.fn(), isPending: false }) }));
 
 import HeroSection from "./HeroSection";
+import { MarketContext, type MarketState } from "@/components/MarketProvider";
+
+const ctx = (m: MarketState["market"]) => ({ market: m, country: null, source: "unknown", confirmed: false, loading: false, saving: false, error: null, choose: vi.fn(async () => undefined), retry: vi.fn() }) as MarketState;
 
 describe("HeroSection", () => {
   it("shows the hero subtitle and trial line", () => {
@@ -36,5 +39,31 @@ describe("HeroSection", () => {
       expect(image.parentElement?.parentElement?.className).toContain("pt-5");
       expect(image.contains(caption)).toBe(false);
     }
+  });
+
+  it("defaults to the EU batch without providers, with correct EU spelling", () => {
+    render(<HeroSection />);
+    expect(screen.getByTestId("img-hero-library-phone").getAttribute("src")).toContain("/marketing/receebo-real-app/v4/eu/library-phone.webp");
+    const alt = screen.getByTestId("img-hero-receipt-phone").getAttribute("alt")!;
+    expect(alt).toContain("Casa Lumen Eletrónica");
+    expect(alt).toContain("649,00 €");
+    expect(alt).toContain("23 out 2026");
+    expect(document.body.innerHTML).not.toContain("Electrónica");
+  });
+
+  it("uses the BR batch for the BR market, EU for others", () => {
+    render(<MarketContext.Provider value={ctx("BR")}><HeroSection /></MarketContext.Provider>);
+    expect(screen.getByTestId("img-hero-receipt-phone").getAttribute("src")).toContain("/v4/br/receipt-phone.webp");
+    expect(screen.getByTestId("img-hero-receipt-phone").getAttribute("alt")).toContain("Loja Fictícia Aurora de Papel");
+  });
+
+  it.each(["PT", "US", null] as const)("root landing with market %s uses EU media", (m) => {
+    render(<MarketContext.Provider value={ctx(m)}><HeroSection /></MarketContext.Provider>);
+    expect(screen.getByTestId("img-hero-library-phone").getAttribute("src")).toContain("/v4/eu/");
+  });
+
+  it("has no 'in English' recording notes", () => {
+    render(<HeroSection />);
+    expect(document.body.textContent).not.toMatch(/inglês|in English/);
   });
 });

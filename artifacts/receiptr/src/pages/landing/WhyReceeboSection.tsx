@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fadeInUp, stagger, VIEWPORT, SectionLabel } from "./shared";
-import { AppCapture } from "./MarketingMedia";
+import { AppCapture, isTallCapture, useMediaMarket, type MediaMarket } from "./MarketingMedia";
+import { mediaCopy } from "./mediaCopy";
 import { lt } from "@/lib/landingLocale";
 
-const getFeatures = () => [
+const getFeatures = (market: MediaMarket, copy = mediaCopy(market)) => [
   {
     title: lt("Capture", "Capturar"),
     items: [
@@ -13,7 +14,7 @@ const getFeatures = () => [
       lt("Import receipts from your inbox", "Importa recibos do teu email", "Importe recibos do seu e-mail"),
     ],
     image: "capture-poster.webp",
-    alt: lt("Receebo's real review form displaying Casa Lumen Electrónica, 23 October 2026 and a €649 total from a fictional receipt.", "Formulário real de revisão do Receebo com Casa Lumen Electrónica, 23 de outubro de 2026 e um total de €649 de um recibo fictício."),
+    alt: copy.whyCaptureAlt,
   },
   {
     title: lt("Find", "Encontrar"),
@@ -23,17 +24,19 @@ const getFeatures = () => [
       lt("Search by brand or category", "Pesquisa por marca ou categoria", "Pesquise por marca ou categoria"),
     ],
     image: "find-poster.webp",
-    alt: lt("A search for TV in the real Receebo interface finds the fictional Casa Lumen Electrónica purchase.", "Uma pesquisa por TV na interface real do Receebo encontra a compra fictícia na Casa Lumen Electrónica."),
+    alt: copy.whyFindAlt,
   },
   {
     title: lt("Protect", "Proteger"),
     items: [
       lt("Warranty reminders", "Lembretes de garantia"),
       lt("Return window alerts", "Alertas de prazo de devolução"),
-      lt("Consumer rights info", "Informação sobre direitos do consumidor", "Informações sobre direitos do consumidor"),
+      market === "us"
+        ? lt("Manufacturer warranty dates", "Datas da garantia do fabricante")
+        : lt("Consumer rights info", "Informação sobre direitos do consumidor", "Informações sobre direitos do consumidor"),
     ],
     image: "protection.webp",
-    alt: lt("Actual consumer-rights information for the sample Portugal purchase: the 3-year legal warranty and the 2-year manufacturer warranty, each with its own end date.", "Informação real sobre direitos do consumidor para a compra de exemplo em Portugal: a garantia legal de 3 anos e a garantia do fabricante de 2 anos, cada uma com a sua data de fim."),
+    alt: copy.whyProtectAlt,
   },
   {
     title: lt("Prove", "Comprovar"),
@@ -43,7 +46,7 @@ const getFeatures = () => [
       lt("Share proof of purchase", "Partilhar comprovativo de compra", "Compartilhar comprovante de compra"),
     ],
     image: "show-to-store.webp",
-    alt: lt("Receebo's full-screen Show to store view displaying the fictional Casa Lumen Electrónica receipt for a €649 55-inch 4K Smart TV.", "Vista de ecrã inteiro do Receebo para mostrar na loja, com o recibo fictício da Casa Lumen Electrónica de uma Smart TV 4K de 55 polegadas por €649.", "Visualização em tela cheia do Receebo para mostrar na loja, com o recibo fictício da Casa Lumen Electrónica de uma Smart TV 4K de 55 polegadas por €649."),
+    alt: copy.whyProveAlt,
   },
 ];
 
@@ -73,7 +76,8 @@ export default function WhyReceeboSection() {
     setActive(idx);
   };
 
-  const FEATURES = getFeatures();
+  const market = useMediaMarket();
+  const FEATURES = getFeatures(market);
   const feature = FEATURES[active];
 
   return (
@@ -189,7 +193,13 @@ export default function WhyReceeboSection() {
             </div>
 
             {/* Right — image */}
-            <div className="relative overflow-hidden min-h-[280px] lg:min-h-[420px]">
+            <div
+              data-testid="why-media-cell"
+              className={`relative overflow-hidden ${isTallCapture(feature.image)
+                // Tall phone captures need real height to stay legible (was a 420px cell).
+                ? "min-h-[min(96svh,880px)] md:min-h-[min(86vh,960px)]"
+                : "min-h-[280px] lg:min-h-[420px]"}`}
+            >
               <AnimatePresence custom={dir} mode="wait">
                 <motion.div
                   key={active + "-img"}

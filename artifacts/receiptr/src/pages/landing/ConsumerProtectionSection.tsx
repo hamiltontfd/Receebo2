@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { ShieldCheck, Clock, RotateCcw, Scale } from "lucide-react";
 import { fadeInUp, slideInRight, stagger, VIEWPORT, SectionLabel } from "./shared";
-import { AppCapture } from "./MarketingMedia";
+import { AppCapture, useMediaMarket } from "./MarketingMedia";
+import { mediaCopy } from "./mediaCopy";
 import { lt } from "@/lib/landingLocale";
 
 const getProtections = () => [
@@ -28,6 +29,7 @@ const getProtections = () => [
 ];
 
 export default function ConsumerProtectionSection() {
+  const copy = mediaCopy(useMediaMarket());
   return (
     <section className="py-24 lg:py-32 bg-muted/20">
       <div className="max-w-7xl mx-auto px-6">
@@ -90,9 +92,9 @@ export default function ConsumerProtectionSection() {
           >
             <AppCapture
               file="protection.webp"
-              alt={lt("Real Receebo consumer-rights panel for a fictional in-store TV purchase in Portugal, showing a three-year legal warranty until 23 October 2029 with its legal citation and a two-year manufacturer warranty until 23 October 2028.", "Painel real de direitos do consumidor do Receebo para uma compra fictícia de uma TV em loja em Portugal, com garantia legal de três anos até 23 de outubro de 2029, a respetiva referência legal, e garantia do fabricante de dois anos até 23 de outubro de 2028.", "Painel real de direitos do consumidor do Receebo para uma compra fictícia de uma TV em loja em Portugal, com garantia legal de três anos até 23 de outubro de 2029, a respectiva referência legal, e garantia do fabricante de dois anos até 23 de outubro de 2028.")}
-              caption={lt("Fictional Portugal example, captured 27 Oct 2026. General guidance, not a guarantee of eligibility.", "Exemplo fictício de Portugal, ecrã em inglês captado a 27 out 2026. Orientação geral, não garante elegibilidade.", "Exemplo fictício de Portugal, tela em inglês capturada em 27 out 2026. Orientação geral, não garante elegibilidade.")}
-              className="w-full h-[420px] lg:h-[500px]"
+              alt={copy.protectionAlt}
+              caption={copy.protectionCaption}
+              className="w-full"
             />
           </motion.div>
         </div>

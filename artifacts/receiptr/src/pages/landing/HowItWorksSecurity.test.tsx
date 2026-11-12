@@ -8,6 +8,7 @@ import { LandingContent } from "../landing";
 vi.mock("framer-motion", () => ({
   useReducedMotion: () => true,
   MotionConfig: ({ children }: { children: R.ReactNode }) => R.createElement(R.Fragment, null, children),
+  AnimatePresence: ({ children }: { children: R.ReactNode }) => R.createElement(R.Fragment, null, children),
   motion: new Proxy({}, {
     get: (_t, tag: string) => ({ children, variants: _v, initial: _i, animate: _a, whileInView: _wv, viewport: _vp, transition: _tr, whileHover: _h, whileTap: _w, ...props }: Record<string, unknown>) =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

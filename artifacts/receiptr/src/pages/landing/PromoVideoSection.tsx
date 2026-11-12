@@ -2,13 +2,25 @@ import { useEffect, useRef, useState } from "react";
 import { useHydrationSafeReducedMotion } from "@/lib/useHydrationSafeReducedMotion";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { lt } from "@/lib/landingLocale";
+import { marketingMedia, useMediaMarket, type MediaMarket } from "./MarketingMedia";
+import { mediaCopy } from "./mediaCopy";
 
-// 30 s promo with burned-in captions, so it reads fine while muted.
+// v4 30 s promo per market batch with burned-in captions, so it reads fine while muted.
 // One <video> is rendered for the current viewport (9:16 on narrow screens,
 // 16:9 from md up), so phones never download the desktop cut or vice versa.
 const WIDE_QUERY = "(min-width: 768px)";
 
-export const promoMedia = (file: string) => `${import.meta.env.BASE_URL}media/${file}`;
+/**
+ * Per-batch promo readiness. v4 promos are not uploaded yet, so every batch is
+ * false: the section shows a real still and requests no video files. Flip a
+ * batch to true only after its six files exist in storage:
+ *   v4/{batch}/receebo-promo-{16x9,9x16}.{webm,mp4} and receebo-promo-{16x9,9x16}-poster.webp
+ */
+export const PROMO_READY: Record<MediaMarket, boolean> = { eu: false, us: false, br: false };
+
+export const promoFile = (ratio: "16x9" | "9x16", ext: "webm" | "mp4" | "poster.webp") =>
+  ext === "poster.webp" ? `receebo-promo-${ratio}-poster.webp` : `receebo-promo-${ratio}.${ext}`;
+export const promoMedia = (file: string, market: MediaMarket = "eu") => marketingMedia(file, market);
 
 function useIsWide() {
   const get = () =>
@@ -28,11 +40,49 @@ function useIsWide() {
   return wide;
 }
 
-export default function PromoVideoSection() {
+export default function PromoVideoSection({ ready }: { ready?: boolean } = {}) {
+  const market = useMediaMarket();
+  const wide = useIsWide();
+  const active = ready ?? PROMO_READY[market];
+  return (
+    <section aria-labelledby="promo-video-title" className="pb-20 lg:pb-28" data-testid="promo-video-section" data-promo-state={active ? "video" : "still"} data-media-market={market}>
+      <div className="max-w-5xl mx-auto px-6">
+        <h2 id="promo-video-title" className="sr-only">{lt("Receebo in 30 seconds", "Receebo em 30 segundos")}</h2>
+        {active ? <PromoVideo market={market} wide={wide} /> : <PromoStill market={market} wide={wide} />}
+      </div>
+    </section>
+  );
+}
+
+/** Truthful fallback while the batch's promo is not uploaded: one real screen, no video requests. */
+function PromoStill({ market, wide }: { market: MediaMarket; wide: boolean }) {
+  return (
+    <figure className="m-0" data-testid="promo-still">
+      <div
+        data-testid="promo-video-frame"
+        className={`relative mx-auto overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-blue-50/70 to-violet-50/70 flex items-center justify-center p-6 sm:p-8 ${wide ? "w-full" : ""}`}
+      >
+        <img
+          src={marketingMedia("library-phone.webp", market)}
+          alt={mediaCopy(market).promoStillAlt}
+          width={780}
+          height={1688}
+          loading="lazy"
+          decoding="async"
+          className="block h-auto w-full max-w-[320px] max-h-[min(72vh,820px)] object-contain rounded-[1.6rem] shadow-[0_30px_60px_-20px_hsl(250_40%_25%/0.35)]"
+        />
+      </div>
+      <figcaption className="mt-3 text-[11px] text-muted-foreground text-center">
+        {lt("Real Receebo screen with fictional sample data.", "Ecrã real do Receebo com dados de exemplo fictícios.", "Tela real do Receebo com dados de exemplo fictícios.")}
+      </figcaption>
+    </figure>
+  );
+}
+
+function PromoVideo({ market, wide }: { market: MediaMarket; wide: boolean }) {
   const TITLE = lt("Receebo in 30 seconds", "Receebo em 30 segundos");
   const reduce = useHydrationSafeReducedMotion();
-  const wide = useIsWide();
-  const ratio = wide ? "16x9" : "9x16";
+  const ratio = wide ? "16x9" as const : "9x16" as const;
   const ref = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -104,9 +154,6 @@ export default function PromoVideoSection() {
     "flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm hover:bg-black/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/40";
 
   return (
-    <section aria-labelledby="promo-video-title" className="pb-20 lg:pb-28" data-testid="promo-video-section">
-      <div className="max-w-5xl mx-auto px-6">
-        <h2 id="promo-video-title" className="sr-only">{TITLE}</h2>
         <figure className="m-0">
           <div
             data-testid="promo-video-frame"
@@ -122,7 +169,7 @@ export default function PromoVideoSection() {
               loop
               playsInline
               preload="metadata"
-              poster={promoMedia(`receebo-promo-${ratio}-poster.webp`)}
+              poster={promoMedia(promoFile(ratio, "poster.webp"), market)}
               width={wide ? 1280 : 720}
               height={wide ? 720 : 1280}
               aria-label={TITLE}
@@ -131,8 +178,8 @@ export default function PromoVideoSection() {
               onPause={() => setPlaying(false)}
               onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
             >
-              <source src={promoMedia(`receebo-promo-${ratio}.webm`)} type="video/webm" />
-              <source src={promoMedia(`receebo-promo-${ratio}.mp4`)} type="video/mp4" />
+              <source src={promoMedia(promoFile(ratio, "webm"), market)} type="video/webm" />
+              <source src={promoMedia(promoFile(ratio, "mp4"), market)} type="video/mp4" />
             </video>
 
             {!playing && manual && (
@@ -166,10 +213,8 @@ export default function PromoVideoSection() {
             </div>
           </div>
           <figcaption className="mt-3 text-[11px] text-muted-foreground text-center">
-            {TITLE}. {lt("Captions on screen, sound off until you turn it on. Fictional sample purchase.", "Legendas no ecrã em inglês, som desligado até o ligares. Compra de exemplo fictícia.", "Legendas na tela em inglês, som desligado até você ligar. Compra de exemplo fictícia.")}
+            {TITLE}. {lt("Captions on screen, sound off until you turn it on. Fictional sample purchase.", "Legendas no ecrã, som desligado até o ligares. Compra de exemplo fictícia.", "Legendas na tela, som desligado até você ligar. Compra de exemplo fictícia.")}
           </figcaption>
         </figure>
-      </div>
-    </section>
   );
 }

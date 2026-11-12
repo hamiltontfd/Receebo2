@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { marketingMedia } from "./MarketingMedia";
+import { marketingMedia, type MediaMarket } from "./MarketingMedia";
 import { lt } from "@/lib/landingLocale";
 
 interface DemoVideo {
@@ -12,8 +12,9 @@ interface DemoVideo {
 }
 
 export default function DemoVideoModal({
-  demo, open, onOpenChange,
+  demo, open, onOpenChange, market = "eu",
 }: {
+  market?: MediaMarket;
   demo: DemoVideo | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -59,7 +60,7 @@ export default function DemoVideoModal({
               autoPlay
               muted
               preload="metadata"
-              poster={marketingMedia(`${demo.clip}-poster.webp`)}
+              poster={marketingMedia(`${demo.clip}-poster.webp`, market)}
               width={960}
               height={640}
               aria-label={`${demo.title}: ${lt("real Receebo screen recording using sample data", "gravação de ecrã real do Receebo com dados de exemplo", "gravação de tela real do Receebo com dados de exemplo")}`}
@@ -67,8 +68,8 @@ export default function DemoVideoModal({
               onError={() => setFailedClip(demo.clip)}
               onLoadedData={() => setFailedClip(null)}
             >
-              <source src={marketingMedia(`${demo.clip}.webm`)} type="video/webm" />
-              <source src={marketingMedia(`${demo.clip}.mp4`)} type="video/mp4" />
+              <source src={marketingMedia(`${demo.clip}.webm`, market)} type="video/webm" />
+              <source src={marketingMedia(`${demo.clip}.mp4`, market)} type="video/mp4" />
               {lt("Your browser cannot play this clip. Read the demonstration description below.", "O teu navegador não consegue reproduzir este vídeo. Lê a descrição da demonstração abaixo.", "Seu navegador não consegue reproduzir este vídeo. Leia a descrição da demonstração abaixo.")}
             </video>
           </motion.div>
@@ -82,7 +83,7 @@ export default function DemoVideoModal({
               {demo.description}
             </DialogDescription>
             <p className="text-xs text-muted-foreground">
-              {lt("Real Receebo screens. Fictional sample data and simulated extraction. Silent video.", "Ecrãs reais do Receebo, em inglês. Dados de exemplo fictícios e extração simulada. Vídeo sem som.", "Telas reais do Receebo, em inglês. Dados de exemplo fictícios e extração simulada. Vídeo sem som.")}
+              {lt("Real Receebo screens. Fictional sample data and simulated extraction. Silent video.", "Ecrãs reais do Receebo. Dados de exemplo fictícios e extração simulada. Vídeo sem som.", "Telas reais do Receebo. Dados de exemplo fictícios e extração simulada. Vídeo sem som.")}
             </p>
             <DialogClose asChild>
               <Button variant="outline" size="sm">{lt("Close video", "Fechar vídeo")}</Button>

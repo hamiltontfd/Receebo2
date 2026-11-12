@@ -4,7 +4,8 @@ import { useHydrationSafeReducedMotion } from "@/lib/useHydrationSafeReducedMoti
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play } from "lucide-react";
 import { fadeInUp, slideInRight, stagger } from "./shared";
-import { marketingMedia } from "./MarketingMedia";
+import { marketingMedia, useMediaMarket, type MediaMarket } from "./MarketingMedia";
+import { mediaCopy } from "./mediaCopy";
 import { lt } from "@/lib/landingLocale";
 import { useLandingCta } from "./useLandingCta";
 
@@ -13,6 +14,9 @@ export default function HeroSection({ isSignedIn = false, variant }: { isSignedI
   const onCta = useLandingCta(us ? "/us" : "/", isSignedIn);
   const reduce = useHydrationSafeReducedMotion();
   const entrance = reduce ? false : "hidden";
+  const batch = useMediaMarket();
+  // An explicit US variant always shows the US batch, with or without providers.
+  const market: MediaMarket = us ? "us" : batch;
 
   return (
     <section className="relative pt-28 pb-20 lg:pt-36 lg:pb-28 overflow-hidden">
@@ -75,20 +79,19 @@ export default function HeroSection({ isSignedIn = false, variant }: { isSignedI
                 </motion.div>
               </Link>
 
-              {/* /us has no demo section yet (its media shows € and EU rules). */}
-              {!us && <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto">
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full sm:w-auto">
                 <Button
                   size="lg"
                   variant="outline"
                   asChild
                   className="rounded-full h-13 px-8 text-base font-medium gap-2 w-full sm:w-auto"
                 >
-                  <a href="#demo">
+                  <a href="#demo" data-testid="link-hero-demo">
                     <Play className="w-3.5 h-3.5 fill-current" />
                     {lt("See it in action", "Ver em ação")}
                   </a>
                 </Button>
-              </motion.div>}
+              </motion.div>
             </motion.div>
 
             {/* Trial line */}
@@ -104,30 +107,7 @@ export default function HeroSection({ isSignedIn = false, variant }: { isSignedI
             animate="visible"
             className="relative"
           >
-            {us ? <UsHeroPhones reduce={!!reduce} /> : <figure data-testid="hero-phones" className="m-0">
-              <div className="relative mx-auto flex justify-center items-start w-full max-w-[560px] pt-2 pb-8">
-                <PhoneFrame
-                  file="library-phone.webp"
-                  testId="img-hero-library-phone"
-                  alt={lt("Actual Receebo library screen on a phone, listing fictional purchases led by a €649 Casa Lumen Electrónica TV.", "Ecrã real da biblioteca do Receebo num telemóvel, com compras fictícias, a primeira uma TV Casa Lumen Electrónica de €649.", "Tela real da biblioteca do Receebo em um celular, com compras fictícias, a primeira uma TV Casa Lumen Electrónica de €649.")}
-                  className="w-[46%] max-w-[260px] z-10 -mr-[8%]"
-                  float={reduce ? undefined : [0, -10, 0]}
-                  duration={7}
-                  priority
-                />
-                <PhoneFrame
-                  file="receipt-phone.webp"
-                  testId="img-hero-receipt-phone"
-                  alt={lt("Actual Receebo receipt detail screen on a phone for the fictional Casa Lumen Electrónica purchase: a €649 55-inch 4K Smart TV.", "Ecrã real de detalhe de recibo do Receebo num telemóvel para a compra fictícia na Casa Lumen Electrónica: uma Smart TV 4K de 55 polegadas por €649.", "Tela real de detalhe de recibo do Receebo em um celular para a compra fictícia na Casa Lumen Electrónica: uma Smart TV 4K de 55 polegadas por €649.")}
-                  className="w-[46%] max-w-[260px] z-20 mt-[12%]"
-                  float={reduce ? undefined : [0, 8, 0]}
-                  duration={8}
-                />
-              </div>
-              <figcaption className="text-[11px] text-muted-foreground text-center">
-                {lt("Real Receebo screens. Fictional sample purchases and simulated extraction.", "Ecrãs reais do Receebo. Compras de exemplo fictícias e extração simulada. Demonstração em inglês.", "Telas reais do Receebo. Compras de exemplo fictícias e extração simulada. Demonstração em inglês.")}
-              </figcaption>
-            </figure>}
+            <HeroPhones market={market} reduce={!!reduce} />
           </motion.div>
         </div>
       </div>
@@ -136,10 +116,10 @@ export default function HeroSection({ isSignedIn = false, variant }: { isSignedI
 }
 
 function PhoneFrame({
-  file, src, alt, className, float, duration, priority, testId, width = 780, height = 1688, cropDisclosure = true,
+  file, market, alt, className, float, duration, priority, testId, width = 780, height = 1688, cropDisclosure = true,
 }: {
-  file?: string;
-  src?: string;
+  file: string;
+  market: MediaMarket;
   alt: string;
   className?: string;
   float?: number[];
@@ -148,7 +128,7 @@ function PhoneFrame({
   testId: string;
   width?: number;
   height?: number;
-  /** EU captures include a 32px disclosure strip. The US dev captures do not. */
+  /** v4 phone captures include a 32px capture-only disclosure strip at 390px wide. */
   cropDisclosure?: boolean;
 }) {
   return (
@@ -162,14 +142,14 @@ function PhoneFrame({
           <div className="overflow-hidden">
           <img
             data-testid={testId}
-            src={src ?? marketingMedia(file ?? "")}
+            src={marketingMedia(file, market)}
             alt={alt}
             width={width}
             height={height}
             decoding="async"
             {...(priority ? { fetchPriority: "high" as const } : { loading: "eager" as const })}
             className="block w-full h-auto"
-            // EU captures: crop the capture-only 32px disclosure strip from the
+            // Crop the capture-only 32px disclosure strip from the
             // 390px-wide source. The disclosure stays in the figure caption.
             style={cropDisclosure ? { marginTop: `${-(32 / 390) * 100}%` } : undefined}
           />
@@ -180,50 +160,35 @@ function PhoneFrame({
   );
 }
 
-/** Real dev captures of one fictional US sample. Not redrawn. */
-function UsHeroPhones({ reduce }: { reduce: boolean }) {
-  const base = import.meta.env.BASE_URL;
+/** Real v4 captures of one fictional sample per market batch. Not redrawn. */
+function HeroPhones({ market, reduce }: { market: MediaMarket; reduce: boolean }) {
+  const copy = mediaCopy(market);
+  const us = market === "us";
   return (
-    <figure data-testid="us-hero-phones" className="m-0">
+    <figure data-testid={us ? "us-hero-phones" : "hero-phones"} data-media-market={market} className="m-0">
       <div className="relative mx-auto flex justify-center items-start w-full max-w-[560px] pt-2 pb-8">
         <PhoneFrame
-          src={`${base}marketing/us/us-detail-390-top.png`}
-          width={581}
-          height={1014}
-          cropDisclosure={false}
-          testId="img-us-detail"
-          alt={lt(
-            "Actual Receebo receipt screen for a fictional Demo Electronics sample: a television for $299 on November 7, 2026, purchase country United States.",
-            "Ecrã real de recibo do Receebo de um exemplo fictício da Demo Electronics: uma televisão por 299 dólares em 7 de novembro de 2026, país da compra Estados Unidos.",
-            "Tela real de recibo do Receebo de um exemplo fictício da Demo Electronics: uma televisão por 299 dólares em 7 de novembro de 2026, país da compra Estados Unidos.",
-          )}
+          file="library-phone.webp"
+          market={market}
+          testId="img-hero-library-phone"
+          alt={copy.heroLibraryAlt}
           className="w-[46%] max-w-[260px] z-10 -mr-[8%]"
           float={reduce ? undefined : [0, -10, 0]}
           duration={7}
           priority
         />
         <PhoneFrame
-          src={`${base}marketing/us/us-review-390-bottom.png`}
-          width={581}
-          height={1014}
-          cropDisclosure={false}
-          testId="img-us-review"
-          alt={lt(
-            "Actual Receebo review screen for the same fictional sample. A 2-year manufacturer warranty is shown because that text is on the sample. The screen says this store's return window is not known.",
-            "Ecrã real de revisão do Receebo do mesmo exemplo fictício. Mostra uma garantia de fabricante de 2 anos porque esse texto está no exemplo. O ecrã diz que o prazo de devolução desta loja não é conhecido.",
-            "Tela real de revisão do Receebo do mesmo exemplo fictício. Mostra uma garantia de fabricante de 2 anos porque esse texto está no exemplo. A tela diz que o prazo de devolução desta loja não é conhecido.",
-          )}
+          file="receipt-phone.webp"
+          market={market}
+          testId="img-hero-receipt-phone"
+          alt={copy.heroReceiptAlt}
           className="w-[46%] max-w-[260px] z-20 mt-[12%]"
           float={reduce ? undefined : [0, 8, 0]}
           duration={8}
         />
       </div>
       <figcaption className="text-[11px] text-muted-foreground text-center max-w-md mx-auto leading-relaxed">
-        {lt(
-          "Real Receebo screens of a fictional Demo Electronics sample, not a real store. The 2 years are manufacturer-warranty words on that sample, not a US legal guarantee. The 30 days are free text; Receebo does not count them as the store's return window.",
-          "Ecrãs reais do Receebo de um exemplo fictício da Demo Electronics, não de uma loja real. Os 2 anos são o texto de garantia do fabricante nesse exemplo, não uma garantia legal dos EUA. Os 30 dias são texto livre; o Receebo não os conta como o prazo de devolução da loja.",
-          "Telas reais do Receebo de um exemplo fictício da Demo Electronics, não de uma loja real. Os 2 anos são o texto de garantia do fabricante nesse exemplo, não uma garantia legal dos EUA. Os 30 dias são texto livre; o Receebo não os conta como o prazo de devolução da loja.",
-        )}
+        {copy.heroCaption}
       </figcaption>
     </figure>
   );

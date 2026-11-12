@@ -15,6 +15,7 @@ import { OPEN_COOKIE_SETTINGS } from "@/components/CookieConsent";
 import { cookieText } from "@/lib/cookieCopy";
 import { useLandingCta } from "./landing/useLandingCta";
 import UsReturnsSection from "./landing/UsReturnsSection";
+import { LandingMediaProvider } from "./landing/MarketingMedia";
 
 // Sections
 import HeroSection from "./landing/HeroSection";
@@ -123,10 +124,20 @@ export function LandingContent({ variant, isSignedIn = false, checkout, marketSe
         {/* ── Page Sections ───────────────────────────────────────────── */}
         <main>
           <HeroSection isSignedIn={isSignedIn} variant={variant} />
-          {/* /us: the video, demo and screenshots show € receipts and EU rules, so they are left out until US captures exist. */}
-          {!us && <PromoVideoSection />}
-          {!us && <DemoSection />}
-          {!us && <WhyReceeboSection />}
+          {/* Media batch: /us always "us"; / uses BR for the BR market, EU otherwise (never browser language). */}
+          {us ? (
+            <LandingMediaProvider market="us">
+              <PromoVideoSection />
+              <DemoSection />
+              <WhyReceeboSection />
+            </LandingMediaProvider>
+          ) : (
+            <>
+              <PromoVideoSection />
+              <DemoSection />
+              <WhyReceeboSection />
+            </>
+          )}
           <EmailReceiptsSection />
           {us ? <UsReturnsSection /> : <ConsumerProtectionSection />}
           <HowItWorksSection variant={variant} />
