@@ -194,12 +194,19 @@ export function startAccountTrial(): Promise<BillingStatus | unknown> {
   return customFetch(`${base}api/billing/start-trial`, { method: "POST" });
 }
 
+/** Brief session-cookie propagation failures must not flash a trial error. */
+export function retryTrialStart(failureCount: number, error: unknown): boolean {
+  const status = (error as { status?: number } | null)?.status;
+  return failureCount < 3 && (!status || status === 401 || status === 403 || status >= 500);
+}
+
 /** Idempotent server initialization of the no-card trial entitlement. */
 export function useStartTrial() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: startAccountTrial,
-    retry: 1,
+    retry: retryTrialStart,
+    retryDelay: attempt => Math.min(500 * 2 ** attempt, 2000),
     onSettled: () => queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY }),
   });
 }

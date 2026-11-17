@@ -10,6 +10,7 @@ import {
   isAtTrialCap,
   TRIAL_UPLOAD_LIMIT,
   TRIAL_DAYS,
+  retryTrialStart,
   type BillingStatus,
 } from "./useBilling";
 import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON, TRIAL_AI_READS_MESSAGE, isTrialLimitMessage } from "@/lib/trialCopy";
@@ -17,6 +18,17 @@ import { TRIAL_CAP_MESSAGE, TRIAL_CAP_BUTTON, TRIAL_AI_READS_MESSAGE, isTrialLim
 const b = (x: Partial<BillingStatus>) => ({ plan: "free", trialEndAt: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, ...x }) as BillingStatus;
 
 describe("billing access helpers", () => {
+  it("briefly retries auth propagation and transient failures, but not real client failures", () => {
+    for (const status of [401, 403, 500, 503]) {
+      expect(retryTrialStart(0, { status })).toBe(true);
+      expect(retryTrialStart(2, { status })).toBe(true);
+      expect(retryTrialStart(3, { status })).toBe(false);
+    }
+    expect(retryTrialStart(0, new TypeError("network"))).toBe(true);
+    for (const status of [400, 402, 404, 409, 422, 428, 429]) {
+      expect(retryTrialStart(0, { status })).toBe(false);
+    }
+  });
   it("fails closed without data or unknown states", () => {
     expect(hasAppAccess(undefined)).toBe(false);
     expect(hasAppAccess(b({}))).toBe(false);

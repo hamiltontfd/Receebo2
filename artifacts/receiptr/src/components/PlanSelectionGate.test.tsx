@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   location: "/search",
   startTrial: vi.fn(),
   startTrialError: false,
+  authLoaded: true,
   checkout: vi.fn(),
   refetch: vi.fn(),
   funnelTrack: vi.fn(),
@@ -31,7 +32,7 @@ vi.mock("@/hooks/useBilling", async () => {
     useCreateCheckout: () => ({ isPending: false, variables: undefined, mutate: mocks.checkout }),
   };
 });
-vi.mock("@clerk/react", () => ({ useClerk: () => ({ signOut: vi.fn() }), useAuth: () => ({ isSignedIn: true }) }));
+vi.mock("@clerk/react", () => ({ useClerk: () => ({ signOut: vi.fn() }), useAuth: () => ({ isSignedIn: true, isLoaded: mocks.authLoaded }) }));
 vi.mock("wouter", () => ({
   useLocation: () => [mocks.location, vi.fn()],
   Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
@@ -52,10 +53,34 @@ beforeEach(() => {
   mocks.startTrial.mockReset();
   mocks.checkout.mockReset();
   mocks.startTrialError = false;
+  mocks.authLoaded = true;
   mocks.funnelTrack.mockReset().mockResolvedValue(true);
 });
 
 describe("PlanSelectionGate", () => {
+  it("waits for Clerk readiness before starting a trial, without showing a stale error", () => {
+    mocks.billing = { accessState: "not_started" };
+    mocks.authLoaded = false;
+    mocks.startTrialError = true;
+    const { rerender } = renderGate();
+    expect(mocks.startTrial).not.toHaveBeenCalled();
+    expect(screen.queryByText("We couldn't start your trial.")).not.toBeInTheDocument();
+    mocks.authLoaded = true;
+    mocks.startTrialError = false;
+    rerender(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
+    expect(mocks.startTrial).toHaveBeenCalledOnce();
+  });
+  it("keeps loading while reconciling an errored start with the current billing status", () => {
+    mocks.billing = { accessState: "not_started" };
+    mocks.startTrialError = true;
+    mocks.isFetching = true;
+    const { rerender } = renderGate();
+    expect(screen.queryByText("We couldn't start your trial.")).not.toBeInTheDocument();
+    mocks.isFetching = false;
+    mocks.billing = { accessState: "account_trial", canUseApp: true };
+    rerender(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
+    expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
+  });
   it("uses the brand while checking the plan, then opens immediately", () => {
     mocks.billing = undefined;
     mocks.isLoading = true;

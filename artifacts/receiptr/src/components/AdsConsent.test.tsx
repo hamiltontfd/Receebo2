@@ -16,7 +16,8 @@ vi.mock("@/components/LegalPageLayout", () => ({ LegalPageLayout: ({ children }:
 
 beforeEach(() => {
   localStorage.clear();
-  send.mockClear();
+  send.mockReset().mockResolvedValue({ created: false });
+  window.history.replaceState({}, "", "/");
   auth.isSignedIn = false; auth.userId = null;
   vi.stubEnv("VITE_META_PIXEL_ID", "test-pixel");
 });
@@ -32,6 +33,57 @@ function view(country: string | null, banner = true) {
   </MarketContext.Provider>);
 }
 describe("live cookie choices", () => {
+  it("keeps the initial campaign in memory until US GeoIP resolves after navigation to sign-up", async () => {
+    window.history.replaceState({}, "", "/us?utm_source=meta&utm_medium=paid_social&utm_campaign=US_Validacao_2026-11&utm_content=TEST_E2E&utm_term=AS_Broad&fbclid=synthetic-click");
+    const first = view(null, false);
+    expect(localStorage.getItem("receebo:ad-attribution")).toBeNull();
+    window.history.replaceState({}, "", "/sign-up");
+    first.unmount();
+    const signedUp = view("US", false);
+    const saved = JSON.parse(localStorage.getItem("receebo:ad-attribution")!);
+    expect(saved).toMatchObject({
+      utmSource: "meta", utmMedium: "paid_social", utmCampaign: "US_Validacao_2026-11",
+      utmContent: "TEST_E2E", utmTerm: "AS_Broad", fbclid: "synthetic-click",
+    });
+    signedUp.unmount();
+    // Clerk sign-in rekeys MarketScope and briefly makes the country unknown.
+    auth.isSignedIn = true; auth.userId = "synthetic-signup";
+    const hydrating = view(null, false);
+    expect(JSON.parse(localStorage.getItem("receebo:ad-attribution")!)).toEqual(saved);
+    expect(send).not.toHaveBeenCalled();
+    hydrating.unmount();
+    view("US", false);
+    await waitFor(() => expect(send).toHaveBeenCalledWith(
+      expect.stringMatching(/\/account\/attribution$/),
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ ...saved, marketingConsent: true }) }),
+    ));
+  });
+  it("does not persist a pending campaign for an EU visitor without consent, or after Reject", () => {
+    window.history.replaceState({}, "", "/?utm_source=synthetic-eu");
+    const pending = view("PT", false);
+    expect(localStorage.getItem("receebo:ad-attribution")).toBeNull();
+    pending.unmount();
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(emptyConsent()));
+    const rejected = view("US", false);
+    expect(localStorage.getItem("receebo:ad-attribution")).toBeNull();
+    rejected.unmount();
+  });
+  it("retries first-touch after legal acceptance instead of swallowing its failed POST", async () => {
+    auth.isSignedIn = true; auth.userId = "synthetic-pending-legal";
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(acceptAll()));
+    const touch = { utmSource: "synthetic", capturedAt: new Date().toISOString() };
+    localStorage.setItem("receebo:ad-attribution", JSON.stringify(touch));
+    send.mockRejectedValueOnce({ status: 428 });
+    view("PT", false);
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    expect(send.mock.calls[0][0]).toMatch(/\/account\/attribution$/);
+    act(() => window.dispatchEvent(new Event("receebo:legal-accepted")));
+    await waitFor(() => expect(send).toHaveBeenCalledWith(
+      expect.stringContaining("/attribution/consent"), expect.anything(),
+    ));
+    expect(send.mock.calls.filter(call => /\/account\/attribution$/.test(call[0]))).toHaveLength(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
   it("permits PageView only on explicit public pages, never authenticated routes", () => {
     for (const path of ["/", "/us", "/pricing", "/privacy", "/cookies", "/terms"]) expect(isPublicMetaPage(path)).toBe(true);
     for (const path of ["/search", "/scan", "/receipts/123", "/settings", "/imports", "/stats", "/profile"]) expect(isPublicMetaPage(path)).toBe(false);

@@ -6,7 +6,7 @@ import { AlertTriangle, Loader2, RotateCw } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { BrandLoading } from "@/components/BrandLoading";
-import { useClerk } from "@clerk/react";
+import { useAuth, useClerk } from "@clerk/react";
 import {
   useBillingStatus,
   useStartTrial,
@@ -126,6 +126,7 @@ const PAYWALL_COPY: Partial<Record<AccessState, { eyebrow: string; title: string
  */
 export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
   useAppLocale();
+  const { isLoaded: authReady, isSignedIn } = useAuth();
   const billingQuery = useBillingStatus();
   const { data: billing, isLoading, isError, refetch, isFetching } = billingQuery;
   const startTrial = useStartTrial();
@@ -140,11 +141,11 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
   // Initialize the trial entitlement once when the server says not_started.
   const startMutate = startTrial.mutate;
   useEffect(() => {
-    if (billing && state === "not_started" && !startFiredRef.current) {
+    if (authReady && isSignedIn && billing && state === "not_started" && !startFiredRef.current) {
       startFiredRef.current = true;
       startMutate();
     }
-  }, [billing, state, startMutate]);
+  }, [authReady, isSignedIn, billing, state, startMutate]);
 
   const inActivatingState =
     !!billing && isCheckoutSuccess() && !isPaidLike(billing) && state !== "owner" && !activatingTimedOut;
@@ -183,7 +184,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
   }
 
   if (state === "not_started") {
-    if (startTrial.isError) {
+    if (authReady && startTrial.isError && !isFetching) {
       return (
         <ErrorScreen
           title="We couldn't start your trial."

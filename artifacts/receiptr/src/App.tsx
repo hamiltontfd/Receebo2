@@ -30,6 +30,8 @@ import TermsOfService from "@/pages/terms";
 import CookiePolicy from "@/pages/cookies";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AdsRuntime } from "@/components/AdsRuntime";
+import { clerkLocalization } from "@/lib/clerkLocalization";
+import { useAppLocale } from "@/lib/locale";
 import { AuthenticatedAdsOpen } from "@/components/AuthenticatedAdsOpen";
 import { useCookieConsent } from "@/lib/useCookieConsent";
 import AppShell from "@/components/AppShell";
@@ -122,21 +124,6 @@ const clerkAppearance = {
     otpCodeFieldInput: "border-[#e5e5e5] focus:ring-[#121212]",
     formFieldRow: "gap-4",
     main: "flex flex-col gap-4",
-  },
-};
-
-const clerkLocalization = {
-  signIn: {
-    start: {
-      title: "Sign in to Receebo",
-      subtitle: "Welcome back. Please sign in to continue.",
-    },
-  },
-  signUp: {
-    start: {
-      title: "Create your Receebo account",
-      subtitle: "Start organizing every receipt in seconds.",
-    },
   },
 };
 
@@ -360,6 +347,7 @@ const queryClient = new QueryClient({
 
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
+  const locale = useAppLocale();
 
   return (
     <ClerkProvider
@@ -367,7 +355,7 @@ function ClerkProviderWithRoutes() {
       proxyUrl={clerkProxyUrl}
       {...{ __internal_clerkJSVersion: CLERK_JS_VERSION, __internal_clerkUIVersion: CLERK_UI_VERSION }}
       appearance={clerkAppearance}
-      localization={clerkLocalization}
+      localization={clerkLocalization(locale)}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
       routerPush={(to) => setLocation(stripBase(to))}
