@@ -1,7 +1,7 @@
 import type { AppLocale } from "./locale";
 
 /** Only the auth subtitles are customized; there is no product-speed promise. */
-export function clerkLocalization(locale: AppLocale) {
+export function clerkLocalization(_locale: AppLocale) {
   return {
     signIn: {
       start: {
@@ -12,9 +12,7 @@ export function clerkLocalization(locale: AppLocale) {
     signUp: {
       start: {
         title: "Create your Receebo account",
-        subtitle: locale === "pt-PT" ? "Comece a organizar todos os seus recibos."
-          : locale === "pt-BR" ? "Comece a organizar todos os seus recibos."
-          : "Start organizing every receipt.",
+        subtitle: "Start organizing every receipt.",
       },
     },
   };
