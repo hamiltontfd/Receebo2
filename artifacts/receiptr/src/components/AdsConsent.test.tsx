@@ -81,13 +81,15 @@ describe("live cookie choices", () => {
     await waitFor(() => expect(send).toHaveBeenCalledTimes(5));
     expect(send.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(2);
   });
-  it("does not repeat a successful POST when retrying a failed consent PATCH", async () => {
+  it("does not POST attribution until the consent PATCH succeeds", async () => {
     auth.isSignedIn = true; auth.userId = "synthetic-patch-retry";
     localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(acceptAll()));
     localStorage.setItem("receebo:ad-attribution", JSON.stringify({ utmSource: "patch-retry", capturedAt: new Date().toISOString() }));
-    send.mockResolvedValueOnce({ created: true }).mockRejectedValueOnce({ status: 428 });
+    send.mockRejectedValueOnce({ status: 401 });
     view("PT", false);
-    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    expect(send.mock.calls[0][1]?.method).toBe("PATCH");
+    expect(send.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(0);
     act(() => window.dispatchEvent(new Event("receebo:legal-accepted")));
     await waitFor(() => expect(send).toHaveBeenCalledTimes(3));
     expect(send.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
@@ -133,10 +135,15 @@ describe("live cookie choices", () => {
     localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(acceptAll()));
     const touch = { utmSource: "synthetic", capturedAt: new Date().toISOString() };
     localStorage.setItem("receebo:ad-attribution", JSON.stringify(touch));
-    send.mockRejectedValueOnce({ status: 428 });
+    send.mockResolvedValueOnce({ created: false }).mockRejectedValueOnce({ status: 428 });
     view("PT", false);
-    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
-    expect(send.mock.calls[0][0]).toMatch(/\/account\/attribution$/);
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    expect(send.mock.calls[0][0]).toMatch(/\/account\/attribution\/consent$/);
+    expect(send.mock.calls[1][0]).toMatch(/\/account\/attribution$/);
+    // 428 is a legal wait, not a timed retry or a consent-error banner.
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 550)); });
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     act(() => window.dispatchEvent(new Event("receebo:legal-accepted")));
     await waitFor(() => expect(send).toHaveBeenCalledWith(
       expect.stringContaining("/attribution/consent"), expect.anything(),

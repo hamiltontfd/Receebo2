@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setAccountLocale } from "@/lib/locale";
 import {
@@ -26,6 +26,21 @@ function acceptance(overrides: Record<string, unknown> = {}) {
 }
 
 describe("LegalConsentGate", () => {
+  it("ignores a legal-required signal while loading and keeps a new account full-page after it resolves", async () => {
+    let resolveStatus!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => { resolveStatus = resolve; })));
+    render(<LegalConsentGate><div>Private app</div></LegalConsentGate>);
+    act(() => notifyLegalAcceptanceRequired());
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByText("Private app")).not.toBeInTheDocument();
+    await act(async () => resolveStatus(new Response(JSON.stringify(acceptance()), { status: 200 })));
+    expect(await screen.findByText("Before you continue")).toBeInTheDocument();
+    act(() => notifyLegalAcceptanceRequired());
+    expect(screen.getByTestId("legal-consent-fullpage")).toBeInTheDocument();
+    expect(screen.queryByText("Updated Privacy Policy")).not.toBeInTheDocument();
+    expect(screen.queryByText("Private app")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("legal-consent-overlay")).not.toBeInTheDocument();
+  });
   it("shows only the branded loading screen while legal status is pending", async () => {
     let resolveStatus!: (response: Response) => void;
     vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { resolveStatus = resolve; })));

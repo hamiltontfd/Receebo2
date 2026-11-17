@@ -209,14 +209,19 @@ export function LegalConsentGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const onRequired = (event: Event) => {
       const detail = (event as CustomEvent<RequiredDetail>).detail ?? {};
-      setStatus((prev) => ({
-        accepted: false,
-        termsVersion: detail.termsVersion ?? prev?.termsVersion ?? "",
-        privacyVersion: detail.privacyVersion ?? prev?.privacyVersion ?? "",
-        acceptedAt: prev?.acceptedAt ?? new Date(0).toISOString(),
-        hadPriorAcceptance: true,
-        previouslyConfirmedAge: prev?.previouslyConfirmedAge !== false,
-      }));
+      setStatus((prev) => {
+        // A failed background query cannot manufacture a prior acceptance.
+        // While loading, only the server's status response may decide the UI.
+        if (!prev) return prev;
+        const hadPriorAcceptance = prev.accepted || prev.hadPriorAcceptance === true || prev.acceptedAt != null;
+        return {
+          ...prev,
+          accepted: false,
+          termsVersion: detail.termsVersion ?? prev.termsVersion,
+          privacyVersion: detail.privacyVersion ?? prev.privacyVersion,
+          hadPriorAcceptance,
+        };
+      });
       setConfirmed(false);
       setError(null);
     };

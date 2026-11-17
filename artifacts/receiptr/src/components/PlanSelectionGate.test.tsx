@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   location: "/search",
   startTrial: vi.fn(),
   startTrialError: false,
+  startTrialCause: null as unknown,
+  startTrialPending: false,
   authLoaded: true,
   checkout: vi.fn(),
   refetch: vi.fn(),
@@ -27,7 +29,7 @@ vi.mock("@/hooks/useBilling", async () => {
       isFetching: mocks.isFetching,
       refetch: mocks.refetch,
     }),
-    useStartTrial: () => ({ mutate: mocks.startTrial, isPending: false, isError: mocks.startTrialError }),
+    useStartTrial: () => ({ mutate: mocks.startTrial, isPending: mocks.startTrialPending, isError: mocks.startTrialError, error: mocks.startTrialCause }),
     useTrialExpiryTimer: () => undefined,
     useCreateCheckout: () => ({ isPending: false, variables: undefined, mutate: mocks.checkout }),
   };
@@ -53,11 +55,50 @@ beforeEach(() => {
   mocks.startTrial.mockReset();
   mocks.checkout.mockReset();
   mocks.startTrialError = false;
+  mocks.startTrialCause = null;
+  mocks.startTrialPending = false;
   mocks.authLoaded = true;
   mocks.funnelTrack.mockReset().mockResolvedValue(true);
 });
 
 describe("PlanSelectionGate", () => {
+  it("keeps a legal-blocked trial loading and resumes once after acceptance without remounting", () => {
+    mocks.billing = { accessState: "not_started" };
+    const { rerender } = renderGate();
+    expect(mocks.startTrial).toHaveBeenCalledTimes(1);
+    mocks.startTrialError = true;
+    mocks.startTrialCause = { status: 428, data: { code: "LEGAL_ACCEPTANCE_REQUIRED" } };
+    rerender(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
+    expect(screen.queryByText("We couldn't start your trial.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("status-brand-loading")).toBeInTheDocument();
+    act(() => window.dispatchEvent(new Event("receebo:legal-accepted")));
+    expect(mocks.startTrial).toHaveBeenCalledTimes(2);
+    mocks.startTrialPending = true;
+    rerender(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
+    act(() => window.dispatchEvent(new Event("receebo:legal-accepted")));
+    expect(mocks.startTrial).toHaveBeenCalledTimes(2);
+    mocks.startTrialPending = false;
+    mocks.startTrialError = false;
+    mocks.startTrialCause = null;
+    mocks.billing = { accessState: "account_trial", canUseApp: true };
+    rerender(<PlanSelectionGate><div>Protected receipt library</div></PlanSelectionGate>);
+    expect(screen.getByText("Protected receipt library")).toBeInTheDocument();
+    expect(mocks.startTrial).toHaveBeenCalledTimes(2);
+  });
+  it("does not overlap an in-flight trial when acceptance arrives before its 428", () => {
+    mocks.billing = { accessState: "not_started" };
+    const { rerender } = renderGate();
+    mocks.startTrialPending = true;
+    rerender(<PlanSelectionGate>Private</PlanSelectionGate>);
+    act(() => window.dispatchEvent(new Event("receebo:legal-accepted")));
+    expect(mocks.startTrial).toHaveBeenCalledTimes(1);
+    mocks.startTrialPending = false;
+    mocks.startTrialCause = { status: 428 };
+    mocks.startTrialError = true;
+    rerender(<PlanSelectionGate>Private</PlanSelectionGate>);
+    expect(mocks.startTrial).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("We couldn't start your trial.")).not.toBeInTheDocument();
+  });
   it("waits for Clerk readiness before starting a trial, without showing a stale error", () => {
     mocks.billing = { accessState: "not_started" };
     mocks.authLoaded = false;

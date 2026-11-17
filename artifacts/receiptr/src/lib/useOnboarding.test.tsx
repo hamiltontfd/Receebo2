@@ -4,6 +4,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { OnboardingProvider, useOnboarding } from "./useOnboarding";
 import { OnboardingCard } from "@/components/OnboardingCard";
 import type { AccountOnboarding } from "@workspace/api-client-react";
+import { LEGAL_ACCEPTED_EVENT, LegalConsentGate, notifyLegalAcceptanceRequired } from "@/components/LegalConsentGate";
 
 const mocks = vi.hoisted(() => ({
   auth: { userId: "A" as string | null, isLoaded: true, isSignedIn: true },
@@ -34,6 +35,7 @@ function mount() {
 function state() { return JSON.parse(screen.getByTestId("state").textContent!); }
 function writes() { return mocks.request.mock.calls.filter(([, init]) => init.method === "PATCH"); }
 beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ accepted: true }), { status: 200 })));
   localStorage.clear();
   mocks.auth = { userId: "A", isLoaded: true, isSignedIn: true };
   accounts = { A: { ...blank }, B: { ...blank } };
@@ -51,8 +53,34 @@ beforeEach(() => {
     return { ...accounts[id] };
   });
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe("account onboarding UI and persistence", () => {
+  it("does not query onboarding before first acceptance or open a re-accept overlay from its 428", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      accepted: false, hadPriorAcceptance: false, acceptedAt: null,
+      termsVersion: "test", privacyVersion: "test",
+    }), { status: 200 })));
+    mocks.request.mockRejectedValue({ status: 428 });
+    const client = new QueryClient({ queryCache: new (await import("@tanstack/react-query")).QueryCache({
+      onError: () => notifyLegalAcceptanceRequired(),
+    }) });
+    render(<QueryClientProvider client={client}><OnboardingProvider>
+      <LegalConsentGate><p>Private app</p></LegalConsentGate>
+    </OnboardingProvider></QueryClientProvider>);
+    expect(await screen.findByText("Before you continue")).toBeInTheDocument();
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(screen.queryByText("Private app")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("legal-consent-overlay")).not.toBeInTheDocument();
+  });
+  it("starts onboarding after the acceptance event without remounting the provider", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ accepted: false }), { status: 200 })));
+    mount();
+    await act(async () => {});
+    expect(mocks.request).not.toHaveBeenCalled();
+    act(() => window.dispatchEvent(new Event(LEGAL_ACCEPTED_EVENT)));
+    await waitFor(() => expect(state().ready).toBe(true));
+    expect(mocks.request).toHaveBeenCalledWith(expect.stringContaining("/account/onboarding"), expect.anything());
+  });
   it("hides through auth and slow hydration, with no celebration for completed accounts", async () => {
     mocks.auth.isLoaded = false;
     const view = mount();
@@ -63,6 +91,7 @@ describe("account onboarding UI and persistence", () => {
     mocks.auth.isLoaded = true;
     view.rerenderSession();
     expect(screen.queryByText("Getting started")).toBeNull();
+    await waitFor(() => expect(resolve).toBeTypeOf("function"));
     await act(async () => resolve({ ...blank, receiptDone: true, searchDone: true, completed: true }));
     await waitFor(() => expect(state()).toMatchObject({ ready: true, allDone: true, celebrating: false, visible: false }));
     expect(screen.queryByText("Getting started")).toBeNull();
@@ -117,6 +146,7 @@ describe("account onboarding UI and persistence", () => {
     let resolve!: (value: AccountOnboarding) => void;
     mocks.request.mockImplementationOnce(() => new Promise(r => { resolve = r; }));
     const view = mount();
+    await waitFor(() => expect(resolve).toBeTypeOf("function"));
     mocks.auth.userId = "B";
     view.rerenderSession();
     await screen.findByText("Getting started");

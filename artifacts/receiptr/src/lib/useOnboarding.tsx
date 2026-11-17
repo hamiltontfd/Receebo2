@@ -6,6 +6,7 @@ import { useLocation } from "wouter";
 import { usePwaUpdateBlocker } from "@/lib/pwa";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch, type AccountOnboarding, type OnboardingProgressInput } from "@workspace/api-client-react";
+import { LEGAL_ACCEPTED_EVENT, LEGAL_ACCEPTANCE_REQUIRED_EVENT } from "@/components/LegalConsentGate";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const empty: AccountOnboarding = { receiptDone: false, searchDone: false, completed: false, dismissed: false };
@@ -68,9 +69,32 @@ function OnboardingScope({ children, userId }: { children: ReactNode; userId: st
   const pendingRef = useRef(pending);
   usePwaUpdateBlocker(!!userId && Object.keys(pending).length > 0);
   const [celebrating, setCelebrating] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
+  useEffect(() => {
+    if (!userId) return;
+    const controller = new AbortController();
+    let revised = false;
+    const accepted = () => { revised = true; setLegalAccepted(true); };
+    const required = () => { revised = true; setLegalAccepted(false); };
+    window.addEventListener(LEGAL_ACCEPTED_EVENT, accepted);
+    window.addEventListener(LEGAL_ACCEPTANCE_REQUIRED_EVENT, required);
+    // This endpoint is legally exempt. Do not issue an onboarding query merely
+    // to discover a new user's missing acceptance through QueryCache.onError.
+    void fetch(`${base}/api/legal/acceptance`, { credentials: "include", signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) return;
+        const status = await response.json();
+        if (!controller.signal.aborted && !revised) setLegalAccepted(status.accepted === true);
+      }).catch(() => { /* Fail closed; acceptance event or remount can recover. */ });
+    return () => {
+      controller.abort();
+      window.removeEventListener(LEGAL_ACCEPTED_EVENT, accepted);
+      window.removeEventListener(LEGAL_ACCEPTANCE_REQUIRED_EVENT, required);
+    };
+  }, [userId]);
   const query = useQuery({
     queryKey: key,
-    enabled: !!userId,
+    enabled: !!userId && legalAccepted,
     queryFn: async ({ signal }) => {
       const data = await customFetch<AccountOnboarding>(`${base}/api/account/onboarding`, {
         signal, credentials: "include", headers: { "X-Onboarding-Account": userId! },
@@ -83,12 +107,12 @@ function OnboardingScope({ children, userId }: { children: ReactNode; userId: st
   });
   const data = query.data ?? empty;
   const state = merge(data, { ...empty, searchDone: pending.searchDone === true, dismissed: pending.dismissed === true });
-  const ready = !!userId && query.isSuccess;
+  const ready = !!userId && legalAccepted && query.isSuccess;
 
   useEffect(() => {
-    if (previousLocation.current !== location && userId) void query.refetch();
+    if (previousLocation.current !== location && userId && legalAccepted) void query.refetch();
     previousLocation.current = location;
-  }, [location, userId, query.refetch]);
+  }, [location, userId, legalAccepted, query.refetch]);
 
   const enqueue = useCallback((patch: OnboardingProgressInput) => {
     if (!userId) return;
@@ -99,7 +123,7 @@ function OnboardingScope({ children, userId }: { children: ReactNode; userId: st
   }, [userId]);
 
   useEffect(() => {
-    if (!userId || !Object.keys(pending).length) return;
+    if (!userId || !legalAccepted || !Object.keys(pending).length) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const controller = new AbortController();
@@ -131,7 +155,7 @@ function OnboardingScope({ children, userId }: { children: ReactNode; userId: st
       if (timer) clearTimeout(timer);
       window.removeEventListener("online", online);
     };
-  }, [userId, pending, client]);
+  }, [userId, legalAccepted, pending, client]);
 
   useEffect(() => {
     if (!celebrating) return;

@@ -14,6 +14,7 @@ import {
   resolveAccessState,
   hasAppAccess,
   isPaidLike,
+  isTrialLegalWait,
   TRIAL_UPLOAD_LIMIT,
   TRIAL_DAYS,
   type AccessState,
@@ -22,6 +23,7 @@ import {
 import { PlanChoice, FoundingNote } from "@/components/PlanChoice";
 import { trackTrialInteraction } from "@/lib/trialFunnel";
 import { frozenRetentionNotice, FROZEN_COPY_NOTE } from "@/lib/accountLifecycle";
+import { LEGAL_ACCEPTED_EVENT } from "@/components/LegalConsentGate";
 
 const ACTIVATING_TIMEOUT_MS = 10_000;
 export const ACTIVE_REVIEW_KEY = "receebo:activeReviewReceiptId";
@@ -132,20 +134,31 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
   const startTrial = useStartTrial();
   const [location] = useLocation();
   const startFiredRef = useRef(false);
+  const [legalRevision, setLegalRevision] = useState(0);
+  const startedLegalRevision = useRef(0);
   const [activatingTimedOut, setActivatingTimedOut] = useState(false);
 
   useTrialExpiryTimer(billing);
 
   const state = resolveAccessState(billing);
+  useEffect(() => {
+    const accepted = () => setLegalRevision(value => value + 1);
+    window.addEventListener(LEGAL_ACCEPTED_EVENT, accepted);
+    return () => window.removeEventListener(LEGAL_ACCEPTED_EVENT, accepted);
+  }, []);
 
-  // Initialize the trial entitlement once when the server says not_started.
+  // Never overlap starts. A legal-blocked attempt may resume after acceptance,
+  // including when acceptance happened while that attempt was still in flight.
   const startMutate = startTrial.mutate;
   useEffect(() => {
-    if (authReady && isSignedIn && billing && state === "not_started" && !startFiredRef.current) {
+    const resumeAfterAcceptance = isTrialLegalWait(startTrial.error) && legalRevision > startedLegalRevision.current;
+    if (authReady && isSignedIn && billing && state === "not_started" && !startTrial.isPending &&
+      (!startFiredRef.current || resumeAfterAcceptance)) {
       startFiredRef.current = true;
+      startedLegalRevision.current = legalRevision;
       startMutate();
     }
-  }, [authReady, isSignedIn, billing, state, startMutate]);
+  }, [authReady, isSignedIn, billing, state, startMutate, startTrial.isPending, startTrial.error, legalRevision]);
 
   const inActivatingState =
     !!billing && isCheckoutSuccess() && !isPaidLike(billing) && state !== "owner" && !activatingTimedOut;
@@ -184,7 +197,7 @@ export function PlanSelectionGate({ children }: { children: React.ReactNode }) {
   }
 
   if (state === "not_started") {
-    if (authReady && startTrial.isError && !isFetching) {
+    if (authReady && startTrial.isError && !isTrialLegalWait(startTrial.error) && !isFetching) {
       return (
         <ErrorScreen
           title="We couldn't start your trial."

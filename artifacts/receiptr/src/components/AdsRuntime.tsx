@@ -8,6 +8,7 @@ import { customFetch, setResponseObserver } from "@workspace/api-client-react";
 import { effectiveConsent, readStoredConsent } from "@/lib/adConsent";
 import { trackMilestoneResponse } from "@/lib/metaLifecycle";
 import { LEGAL_ACCEPTED_EVENT } from "./LegalConsentGate";
+import { accountConsentNotApplicable, beginAccountConsentSync } from "@/lib/accountConsentSync";
 
 const PURCHASE_KEY = "receebo:purchase-event";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -15,7 +16,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 // at sign-in, but is never persisted before a jurisdiction/choice permits it.
 let pendingTouch: AdTouch | null = null;
 // Successful POSTs only, scoped to account and touch for this page session.
-// A failed consent PATCH must not cause the successful attribution POST to repeat.
+// Consent updates and retries must not repeat a successful attribution POST.
 const syncedTouches = new Map<string, Set<string>>();
 
 /** Explicit public-route allowlist: never measure receipt/search/account URLs. */
@@ -97,7 +98,11 @@ export function AdsRuntime() {
   }, [consent.marketing, path]);
 
   useEffect(() => {
-    if (!isSignedIn || !userId || (region === "UNKNOWN" && !stored?.choice)) return;
+    if (!isSignedIn || !userId) return;
+    if (region === "UNKNOWN" && !stored?.choice) {
+      accountConsentNotApplicable(userId);
+      return;
+    }
     const touch = consent.attribution ? readTouch() : null;
     const key = JSON.stringify(touch);
     // The capture effect just wrote a new touch: let its state update trigger
@@ -105,7 +110,15 @@ export function AdsRuntime() {
     if (touch && key !== touchKey) return;
     // Serialize changes so a slow earlier Accept cannot overwrite a later Reject.
     const marketingConsent = consent.marketing;
+    const consentSynced = beginAccountConsentSync(userId);
     syncQueue.current = syncQueue.current.catch(() => undefined).then(async () => {
+      if (account.current !== userId) return;
+      // Exempt from the legal gate: record the current choice before trial
+      // creation can emit a milestone, even while attribution must still wait.
+      await customFetch(`${base}/api/account/attribution/consent`, {
+        method: "PATCH", body: JSON.stringify({ marketingConsent }),
+      });
+      consentSynced();
       if (account.current !== userId) return;
       if (touch && latest.current.attribution && !syncedTouches.get(userId)?.has(key)) {
         await customFetch<{ created: boolean }>(`${base}/api/account/attribution`, {
@@ -115,14 +128,16 @@ export function AdsRuntime() {
         sent.add(key);
         syncedTouches.set(userId, sent);
       }
-      if (account.current !== userId) return;
-      await customFetch(`${base}/api/account/attribution/consent`, {
-        method: "PATCH", body: JSON.stringify({ marketingConsent }),
-      });
       if (account.current === userId) { retryCount.current = 0; setSyncFailed(false); }
     }).catch((error: { status?: number }) => {
       if (account.current !== userId) return;
-      if ((!error.status || [401, 403, 428].includes(error.status) || error.status >= 500) && retryCount.current < 4) {
+      // Expected before first acceptance; the acceptance event resumes sync.
+      if (error.status === 428) {
+        clearTimeout(retryTimer.current);
+        setSyncFailed(false);
+        return;
+      }
+      if ((!error.status || [401, 403].includes(error.status) || error.status >= 500) && retryCount.current < 4) {
         clearTimeout(retryTimer.current);
         retryTimer.current = setTimeout(() => setRetry(value => value + 1), 500 * 2 ** retryCount.current++);
       } else setSyncFailed(true);

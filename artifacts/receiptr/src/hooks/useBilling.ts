@@ -12,6 +12,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { recordCheckoutCancellation } from "@/lib/trialFunnel";
 import { rememberPurchaseEvent } from "@/components/AdsRuntime";
+import { waitForAccountConsent } from "@/lib/accountConsentSync";
 import { CONSENT_STORAGE_KEY, consentCountry, consentRegion, effectiveConsent, parseConsent } from "@/lib/adConsent";
 import { metaPixelId, newEventId } from "@/lib/metaPixel";
 import { MarketContext } from "@/components/MarketProvider";
@@ -195,6 +196,10 @@ export function startAccountTrial(): Promise<BillingStatus | unknown> {
 }
 
 /** Brief session-cookie propagation failures must not flash a trial error. */
+export function isTrialLegalWait(error: unknown): boolean {
+  return (error as { status?: number } | null)?.status === 428;
+}
+
 export function retryTrialStart(failureCount: number, error: unknown): boolean {
   const status = (error as { status?: number } | null)?.status;
   return failureCount < 3 && (!status || status === 401 || status === 403 || status >= 500);
@@ -203,8 +208,12 @@ export function retryTrialStart(failureCount: number, error: unknown): boolean {
 /** Idempotent server initialization of the no-card trial entitlement. */
 export function useStartTrial() {
   const queryClient = useQueryClient();
+  const { userId } = useAuth();
   return useMutation({
-    mutationFn: startAccountTrial,
+    mutationFn: async () => {
+      await waitForAccountConsent(userId);
+      return startAccountTrial();
+    },
     retry: retryTrialStart,
     retryDelay: attempt => Math.min(500 * 2 ** attempt, 2000),
     onSettled: () => queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY }),
