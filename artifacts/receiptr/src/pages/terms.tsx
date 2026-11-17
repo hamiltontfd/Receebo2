@@ -64,7 +64,7 @@ export default function TermsOfService() {
           receipts in total, counting both uploads and approved email
           imports. An upload counts only once you save it after review. The
           trial also includes up to 10 automatic receipt reads, whether or not
-          the result is saved <strong>[LEGAL REVIEW NEEDED]</strong>. After the fifth receipt you cannot add more, but you keep
+          the result is saved. After the fifth receipt you cannot add more, but you keep
           access to view, search, open, and export your receipts and to
           receive warranty and return alerts until the trial ends. The trial
           never converts into a paid subscription automatically.
@@ -77,7 +77,7 @@ export default function TermsOfService() {
         </li>
         <li>
           {/* [LEGAL REVIEW NEEDED] Draft clause (account pause and deletion after 60 days). */}
-          <strong>[LEGAL REVIEW NEEDED]</strong> If you don’t have an active
+          If you don’t have an active
           subscription after your free trial ends, or after your paid
           subscription ends, your account is paused: you can no longer add or
           open receipts, email imports stop, and warranty and return reminders
@@ -178,9 +178,8 @@ export default function TermsOfService() {
       <p>
         You may cancel your subscription or delete your account through
         Settings; to protect your account, deletion is confirmed with a
-        one-time code sent to your account email{" "}
-        <strong>[LEGAL REVIEW NEEDED]</strong>. Paused accounts are deleted after 60 days as
-        described in section 4 <strong>[LEGAL REVIEW NEEDED]</strong>. Receebo may suspend or terminate access for serious or repeated
+        one-time code sent to your account email. Paused accounts are deleted after 60 days as
+        described in section 4. Receebo may suspend or terminate access for serious or repeated
         breach, fraud, security risk, non-payment, or legal necessity. Where
         appropriate, Receebo will provide notice and an opportunity to remedy
         the issue. Terms that by nature should survive termination—including

@@ -1,4 +1,5 @@
 import { LegalPageLayout } from "@/components/LegalPageLayout";
+import { LegalDraftNotice } from "@/components/LegalDraftNotice";
 import { useAppLocale } from "@/lib/locale";
 import { Link, useLocation } from "wouter";
 
@@ -37,7 +38,7 @@ export const pt: Row[] = [
   { name: "Landing event beacon", purpose: "Apenas contagens agregadas: sem identificador do navegador, cookie ou armazenamento no navegador.", duration: "Sem armazenamento no navegador; contagens agregadas no servidor.", party: "Receebo (medição agregada)" },
   { name: "receebo:ad-attribution", purpose: "Guarda a primeira ligação de anúncio (campos UTM e fbclid) até criar conta.", duration: "90 dias, ou até o registo ficar gravado.", party: "Receebo (atribuição)" },
   { name: "receebo:app-open:*", purpose: "Último dia UTC de abertura autenticada permitida, por conta neste navegador, para medir o regresso noutro dia. Só é usado quando o marketing está permitido.", duration: "Até ser apagado ou o marketing ser revogado.", party: "Receebo (marketing)" },
-  { name: "Pixel da Meta e API de conversões", purpose: "Mede visitas a páginas, inícios do período experimental, o primeiro recibo guardado durante esse período, regressos e subscrições para os nossos anúncios no Facebook e Instagram; a Meta também pode usar estes dados para os seus próprios fins segundo a sua Política de Privacidade. Define _fbp (90 dias) e _fbc (90 dias, quando chega de um anúncio).", duration: "_fbp: 90 dias; _fbc: 90 dias. Eventos do servidor apenas nessa ação.", party: "Meta (marketing)" },
+  { name: "Pixel da Meta e API de conversões", purpose: "Mede páginas, início do trial, primeiro recibo do trial guardado, regressos no navegador e subscrições depois da escolha que permite marketing.", duration: "Cookies da Meta, em geral até 90 dias. O evento de servidor só é enviado nessa ação.", party: "Meta (marketing)" },
 ];
 
 export default function CookiePolicy() {
@@ -47,11 +48,12 @@ export default function CookiePolicy() {
   const english = us || locale === "en";
   const rows = english ? en : pt;
   return (
-    <LegalPageLayout title={english ? "Cookie Policy" : "Política de cookies"} description="Cookies and similar technologies used by Receebo." effectiveDate="17 November 2026">
+    <LegalPageLayout title={english ? "Cookie Policy" : "Política de cookies"} description="Cookies and similar technologies used by Receebo." effectiveDate={english ? "17 November 2026" : "9 November 2026"}>
+      {!english && <LegalDraftNotice />}
       <p>
         {english
           ? "This page lists the cookies and similar storage Receebo uses."
-          : "Esta página lista os cookies e armazenamento semelhante que o Receebo usa."}
+          : "Este rascunho lista os cookies e armazenamento semelhante que o Receebo usa. Os itens essenciais fazem a conta funcionar. O resto espera pela sua escolha quando a lei exige opt-in, e pode ser recusado no aviso ou nas definições de cookies."}
       </p>
       <p>
         <Link href="/privacy" className="underline">{english ? "Privacy Policy" : "Política de privacidade"}</Link>
