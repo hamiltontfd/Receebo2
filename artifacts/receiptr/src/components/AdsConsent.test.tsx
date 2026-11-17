@@ -8,6 +8,11 @@ import { acceptAll, emptyConsent, CONSENT_CHANGED, CONSENT_STORAGE_KEY } from "@
 import { en, pt } from "@/pages/cookies";
 
 const { send, auth } = vi.hoisted(() => ({ send: vi.fn(async (_path: string, _options?: RequestInit) => ({ created: false })), auth: { isSignedIn: false, userId: null as string | null } }));
+const navigation = vi.hoisted(() => ({ path: "/" }));
+vi.mock("wouter", async importOriginal => ({
+  ...await importOriginal<typeof import("wouter")>(),
+  useLocation: () => [navigation.path, vi.fn()],
+}));
 vi.mock("@clerk/react", () => ({ useAuth: () => auth }));
 vi.mock("@workspace/api-client-react", async (importOriginal) => ({
   ...await importOriginal<typeof import("@workspace/api-client-react")>(), customFetch: send,
@@ -18,6 +23,7 @@ beforeEach(() => {
   localStorage.clear();
   send.mockReset().mockResolvedValue({ created: false });
   window.history.replaceState({}, "", "/");
+  navigation.path = "/";
   auth.isSignedIn = false; auth.userId = null;
   vi.stubEnv("VITE_META_PIXEL_ID", "test-pixel");
 });
@@ -33,6 +39,60 @@ function view(country: string | null, banner = true) {
   </MarketContext.Provider>);
 }
 describe("live cookie choices", () => {
+  it("does not resend attribution or consent on plain navigation; retry triggers still sync consent", async () => {
+    auth.isSignedIn = true; auth.userId = "synthetic-navigation";
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(acceptAll()));
+    const raw = JSON.stringify({ utmSource: "navigation", capturedAt: new Date().toISOString() });
+    localStorage.setItem("receebo:ad-attribution", raw);
+    const ui = () => <MarketContext.Provider value={{ country: "US" } as ContextType<typeof MarketContext>}><AdsRuntime /></MarketContext.Provider>;
+    const mounted = render(ui());
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    for (const path of ["/search", "/scan", "/settings"]) {
+      navigation.path = path;
+      window.history.replaceState({}, "", path);
+      await act(async () => mounted.rerender(ui()));
+    }
+    expect(send).toHaveBeenCalledTimes(2);
+    for (const event of ["online", "focus", "receebo:legal-accepted"]) {
+      const count = send.mock.calls.length;
+      act(() => window.dispatchEvent(new Event(event)));
+      await waitFor(() => expect(send).toHaveBeenCalledTimes(count + 1));
+    }
+    expect(send.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
+    expect(localStorage.getItem("receebo:ad-attribution")).toBe(raw);
+    mounted.unmount();
+    // Remounting in the same browser session does not resend the same user/touch.
+    render(ui());
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(6));
+    expect(send.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
+  });
+  it("syncs a newly written touch on navigation, and scopes successful POSTs by user", async () => {
+    auth.isSignedIn = true; auth.userId = "synthetic-new-touch";
+    const ui = () => <MarketContext.Provider value={{ country: "US" } as ContextType<typeof MarketContext>}><AdsRuntime /></MarketContext.Provider>;
+    const mounted = render(ui());
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    navigation.path = "/pricing";
+    window.history.replaceState({}, "", "/pricing?utm_source=new-touch");
+    mounted.rerender(ui());
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(3));
+    expect(send.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
+    auth.userId = "synthetic-other-account";
+    mounted.rerender(ui());
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(5));
+    expect(send.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(2);
+  });
+  it("does not repeat a successful POST when retrying a failed consent PATCH", async () => {
+    auth.isSignedIn = true; auth.userId = "synthetic-patch-retry";
+    localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(acceptAll()));
+    localStorage.setItem("receebo:ad-attribution", JSON.stringify({ utmSource: "patch-retry", capturedAt: new Date().toISOString() }));
+    send.mockResolvedValueOnce({ created: true }).mockRejectedValueOnce({ status: 428 });
+    view("PT", false);
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    act(() => window.dispatchEvent(new Event("receebo:legal-accepted")));
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(3));
+    expect(send.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
+    expect(send.mock.calls.filter(call => call[1]?.method === "PATCH")).toHaveLength(2);
+  });
   it("keeps the initial campaign in memory until US GeoIP resolves after navigation to sign-up", async () => {
     window.history.replaceState({}, "", "/us?utm_source=meta&utm_medium=paid_social&utm_campaign=US_Validacao_2026-11&utm_content=TEST_E2E&utm_term=AS_Broad&fbclid=synthetic-click");
     const first = view(null, false);

@@ -14,6 +14,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 // Memory only until attribution is allowed. Survives the MarketScope remount
 // at sign-in, but is never persisted before a jurisdiction/choice permits it.
 let pendingTouch: AdTouch | null = null;
+// Successful POSTs only, scoped to account and touch for this page session.
+// A failed consent PATCH must not cause the successful attribution POST to repeat.
+const syncedTouches = new Map<string, Set<string>>();
 
 /** Explicit public-route allowlist: never measure receipt/search/account URLs. */
 export function isPublicMetaPage(path: string): boolean {
@@ -37,6 +40,7 @@ export function AdsRuntime() {
   const { consent, stored, region } = useCookieConsent();
   const [syncFailed, setSyncFailed] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [touchKey, setTouchKey] = useState(() => JSON.stringify(readTouch()));
   const retryCount = useRef(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
@@ -80,7 +84,10 @@ export function AdsRuntime() {
     if (stored?.choice && !consent.attribution) { pendingTouch = null; return; }
     if (!consent.attribution) return;
     const next = firstTouch(readTouch(), pendingTouch);
-    if (next && JSON.stringify(next) !== JSON.stringify(readTouch())) writeTouch(next);
+    if (next && JSON.stringify(next) !== JSON.stringify(readTouch())) {
+      writeTouch(next);
+      setTouchKey(JSON.stringify(next));
+    }
     pendingTouch = null;
   }, [consent.attribution, path, stored?.choice]);
 
@@ -92,14 +99,21 @@ export function AdsRuntime() {
   useEffect(() => {
     if (!isSignedIn || !userId || (region === "UNKNOWN" && !stored?.choice)) return;
     const touch = consent.attribution ? readTouch() : null;
+    const key = JSON.stringify(touch);
+    // The capture effect just wrote a new touch: let its state update trigger
+    // one sync, rather than also syncing the previous render.
+    if (touch && key !== touchKey) return;
     // Serialize changes so a slow earlier Accept cannot overwrite a later Reject.
     const marketingConsent = consent.marketing;
     syncQueue.current = syncQueue.current.catch(() => undefined).then(async () => {
       if (account.current !== userId) return;
-      if (touch && latest.current.attribution) {
+      if (touch && latest.current.attribution && !syncedTouches.get(userId)?.has(key)) {
         await customFetch<{ created: boolean }>(`${base}/api/account/attribution`, {
           method: "POST", body: JSON.stringify({ ...touch, marketingConsent }),
         });
+        const sent = syncedTouches.get(userId) ?? new Set<string>();
+        sent.add(key);
+        syncedTouches.set(userId, sent);
       }
       if (account.current !== userId) return;
       await customFetch(`${base}/api/account/attribution/consent`, {
@@ -113,7 +127,7 @@ export function AdsRuntime() {
         retryTimer.current = setTimeout(() => setRetry(value => value + 1), 500 * 2 ** retryCount.current++);
       } else setSyncFailed(true);
     });
-  }, [isSignedIn, userId, region, consent.attribution, consent.marketing, stored?.choice, retry, path]);
+  }, [isSignedIn, userId, region, consent.attribution, consent.marketing, stored?.choice, retry, touchKey]);
 
   useEffect(() => {
     if (!consent.marketing || !window.location.search.includes("checkout=success")) return;
