@@ -63,7 +63,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session): Promis
     const currency = session.currency ? session.currency.toUpperCase() : null;
     const shared = { eventId, userId, value, currency, eventSourceUrl: session.success_url ?? null };
     await sendMetaEvent({ ...shared, eventName: "Purchase" });
-    await sendMetaEvent({ ...shared, eventName: "Subscribe" });
+    // Re-read after the first network request: a later opt-out takes effect
+    // even if it arrives while Purchase is in flight.
+    if (await marketingConsentFor(userId)) {
+      await sendMetaEvent({ ...shared, eventName: "Subscribe" });
+    }
   } catch (err) {
     logger.warn({ err }, "webhookHandlers: conversions api purchase was not sent");
   }

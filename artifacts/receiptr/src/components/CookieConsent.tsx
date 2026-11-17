@@ -85,6 +85,7 @@ export function CookieConsent({ region }: { region: ConsentRegion }) {
         <div>
           <h2 id="cookie-title" className="text-base font-bold">{cookieText("title")}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{region === "US" ? cookieText("usLead") : cookieText("euLead")}</p>
+          {region === "US" && gpc && <p className="mt-1 text-sm" data-testid="gpc-notice">Your browser&apos;s Global Privacy Control signal is honored.</p>}
         </div>
         {prefs && (
           <fieldset className="space-y-3 text-sm" data-testid="cookie-preferences-panel">

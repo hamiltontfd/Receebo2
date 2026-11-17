@@ -1,8 +1,6 @@
 /**
  * Cookie choices for attribution and Meta ads.
- * DRAFT pending legal review — counsel should confirm the EU opt-in and the
- * California opt-out / Global Privacy Control behaviour before this is treated
- * as final policy.
+ * Country-based opt-in and US opt-out / Global Privacy Control choices.
  */
 export type ConsentRegion = "US" | "EU" | "UNKNOWN";
 

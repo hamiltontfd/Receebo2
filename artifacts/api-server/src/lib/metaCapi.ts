@@ -23,13 +23,18 @@ function sha256(value: string): string {
 }
 
 export function metaEventBody(event: ServerMetaEvent, testEventCode?: string) {
+  let source: string | undefined;
+  try {
+    const url = new URL(event.eventSourceUrl ?? "");
+    if (url.protocol === "https:" || url.protocol === "http:") source = url.origin + url.pathname;
+  } catch { /* Omit missing or malformed source URLs. */ }
   return {
     data: [{
       event_name: event.eventName,
       event_time: Math.floor(Date.now() / 1000),
       event_id: event.eventId,
       action_source: "website",
-      ...(event.eventSourceUrl ? { event_source_url: event.eventSourceUrl } : {}),
+      ...(source ? { event_source_url: source } : {}),
       user_data: {
         external_id: sha256(event.userId),
         ...(event.email ? { em: sha256(event.email) } : {}),

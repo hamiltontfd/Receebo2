@@ -11,6 +11,11 @@ import { trackMilestoneResponse } from "@/lib/metaLifecycle";
 const PURCHASE_KEY = "receebo:purchase-event";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+/** Explicit public-route allowlist: never measure receipt/search/account URLs. */
+export function isPublicMetaPage(path: string): boolean {
+  return ["/", "/us", "/pricing", "/privacy", "/cookies", "/terms"].includes(path.split(/[?#]/)[0]);
+}
+
 function readTouch(): AdTouch | null {
   try { return parseTouch(localStorage.getItem(ATTRIBUTION_STORAGE_KEY)); }
   catch { return null; }
@@ -61,7 +66,7 @@ export function AdsRuntime() {
   }, [consent.attribution, path]);
 
   useEffect(() => {
-    if (!consent.marketing || !metaPixelId()) return;
+    if (!consent.marketing || !metaPixelId() || !isPublicMetaPage(path)) return;
     trackMetaEvent({ name: "PageView", eventId: newEventId() }, true);
   }, [consent.marketing, path]);
 

@@ -46,9 +46,9 @@ function buildFaqs(providers: AvailableMailProvider[], { monthly: m, yearly: y }
   {
     q: lt("Is my data private?", "Os meus dados são privados?", "Meus dados são privados?"),
     a: lt(
-      "Your receipts are private to your account and are shared only with the services needed to run Receebo, such as AI extraction. Inbox access is read-only and can be disconnected at any time. We never sell your data or use it for advertising, and you can delete everything at any time.",
-      "Os teus recibos são privados da tua conta e só são partilhados com os serviços necessários para o Receebo funcionar, como a extração com IA. O acesso ao email é só de leitura e pode ser desligado a qualquer momento. Nunca vendemos os teus dados nem os usamos para publicidade, e podes apagar tudo a qualquer momento.",
-      "Seus recibos são privados da sua conta e só são compartilhados com os serviços necessários para o Receebo funcionar, como a extração com IA. O acesso ao e-mail é somente leitura e pode ser desconectado a qualquer momento. Nunca vendemos seus dados nem os usamos para publicidade, e você pode apagar tudo a qualquer momento.",
+      "Your receipts are private to your account and are shared only with the services needed to run Receebo, such as AI extraction. Inbox access is read-only and can be disconnected at any time. We never sell your data, and we never use your receipts or emails for ads. You can opt out of ad measurement anytime and delete everything at any time.",
+      "Os teus recibos são privados da tua conta e só são partilhados com os serviços necessários para o Receebo funcionar, como a extração com IA. O acesso ao email é só de leitura e pode ser desligado a qualquer momento. Nunca vendemos os teus dados nem usamos os teus recibos ou emails para anúncios. Podes recusar a medição de anúncios e apagar tudo a qualquer momento.",
+      "Seus recibos são privados da sua conta e só são compartilhados com os serviços necessários para o Receebo funcionar, como a extração com IA. O acesso ao e-mail é somente leitura e pode ser desconectado a qualquer momento. Nunca vendemos seus dados nem usamos seus recibos ou e-mails para anúncios. Você pode recusar a medição de anúncios e apagar tudo a qualquer momento.",
     ),
   },
   {

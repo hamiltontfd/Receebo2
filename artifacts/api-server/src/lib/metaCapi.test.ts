@@ -2,6 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import { metaCapiConfigured, metaEventBody, sendMetaEvent } from "./metaCapi";
 
 describe("meta conversions api", () => {
+  it.each([
+    ["https://receebo.net/settings?search=private#receipt", "https://receebo.net/settings"],
+    ["https://receebo.net/?checkout=success#private", "https://receebo.net/"],
+    ["javascript:alert(1)", undefined],
+    ["not a URL", undefined],
+  ])("sanitizes source URL %s", (input, expected) => {
+    const body = metaEventBody({ eventName: "Purchase", eventId: "safe", userId: "synthetic", eventSourceUrl: input });
+    expect(body.data[0].event_source_url).toBe(expected);
+  });
   it("stays inert when the pixel id or token is missing", async () => {
     expect(metaCapiConfigured({})).toBe(false);
     const fetchImpl = vi.fn();

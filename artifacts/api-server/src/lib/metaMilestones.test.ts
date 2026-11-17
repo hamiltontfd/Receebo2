@@ -49,6 +49,14 @@ describe("consented milestones, using the existing unique trial funnel", () => {
     expect((await withFirstReceiptEvent("test-account", async () => "saved")).event).toBeUndefined();
     expect(mocks.send).not.toHaveBeenCalled();
   });
+  it("re-reads current consent for later events instead of retaining the trial-start choice", async () => {
+    mocks.consent.mockResolvedValueOnce(true).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    expect(await sendMilestone("test-account", "CompleteRegistration")).toHaveProperty("eventId");
+    expect(await sendMilestone("test-account", "FirstReceiptSaved")).toBeUndefined();
+    expect(await sendMilestone("test-account", "FirstReceiptSaved")).toHaveProperty("eventId");
+    expect(mocks.consent).toHaveBeenCalledTimes(3);
+    expect(mocks.send).toHaveBeenCalledTimes(2);
+  });
   it("does not fail the product operation if analytics is unavailable", async () => {
     mocks.execute.mockRejectedValue(new Error("analytics unavailable"));
     const result = await withFirstReceiptEvent("test-account", async () => "saved");

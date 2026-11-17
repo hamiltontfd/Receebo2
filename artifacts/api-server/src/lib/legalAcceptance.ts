@@ -4,12 +4,11 @@ import type { NextFunction, Request, Response } from "express";
 
 export const TERMS_VERSION = "2026-08-30";
 /**
- * Bumped 4 Nov 2026 (Hamilton): the policy gained the language, approximate
- * country, landing-count and anonymous-rating lines and encryption at rest.
+ * Bumped 17 Nov 2026: reviewed advertising, Meta data flows, retention and US rights.
  * Any change here makes every signed-in account accept again (LegalConsentGate)
  * before using the app; keep it in sync with the date on /privacy.
  */
-export const PRIVACY_VERSION = "2026-11-04";
+export const PRIVACY_VERSION = "2026-11-17";
 
 export async function hasCurrentLegalAcceptance(userId: string): Promise<boolean> {
   const [acceptance] = await db

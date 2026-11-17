@@ -1,5 +1,4 @@
 import { LegalPageLayout } from "@/components/LegalPageLayout";
-import { LegalDraftNotice } from "@/components/LegalDraftNotice";
 import { Link } from "wouter";
 
 export default function PrivacyPolicy() {
@@ -7,7 +6,7 @@ export default function PrivacyPolicy() {
     <LegalPageLayout
       title="Privacy Policy"
       description="How Receebo collects, uses, stores, and protects personal data."
-      effectiveDate="4 November 2026"
+      effectiveDate="17 November 2026"
     >
       <p>
         This Privacy Policy explains how Receebo handles personal data when you
@@ -86,22 +85,14 @@ export default function PrivacyPolicy() {
           (utm_content). No cookie or identifier is set for that count.
         </li>
         <li>
-          {/* DRAFT pending legal review */}
-          <strong>Ad attribution and measurement:</strong> if the address that
-          opened Receebo includes campaign parameters (utm_source, utm_medium,
-          utm_campaign, utm_content, utm_term) or a Meta click id (fbclid), and
-          your cookie choice allows attribution, Receebo stores that first link
-          on this browser for 90 days and, when you create an account, saves it
-          with the account so we can tell which campaign started the trial.
-          If your choice also allows marketing, Receebo uses the Meta Pixel in
-          the browser and the Meta Conversions API on our server to measure trial
-          starts, the first saved trial receipt and subscriptions. Page views
-          and a return to the authenticated app on a later UTC day are measured
-          in the browser. The return measurement keeps the last permitted open
-          day in this browser, separately for each account. Receipt contents,
-          merchant names and receipt amounts are not included in trial-start,
-          first-receipt or return event parameters. Browser and server events
-          share an event id so the same action is not counted twice. See the{" "}
+          <strong>Ad attribution and measurement:</strong> If the link that opened Receebo includes campaign parameters (utm_source, utm_medium, utm_campaign, utm_content, utm_term) or a Meta click ID (fbclid), and your cookie choice allows attribution, Receebo stores that first link in your browser for up to 90 days. When you create an account, Receebo saves it with your account so we know which campaign started your trial. If your choice allows marketing, we also use the Meta Pixel (in your browser) and the Meta Conversions API (from our server) to measure our ads on Facebook and Instagram.
+          <ul>
+            <li>Events sent to Meta: page views of our public pages, account creation (trial start), the first receipt saved during the trial, a return to the app on a later day, and subscription purchases with their price and currency.</li>
+            <li>Through the Pixel, Meta receives your IP address, browser and device information, the page address and referrer, the event name and time, and identifiers in Meta cookies (_fbp, and _fbc when you arrive from an ad). If you are logged in to Facebook or Instagram in the same browser, Meta&apos;s own cookies are included too.</li>
+            <li>Through the Conversions API, Meta receives the event name and time, an event ID, the page address without query parameters, a one-way hashed (SHA-256) version of your Receebo account ID, the _fbp/_fbc identifiers, and, for subscriptions, the price and currency.</li>
+            <li>Never sent: receipt contents, merchant names, receipt amounts, search terms, email contents or uploaded files.</li>
+          </ul>
+          See the{" "}
           <Link href="/cookies">Cookie Policy</Link>.
         </li>
       </ul>
@@ -139,6 +130,12 @@ export default function PrivacyPolicy() {
         </li>
       </ul>
 
+      <p><strong>Measuring our advertising:</strong> to learn which campaigns bring people to Receebo and lead to trials and subscriptions.</p>
+      <ul>
+        <li>First-party attribution and the cookie-free daily page counts: our legitimate interest in measuring our own marketing, using minimal data.</li>
+        <li>Meta Pixel and Conversions API in the EU/EEA, UK, Brazil and anywhere we cannot determine your country: your consent (Accept or Preferences &gt; Marketing), which you can withdraw at any time.</li>
+        <li>Visitors we locate in the United States: our legitimate interest in measuring our advertising, balanced by an easy opt-out. You can object at any time with &apos;Do Not Sell or Share My Personal Information&apos;, &apos;Reject&apos; in Cookie settings, or a Global Privacy Control signal, and we then stop.</li>
+      </ul>
       <h2>3. Automated and AI-assisted processing</h2>
       <p>
         Receebo uses AI-assisted OCR and extraction to determine whether an
@@ -168,10 +165,7 @@ export default function PrivacyPolicy() {
         </li>
         <li><strong>Stripe:</strong> checkout, trials, subscriptions, invoices, and payments.</li>
         <li>
-          {/* DRAFT pending legal review */}
-          <strong>Meta:</strong> when marketing measurement is allowed, page
-          views, new accounts and subscriptions may be sent to Meta through the
-          Pixel and the Conversions API.
+          <strong>Meta (Meta Platforms Ireland Ltd.; for US users also Meta Platforms, Inc.):</strong> ad measurement through the Meta Pixel and Conversions API, only when your choice allows marketing. Receebo and Meta Platforms Ireland are joint controllers for collecting this data on our site and sending it to Meta (Article 26 GDPR), under <a href="https://www.facebook.com/legal/controller_addendum">Meta&apos;s Controller Addendum</a>. Receebo is responsible for showing you this information and collecting your choice. Meta is responsible for letting you exercise your rights over the data once Meta holds it. After receiving the data, Meta processes it as an independent controller under its own <a href="https://www.facebook.com/privacy/policy">Privacy Policy</a>. Meta may combine it with other information it holds about you and use it to measure, deliver and improve ads. You can contact us or Meta to exercise your rights.
         </li>
         <li>
           <strong>Microsoft:</strong> optional Microsoft account sign-in (OAuth)
@@ -186,15 +180,14 @@ export default function PrivacyPolicy() {
         </li>
       </ul>
       <p>
-        Receebo does not sell personal data. To understand the no-card trial and
+        Receebo does not sell personal data for money. To understand the no-card trial and
         subscription process, Receebo records limited first-party milestones such
         as trial start, successful-upload counts, paywall views, plan choice and
         payment confirmation. These records contain a random internal identifier,
         timestamps and fixed plan or paywall categories, not receipt contents,
         email addresses or payment details. The separate account mapping and
         milestone records are removed when your account is deleted. This
-        measurement does not use analytics cookies or third-party tracking scripts.
-        Non-essential tracking will not begin before any consent required by law.
+        measurement uses no cookies. The advertising measurement described in section 1 is the only third-party tracking on Receebo, and it runs only as your cookie choice allows.
       </p>
 
       <h2>5. Email inbox access (Microsoft Outlook)</h2>
@@ -235,14 +228,14 @@ export default function PrivacyPolicy() {
 
       <h2>6. Retention and deletion</h2>
       <ul>
+        <li>Ad attribution: the first campaign link stays in your browser for up to 90 days; the campaign fields, Meta click identifiers and your marketing choice saved with your account are kept while the account exists and deleted with it.</li>
         <li>
           Account, receipt, attachment, and preference data is generally kept
           while your account is active and removed when you delete it, subject
           to the exceptions below.
         </li>
         <li>
-          {/* [LEGAL REVIEW NEEDED] Draft retention clause for paused accounts. */}
-          <strong>[LEGAL REVIEW NEEDED]</strong> When your access to Receebo
+          When your access to Receebo
           ends without an active subscription, either because your free trial
           ended or because your paid subscription was cancelled or lapsed, your
           account is paused and we keep your account and data for 60 days so
@@ -290,6 +283,7 @@ export default function PrivacyPolicy() {
       </ul>
 
       <h2>7. International transfers</h2>
+      <p>Data sent to Meta through the Pixel and Conversions API may be processed in the United States. Meta Platforms, Inc. is certified under the EU-U.S. Data Privacy Framework, and Meta also uses Standard Contractual Clauses for transfers.</p>
       <p>
         Some providers may process data outside Portugal or the European
         Economic Area. Where GDPR requires it, Receebo relies on an adequacy
@@ -305,7 +299,7 @@ export default function PrivacyPolicy() {
         your account has access you can download a structured data export in
         Settings; while it is paused you can request a copy by email. You can
         request account deletion in Settings (confirmed with a one-time code
-        sent to your account email) <strong>[LEGAL REVIEW NEEDED]</strong>, or contact{" "}
+        sent to your account email), or contact{" "}
         <a href="mailto:contact@receebo.net">contact@receebo.net</a>. Receebo may
         need to verify your identity before fulfilling a request.
       </p>
@@ -332,20 +326,33 @@ export default function PrivacyPolicy() {
       </p>
 
       <h2>10. Cookies and local storage</h2>
-      {/* DRAFT pending legal review */}
-      <LegalDraftNotice forHamilton />
       <p>
-        Receebo uses essential authentication and payment technologies (Clerk
-        and Stripe), preference storage, optional ad-attribution storage, and,
-        only when your choice allows marketing, the Meta Pixel and a matching
-        server event. In the EU and UK, non-essential storage stays off until
-        you accept it. On US pages you can refuse sale or sharing, and a Global
-        Privacy Control signal is treated as that refusal until you explicitly
-        accept marketing. The details, durations and how to change your choice
-        are in the <Link href="/cookies">Cookie Policy</Link>.
+        Receebo uses essential authentication and payment technologies (Clerk and Stripe), storage of your cookie choice, optional preference storage, optional ad-attribution storage and, only when your choice allows marketing, the Meta Pixel and matching server events.
       </p>
-
-      <h2>11. Changes and contact</h2>
+      <ul>
+        <li>EU/EEA, UK, Brazil, or country unknown: everything non-essential stays off until you select Accept or turn it on in Preferences. Rejecting is as easy as accepting.</li>
+        <li>United States: ad attribution and marketing are on unless you opt out. You can opt out at any time with &apos;Do Not Sell or Share My Personal Information&apos; in the footer of our US pages, &apos;Reject&apos; in Cookie settings, or a Global Privacy Control signal, which we treat as an opt-out of sale or sharing unless you later choose Accept.</li>
+        <li>When you withdraw or opt out, the Pixel stops loading, we delete the _fbp and _fbc cookies on our domain, and we stop sending server events for your account. Data already sent to Meta is handled under Meta&apos;s policies.</li>
+        <li>To limit ads based on activity elsewhere, use your <a href="https://www.facebook.com/adpreferences">Facebook/Instagram ad preferences</a>, <a href="https://optout.aboutads.info">https://optout.aboutads.info</a>, or <a href="https://www.youronlinechoices.eu">https://www.youronlinechoices.eu</a>.</li>
+      </ul>
+      <p>Names, purposes and durations are listed in the <Link href="/cookies">Cookie Policy</Link>.</p>
+      <h2>11. Notice for US residents</h2>
+      <p>In the last 12 months, Receebo collected these categories of personal information, as described above:</p>
+      <ul>
+        <li>Identifiers: name, email, account ID, IP address, cookie IDs.</li>
+        <li>Commercial information: subscription and the receipts you choose to save.</li>
+        <li>Internet activity on our site: pages and events.</li>
+        <li>Approximate location: country from IP.</li>
+        <li>Inferences limited to which campaign brought you.</li>
+      </ul>
+      <p>We do not sell personal information for money. When marketing is on, letting Meta collect data through the Pixel and Conversions API to measure our ads may count as &apos;sharing&apos; for cross-context behavioral advertising, or &apos;targeted advertising&apos;, under California and other state privacy laws. We share only the identifiers and internet-activity data listed in section 1 with Meta, and never receipt contents.</p>
+      <ul>
+        <li>Opting out: select &apos;Do Not Sell or Share My Personal Information&apos; in the footer of our US pages, or send a Global Privacy Control signal, which we honor in that browser. If you are signed in, we also apply the opt-out to your account.</li>
+        <li>Your other rights: you can ask us to access, correct or delete your information, or to tell you what we share, at contact@receebo.net. You may use an authorized agent, and we will not discriminate against you for using these rights.</li>
+        <li>Sensitive information: we do not use or disclose it for any purpose that would require a &apos;limit&apos; right.</li>
+        <li>Age: we do not knowingly sell or share the information of anyone under 16, and Receebo is only for adults (18+).</li>
+      </ul>
+      <h2>12. Changes and contact</h2>
       <p>
         Receebo may update this policy when the service, providers, or law
         changes. Material changes will be highlighted in the service and may

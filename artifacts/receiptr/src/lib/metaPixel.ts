@@ -62,6 +62,7 @@ export function loadMetaPixel(id = metaPixelId()): boolean {
     script.src = "https://connect.facebook.net/en_US/fbevents.js";
     document.head.appendChild(script);
   }
+  window.fbq("set", "autoConfig", false, id);
   window.fbq("init", id);
   window.fbq.loaded = true;
   return true;

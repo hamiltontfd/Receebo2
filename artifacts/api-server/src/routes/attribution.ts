@@ -23,7 +23,7 @@ function text(value: unknown): string | undefined {
 /**
  * First-touch campaign fields for this account. Saving attribution never emits
  * a registration event; registration belongs to creation of the trial.
- * DRAFT pending legal review.
+ * Attribution is stored only when the browser choice permits it.
  */
 router.post("/account/attribution", requireAuth, async (req, res): Promise<void> => {
   const body = req.body as Record<string, unknown>;

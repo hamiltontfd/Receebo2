@@ -5,7 +5,7 @@ import { db } from "@workspace/db";
  * Additive table for the origin of a trial. Created on API startup with
  * IF NOT EXISTS. No backfill. A normal account consent change may create a
  * consent-only row; first-touch fields are filled once when supplied later.
- * DRAFT pending legal review.
+ * First-touch campaign fields and the account's latest marketing choice.
  */
 export async function migrateAdAttribution(): Promise<void> {
   await db.execute(sql`

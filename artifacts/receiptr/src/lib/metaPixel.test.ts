@@ -39,9 +39,10 @@ describe("meta pixel", () => {
     expect(fbq.version).toBe("2.0");
     expect(fbq.loaded).toBe(true);
     expect(window._fbq).toBe(fbq);
-    expect(fbq.queue!.map(args => Array.from(args))).toEqual([["init", "123"]]);
+    expect(fbq.queue!.map(args => Array.from(args))).toEqual([["set", "autoConfig", false, "123"], ["init", "123"]]);
     expect(trackMetaEvent({ name: "PageView", eventId: "queued-event" }, true, "123")).toBe(true);
     expect(fbq.queue!.map(args => Array.from(args))).toEqual([
+      ["set", "autoConfig", false, "123"],
       ["init", "123"],
       ["consent", "grant"],
       ["track", "PageView", {}, { eventID: "queued-event" }],
@@ -60,9 +61,9 @@ describe("meta pixel", () => {
     fbq("consent", "revoke");
     fbq.push!("consent", "grant");
     expect(dispatch.mock.calls).toEqual([
-      ["init", "123"], ["consent", "revoke"], ["consent", "grant"],
+      ["set", "autoConfig", false, "123"], ["init", "123"], ["consent", "revoke"], ["consent", "grant"],
     ]);
-    expect(dispatch.mock.contexts.slice(1)).toEqual([fbq, fbq]);
+    expect(dispatch.mock.contexts.slice(2)).toEqual([fbq, fbq]);
     expect(fbq.queue).toEqual([]);
   });
 

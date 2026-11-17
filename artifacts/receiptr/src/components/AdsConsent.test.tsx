@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ContextType } from "react";
 import { MarketContext } from "./MarketProvider";
 import { CookieConsent } from "./CookieConsent";
-import { AdsRuntime } from "./AdsRuntime";
+import { AdsRuntime, isPublicMetaPage } from "./AdsRuntime";
 import { acceptAll, emptyConsent, CONSENT_CHANGED, CONSENT_STORAGE_KEY } from "@/lib/adConsent";
 import { en, pt } from "@/pages/cookies";
 
@@ -32,6 +32,19 @@ function view(country: string | null, banner = true) {
   </MarketContext.Provider>);
 }
 describe("live cookie choices", () => {
+  it("permits PageView only on explicit public pages, never authenticated routes", () => {
+    for (const path of ["/", "/us", "/pricing", "/privacy", "/cookies", "/terms"]) expect(isPublicMetaPage(path)).toBe(true);
+    for (const path of ["/search", "/scan", "/receipts/123", "/settings", "/imports", "/stats", "/profile"]) expect(isPublicMetaPage(path)).toBe(false);
+  });
+  it("synchronizes a US GPC opt-out to the signed-in account", async () => {
+    auth.isSignedIn = true; auth.userId = "synthetic-gpc";
+    Object.defineProperty(navigator, "globalPrivacyControl", { value: true, configurable: true });
+    try {
+      view("US");
+      expect(screen.getByTestId("gpc-notice")).toHaveTextContent("Your browser's Global Privacy Control signal is honored.");
+      await waitFor(() => expect(send).toHaveBeenCalledWith(expect.stringContaining("/attribution/consent"), expect.objectContaining({ body: '{"marketingConsent":false}' })));
+    } finally { Object.defineProperty(navigator, "globalPrivacyControl", { value: false, configurable: true }); }
+  });
   it("does not emit registration when attribution is first saved", async () => {
     auth.isSignedIn = true; auth.userId = "account-test";
     localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(acceptAll()));
