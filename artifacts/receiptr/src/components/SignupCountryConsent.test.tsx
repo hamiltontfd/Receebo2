@@ -41,6 +41,21 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllEnvs(); delete window.fbq; delete window._fbq; });
 
 describe("IP consent and the trial barrier before legal acceptance (all requests mocked)", () => {
+  it.each(["/sign-up", "/sign-in", "/sign-up/verify-email-address"])("uses English for the US auth background on %s without changing market or country", async path => {
+    mocks.auth.isSignedIn = false; mocks.auth.userId = "";
+    mocks.path = path;
+    window.history.replaceState({}, "", `${path}?landing=us`);
+    localStorage.setItem("receebo:visitorMarket", "BR");
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["pt-BR"]);
+    mocks.request.mockResolvedValue({ country: "PT", market: "PT" });
+    render(<MarketProvider><Probe /></MarketProvider>);
+    await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent('"country":"PT"'));
+    expect(screen.getByTestId("state")).toHaveTextContent('"market":"BR"');
+    expect(screen.getByTestId("state")).toHaveTextContent('"locale":"en"');
+    expect(screen.getByTestId("state")).toHaveTextContent('"region":"EU"');
+    expect(localStorage.getItem("receebo:visitorMarket")).toBe("BR");
+    expect(mocks.request.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+  });
   it("resolves signed-in US through the public endpoint after account 428; PATCH completes before trial and keeps Meta cookies", async () => {
     const country = deferred<{ country: string; market: string }>();
     const patch = deferred<object>();

@@ -3,6 +3,7 @@ import { MarketContext } from "@/components/MarketProvider";
 import { sendLandingEvent, type LandingPath } from "@/lib/landingBeacon";
 import { useCookieConsent } from "@/lib/useCookieConsent";
 import { campaignSignUpHref, captureAllowedFirstTouch } from "@/lib/adAttribution";
+import { isAuthLandingPath, withUsLanding } from "@/lib/authLanding";
 
 /**
  * CTA click on a landing page: counts an aggregate "cta_click" for the page,
@@ -15,9 +16,13 @@ import { campaignSignUpHref, captureAllowedFirstTouch } from "@/lib/adAttributio
 export function useLandingCta(path: LandingPath, isSignedIn = false) {
   const market = useContext(MarketContext);
   const { consent } = useCookieConsent();
+  const search = typeof window === "undefined" ? "" : window.location.search;
   return Object.assign(() => {
     captureAllowedFirstTouch(consent.attribution, window.location.search);
     sendLandingEvent("cta_click", path);
-    if (path === "/us" && !isSignedIn && market && !market.confirmed) void market.choose("US");
-  }, { href: campaignSignUpHref() });
+    if (path === "/us" && !isAuthLandingPath(window.location.pathname) && !isSignedIn && market && !market.confirmed) void market.choose("US");
+  }, {
+    href: withUsLanding(campaignSignUpHref(search), search, path === "/us"),
+    signInHref: withUsLanding("/sign-in", search, path === "/us"),
+  });
 }

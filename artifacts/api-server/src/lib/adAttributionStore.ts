@@ -80,7 +80,9 @@ export async function marketingConsentFor(userId: string): Promise<boolean> {
 }
 
 /** Matching identifiers only; the caller has already checked current marketing consent. */
-export async function metaIdentifiersFor(userId: string): Promise<{ fbc?: string; fbp?: string }> {
+export type StoredMetaIdentifiers = { fbc?: string; fbp?: string; fbcSource: "stored" | "built" | "none" };
+
+export async function metaIdentifiersFor(userId: string): Promise<StoredMetaIdentifiers> {
   const result = await db.execute(sql`
     SELECT fbc, fbp, fbclid, captured_at FROM ad_attributions WHERE user_id = ${userId}`);
   const rows = (Array.isArray(result) ? result : result.rows ?? []) as Array<{
@@ -91,9 +93,12 @@ export async function metaIdentifiersFor(userId: string): Promise<{ fbc?: string
 
 export function storedMetaIdentifiers(touch?: {
   fbc?: string | null; fbp?: string | null; fbclid?: string | null; captured_at?: Date | string | null;
-}): { fbc?: string; fbp?: string } {
+}): StoredMetaIdentifiers {
   const captured = touch?.captured_at == null ? NaN : new Date(touch.captured_at).getTime();
   const fbc = touch?.fbc || (touch?.fbclid && Number.isFinite(captured)
     ? `fb.1.${captured}.${touch.fbclid}` : undefined);
-  return { ...(fbc ? { fbc } : {}), ...(touch?.fbp ? { fbp: touch.fbp } : {}) };
+  return {
+    ...(fbc ? { fbc } : {}), ...(touch?.fbp ? { fbp: touch.fbp } : {}),
+    fbcSource: touch?.fbc ? "stored" : fbc ? "built" : "none",
+  };
 }

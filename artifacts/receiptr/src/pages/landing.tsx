@@ -96,7 +96,7 @@ export function LandingContent({ variant, isSignedIn = false, checkout, marketSe
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
           >
             {marketSelector}
-            <Link href="/sign-in" className="hidden md:inline-block">
+            <Link href={onCta.signInHref} className="hidden md:inline-block">
               <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                 <Button
                   variant="outline"
@@ -189,7 +189,7 @@ export function LandingContent({ variant, isSignedIn = false, checkout, marketSe
                   {lt("Terms", "Termos")}
                 </Link>
                 <Link
-                  href="/sign-in"
+                  href={onCta.signInHref}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {lt("Sign in", "Entrar")}

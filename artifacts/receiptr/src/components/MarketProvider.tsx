@@ -1,6 +1,7 @@
 import { LEGAL_ACCEPTED_EVENT } from "@/components/LegalConsentGate";
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
+import { hasUsLanding, isAuthLandingPath } from "@/lib/authLanding";
 import { setPublicLocale } from "@/lib/locale";
 import { useAuth } from "@clerk/react";
 import { customFetch, type AccountMarket, type MarketSuggestion } from "@workspace/api-client-react";
@@ -58,6 +59,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
 
 function MarketScope({ userId, ready, children }: { userId: string | null; ready: boolean; children: ReactNode }) {
   const [path] = useLocation();
+  const search = useSearch();
   const [visitor, setVisitor] = useState(readVisitorMarket);
   const pendingVisitor = useRef(readPendingVisitor(userId) ?? visitor);
   const [account, setAccount] = useState<Market | null>(null);
@@ -228,11 +230,12 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
   const confirmed = ready ? (userId ? account : visitor) : null;
   // A public route selects the product presentation, never the IP jurisdiction.
   const usLanding = !userId && path.split(/[?#]/)[0] === "/us";
+  const usAuth = isAuthLandingPath(path) && hasUsLanding(search);
   const market = ready ? confirmed ?? (usLanding ? "US" : suggestion) : null;
   useLayoutEffect(() => {
-    setPublicLocale(usLanding && (!visitor || visitor === "US") ? "en" : undefined);
+    setPublicLocale(usAuth || (usLanding && (!visitor || visitor === "US")) ? "en" : undefined);
     return () => setPublicLocale(undefined);
-  }, [usLanding, visitor]);
+  }, [usLanding, usAuth, visitor]);
   return <Context.Provider value={{
     market, country, countryPending: !country && countryPending, savedCountry, source: confirmed ? (userId ? "account" : "visitor") : suggestion ? "suggestion" : "unknown",
     confirmed: !!confirmed, loading, saving, error, choose,

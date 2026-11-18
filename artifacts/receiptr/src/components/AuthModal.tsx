@@ -1,25 +1,28 @@
 import type { ReactNode } from "react";
 import { ClerkLoaded, ClerkLoading } from "@clerk/react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import {
   Dialog, DialogClose, DialogContent, DialogTitle,
 } from "@/components/ui/dialog";
 import Landing from "@/pages/landing";
+import { hasUsLanding, isAuthLandingPath } from "@/lib/authLanding";
 
 /** Keep the existing auth URLs (including OAuth steps) over the public homepage. */
 export default function AuthModal({ title, children }: { title: string; children: ReactNode }) {
-  const [, setLocation] = useLocation();
+  const [path, setLocation] = useLocation();
+  const search = useSearch();
+  const us = isAuthLandingPath(path) && hasUsLanding(search);
 
   const close = () => {
     // Dismissing a trial must not start checkout after an unrelated future login.
     sessionStorage.removeItem("receebo:pendingPlan");
-    setLocation("/", { replace: true });
+    setLocation(us ? "/us" : "/", { replace: true });
   };
 
   return (
     <>
-      <Landing />
+      <Landing variant={us ? "us" : undefined} />
       <Dialog open onOpenChange={(open) => { if (!open) close(); }}>
         <DialogContent
           className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-[488px] grid-cols-1 overflow-y-auto rounded-2xl border-0 px-4 pb-6 pt-14 sm:px-6"

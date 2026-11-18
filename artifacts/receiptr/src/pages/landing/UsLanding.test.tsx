@@ -35,6 +35,23 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); localStorage.clear(); sessionStorage.clear(); });
 
 describe("/us landing (C + D)", () => {
+  it("carries the US display context and campaign through hero, pricing, header/footer and final auth links", () => {
+    const { container } = render(<LandingContent variant="us" />);
+    const authLinks = [...container.querySelectorAll<HTMLAnchorElement>("a")].filter(link =>
+      ["/sign-up", "/sign-in"].includes(new URL(link.href).pathname),
+    );
+    // Header + hero + two pricing plans + final + footer signup; two Sign in links.
+    expect(authLinks.length).toBeGreaterThanOrEqual(8);
+    for (const link of authLinks) {
+      const url = new URL(link.href);
+      expect(url.searchParams.get("landing")).toBe("us");
+      expect(url.searchParams.get("utm_source")).toBe("meta");
+      expect(url.searchParams.get("utm_content")).toBe("bf-tv-1");
+    }
+    expect(screen.getByTestId("link-hero-trial")).toHaveAttribute("href", expect.stringContaining("landing=us"));
+    expect(screen.getByTestId("link-nav-trial")).toHaveAttribute("href", expect.stringContaining("landing=us"));
+  });
+
   it.each([
     ["en-US", "US", "us"],
     ["en-US", "PT", undefined],
@@ -57,7 +74,9 @@ describe("/us landing (C + D)", () => {
     }
     const footer = links.closest("footer")!;
     expect(footer.querySelector('a[href="/privacy"]')).not.toBeNull();
-    expect(footer.querySelector('a[href="/sign-in"]')).not.toBeNull();
+    const signIn = [...footer.querySelectorAll("a")].find(a => new URL(a.href).pathname === "/sign-in");
+    expect(signIn).toBeDefined();
+    expect(new URL(signIn!.href).searchParams.get("landing")).toBe(variant === "us" ? "us" : null);
     expect(footer.querySelector(`a[href="${variant === "us" ? "/cookies?region=us" : "/cookies"}"]`)).not.toBeNull();
     expect(links.textContent?.includes("Do Not Sell or Share My Personal Information")).toBe(variant === "us");
     unmount();

@@ -3,7 +3,8 @@ import { OnboardingProvider } from "@/lib/useOnboarding";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
-import { Switch, Route, useLocation, Router as WouterRouter, Redirect, Link } from "wouter";
+import { Switch, Route, useLocation, useSearch, Router as WouterRouter, Redirect, Link } from "wouter";
+import { withUsLanding } from "@/lib/authLanding";
 import { QueryCache, QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { clearActionCooldowns, temporaryActionError } from "@workspace/api-client-react";
 import { actionWaitMessage } from "@/lib/actionLimit";
@@ -128,18 +129,20 @@ const clerkAppearance = {
 };
 
 function SignInPage() {
+  const search = useSearch();
   return (
     <AuthModal title="Sign in to Receebo">
-      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={withUsLanding(`${basePath}/sign-up`, search)} />
     </AuthModal>
   );
 }
 
 function SignUpPage() {
+  const search = useSearch();
   return (
     <AuthModal title="Create your Receebo account">
       <div className="flex min-w-0 w-full max-w-[440px] flex-col items-center gap-4">
-        <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+        <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={withUsLanding(`${basePath}/sign-in`, search)} />
         <p className="max-w-sm text-center text-xs leading-5 text-muted-foreground">
           Before using Receebo, you’ll be asked to confirm that you are 18+ and
           agree to the{" "}
@@ -347,6 +350,7 @@ const queryClient = new QueryClient({
 
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const locale = useAppLocale();
 
   return (
@@ -356,10 +360,10 @@ function ClerkProviderWithRoutes() {
       {...{ __internal_clerkJSVersion: CLERK_JS_VERSION, __internal_clerkUIVersion: CLERK_UI_VERSION }}
       appearance={clerkAppearance}
       localization={clerkLocalization(locale)}
-      signInUrl={`${basePath}/sign-in`}
-      signUpUrl={`${basePath}/sign-up`}
-      routerPush={(to) => setLocation(stripBase(to))}
-      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+      signInUrl={withUsLanding(`${basePath}/sign-in`, search)}
+      signUpUrl={withUsLanding(`${basePath}/sign-up`, search)}
+      routerPush={(to) => setLocation(withUsLanding(stripBase(to), search))}
+      routerReplace={(to) => setLocation(withUsLanding(stripBase(to), search), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
