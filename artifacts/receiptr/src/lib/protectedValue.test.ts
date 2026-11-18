@@ -176,4 +176,30 @@ describe("durableKeeping (Search home row and See all)", () => {
     expect(items[0].day >= items[1].day).toBe(true);
     expect(items.find((i) => i.name === "Speaker")!.day).toBe("2026-10-26");
   });
+
+  it("uses the account region, receipt fallback coverage, and a line's own coverage", () => {
+    const receipt = rc({
+      id: 41, category: "Electronics", merchant: "Unknown Shop", purchaseDate: "2026-10-20",
+      deliveryDate: "2026-10-21", purchaseCountry: "US", isOnlinePurchase: true,
+      warranty: "2-year manufacturer warranty", returnDays: 30,
+      notableItems: [n("Device", 300)],
+      products: [{ lineId: "l_device00000001", name: "Device", category: null, coverages: [] }],
+    });
+    expect(durableKeeping([receipt], NOW, { region: "US", savedCountry: "PT" })[0]).toMatchObject({
+      status: "return", caption: "Return by 20 Nov",
+    });
+
+    const overridden = rc({
+      ...receipt, id: 42,
+      products: [{
+        lineId: "l_device00000002", name: "Device", category: null, coverages: [
+          { id: "c_return00000001", kind: "return", warrantyType: null, basis: "user", certainty: "confirmed", lengthDays: 7, lengthMonths: null, endDate: null, evidence: null, source: "user" },
+          { id: "c_warranty0000001", kind: "warranty", warrantyType: "manufacturer", basis: "user", certainty: "confirmed", lengthDays: null, lengthMonths: 12, endDate: null, evidence: null, source: "user" },
+        ],
+      }],
+    });
+    expect(durableKeeping([overridden], NOW, { region: "US", savedCountry: "PT" })[0]).toMatchObject({
+      status: "warranty", caption: "Warranty to 20 Oct 2027",
+    });
+  });
 });

@@ -1,11 +1,11 @@
 import { randomBytes } from "crypto";
-import { isOnlineForConsumerRights } from "@workspace/api-zod";
+import { isOnlineForConsumerRights, isReceiptWarrantyTextScoped, parseReceiptReturnDays } from "@workspace/api-zod";
 import { CANONICAL_CATEGORIES, type CanonicalCategory } from "./categories";
 import { hasNoConsumerDates } from "./purchaseType";
 import { detectCountry, returnWindowStart } from "./returnWindowCalc";
 import { resolvePurchaseCountry } from "./purchaseCountry";
-import { addDaysIso, usStoreReturnWindow } from "./usStorePolicies";
-import { addMonthsClamped, addYearsClamped, isIsoDate } from "./warrantyExpiry";
+import { addDaysIso, usReturnStart, usStoreReturnWindow } from "./usStorePolicies";
+import { addMonthsClamped, addYearsClamped, isIsoDate, parseManufacturerWarrantyMonths } from "./warrantyExpiry";
 import type { ReceiptProductItem } from "@workspace/db";
 
 /**
@@ -65,6 +65,7 @@ export interface ItemRulesContext {
   category?: string | null;
   storeDomain?: string | null;
   savedCountry?: string | null;
+  geoIpCountry?: string | null;
   deliveryCountry?: string | null;
   sellerCountry?: string | null;
   /** Account rules region. US uses the store table and no federal legal warranty. */
@@ -76,6 +77,9 @@ export interface ItemRulesContext {
   merchant?: string | null;
   isOnlinePurchase?: boolean | null;
   purchaseType?: string | null;
+  /** Receipt-level stated fields are fallbacks only when a line has no same-kind coverage. */
+  warranty?: string | null;
+  returnDays?: number | null;
   /** YYYY-MM-DD. Defaults to today (UTC). */
   asOf?: string;
 }
@@ -403,6 +407,83 @@ function statedContract(lineId: string, coverage: StoredCoverage, purchaseDate: 
   };
 }
 
+function receiptFallbackCoverage(
+  line: ReceiptProductItem,
+  kind: "return" | "warranty",
+  ctx: ItemRulesContext,
+  index: number,
+  allowFallback: boolean,
+): StoredCoverage | null {
+  if (hasNoConsumerDates(ctx.purchaseType)) return null;
+  if ((line.coverages ?? []).some((coverage) => coverage.kind === kind)) return null;
+  if (kind === "return") {
+    if (ctx.region !== "US") return null;
+    const parsedFromText = ctx.returnDays == null && allowFallback ? parseReceiptReturnDays(ctx.warranty) : null;
+    const lengthDays = ctx.returnDays ?? parsedFromText;
+    if (!Number.isInteger(lengthDays) || lengthDays! < 0 || lengthDays! > 365) return null;
+    return {
+      id: `receipt:${line.lineId ?? `legacy-${index}`}:return`,
+      kind: "return",
+      warrantyType: null,
+      basis: "stated",
+      certainty: parsedFromText != null ? "estimated" : "confirmed",
+      lengthDays: lengthDays!,
+      lengthMonths: null,
+      endDate: null,
+      evidence: parsedFromText != null ? ctx.warranty ?? null : null,
+      source: parsedFromText != null ? "extraction" : "user",
+    };
+  }
+  if (!allowFallback) return null;
+  const lengthMonths = parseManufacturerWarrantyMonths(ctx.warranty);
+  if (lengthMonths == null) return null;
+  return {
+    id: `receipt:${line.lineId ?? `legacy-${index}`}:manufacturer`,
+    kind: "warranty",
+    warrantyType: "manufacturer",
+    basis: "stated",
+    certainty: "estimated",
+    lengthDays: null,
+    lengthMonths,
+    endDate: null,
+    evidence: ctx.warranty ?? null,
+    source: "extraction",
+  };
+}
+
+function receiptFallbackContract(
+  line: ReceiptProductItem,
+  coverage: StoredCoverage,
+  ctx: ItemRulesContext,
+  asOf: string,
+): ItemContract {
+  if (coverage.kind !== "return" || !ctx.purchaseDate || !isIsoDate(ctx.purchaseDate)) {
+    return statedContract(line.lineId ?? "", coverage, ctx.purchaseDate ?? null, asOf);
+  }
+  const start = usReturnStart({
+    purchaseDate: ctx.purchaseDate,
+    deliveryDate: ctx.deliveryDate,
+    isOnlinePurchase: ctx.isOnlinePurchase,
+  });
+  const endDate = addDaysIso(start.date, coverage.lengthDays ?? 0);
+  return {
+    id: coverage.id,
+    kind: coverage.kind,
+    warrantyType: null,
+    basis: coverage.basis,
+    certainty: coverage.certainty,
+    status: statusFor(endDate, asOf, "open"),
+    lengthDays: coverage.lengthDays,
+    lengthMonths: null,
+    startDate: start.date,
+    endDate,
+    ruleId: null,
+    evidence: coverage.evidence,
+    conflict: false,
+    legalReviewPending: false,
+  };
+}
+
 function markConflicts(contracts: ItemContract[]): ItemContract[] {
   const groups = new Map<string, ItemContract[]>();
   for (const contract of contracts) {
@@ -496,7 +577,7 @@ function returnForLine(line: ReceiptProductItem, ctx: ItemRulesContext, asOf: st
       purchaseDate: ctx.purchaseDate,
       deliveryDate: ctx.deliveryDate,
       isOnlinePurchase: ctx.isOnlinePurchase,
-      category: line.category ?? null,
+      category: line.category ?? ctx.category ?? null,
       itemNames: [line.name],
     });
     if (suggestion.status === "unknown") return null;
@@ -558,14 +639,35 @@ function returnForLine(line: ReceiptProductItem, ctx: ItemRulesContext, asOf: st
 
 /** Read-side deadlines. Does not read or write reminder columns. */
 export function evaluateItemRights(lines: ReceiptProductItem[] | null | undefined, ctx: ItemRulesContext): ItemRights[] {
-  ctx = { ...ctx, purchaseCountry: resolvePurchaseCountry({
+  const suppliedCountry = resolvePurchaseCountry({
+    ...ctx, storeDomain: null, sellerCountry: null,
+    isOnlinePurchase: ctx.isOnlinePurchase ?? null, purchaseCountry: ctx.purchaseCountry ?? null,
+    deliveryCountry: ctx.deliveryCountry ?? null, savedCountry: ctx.savedCountry ?? null,
+  });
+  const geoIpFallback = suppliedCountry == null && isOnlineForConsumerRights(ctx.isOnlinePurchase, ctx.merchant, ctx.storeDomain)
+    ? resolvePurchaseCountry({
+      ...ctx,
+      purchaseCountry: ctx.geoIpCountry ?? null,
+      savedCountry: null,
+      deliveryCountry: ctx.deliveryCountry ?? null,
+      storeDomain: ctx.storeDomain ?? null,
+      sellerCountry: ctx.sellerCountry ?? null,
+      isOnlinePurchase: ctx.isOnlinePurchase ?? null,
+    })
+    : null;
+  ctx = { ...ctx, purchaseCountry: suppliedCountry ?? geoIpFallback ?? resolvePurchaseCountry({
     ...ctx, isOnlinePurchase: ctx.isOnlinePurchase ?? null, purchaseCountry: ctx.purchaseCountry ?? null,
     deliveryCountry: ctx.deliveryCountry ?? null, storeDomain: ctx.storeDomain ?? null,
     sellerCountry: ctx.sellerCountry ?? null,
   }) };
   const asOf = asOfDate(ctx.asOf);
+  const receiptTextScoped = isReceiptWarrantyTextScoped(ctx.warranty, (lines ?? []).map((line) => line.name));
   return (lines ?? []).map((line, index) => {
     const stated = (line.coverages ?? []).map((coverage) => statedContract(line.lineId ?? "", coverage, ctx.purchaseDate ?? null, asOf));
+    const receiptReturn = receiptFallbackCoverage(line, "return", ctx, index, !receiptTextScoped);
+    const receiptWarranty = receiptFallbackCoverage(line, "warranty", ctx, index, !receiptTextScoped);
+    if (receiptReturn) stated.push(receiptFallbackContract(line, receiptReturn, ctx, asOf));
+    if (receiptWarranty) stated.push(receiptFallbackContract(line, receiptWarranty, ctx, asOf));
     if (hasNoConsumerDates(ctx.purchaseType)) {
       const blocked = (["return", "warranty"] as const).map((kind) => ruleContract({
         id: `rule:${line.lineId ?? "legacy"}:purchase_type:${kind}`,
@@ -585,7 +687,7 @@ export function evaluateItemRights(lines: ReceiptProductItem[] | null | undefine
     }
     const contracts = [...stated];
     const legal = legalForLine(line, ctx, asOf);
-    const ret = returnForLine(line, ctx, asOf);
+    const ret = receiptReturn ? null : returnForLine(line, ctx, asOf);
     if (legal) contracts.push(legal);
     if (ret) contracts.push(ret);
     if (!contracts.some((c) => c.kind === "return")) {

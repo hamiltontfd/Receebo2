@@ -1,7 +1,8 @@
 import { formatLocaleDate, type AppLocale } from "./locale";
 import { rightsCopy } from "./rightsCopy";
-import { isOnlineForConsumerRights, merchantSuggestsOnline } from "@workspace/api-zod";
+import { isOnlineForConsumerRights, isReceiptWarrantyTextScoped, merchantSuggestsOnline, parseReceiptReturnDays } from "@workspace/api-zod";
 export { merchantSuggestsOnline } from "@workspace/api-zod";
+export { parseReceiptReturnDays } from "@workspace/api-zod";
 import { hasNoConsumerDates } from "./purchaseType";
 import { addDaysIso, usReturnStart, usStoreReturnWindow, type UsReturnSuggestion } from "./usStorePolicies";
 
@@ -354,6 +355,8 @@ export function deriveConsumerRights(params: {
   merchant?: string | null;
   /** The receipt's warranty text (manufacturer warranty, if stated). */
   warrantyText?: string | null;
+  /** Text to use for explicit receipt return duration parsing (defaults to warrantyText). */
+  returnText?: string | null;
   /** Subscription / digital / ticket / service: no return window, no warranty, just a note. */
   purchaseType?: string | null;
   locale?: AppLocale;
@@ -480,7 +483,8 @@ export function deriveConsumerRights(params: {
 
   // ── Manufacturer warranty: its own end date, side by side, never added to the legal one ──
   let manufacturerWarranty: ManufacturerWarrantyInfo | null = null;
-  const months = parseManufacturerWarrantyMonths(params.warrantyText);
+  const warrantyTextScoped = isReceiptWarrantyTextScoped(params.warrantyText, params.itemNames);
+  const months = parseManufacturerWarrantyMonths(warrantyTextScoped ? null : params.warrantyText);
   if (months != null) {
     const expiry = addMonthsClamped(purchaseDateObj, months);
     const daysUntilExpiry = daysFromNow(expiry);
@@ -527,6 +531,7 @@ export function usRightsCopy(locale: AppLocale = "en") {
         ? `${s.store.name} holiday returns (store policy, checked ${checked})`
         : `${s.store.name}${s.rule === "standard" ? "" : ` (${s.rule})`}: ${s.days} days (store policy, checked ${checked})`,
     userSource: (days: number) => `Your store's window: ${days} day${days === 1 ? "" : "s"} (you saved it)`,
+    receiptSource: (days: number) => `Receipt states: ${days} day${days === 1 ? "" : "s"} for returns`,
     disclaimer: "General information, not legal advice. Check with the store.",
   };
   const br = locale === "pt-BR";
@@ -550,6 +555,9 @@ export function usRightsCopy(locale: AppLocale = "en") {
     userSource: (days: number) => br
       ? `Prazo da loja: ${days} dia${days === 1 ? "" : "s"} (você salvou)`
       : `Prazo da loja: ${days} dia${days === 1 ? "" : "s"} (guardado por si)`,
+    receiptSource: (days: number) => br
+      ? `O recibo informa ${days} dia${days === 1 ? "" : "s"} para devolução`
+      : `O recibo indica ${days} dia${days === 1 ? "" : "s"} para devolução`,
     disclaimer: br
       ? "Informação geral, não é aconselhamento jurídico. Confirme com a loja."
       : "Informação geral, não é aconselhamento jurídico. Confirme com a loja.",
@@ -595,10 +603,15 @@ function deriveUsConsumerRights(params: Parameters<typeof deriveConsumerRights>[
   const notes: string[] = [c.noFederalNote];
   let returnWindow: ReturnWindowInfo | null = null;
   let usReturn: UsReturnInfo;
-  const userDays = params.returnDays;
+  const returnText = params.returnText === undefined ? params.warrantyText : params.returnText;
+  const receiptDays = params.returnDays == null && !isReceiptWarrantyTextScoped(returnText, params.itemNames)
+    ? parseReceiptReturnDays(returnText)
+    : null;
+  const userDays = params.returnDays ?? receiptDays;
   if (typeof userDays === "number" && Number.isInteger(userDays) && userDays >= 0) {
     const start = usReturnStart({ purchaseDate, deliveryDate: params.deliveryDate, isOnlinePurchase: params.isOnlinePurchase });
-    returnWindow = returnInfo(isoToLocalDate(addDaysIso(start.date, userDays)), c.userSource(userDays), start.from, fmtUs);
+    const source = params.returnDays == null ? c.receiptSource(userDays) : c.userSource(userDays);
+    returnWindow = returnInfo(isoToLocalDate(addDaysIso(start.date, userDays)), source, start.from, fmtUs);
     usReturn = { kind: "user", days: userDays, store };
   } else {
     usReturn = { kind: "store", store };
@@ -613,7 +626,8 @@ function deriveUsConsumerRights(params: Parameters<typeof deriveConsumerRights>[
   }
 
   let manufacturerWarranty: ManufacturerWarrantyInfo | null = null;
-  const months = parseManufacturerWarrantyMonths(params.warrantyText);
+  const warrantyTextScoped = isReceiptWarrantyTextScoped(params.warrantyText, params.itemNames);
+  const months = parseManufacturerWarrantyMonths(warrantyTextScoped ? null : params.warrantyText);
   if (months != null) {
     const expiry = addMonthsClamped(isoToLocalDate(purchaseDate), months);
     const daysUntilExpiry = daysFromNow(expiry);

@@ -259,6 +259,130 @@ describe("item coverage foundation", () => {
     expect(jp[0].contracts.map((c) => c.status)).toEqual(["unknown", "unknown"]);
   });
 
+  it("uses receipt-stated warranty and US return duration only as same-kind line fallbacks", () => {
+    const receiptFields = {
+      region: "US" as const,
+      category: "Electronics",
+      purchaseDate: "2026-11-01",
+      deliveryDate: "2026-11-02",
+      merchant: "Unknown Shop",
+      warranty: "2-year manufacturer warranty",
+      returnDays: 30,
+      asOf: AS_OF,
+    };
+    const fallback = evaluateItemRights([line({ category: null, coverages: [] })], ctx(receiptFields))[0].contracts;
+    expect(fallback.find((c) => c.kind === "warranty" && c.warrantyType === "manufacturer")).toMatchObject({
+      basis: "stated", certainty: "estimated", lengthMonths: 24, startDate: "2026-11-01",
+      endDate: "2028-11-01", evidence: "2-year manufacturer warranty",
+    });
+    expect(fallback.find((c) => c.kind === "return" && c.basis === "stated")).toMatchObject({
+      basis: "stated", certainty: "confirmed", lengthDays: 30, startDate: "2026-11-02",
+      endDate: "2026-12-02",
+    });
+    expect(fallback.find((c) => c.ruleId === "US:no_federal_legal_warranty")).toMatchObject({ status: "not_applicable" });
+
+    const own = line({
+      category: null,
+      coverages: [
+        { id: "c_line0000000001", kind: "warranty", warrantyType: "manufacturer", basis: "user", certainty: "confirmed", lengthDays: null, lengthMonths: 12, endDate: null, evidence: null, source: "user" },
+        { id: "c_return000000001", kind: "return", warrantyType: null, basis: "user", certainty: "confirmed", lengthDays: 10, lengthMonths: null, endDate: null, evidence: null, source: "user" },
+      ],
+    });
+    const [overridden, inherited] = evaluateItemRights([
+      own,
+      line({ lineId: "l_other0000000001", name: "Other item", category: null, coverages: [] }),
+    ], ctx({
+      ...receiptFields,
+      returnDays: null,
+      warranty: "2-year manufacturer warranty; 30-day returns",
+    })).map((rights) => rights.contracts);
+    expect(overridden.find((c) => c.kind === "warranty" && c.warrantyType === "manufacturer")).toMatchObject({
+      basis: "user", lengthMonths: 12, endDate: "2027-11-01",
+    });
+    expect(overridden.find((c) => c.kind === "return" && c.basis === "user")).toMatchObject({
+      basis: "user", lengthDays: 10, endDate: "2026-11-11",
+    });
+    expect(overridden.some((c) => c.evidence?.includes("2-year manufacturer") || c.lengthDays === 30)).toBe(false);
+    expect(inherited.find((c) => c.kind === "warranty" && c.warrantyType === "manufacturer")).toMatchObject({
+      basis: "stated", lengthMonths: 24, endDate: "2028-11-01",
+      evidence: "2-year manufacturer warranty; 30-day returns",
+    });
+    expect(inherited.find((c) => c.kind === "return" && c.basis === "stated")).toMatchObject({
+      lengthDays: 30, startDate: "2026-11-02", endDate: "2026-12-02",
+    });
+  });
+
+  it("accepts an explicit receipt-text return duration but rejects missing or conflicting durations", () => {
+    const noSavedDays = ctx({
+      region: "US", category: "Electronics", purchaseDate: "2026-11-01", deliveryDate: "2026-11-02",
+      purchaseCountry: "US", merchant: "Unknown Shop", isOnlinePurchase: true, returnDays: null,
+      warranty: "2-year manufacturer warranty; 30-day returns",
+    });
+    const contracts = evaluateItemRights([line({ coverages: [] })], noSavedDays)[0].contracts;
+    expect(contracts.find((c) => c.kind === "return" && c.basis === "stated")).toMatchObject({
+      certainty: "estimated", lengthDays: 30, startDate: "2026-11-02", endDate: "2026-12-02",
+      evidence: "2-year manufacturer warranty; 30-day returns",
+    });
+    expect(contracts.find((c) => c.warrantyType === "manufacturer")).toMatchObject({ lengthMonths: 24 });
+
+    for (const warranty of [
+      "2-year manufacturer warranty",
+      "2-year manufacturer warranty; return policy varies",
+      "30-day returns; return window of 14 days",
+      "30-day warranty; return policy varies",
+    ]) {
+      const noReturnDuration = evaluateItemRights([line({ coverages: [] })], {
+        ...noSavedDays, warranty,
+      })[0].contracts.find((c) => c.kind === "return");
+      expect(noReturnDuration).toMatchObject({ status: "unknown", lengthDays: null, endDate: null });
+    }
+  });
+
+  it("does not smear item-scoped or competing receipt warranty terms onto uncovered lines", () => {
+    const tv = line({
+      name: "TV",
+      coverages: [{
+        id: "c_tv000000000001", kind: "warranty", warrantyType: "manufacturer", basis: "user",
+        certainty: "confirmed", lengthDays: null, lengthMonths: 24, endDate: null, evidence: null, source: "user",
+      }],
+    });
+    const soundbar = line({ lineId: "l_soundbar000001", name: "Soundbar", coverages: [] });
+    const cable = line({ lineId: "l_cable000000001", name: "Cable", coverages: [] });
+    const rights = evaluateItemRights([tv, soundbar, cable], ctx({
+      region: "US", purchaseCountry: "US", isOnlinePurchase: true, merchant: "Unknown Shop",
+      warranty: "TV: 2-year manufacturer warranty; Soundbar: 1-year manufacturer warranty",
+      returnDays: null,
+    }));
+    expect(rights[0].contracts.find((c) => c.warrantyType === "manufacturer")).toMatchObject({ basis: "user", lengthMonths: 24 });
+    expect(rights[1].contracts.some((c) => c.warrantyType === "manufacturer")).toBe(false);
+    expect(rights[2].contracts.some((c) => c.warrantyType === "manufacturer")).toBe(false);
+  });
+
+  it("uses the receipt category for US store exceptions and prefers stored, then saved, then GeoIP country", () => {
+    const device = line({ name: "Unclassified device", category: null, coverages: [] });
+    const categoryRule = evaluateItemRights([device], ctx({
+      region: "US", category: "Electronics", merchant: "Walmart", purchaseDate: "2026-09-01",
+      deliveryDate: null, isOnlinePurchase: false, returnDays: null,
+    }))[0].contracts.find((c) => c.kind === "return" && c.basis === "rule");
+    expect(categoryRule).toMatchObject({ lengthDays: 30, ruleId: "US:walmart:electronics" });
+
+    const base = ctx({ isOnlinePurchase: true, purchaseCountry: null, merchant: "Amazon", currency: "EUR" });
+    const savedBeforeGeo = evaluateItemRights([device], { ...base, savedCountry: "PT", geoIpCountry: "JP" })[0].contracts;
+    expect(savedBeforeGeo.find((c) => c.warrantyType === "legal")).toMatchObject({ lengthMonths: 36, ruleId: "PT:DL-84/2021" });
+    const storedBeforeSaved = evaluateItemRights([device], {
+      ...base, purchaseCountry: "FR", savedCountry: "PT", geoIpCountry: "JP",
+    })[0].contracts;
+    expect(storedBeforeSaved.find((c) => c.warrantyType === "legal")).toMatchObject({ lengthMonths: 24, ruleId: "EU:2019/771" });
+    const deliveryBeforeStored = evaluateItemRights([device], {
+      ...base, purchaseCountry: "FR", deliveryCountry: "PT", savedCountry: "ES", geoIpCountry: "JP",
+    })[0].contracts;
+    expect(deliveryBeforeStored.find((c) => c.warrantyType === "legal")).toMatchObject({ lengthMonths: 36, ruleId: "PT:DL-84/2021" });
+    const geoAfterSaved = evaluateItemRights([device], {
+      ...base, savedCountry: null, geoIpCountry: "ES",
+    })[0].contracts;
+    expect(geoAfterSaved.find((c) => c.warrantyType === "legal")).toMatchObject({ lengthMonths: 36, ruleId: "ES:RDL-7/2021-art-120.1" });
+  });
+
   it("keeps a stated contract beside the rule, flags two stated contracts that disagree, and does not treat a subscription as having no stated warranty", () => {
     const tv = line({
       category: "Electronics",

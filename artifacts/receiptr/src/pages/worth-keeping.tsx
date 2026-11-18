@@ -8,6 +8,7 @@ import { ReceiptSheet } from "@/components/ReceiptSheet";
 import { useAllReceipts } from "@/pages/stats";
 import { categoryIcon, categoryStyle } from "@/lib/categories";
 import { deadlineUrgency, durableKeeping, formatAmount, formatShortDate, type DurableKeepItem } from "@/lib/protectedValue";
+import { useAccountRegion } from "@/lib/region";
 
 export interface KeepGroup { key: string; label: string; items: DurableKeepItem[] }
 
@@ -78,7 +79,11 @@ export default function WorthKeepingPage() {
   const locale = useAppLocale();
   const { data: receipts, isLoading, isError } = useAllReceipts();
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const items = useMemo(() => durableKeeping(receipts ?? []), [receipts, locale]);
+  const { region, savedCountry } = useAccountRegion();
+  const items = useMemo(
+    () => durableKeeping(receipts ?? [], undefined, { region, savedCountry }),
+    [receipts, locale, region, savedCountry],
+  );
   const groups = useMemo(() => groupKeepItems(items), [items, locale]);
 
   return (

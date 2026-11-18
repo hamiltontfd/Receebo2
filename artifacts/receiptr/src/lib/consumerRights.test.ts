@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { isReceiptWarrantyTextScoped, parseReceiptReturnDays } from "@workspace/api-zod";
 import { deriveConsumerRights, isProvisionalLegalEstimate, merchantSuggestsOnline, returnWindowStartDate, showDeliveryDateField } from "./consumerRights";
 
 const local = (offsetDays: number) => {
@@ -68,6 +69,29 @@ describe("US: structure only", () => {
     expect(rights.returnWindow?.source).toBe("Best Buy return policy (typical, check with the store)");
     expect(rights.notes[0]).toMatch(/No federal minimum/);
     expect(rights.legalReviewPending).toBe(true);
+  });
+
+  it("reads explicit US receipt return days from the receipt text without guessing", () => {
+    expect(parseReceiptReturnDays("2-year manufacturer warranty; 30-day returns")).toBe(30);
+    expect(parseReceiptReturnDays("return window: 30 days")).toBe(30);
+    expect(parseReceiptReturnDays("30 dias para devolução")).toBe(30);
+    expect(parseReceiptReturnDays("Devolução em 30 dias")).toBe(30);
+    expect(parseReceiptReturnDays("2-year manufacturer warranty")).toBeNull();
+    expect(parseReceiptReturnDays("30-day warranty; return policy varies")).toBeNull();
+    expect(parseReceiptReturnDays("30-day returns; return window of 14 days")).toBeNull();
+    expect(isReceiptWarrantyTextScoped("2-year manufacturer warranty", ["TV", "Cable"])).toBe(false);
+    expect(isReceiptWarrantyTextScoped("TV: 2-year manufacturer warranty", ["TV", "Cable"])).toBe(true);
+    expect(isReceiptWarrantyTextScoped("2-year warranty; 1-year warranty", ["TV", "Cable"])).toBe(true);
+
+    const rights = deriveConsumerRights({
+      region: "US", merchant: "Unknown Shop", purchaseDate: "2026-03-01",
+      warrantyText: "2-year manufacturer warranty; 30-day returns",
+    });
+    expect(rights.returnWindow).toMatchObject({
+      source: "Receipt states: 30 days for returns", startsFrom: "purchase",
+    });
+    expect(rights.returnWindow?.deadline.getDate()).toBe(31);
+    expect(rights.manufacturerWarranty?.months).toBe(24);
   });
 });
 

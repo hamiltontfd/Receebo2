@@ -2,13 +2,16 @@ import { render, screen, within, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ listReceipts: vi.fn(), sheet: vi.fn() }));
+const mocks = vi.hoisted(() => ({ listReceipts: vi.fn(), sheet: vi.fn(), region: "PT", savedCountry: null as string | null }));
 vi.mock("@workspace/api-client-react", () => ({
   listReceipts: mocks.listReceipts,
   getListReceiptsQueryKey: () => ["/api/receipts"],
 }));
 vi.mock("@/components/ReceiptSheet", () => ({
   ReceiptSheet: ({ receiptId }: { receiptId: number | null }) => { mocks.sheet(receiptId); return null; },
+}));
+vi.mock("@/lib/region", () => ({
+  useAccountRegion: () => ({ region: mocks.region, savedCountry: mocks.savedCountry }),
 }));
 vi.mock("wouter", () => ({
   Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
@@ -24,7 +27,12 @@ function mount() {
   return render(<QueryClientProvider client={client}><WorthKeepingPage /></QueryClientProvider>);
 }
 
-beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date(2026, 9, 29, 9)); });
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 9, 29, 9));
+  mocks.region = "PT";
+  mocks.savedCountry = null;
+});
 afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
 describe("/search/worth-keeping", () => {
@@ -65,5 +73,21 @@ describe("/search/worth-keeping", () => {
     mocks.listReceipts.mockResolvedValueOnce({ items: [r(9, { category: "Groceries", total: 30 })], nextCursor: null });
     mount();
     expect(await screen.findByTestId("keep-empty")).toHaveTextContent("Nothing here yet.");
+  });
+
+  it("uses the US region for receipt-text warranty and return coverage in the See all list", async () => {
+    mocks.region = "US";
+    mocks.savedCountry = "PT";
+    mocks.listReceipts.mockResolvedValueOnce({
+      items: [r(10, {
+        purchaseDate: "2026-10-20", deliveryDate: null, purchaseCountry: null, isOnlinePurchase: true,
+        warranty: "2-year manufacturer warranty; 30-day returns", total: 300,
+        notableItems: n("Device", 300),
+      })],
+      nextCursor: null,
+    });
+    mount();
+    const group = await screen.findByTestId("keep-group-return-open");
+    expect(within(group).getByText("Return by 19 Nov")).toBeInTheDocument();
   });
 });

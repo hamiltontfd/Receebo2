@@ -73,6 +73,7 @@ function duration(contract: ShownContract): string | null {
 }
 
 function provenance(contract: ShownContract): string {
+  if (contract.id.startsWith("receipt:")) return appText("From the receipt");
   if (contract.basis === "user") return appText("You saved this");
   if (contract.basis === "stated") return contract.evidence || appText("From the receipt");
   if (contract.warrantyType === "legal") return appText("Legal warranty");

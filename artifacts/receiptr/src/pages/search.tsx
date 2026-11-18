@@ -42,6 +42,7 @@ import { ReceiptSheet } from "@/components/ReceiptSheet";
 import { receiptListYear } from "@/lib/receiptDate";
 import { WorthKeepingCards } from "@/components/WorthKeepingCards";
 import { durableKeeping, HOME_KEEP_LIMIT } from "@/lib/protectedValue";
+import { useAccountRegion } from "@/lib/region";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
 
@@ -412,6 +413,7 @@ export default function SearchPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { isGuest } = useGuestMode();
   const { isSignedIn, userId } = useAuth();
+  const { region, savedCountry } = useAccountRegion();
   const searchOwnerRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -479,7 +481,10 @@ export default function SearchPage() {
   // "Worth keeping" right under the search field: durable goods from the receipts
   // already loaded (no extra request), open return windows first, then the most
   // recent purchases; up to 10 cards, the rest on /search/worth-keeping.
-  const homeKeepAll = useMemo(() => durableKeeping(allReceipts), [allReceipts, locale]);
+  const homeKeepAll = useMemo(
+    () => durableKeeping(allReceipts, undefined, { region, savedCountry }),
+    [allReceipts, locale, region, savedCountry],
+  );
   const homeKeep = homeKeepAll.slice(0, HOME_KEEP_LIMIT);
   const homeKeepMore = homeKeepAll.length > HOME_KEEP_LIMIT || (!!hasNextPage && homeKeep.length > 0);
 

@@ -1,4 +1,5 @@
 import type { Receipt } from "@workspace/api-client-react";
+import { isReceiptWarrantyTextScoped } from "@workspace/api-zod";
 import { appText } from "./appCopy";
 import { getAppLocale, formatLocaleMoney } from "./locale";
 import { deriveConsumerRights } from "./consumerRights";
@@ -62,6 +63,10 @@ export function classifyReceipt(r: Receipt, now: Date = new Date(), region?: str
   if (r.total == null || !(r.total > 0)) return { kind: "none" };
 
   const today = startOfToday(now);
+  const receiptTextScoped = isReceiptWarrantyTextScoped(
+    r.warranty,
+    [...(r.notableItems ?? []), ...(r.products ?? [])].map((item) => item.name),
+  );
   const rights = deriveConsumerRights({
     purchaseDate: r.purchaseDate,
     deliveryDate: r.deliveryDate,
@@ -70,7 +75,8 @@ export function classifyReceipt(r: Receipt, now: Date = new Date(), region?: str
     purchaseCountry: r.purchaseCountry,
     isOnlinePurchase: r.isOnlinePurchase,
     merchant: r.merchant,
-    warrantyText: r.warranty,
+    warrantyText: receiptTextScoped ? null : r.warranty,
+    returnText: receiptTextScoped ? null : r.warranty,
     purchaseType: r.purchaseType,
     ...(region === "US" ? {
       region, returnDays: r.returnDays,
@@ -303,44 +309,84 @@ export function isDurableReceipt(r: Receipt): boolean {
  * order), then the most valuable item. Captioned with the return / warranty
  * date, else the merchant.
  */
-export function durableKeeping(receipts: Receipt[], now: Date = new Date()): DurableKeepItem[] {
+export function durableKeeping(
+  receipts: Receipt[],
+  now: Date = new Date(),
+  context: { region?: string | null; savedCountry?: string | null } = {},
+): DurableKeepItem[] {
   const today = startOfToday(now);
   const out: DurableKeepItem[] = [];
   for (const r of receipts) {
     if (!isDurableReceipt(r)) continue;
     const notable = (r.notableItems ?? []).filter((n) => n.name && (n.category ?? "") !== "Groceries");
     if (notable.length === 0) continue;
-    const rights = deriveConsumerRights({
-      purchaseDate: r.purchaseDate,
-      deliveryDate: r.deliveryDate,
-      category: r.category,
-      currency: r.currency,
-      purchaseCountry: r.purchaseCountry,
-      isOnlinePurchase: r.isOnlinePurchase,
-      merchant: r.merchant,
-      warrantyText: r.warranty,
-      purchaseType: r.purchaseType,
-    });
-    let status: DurableKeepItem["status"] = "none";
-    let deadline: Date | null = null;
-    const rw = rights.returnWindow;
-    if (rw && daysBetween(today, rw.deadline) >= 0) {
-      status = "return";
-      deadline = rw.deadline;
-    } else {
-      const warranties = [rights.warranty?.expiry, rights.manufacturerWarranty?.expiry]
-        .filter((d): d is Date => d instanceof Date && daysBetween(today, d) >= 0);
-      if (warranties.length > 0) {
-        status = "warranty";
-        deadline = new Date(Math.max(...warranties.map((d) => d.getTime())));
-      }
-    }
-    const currency = (r.currency ?? "EUR").toUpperCase();
-    const caption = status === "none"
-      ? r.merchant ?? null
-      : protectionCaption({ bucket: status, deadline, currency }, now);
+    const receiptTextScoped = isReceiptWarrantyTextScoped(
+      r.warranty,
+      [...notable, ...(r.products ?? [])].map((item) => item.name),
+    );
     const day = receiptListDay(r);
     for (const n of notable) {
+      const normalizedName = n.name.trim().toLowerCase();
+      const product = (r.products ?? []).find((p) => p.name.trim().toLowerCase() === normalizedName);
+      const ownReturns = product?.coverages?.filter((coverage) => coverage.kind === "return") ?? [];
+      const ownWarranties = product?.coverages?.filter((coverage) => coverage.kind === "warranty") ?? [];
+      const rights = deriveConsumerRights({
+        purchaseDate: r.purchaseDate,
+        deliveryDate: r.deliveryDate,
+        category: product ? product.category ?? r.category : n.category ?? r.category,
+        currency: r.currency,
+        purchaseCountry: r.purchaseCountry,
+        isOnlinePurchase: r.isOnlinePurchase,
+        merchant: r.merchant,
+        warrantyText: ownWarranties.length > 0 || receiptTextScoped ? null : r.warranty,
+        returnText: ownReturns.length > 0 || receiptTextScoped ? null : r.warranty,
+        purchaseType: r.purchaseType,
+        region: context.region,
+        savedCountry: context.savedCountry,
+        returnDays: ownReturns.length > 0 ? null : r.returnDays,
+        itemNames: [n.name],
+      });
+      const ownDeadline = (coverage: { endDate?: string | null; lengthMonths?: number | null; lengthDays?: number | null }): Date | null => {
+        const explicit = coverage.endDate;
+        if (explicit && /^\d{4}-\d{2}-\d{2}$/.test(explicit) && !Number.isNaN(new Date(`${explicit}T00:00:00`).getTime())) {
+          return new Date(`${explicit}T00:00:00`);
+        }
+        if (!r.purchaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(r.purchaseDate)) return null;
+        const deadline = new Date(`${r.purchaseDate}T00:00:00`);
+        if (coverage.lengthMonths != null) {
+          const targetMonth = deadline.getMonth() + coverage.lengthMonths;
+          const lastDay = new Date(deadline.getFullYear(), targetMonth + 1, 0).getDate();
+          deadline.setDate(Math.min(deadline.getDate(), lastDay));
+          deadline.setMonth(targetMonth);
+        } else if (coverage.lengthDays != null) {
+          deadline.setDate(deadline.getDate() + coverage.lengthDays);
+        } else {
+          return null;
+        }
+        return deadline;
+      };
+      const returnDeadlines = [...ownReturns.map(ownDeadline), rights.returnWindow?.deadline]
+        .filter((d): d is Date => d instanceof Date && daysBetween(today, d) >= 0);
+      const returnDeadline = returnDeadlines.length > 0
+        ? new Date(Math.max(...returnDeadlines.map((d) => d.getTime())))
+        : null;
+      let status: DurableKeepItem["status"] = "none";
+      let deadline: Date | null = null;
+      if (returnDeadline) {
+        status = "return";
+        deadline = returnDeadline;
+      } else {
+        const warranties = [rights.warranty?.expiry, rights.manufacturerWarranty?.expiry, ...ownWarranties.map(ownDeadline)]
+          .filter((d): d is Date => d instanceof Date && daysBetween(today, d) >= 0);
+        if (warranties.length > 0) {
+          status = "warranty";
+          deadline = new Date(Math.max(...warranties.map((d) => d.getTime())));
+        }
+      }
+      const currency = (r.currency ?? "EUR").toUpperCase();
+      const caption = status === "none"
+        ? r.merchant ?? null
+        : protectionCaption({ bucket: status, deadline, currency }, now);
       out.push({
         name: n.name, price: n.price ?? null, category: n.category ?? r.category ?? null,
         receiptId: r.id, currency: r.currency ?? null, caption,

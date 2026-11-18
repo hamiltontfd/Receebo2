@@ -160,4 +160,20 @@ describe("highlight reading cards", () => {
     expect(screen.getAllByTestId("row-return")).toHaveLength(5);
     expect(screen.getAllByTestId("row-warranty")).toHaveLength(5);
   });
+
+  it("labels fallback contracts as receipt-sourced even when they carry extracted evidence", () => {
+    render(
+      <ItemCoverageSections
+        products={[{ lineId: "l_device", name: "Device" }]}
+        itemRights={[{
+          lineId: "l_device", index: 0, contracts: [
+            { id: "receipt:l_device:return", kind: "return", basis: "stated", certainty: "estimated", status: "open", endDate: "2026-12-02", lengthDays: 30, evidence: "2-year manufacturer warranty; 30-day returns" },
+          ],
+        }]}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("button-return-info"));
+    expect(screen.getByTestId("text-return-info").textContent).toContain("Device: From the receipt");
+    expect(screen.getByTestId("text-return-info").textContent).not.toContain("You saved this");
+  });
 });

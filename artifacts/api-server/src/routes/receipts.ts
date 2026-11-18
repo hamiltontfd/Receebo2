@@ -501,11 +501,14 @@ async function itemRightsFor(userId: string, receipt: {
   merchant?: string | null;
   isOnlinePurchase?: boolean | null;
   purchaseType?: string | null;
-}, requestCountry?: string | null) {
+  warranty?: string | null;
+  returnDays?: number | null;
+}, geoIpCountry?: string | null) {
   let region: "US" | "PT" = "PT";
   try { region = rulesRegionForMarket(await getAccountMarket(userId)); } catch { region = "PT"; }
   return evaluateItemRights(receipt.products, {
-    savedCountry: requestCountry ?? await getAccountCountry(userId).catch(() => null),
+    savedCountry: await getAccountCountry(userId).catch(() => null),
+    geoIpCountry,
     region,
     category: receipt.category,
     purchaseDate: receipt.purchaseDate,
@@ -515,6 +518,8 @@ async function itemRightsFor(userId: string, receipt: {
     merchant: receipt.merchant,
     isOnlinePurchase: receipt.isOnlinePurchase,
     purchaseType: receipt.purchaseType,
+    warranty: receipt.warranty,
+    returnDays: receipt.returnDays,
   });
 }
 
