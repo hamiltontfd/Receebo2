@@ -25,9 +25,9 @@ export function consentRegion(country: string | null | undefined): ConsentRegion
   return country.toUpperCase() === "US" ? "US" : "EU";
 }
 
-export function consentCountry(country: string | null | undefined, _search?: string, _dev?: boolean): string | null {
-  // Even a development URL must not turn a PT jurisdiction into US opt-out.
-  return country ?? null;
+export function consentCountry(country: string | null | undefined, search = typeof window !== "undefined" ? window.location.search : "", dev = import.meta.env.DEV): string | null {
+  const override = dev ? new URLSearchParams(search).get("dev_country")?.toUpperCase() : null;
+  return override && /^[A-Z]{2}$/.test(override) ? override : country ?? null;
 }
 
 export function readStoredConsent(): ConsentState | null {

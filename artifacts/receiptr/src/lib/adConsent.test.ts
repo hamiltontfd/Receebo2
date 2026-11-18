@@ -11,15 +11,28 @@ describe("ad consent", () => {
     expect(consentCountry("PT")).toBe("PT");
     expect(consentCountry("BR", undefined, true)).toBe("BR");
     expect(consentCountry(null)).toBeNull();
-    expect(consentCountry("PT", "?dev_country=US", true)).toBe("PT");
+    expect(consentCountry("PT", "?dev_country=US", true)).toBe("US");
     expect(consentCountry("PT", "?dev_country=US", false)).toBe("PT");
   });
 
-  it("never lets URL parameters override server IP jurisdiction, even in development", () => {
+  it("allows a valid DEV country override from browser location or an explicit search", () => {
     vi.stubGlobal("window", { location: { search: "?dev_country=US" } });
-    expect(consentCountry("PT", undefined, true)).toBe("PT");
+    expect(consentCountry("PT", undefined, true)).toBe("US");
     expect(consentCountry("PT", undefined, false)).toBe("PT");
-    expect(consentCountry("PT", "?dev_country=BR", true)).toBe("PT");
+    expect(consentCountry("PT", "?dev_country=br", true)).toBe("BR");
+    expect(consentCountry("PT", "?dev_country=EUROPE", true)).toBe("PT");
+    expect(consentCountry("PT", "?dev_country=", true)).toBe("PT");
+  });
+
+  it("ignores country overrides in production mode, including browser location", () => {
+    vi.stubGlobal("window", { location: { search: "?dev_country=US" } });
+    expect(consentCountry("PT", undefined, false)).toBe("PT");
+    expect(consentCountry(null, "?dev_country=US", false)).toBeNull();
+    expect(consentCountry("US", "?dev_country=PT", false)).toBe("US");
+  });
+
+  it("uses the Vite DEV guard by default", () => {
+    expect(consentCountry("PT", "?dev_country=US")).toBe(import.meta.env.DEV ? "US" : "PT");
   });
 
   it("uses the country alone: EU/EEA/GB/CH/BR opt in regardless of /us or chosen market", () => {
@@ -31,8 +44,8 @@ describe("ad consent", () => {
     expect(consentRegion(null)).toBe("UNKNOWN");
     expect(effectiveConsent(acceptAll(), "UNKNOWN", false).marketing).toBe(true);
     expect(consentCountry("PT", "?dev_country=US", false)).toBe("PT");
-    expect(consentCountry(null, "?dev_country=US", true)).toBeNull();
-    expect(consentCountry("US", "?dev_country=PT", true)).toBe("US");
+    expect(consentCountry(null, "?dev_country=US", true)).toBe("US");
+    expect(consentCountry("US", "?dev_country=PT", true)).toBe("PT");
   });
 
   it("keeps opt-in regions off without a choice and uses GPC only for US defaults", () => {
