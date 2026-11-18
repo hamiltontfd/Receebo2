@@ -99,8 +99,11 @@ describe("/us landing (C + D)", () => {
     expect(url).toMatch(/\/api\/landing\/event$/);
     expect(init.credentials).toBe("omit");
     expect(JSON.parse(String(init.body))).toEqual({ event: "cta_click", path: "/us", utmContent: "bf-tv-1" });
-    // Nothing about the measurement is kept in the browser.
-    expect(localStorage.length).toBe(0);
+    // The aggregate beacon stores nothing; allowed first-touch attribution is
+    // deliberately captured synchronously by the CTA before navigation.
+    expect(JSON.parse(localStorage.getItem("receebo:ad-attribution")!)).toMatchObject({
+      utmSource: "meta", utmContent: "bf-tv-1",
+    });
     expect(sessionStorage.length).toBe(0);
   });
 

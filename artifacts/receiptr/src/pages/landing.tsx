@@ -108,7 +108,7 @@ export function LandingContent({ variant, isSignedIn = false, checkout, marketSe
               </motion.div>
             </Link>
 
-            <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-nav-trial" onClick={onCta}>
+            <Link href={isSignedIn ? "/search" : onCta.href} data-testid="link-nav-trial" onClick={onCta}>
               <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                 <Button size="sm" className="rounded-full font-semibold text-sm px-4">
                   {isSignedIn ? lt("Open app", "Abrir app") : lt("Start free", "Começar grátis")}
@@ -195,7 +195,8 @@ export function LandingContent({ variant, isSignedIn = false, checkout, marketSe
                   {lt("Sign in", "Entrar")}
                 </Link>
                 <Link
-                  href="/sign-up"
+                  href={onCta.href}
+                  onClick={onCta}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {lt("Sign up", "Criar conta")}

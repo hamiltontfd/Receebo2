@@ -13,6 +13,7 @@ export type AdTouch = {
 
 export const ATTRIBUTION_STORAGE_KEY = "receebo:ad-attribution";
 export const ATTRIBUTION_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+export const CAMPAIGN_PARAMS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "fbclid"] as const;
 const MAX = 120;
 
 function clip(value: string | null): string | undefined {
@@ -59,4 +60,31 @@ export function parseTouch(raw: string | null): AdTouch | null {
 export function firstTouch(existing: AdTouch | null, incoming: AdTouch | null, now = Date.now()): AdTouch | null {
   const fresh = existing && now - Date.parse(existing.capturedAt) < ATTRIBUTION_MAX_AGE_MS ? existing : null;
   return fresh ?? incoming;
+}
+
+/** Called in the CTA click, before the router or Clerk can navigate. */
+export const ATTRIBUTION_CAPTURED_EVENT = "receebo:attribution-captured";
+
+export function captureAllowedFirstTouch(allowed: boolean, search: string): AdTouch | null {
+  if (!allowed) return null;
+  try {
+    const previous = parseTouch(localStorage.getItem(ATTRIBUTION_STORAGE_KEY));
+    const next = firstTouch(previous, touchFromSearch(search));
+    if (next) {
+      localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(next));
+      document.cookie = `${ATTRIBUTION_STORAGE_KEY}=${encodeURIComponent(JSON.stringify(next))}; Path=/; Max-Age=${ATTRIBUTION_MAX_AGE_MS / 1000}; SameSite=Lax; Secure`;
+      if (JSON.stringify(previous) !== JSON.stringify(next)) window.dispatchEvent(new Event(ATTRIBUTION_CAPTURED_EVENT));
+    }
+    return next;
+  } catch { return null; }
+}
+
+export function campaignSignUpHref(search = typeof window === "undefined" ? "" : window.location.search): string {
+  const incoming = new URLSearchParams(search);
+  const kept = new URLSearchParams();
+  for (const key of CAMPAIGN_PARAMS) {
+    const value = incoming.get(key);
+    if (value) kept.set(key, value);
+  }
+  return `/sign-up${kept.size ? `?${kept}` : ""}`;
 }

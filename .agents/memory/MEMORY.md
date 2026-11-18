@@ -19,7 +19,7 @@
 - [Market GeoIP proxy trust](market-proxy-trust.md) — internal-only proxy paths cannot establish visitor country; verify production topology independently and keep unknown/manual choice.
 - [Expo dependency watcher](expo-dependency-watcher.md) — workspace package installs can invalidate Metro watches on transient pnpm folders; verify mobile startup after shared installs.
 - [Direção das versões nativas](native-app-direction.md) — Web/PWA é a referência; futuras versões iOS e Android serão apenas uma casca do mesmo PWA para as lojas.
-- [Language preference boundaries](language-preference-boundaries.md) — visitors use browser language automatically; manual selection belongs only in signed-in settings, never on the homepage.
+- [Language preference boundaries](language-preference-boundaries.md) — visitors use browser language except the explicit /us English entry; consent jurisdiction stays IP-based, not presentation-based.
 - [Automation trust boundaries](automation-trust-boundaries.md) — Clerk availability is not verified tenant state; unverified proxy IPs cannot safely identify guests.
 - [Onboarding evidence](onboarding-evidence.md) — legacy browser flags have no reliable owner; receipt ownership proves only the receipt step, never completion.
 - [Public hydration](public-hydration.md) — verify narrow Portuguese/reduced-motion browsers too; preference-dependent controls can invalidate an otherwise valid server snapshot.

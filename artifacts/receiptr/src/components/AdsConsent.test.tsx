@@ -6,6 +6,7 @@ import { CookieConsent } from "./CookieConsent";
 import { AdsRuntime, isPublicMetaPage } from "./AdsRuntime";
 import { acceptAll, emptyConsent, CONSENT_CHANGED, CONSENT_STORAGE_KEY } from "@/lib/adConsent";
 import { en, pt } from "@/pages/cookies";
+import { captureAllowedFirstTouch } from "@/lib/adAttribution";
 
 const { send, auth } = vi.hoisted(() => ({ send: vi.fn(async (_path: string, _options?: RequestInit) => ({ created: false })), auth: { isSignedIn: false, userId: null as string | null } }));
 const navigation = vi.hoisted(() => ({ path: "/" }));
@@ -39,6 +40,38 @@ function view(country: string | null, banner = true) {
   </MarketContext.Provider>);
 }
 describe("live cookie choices", () => {
+  it("syncs a first touch written synchronously by a CTA, but not a repeated click or plain navigation", async () => {
+    auth.isSignedIn = true; auth.userId = "synthetic-cta-captured";
+    const mounted = view("US", false);
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    act(() => { captureAllowedFirstTouch(true, "?utm_source=meta&utm_campaign=cta"); });
+    await waitFor(() => expect(send.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1));
+    const count = send.mock.calls.length;
+    act(() => { captureAllowedFirstTouch(true, "?utm_source=meta&utm_campaign=other"); });
+    navigation.path = "/search";
+    mounted.rerender(<MarketContext.Provider value={{ country: "US" } as ContextType<typeof MarketContext>}><AdsRuntime /></MarketContext.Provider>);
+    await act(async () => { await Promise.resolve(); });
+    expect(send).toHaveBeenCalledTimes(count);
+    expect(JSON.parse(String(send.mock.calls.find(call => call[1]?.method === "POST")![1]?.body))).toMatchObject({ utmCampaign: "cta" });
+  });
+  it("shows the account banner only after persistent non-auth failures exhaust four retries", async () => {
+    vi.useFakeTimers();
+    try {
+      auth.isSignedIn = true; auth.userId = "synthetic-persistent-failure";
+      send.mockRejectedValue({ status: 400 });
+      view("US", false);
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      for (const delay of [500, 1000, 2000]) {
+        await act(async () => { await vi.advanceTimersByTimeAsync(delay); });
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      }
+      await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
+      expect(send).toHaveBeenCalledTimes(5);
+      expect(screen.getByRole("alert")).toHaveTextContent("account marketing consent could not be updated");
+    } finally { vi.useRealTimers(); }
+  });
   it("does not resend attribution or consent on plain navigation; retry triggers still sync consent", async () => {
     auth.isSignedIn = true; auth.userId = "synthetic-navigation";
     localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(acceptAll()));

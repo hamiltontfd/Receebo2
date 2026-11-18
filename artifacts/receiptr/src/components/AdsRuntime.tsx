@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { useLocation } from "wouter";
-import { ATTRIBUTION_STORAGE_KEY, firstTouch, parseTouch, touchFromSearch, type AdTouch } from "@/lib/adAttribution";
+import { ATTRIBUTION_CAPTURED_EVENT, ATTRIBUTION_STORAGE_KEY, firstTouch, parseTouch, touchFromSearch, type AdTouch } from "@/lib/adAttribution";
 import { useCookieConsent } from "@/lib/useCookieConsent";
 import { applyConsentPrivacy, metaPixelId, newEventId, trackMetaEvent } from "@/lib/metaPixel";
 import { customFetch, setResponseObserver } from "@workspace/api-client-react";
@@ -36,9 +36,10 @@ function writeTouch(touch: AdTouch) {
 
 /** Page views, first-touch campaign storage, registration and purchase events. */
 export function AdsRuntime() {
-  const { isSignedIn, userId } = useAuth();
+  const { isSignedIn, userId, sessionId, sessionClaims } = useAuth();
+  const authRevision = `${sessionId ?? ""}:${sessionClaims?.iat ?? ""}`;
   const [path] = useLocation();
-  const { consent, stored, region } = useCookieConsent();
+  const { consent, stored, region, pending } = useCookieConsent();
   const [syncFailed, setSyncFailed] = useState(false);
   const [retry, setRetry] = useState(0);
   const [touchKey, setTouchKey] = useState(() => JSON.stringify(readTouch()));
@@ -46,14 +47,17 @@ export function AdsRuntime() {
   const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     const refresh = () => setRetry(value => value + 1);
+    const touchCaptured = () => setTouchKey(JSON.stringify(readTouch()));
     window.addEventListener("online", refresh);
     window.addEventListener("focus", refresh);
     window.addEventListener(LEGAL_ACCEPTED_EVENT, refresh);
+    window.addEventListener(ATTRIBUTION_CAPTURED_EVENT, touchCaptured);
     return () => {
       clearTimeout(retryTimer.current);
       window.removeEventListener("online", refresh);
       window.removeEventListener("focus", refresh);
       window.removeEventListener(LEGAL_ACCEPTED_EVENT, refresh);
+      window.removeEventListener(ATTRIBUTION_CAPTURED_EVENT, touchCaptured);
     };
   }, []);
   const latest = useRef(consent);
@@ -74,10 +78,11 @@ export function AdsRuntime() {
   }, []);
 
   useEffect(() => {
+    if (pending && !stored?.choice) return;
     // UNKNOWN is not a rejection: stop marketing, but do not erase a previously
     // consented first touch while the new authenticated GeoIP request loads.
     applyConsentPrivacy({ ...consent, attribution: region === "UNKNOWN" && !stored?.choice ? true : consent.attribution });
-  }, [consent.marketing, consent.attribution, region, stored?.choice]);
+  }, [consent.marketing, consent.attribution, region, stored?.choice, pending]);
 
   useEffect(() => {
     const incoming = touchFromSearch(window.location.search);
@@ -99,6 +104,10 @@ export function AdsRuntime() {
 
   useEffect(() => {
     if (!isSignedIn || !userId) return;
+    if (pending && !stored?.choice) {
+      beginAccountConsentSync(userId);
+      return;
+    }
     if (region === "UNKNOWN" && !stored?.choice) {
       accountConsentNotApplicable(userId);
       return;
@@ -132,17 +141,17 @@ export function AdsRuntime() {
     }).catch((error: { status?: number }) => {
       if (account.current !== userId) return;
       // Expected before first acceptance; the acceptance event resumes sync.
-      if (error.status === 428) {
+      if ([401, 403, 428].includes(error.status ?? 0)) {
         clearTimeout(retryTimer.current);
         setSyncFailed(false);
         return;
       }
-      if ((!error.status || [401, 403].includes(error.status) || error.status >= 500) && retryCount.current < 4) {
+      if (retryCount.current < 4) {
         clearTimeout(retryTimer.current);
         retryTimer.current = setTimeout(() => setRetry(value => value + 1), 500 * 2 ** retryCount.current++);
       } else setSyncFailed(true);
     });
-  }, [isSignedIn, userId, region, consent.attribution, consent.marketing, stored?.choice, retry, touchKey]);
+  }, [isSignedIn, userId, authRevision, region, consent.attribution, consent.marketing, stored?.choice, pending, retry, touchKey]);
 
   useEffect(() => {
     if (!consent.marketing || !window.location.search.includes("checkout=success")) return;

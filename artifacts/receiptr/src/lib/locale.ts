@@ -4,7 +4,8 @@
  * purchase country or currency. Coverage: docs/locales-and-rights.md.
  *
  * - Account language wins while signed in; null uses browser language.
- * - Signed-out visitors always use browser language, ignoring legacy local overrides.
+ * - Signed-out visitors use browser language, except the explicit /us landing
+ *   defaults to English until a different market is deliberately selected.
  * - Browser/sign-up fallback: pt-BR → pt-BR, any other pt* → pt-PT, else en.
  * - Without a saved override, browser language selects the UI locale.
  * - Money uses the amount's own currency, formatted per UI locale.
@@ -15,6 +16,7 @@ export type AppLocale = "en" | "pt-PT" | "pt-BR";
 export const APP_LOCALES: readonly AppLocale[] = ["en", "pt-PT", "pt-BR"];
 export const LOCALE_STORAGE_KEY = "receebo:locale";
 let accountOverride: AppLocale | null | undefined;
+let publicOverride: AppLocale | undefined;
 const listeners = new Set<() => void>();
 export function notifyLocaleChange() {
   listeners.forEach((listener) => listener());
@@ -22,6 +24,12 @@ export function notifyLocaleChange() {
 /** undefined = visitor; null = account using automatic browser language. Both use the browser. */
 export function setAccountLocale(language: AppLocale | null | undefined) {
   accountOverride = language;
+  notifyLocaleChange();
+}
+/** Presentation-only override for the explicit US landing; never a legal-country signal. */
+export function setPublicLocale(language: AppLocale | undefined) {
+  if (publicOverride === language) return;
+  publicOverride = language;
   notifyLocaleChange();
 }
 export function useAppLocale(): AppLocale {
@@ -46,6 +54,7 @@ export function getAppLocale(
   _legacyStorage: Pick<Storage, "getItem"> | null = null,
   browserLanguage: string | null | undefined = typeof navigator === "undefined" ? undefined : navigator.languages?.[0] ?? navigator.language,
 ): AppLocale {
+  if (arguments.length === 0 && publicOverride) return publicOverride;
   // Explicit arguments keep this helper usable for deterministic formatting/tests.
   if (arguments.length === 0 && accountOverride !== undefined) {
     return accountOverride ?? resolveLocale(browserLanguage);

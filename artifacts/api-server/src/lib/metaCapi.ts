@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { logger } from "./logger";
+import { metaIdentifiersFor } from "./adAttributionStore";
 
 export type ServerMetaEvent = {
   eventName: "CompleteRegistration" | "FirstReceiptSaved" | "Purchase" | "Subscribe";
@@ -55,17 +57,29 @@ export async function sendMetaEvent(
   fetchImpl: typeof fetch = fetch,
   env: { META_PIXEL_ID?: string; META_CAPI_ACCESS_TOKEN?: string; META_TEST_EVENT_CODE?: string } = process.env,
 ): Promise<{ sent: boolean; reason?: string }> {
-  if (!metaCapiConfigured(env)) return { sent: false, reason: "unconfigured" };
+  const failed = (reason: string, httpStatus?: number) => {
+    logger.warn({ eventName: event.eventName, reason, ...(httpStatus ? { httpStatus } : {}) }, "Meta CAPI send failed");
+    return { sent: false, reason };
+  };
+  if (!metaCapiConfigured(env)) return failed("unconfigured");
   const pixel = env.META_PIXEL_ID!.trim();
   const token = env.META_CAPI_ACCESS_TOKEN!.trim();
-  const response = await fetchImpl(
-    `https://graph.facebook.com/v21.0/${encodeURIComponent(pixel)}/events?access_token=${encodeURIComponent(token)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(metaEventBody(event, env.META_TEST_EVENT_CODE?.trim() || undefined)),
-    },
-  );
-  if (!response.ok) return { sent: false, reason: `http_${response.status}` };
-  return { sent: true };
+  // Receipt/user data and upstream response bodies never enter the log.
+  const stored = await metaIdentifiersFor(event.userId).catch(() => ({} as { fbc?: string; fbp?: string }));
+  const matched = { ...event, fbc: event.fbc || stored.fbc, fbp: event.fbp || stored.fbp };
+  try {
+    const response = await fetchImpl(
+      `https://graph.facebook.com/v21.0/${encodeURIComponent(pixel)}/events?access_token=${encodeURIComponent(token)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(metaEventBody(matched, env.META_TEST_EVENT_CODE?.trim() || undefined)),
+      },
+    );
+    if (!response.ok) return failed(`http_${response.status}`, response.status);
+    logger.info({ eventName: event.eventName }, "Meta CAPI sent");
+    return { sent: true };
+  } catch {
+    return failed("network_error");
+  }
 }

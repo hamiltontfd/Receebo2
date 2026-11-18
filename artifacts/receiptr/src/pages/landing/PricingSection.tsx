@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { lt } from "@/lib/landingLocale";
 import { PUBLIC_PLANS } from "@/lib/publicPricing";
 import { usePlanPrices } from "@/hooks/usePlanPrices";
+import { useLandingCta } from "./useLandingCta";
 
 const getFeatures = () => [
   lt("Unlimited scans", "Digitalizações ilimitadas"),
@@ -31,6 +32,7 @@ export default function PricingSection({ checkout, variant }: {
   checkout?: { mutate: (plan: "monthly" | "yearly") => void; isPending: boolean };
   variant?: "us";
 }) {
+  const onCta = useLandingCta(variant === "us" ? "/us" : "/", !!checkout);
   const features = getFeatures();
   const { prices, unavailable } = usePlanPrices(variant === "us" ? { usOffer: true } : undefined);
   const plans = getPlans(prices ?? { monthly: lt("Price unavailable", "Preço indisponível"), yearly: lt("Price unavailable", "Preço indisponível") });
@@ -164,7 +166,7 @@ export default function PricingSection({ checkout, variant }: {
                   {checkout.isPending ? lt("Loading…", "A carregar…", "Carregando…") : lt(`Subscribe ${price}${period}`, `Subscrever ${price}${period}`, `Assinar ${price}${period}`)}
                 </Button>
               ) : (
-                <Link href="/sign-up">
+                <Link href={onCta.href} onClick={onCta}>
                   <Button
                     variant={highlight ? "outline" : "default"}
                     className={cn(

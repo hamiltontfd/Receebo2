@@ -14,7 +14,18 @@ purchase data, not interface copy to rewrite.
 **How to apply:** Extend translations explicitly by surface. Never use the selected
 language to rewrite purchase country, currency or legal jurisdiction.
 
-Visitors always use browser language. Do not display a manual language selector on the homepage, including on mobile. Manual language changes belong only in signed-in user settings.
+Visitors normally use browser language. Do not display a manual language selector on the homepage, including on mobile. Manual language changes belong only in signed-in user settings.
+
+The signed-out `/us` entry is an explicit exception: default to the US market and
+English even when GeoIP or browser language suggests Portugal. An explicit
+different market choice wins. This controls presentation only; consent jurisdiction
+must come from the server's IP-country signal, never the route, query or product market.
+
+**Why:** Hamilton approved fixing the US landing switching to PT/Portuguese after
+cookie choice; selecting US presentation must not turn a European visitor into US opt-out.
+
+**How to apply:** Keep display-market/language precedence separate from consent
+country, including while authentication and legal acceptance are still loading.
 
 The authenticated app home must not show the compact country/market selector either; keep that preference in account settings alongside language.
 

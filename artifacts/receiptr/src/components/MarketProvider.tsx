@@ -1,5 +1,7 @@
 import { LEGAL_ACCEPTED_EVENT } from "@/components/LegalConsentGate";
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLocation } from "wouter";
+import { setPublicLocale } from "@/lib/locale";
 import { useAuth } from "@clerk/react";
 import { customFetch, type AccountMarket, type MarketSuggestion } from "@workspace/api-client-react";
 import { lt } from "@/lib/landingLocale";
@@ -26,6 +28,8 @@ export type MarketState = {
   market: Market | null;
   /** ISO country the server detected from this request's IP (never stored); null when unknown. */
   country: string | null;
+  /** IP-country resolution is independent of legal acceptance and market choice. */
+  countryPending?: boolean;
   savedCountry?: string | null;
   source: "account" | "visitor" | "suggestion" | "unknown";
   confirmed: boolean;
@@ -53,11 +57,13 @@ export function MarketProvider({ children }: { children: ReactNode }) {
 }
 
 function MarketScope({ userId, ready, children }: { userId: string | null; ready: boolean; children: ReactNode }) {
+  const [path] = useLocation();
   const [visitor, setVisitor] = useState(readVisitorMarket);
   const pendingVisitor = useRef(readPendingVisitor(userId) ?? visitor);
   const [account, setAccount] = useState<Market | null>(null);
   const [suggestion, setSuggestion] = useState<Market | null>(null);
   const [country, setCountry] = useState<string | null>(null);
+  const [countryPending, setCountryPending] = useState(true);
   const [savedCountry, setSavedCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -71,16 +77,19 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
   // Country is independent of market selection/revision. A manual choice must
   // not cancel the jurisdiction lookup or be overwritten by its suggestion.
   useEffect(() => {
-    if (!ready || userId) return;
+    if (!ready) return;
     const abort = new AbortController();
-    const timeout = setTimeout(() => abort.abort(), 8000);
+    let cancelled = false;
+    setCountryPending(true);
+    const timeout = setTimeout(() => abort.abort(), 2500);
     void request<MarketSuggestion>("market/suggestion", { signal: abort.signal }).then(result => {
-      if (abort.signal.aborted) return;
-      setCountry(result.country ?? null);
-      if (!readVisitorMarket()) setSuggestion(isMarket(result.market) ? result.market : null);
+      if (cancelled || abort.signal.aborted) return;
+      setCountry(previous => result.country ?? previous);
+      if (!userId && !readVisitorMarket()) setSuggestion(isMarket(result.market) ? result.market : null);
     }).catch(() => { /* Safe opt-in fallback: country remains unknown. */ })
-      .finally(() => clearTimeout(timeout));
-    return () => { clearTimeout(timeout); abort.abort(); };
+      .finally(() => { clearTimeout(timeout); if (!cancelled) setCountryPending(false); });
+    abort.signal.addEventListener("abort", () => { if (!cancelled) setCountryPending(false); }, { once: true });
+    return () => { cancelled = true; clearTimeout(timeout); abort.abort(); };
   }, [ready, userId, reload]);
 
   useEffect(() => {
@@ -147,7 +156,7 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
           if (!current()) return;
           chosen = prefs.market;
           setAccount(chosen);
-          setCountry(prefs.country ?? null);
+          setCountry(previous => prefs.country ?? previous);
           setSavedCountry(prefs.savedCountry ?? null);
           pendingVisitor.current = null;
           try { sessionStorage.removeItem(pendingKey(userId)); } catch { /* no storage */ }
@@ -217,9 +226,15 @@ function MarketScope({ userId, ready, children }: { userId: string | null; ready
     }
   };
   const confirmed = ready ? (userId ? account : visitor) : null;
-  const market = ready ? confirmed ?? suggestion : null;
+  // A public route selects the product presentation, never the IP jurisdiction.
+  const usLanding = !userId && path.split(/[?#]/)[0] === "/us";
+  const market = ready ? confirmed ?? (usLanding ? "US" : suggestion) : null;
+  useLayoutEffect(() => {
+    setPublicLocale(usLanding && (!visitor || visitor === "US") ? "en" : undefined);
+    return () => setPublicLocale(undefined);
+  }, [usLanding, visitor]);
   return <Context.Provider value={{
-    market, country, savedCountry, source: confirmed ? (userId ? "account" : "visitor") : suggestion ? "suggestion" : "unknown",
+    market, country, countryPending: !country && countryPending, savedCountry, source: confirmed ? (userId ? "account" : "visitor") : suggestion ? "suggestion" : "unknown",
     confirmed: !!confirmed, loading, saving, error, choose,
     retry: () => {
       if (failedChoice.current) void choose(failedChoice.current);

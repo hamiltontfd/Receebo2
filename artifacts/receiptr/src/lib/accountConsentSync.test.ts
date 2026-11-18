@@ -33,7 +33,7 @@ describe("trial consent synchronization barrier", () => {
     vi.useFakeTimers();
     let ready = false;
     const waiting = waitForAccountConsent("offline-account").then(() => { ready = true; });
-    await vi.advanceTimersByTimeAsync(2999);
+    await vi.advanceTimersByTimeAsync(4999);
     expect(ready).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     await waiting;

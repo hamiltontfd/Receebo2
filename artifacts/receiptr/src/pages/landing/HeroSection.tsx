@@ -67,7 +67,7 @@ export default function HeroSection({ isSignedIn = false, variant }: { isSignedI
 
             {/* CTAs */}
             <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-3 pt-1">
-              <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-hero-trial" onClick={onCta}>
+              <Link href={isSignedIn ? "/search" : onCta.href} data-testid="link-hero-trial" onClick={onCta}>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Button
                     size="lg"

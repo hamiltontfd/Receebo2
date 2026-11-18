@@ -7,7 +7,14 @@ const mocks = vi.hoisted(() => ({
   request: vi.fn(),
 }));
 vi.mock("@clerk/react", () => ({ useAuth: () => mocks.auth }));
-vi.mock("@workspace/api-client-react", () => ({ customFetch: (...args: unknown[]) => mocks.request(...args) }));
+vi.mock("@workspace/api-client-react", () => ({ customFetch: (...args: unknown[]) => {
+  // These account-isolation tests script account replies; country fallback has
+  // separate full-path integration coverage in SignupCountryConsent.test.tsx.
+  if (mocks.auth.userId && String(args[0]).endsWith("/market/suggestion")) {
+    return Promise.resolve({ country: null, market: null });
+  }
+  return mocks.request(...args);
+} }));
 function View() {
   const m = useMarket();
   return <div>

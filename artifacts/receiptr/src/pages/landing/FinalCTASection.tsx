@@ -4,8 +4,12 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { fadeInUp, stagger } from "./shared";
 import { lt } from "@/lib/landingLocale";
+import { useLocation } from "wouter";
+import { useLandingCta } from "./useLandingCta";
 
 export default function FinalCTASection({ isSignedIn = false }: { isSignedIn?: boolean }) {
+  const [path] = useLocation();
+  const onCta = useLandingCta(path === "/us" ? "/us" : "/", isSignedIn);
 
   return (
     <section className="py-28 lg:py-36 bg-foreground text-background overflow-hidden relative">
@@ -38,7 +42,7 @@ export default function FinalCTASection({ isSignedIn = false }: { isSignedIn?: b
           </motion.div>
 
           <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-3">
-            <Link href={isSignedIn ? "/search" : "/sign-up"} data-testid="link-final-trial">
+            <Link href={isSignedIn ? "/search" : onCta.href} data-testid="link-final-trial" onClick={onCta}>
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                 <Button
                   size="lg"

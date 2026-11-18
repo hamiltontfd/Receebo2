@@ -24,7 +24,7 @@ export function accountConsentNotApplicable(userId: string): void {
   notify();
 }
 
-export async function waitForAccountConsent(userId: string | null | undefined, timeoutMs = 3000): Promise<void> {
+export async function waitForAccountConsent(userId: string | null | undefined, timeoutMs = 5000): Promise<void> {
   // Allow sibling passive effects to register this render's newest choice.
   await Promise.resolve();
   if (!userId || states.get(userId)?.pending === false) return Promise.resolve();
