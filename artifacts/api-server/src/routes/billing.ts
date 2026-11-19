@@ -16,6 +16,9 @@ import { hasOwnerAccess } from "../lib/ownerAccess";
 import { billingOrigin } from "../lib/billingUrls";
 import { billingPriceId, billingPortalConfiguration, describeChargedPlan, effectiveBillingCurrency, priceMatchesSelection, PLAN_AMOUNTS, type BillingCurrency } from "../lib/billingConfig";
 import { getAccountMarket } from "../lib/accountMarket";
+import { notifyOnlyCreatedTrial } from "../lib/signupNotify";
+import { notifyNewTrial } from "../lib/signupNotifyService";
+import { requestCountry } from "../lib/marketGeoip";
 
 const router: IRouter = Router();
 
@@ -159,6 +162,9 @@ router.post("/billing/start-trial", requireAuth, requireCurrentLegalAcceptance,
         monthlyPriceId: billingPriceId("monthly", market),
         yearlyPriceId: billingPriceId("yearly", market),
       }).onConflictDoNothing().returning({ userId: accountTrialsTable.userId });
+      notifyOnlyCreatedTrial(inserted.length > 0, () => notifyNewTrial({
+        userId: req.userId!, at: startedAt, market, country: requestCountry(req).country,
+      }));
       if (inserted.length) returnMetaMilestone(res, await sendMilestone(req.userId!, "CompleteRegistration"));
     }
     res.json({ started: true });

@@ -1,4 +1,6 @@
 import { Resend } from "resend";
+// Separate bounded/plain-text path; same Resend integration, no provider error logging.
+export { sendSignupNotification } from "./signupNotify";
 import { createHmac, timingSafeEqual } from "crypto";
 import { clerkClient } from "@clerk/express";
 import { logger } from "./logger";

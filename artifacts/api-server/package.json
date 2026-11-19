@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:signup-notify:dev": "NODE_ENV=development pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/signupNotifyTest.ts",
     "report:trial-funnel": "pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/trialFunnelReport.ts",
     "report:landing-events": "pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/landingEventReport.ts",
     "report:market-interest": "pnpm --filter @workspace/scripts exec tsx ../artifacts/api-server/src/scripts/marketInterestReport.ts",
